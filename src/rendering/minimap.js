@@ -1,0 +1,107 @@
+import * as E from '../game/index.js';
+import { MAP, riverX } from '../game/index.js';
+export function updateMinimap(canvas) {
+  const ctx = canvas.getContext('2d'),
+    w = canvas.width,
+    h = canvas.height,
+    sensors = E.sensorSources(this.state, 0),
+    px = (x) => (x / MAP.width + 0.5) * w,
+    pz = (z) => (z / MAP.depth + 0.5) * h;
+  ctx.fillStyle = '#26382f';
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#567b88';
+  ctx.lineWidth = 9;
+  ctx.beginPath();
+  for (let i = 0; i <= 100; i++) ctx.lineTo(px(riverX((i / 100 - 0.5) * MAP.depth)), (i / 100) * h);
+  ctx.stroke();
+  for (const raw of this.state.roads) {
+    const r = E.observedTarget(this.state, 0, raw.id, sensors);
+    if (!r || r.removed) continue;
+    ctx.strokeStyle = E.passable(r) ? (r.side === 0 ? '#a4bdab' : '#ba9e8b') : '#ff6549';
+    ctx.lineWidth = r.connectorTo ? 0.5 : 1.2;
+    ctx.beginPath();
+    ctx.moveTo(px(r.ax), pz(r.az));
+    ctx.lineTo(px(r.bx), pz(r.bz));
+    ctx.stroke();
+  }
+
+  for (const raw of this.state.buildings) {
+    const b = E.observedTarget(this.state, 0, raw.id, sensors);
+    if (!b || b.hp <= 0) continue;
+    ctx.fillStyle = b.side === 0 ? '#9addb5' : '#e69a80';
+    ctx.fillRect(px(b.x) - 2, pz(b.z) - 2, b.key === 'hq' ? 6 : 3, b.key === 'hq' ? 6 : 3);
+  }
+  for (const p of sensors.filter((p) => p.kind === 'radar')) {
+    ctx.strokeStyle = '#8dccd650';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.ellipse(
+      px(p.x),
+      pz(p.z),
+      (p.air / MAP.width) * w,
+      (p.air / MAP.depth) * h,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.stroke();
+  }
+  for (const u of this.state.groundUnits || []) {
+    if (!E.groundVisible(this.state, 0, u)) continue;
+    ctx.fillStyle = u.side === 0 ? '#a6d7ff' : '#ffa48a';
+    ctx.fillRect(px(u.x) - 1.5, pz(u.z) - 1.5, 3, 3);
+  }
+  for (const z of E.BRIDGES) {
+    ctx.strokeStyle = '#cfbf96';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px(E.riverX(z) - 110), pz(z));
+    ctx.lineTo(px(E.riverX(z) + 110), pz(z));
+    ctx.stroke();
+  }
+  for (const u of this.state.units)
+    if (E.unitVisible(this.state, 0, u, sensors)) {
+      ctx.fillStyle = u.side === 0 ? '#c8f4db' : '#ffb5a0';
+      ctx.beginPath();
+      ctx.arc(px(u.x), pz(u.z), 1.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  if (this.orderPreview) {
+    const origin = E.selectedLaunchSite(this.state, 0, this.orderPreview.siteId),
+      aim = E.resolveAim(this.state, 0, this.orderPreview.aim);
+    if (origin && aim) {
+      ctx.strokeStyle = '#eabe99';
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(px(origin.x), pz(origin.z));
+      for (const p of E.flightRoute(origin, aim, this.orderPreview.key))
+        ctx.lineTo(px(p.x), pz(p.z));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  for (const c of this.state.contacts?.[0] || []) {
+    ctx.strokeStyle = '#f0b78699';
+    ctx.beginPath();
+    ctx.ellipse(
+      px(c.x),
+      pz(c.z),
+      (c.radius / MAP.width) * w,
+      (c.radius / MAP.depth) * h,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.stroke();
+  }
+  const t = this.controls.target;
+  ctx.strokeStyle = '#ffffff90';
+  ctx.lineWidth = 1;
+  const d = this.camera.position.distanceTo(t) * 0.4;
+  ctx.strokeRect(
+    px(t.x - d),
+    pz(t.z - d * 0.6),
+    ((d * 2) / MAP.width) * w,
+    ((d * 1.2) / MAP.depth) * h,
+  );
+}

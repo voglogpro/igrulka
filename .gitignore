@@ -1,0 +1,13 @@
+node_modules/
+artifacts/
+.qa/
+.openai/
+.env
+.env.*
+*.log
+*.zip
+*.tar.gz
+__pycache__/
+.venv/
+.DS_Store
+Thumbs.db

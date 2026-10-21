@@ -1,0 +1,8 @@
+node_modules/
+vendor/
+assets/fonts/
+archive/
+artifacts/
+play/
+docs/history/
+package-lock.json

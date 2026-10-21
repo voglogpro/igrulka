@@ -1,0 +1,57 @@
+import * as E from '../game/index.js';
+export function panelHTML({ panel, weapon, count, settings, state }) {
+  let html = `<div class="panel-head"><span class="eyebrow">${{ attack: 'АРСЕНАЛ И АТАКА', research: 'ИССЛЕДОВАНИЯ', economy: 'ЭКОНОМИКА', settings: 'НАСТРОЙКИ', help: 'ПРАВИЛА', army: 'НАЗЕМНАЯ АРМИЯ' }[panel]}</span><button data-action="close-panel" aria-label="Закрыть">×</button></div>`;
+  if (panel === 'attack') {
+    html += `<p class="pipeline">Завод → склад → выбор вооружения → ЛКМ по карте</p><div class="weapons">${Object.entries(
+      E.WEAPONS,
+    )
+      .map(([key, d]) => {
+        const locked = d.tech && !state.sides[0].tech.includes(d.tech);
+        return `<div class="weapon-row" data-row="${key}"><button class="weapon-choice ${key === weapon ? 'active' : ''}" data-weapon="${key}"><b>${d.name}</b><small>${d.cost} ₡ · ${d.metal} спл. · ${d.time} с</small></button><strong data-stock="${key}">0</strong><button class="order" data-produce="${key}" ${locked ? 'disabled' : ''} title="Добавить в очередь завода">+1</button></div>`;
+      })
+      .join(
+        '',
+      )}</div><div id="queue-status" class="small-muted"></div><div class="attack-controls"><label>Пусковая<select id="launch-site" aria-label="Пусковая установка"></select></label><label class="aim-label">Точка / объекты карты<select id="attack-target"></select></label><div class="salvo-row"><label>В залпе<input id="salvo-count" type="number" min="1" max="6" value="${count}"></label><button data-action="aim">Наводить мышью ↗</button></div><button class="primary attack-button" data-action="launch" id="launch-button">Выбрать и наводить</button><p id="route-status" class="status-note"></p><p id="launch-status" class="status-note"></p><div class="quick-build"><button data-build="factory">+ Завод</button><button data-build="launcher">+ Пусковая</button></div></div>`;
+  }
+  if (panel === 'research') {
+    html += `<div id="research-progress" class="small-muted"></div>${[
+      'Оборона',
+      'Авиация',
+      'Армия',
+      'Город',
+    ]
+      .map(
+        (branch) =>
+          `<section class="tech-branch"><h3>${branch}</h3>${Object.entries(E.TECH)
+            .filter(([key, d]) => d.branch === branch)
+            .map(
+              ([key, d]) =>
+                `<button class="tech ${d.requires ? 'tech-child' : ''}" data-research="${key}" title="${d.description}"><span><b>${d.name}</b><small>${d.requires ? 'После: ' + E.TECH[d.requires].name + '<br>' : ''}${d.science} науки · ${d.cost} ₡ · ${d.time} с</small><em>${d.description}</em></span><i data-tech="${key}">→</i></button>`,
+            )
+            .join('')}</section>`,
+      )
+      .join('')}`;
+  }
+  if (panel === 'army') {
+    html += `<p class="status-note">Рамка выделяет бойцов; Shift добавляет к выбору. Ctrl+1…9 сохраняет группу, цифра выбирает её. ЛКМ по земле — движение, по врагу — атака. Пехота садится в свой БТР по клику на него. ПКМ снимает выбор.</p><div class="recruit-batch"><span>Заказать за клик</span><button data-recruit-count="1">×1</button><button data-recruit-count="5">×5</button></div><div class="army-recruit">${Object.entries(
+      E.GROUND_UNITS,
+    )
+      .map(
+        ([key, d]) =>
+          `<button data-recruit="${key}" title="${d.role}"><b>+ ${d.name}</b><small>${d.cost} ₡ · ${d.metal} спл. · ${d.time} с</small></button>`,
+      )
+      .join(
+        '',
+      )}</div><div id="army-queue" class="small-muted"></div><div id="army-list"></div><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-rally="auto">Сбор в точке ↗</button><button data-action="army-all">Выбрать всю армию</button></div>`;
+  }
+  if (panel === 'economy') {
+    html += `<h2>Город и снабжение</h2><div id="economy-values"></div><div id="economy-buildings"></div><p class="status-note">Предприятие у связанной со штабом дороги работает на 100%. При разрыве пути его выпуск падает до 20%. Дефицит электричества и повреждения снижают его дополнительно.</p><p class="status-note">Пусковые автономны и не требуют дороги. Дороги снабжают заводы и экономику; их можно чинить или обходить новой улицей. Бонус бота ×1,25 действует на поступления ресурсов, цены совпадают.</p>`;
+  }
+  if (panel === 'settings') {
+    html += `<div class="setting"><span>Графика</span><b>УЛЬТРА</b></div><label class="setting">Громкость<input id="volume" type="range" min="0" max="100" value="${settings.volume * 100}"></label><label class="setting">Сотрясение камеры<input id="shake" type="range" min="0" max="100" value="${settings.shake * 100}"></label><div class="settings-list"><button data-action="save">Сохранить</button><button data-action="export">Экспорт кампании</button><button data-action="import">Импорт кампании</button><button data-panel="help">Управление и правила</button><button data-action="new-confirm">Новая игра</button></div><p class="small-muted">Автосохранение каждые 10 секунд. Пробел — пауза. При скрытии вкладки время останавливается.</p>`;
+  }
+  if (panel === 'help') {
+    html += `<div class="help"><p><b>Экономика.</b> Жильё, предприятия и заводы строятся у улицы штаба. Без дороги выпуск падает до 20%. Пусковые и ПВО можно ставить отдельно. Содержание и боеприпасы расходуются непрерывно.</p><p><b>Пехота.</b> Рамка и Shift выделяют отдельных бойцов. Ctrl+цифра сохраняет группу, цифра выбирает её. H — окоп, K — маскировка, F — держать огонь, T — отступить, M — наступать, U — высадка, Q — FPV оператора. Лес и окопы защищают; выстрелы выдают примерную позицию. Стены перекрывают огонь, пулемёты подавляют. Сапёры ремонтируют технику, у казарм восстанавливаются бойцы. Закажите ×5 и задайте казармам точку сбора для расстановки.</p><p><b>Армия.</b> B — отряды. Казармы у дороги готовят пехоту и технику. Выберите отряд и укажите ЛКМ место или врага; «Вся армия» отдаёт общий приказ. ПВО имеет боезапас, перезарядку и нагрев: перегретые стволы стреляют менее точно. Изучите стабилизацию и улучшайте установки до третьего уровня.</p><p><b>Маршрут.</b> «Задать маршрут» включает расстановку точек. «Готово» или Enter возвращает наведение удара. Shift + ЛКМ добавляет точку, Backspace удаляет. Z / X / C / V быстро переключают оружие. Пушки и солдаты не сбивают ракеты; для них нужны ЗРК.</p><p><b>Налёт.</b> Завод производит вооружение на склад. Нажмите его название в арсенале: курсор сразу показывает маршрут и кольцо взрыва. Каждый ЛКМ отправляет 1, 3 или 5 единиц. Передвигайте мышь и кликайте по следующим целям. На каждой площадке до 12 ожидающих стартов; склад резервируется сразу.</p><p><b>Отмена.</b> Короткий ПКМ убирает вооружение или стройку. Зажмите ПКМ и двигайте мышь — поворот и наклон камеры. WASD и стрелки перемещают обзор, колесо меняет масштаб.</p><p><b>Бой.</b> Трассеры летят по дуге. Сбитые аппараты могут взорваться в воздухе или потерять крыло и упасть. Падение повреждает всё под ним. Взрывы поражают здания и дороги обеих сторон; урон убывает к краю кольца.</p><p><b>Карта.</b> Вся карта открыта, разведывательных дронов нет. Радар повышает дальность ближайшего ПВО и уменьшает разброс; ему нужно электричество.</p><p><b>Разрушения.</b> Выберите свои руины и нажмите «Разобрать руины», чтобы вновь строить на этом месте. Наложение улиц запрещено; обычные перекрёстки и примыкания разрешены.</p><p><b>Клавиши.</b> G — дорога, 1 — жильё, 2 — промышленность, 3 — энергия, 4 — пулемёт, 5 — пусковая, E — арсенал, R — поворот постройки, Esc — отмена, пробел — пауза.</p><p><b>Победа.</b> Уничтожьте штаб врага, сохранив свой. Бот получает +25% к доходу, сплавам и науке. Все параметры вооружений игровые.</p></div>`;
+  }
+  return html;
+}
