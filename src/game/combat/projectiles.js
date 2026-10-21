@@ -1,5 +1,5 @@
 import { clamp } from '../shared/math.js';
-import { impactGround } from '../units/ground/index.js';
+import { impactGround, gainGroundExperience } from '../units/ground/index.js';
 import { event } from '../shared/events.js';
 import { unitVisible } from '../visibility.js';
 import { interceptPoint } from './air-defense.js';
@@ -25,9 +25,12 @@ export function moveProjectiles(s, dt) {
     p.py = p.y;
     p.pz = p.z;
     if (p.domain === 'ground') {
-      p.x += p.vx * dt;
-      p.z += p.vz * dt;
+      const travel = Math.min(dt, Math.max(0, p.flight - (p.life - dt)));
+      p.x += p.vx * travel;
+      p.z += p.vz * travel;
       if (p.life >= p.flight) {
+        p.x = p.tx;
+        p.z = p.tz;
         p.dead = true;
         impactGround(s, p, event);
       }
@@ -69,7 +72,9 @@ export function moveProjectiles(s, dt) {
       ) {
         p.dead = true;
         s.stats.hits++;
+        const before = u.hp;
         damageAircraft(s, u, p.damage, p.side);
+        gainGroundExperience(s, p.sourceId, Math.max(0, before - u.hp), u.hp <= 0);
         break;
       }
     if (!p.dead && (p.life > p.maxLife || p.y < 0)) {

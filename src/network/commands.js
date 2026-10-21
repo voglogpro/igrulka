@@ -1,0 +1,152 @@
+import * as E from '../game/index.js';
+
+export const PROTOCOL_VERSION = 1;
+const own = (s, side, id) => E.targetById(s, id)?.side === side;
+const validId = (id) => Number.isSafeInteger(id) && id > 0;
+const point = (p) =>
+  object(p) &&
+  Object.hasOwn(p, 'x') &&
+  Object.hasOwn(p, 'z') &&
+  [p.x, p.z].every(Number.isFinite) &&
+  Math.abs(p.x) <= 864 &&
+  Math.abs(p.z) <= 576;
+const ids = (list) =>
+  Array.isArray(list) &&
+  list.length > 0 &&
+  list.length <= E.GROUND_LIMIT &&
+  list.every(validId) &&
+  new Set(list).size === list.length;
+const unitsOwned = (s, side, list) =>
+  ids(list) &&
+  list.every((id) => s.groundUnits.some((u) => u.id === id && u.side === side && u.hp > 0));
+const object = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
+const invalid = 'Некорректная команда';
+const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
+
+// One allowlist for local play and the authoritative server. Clients cannot set state or choose a side.
+export function executeCommand(s, side, type, a = {}) {
+  if (![0, 1].includes(side) || !object(a) || typeof type !== 'string') return invalid;
+  if (s.result) return 'Матч завершён';
+  switch (type) {
+    case 'build':
+      if (!configured(E.BUILDINGS, a.key) || !point(a) || !Number.isFinite(a.rotation ?? 0))
+        return invalid;
+      return E.build(s, side, a.key, a.x, a.z, a.rotation ?? 0);
+    case 'road':
+      if (!point(a.a) || !point(a.b)) return invalid;
+      return E.buildRoad(s, side, a.a.x, a.a.z, a.b.x, a.b.z);
+    case 'repair':
+    case 'demolish':
+    case 'upgrade':
+    case 'redeploy':
+      if (!validId(a.id) || !own(s, side, a.id)) return 'Объект вам не принадлежит';
+      if (type === 'repair') return E.repair(s, a.id, side);
+      if (type === 'demolish') return E.demolish(s, a.id, side);
+      if (type === 'upgrade') return E.upgradeDefense(s, side, a.id);
+      return E.redeployMOG(s, side, a.id);
+    case 'produce':
+      return configured(E.WEAPONS, a.key) ? E.produce(s, side, a.key) : invalid;
+    case 'research':
+      return configured(E.TECH, a.key) ? E.research(s, side, a.key) : invalid;
+    case 'launch': {
+      if (
+        !configured(E.WEAPONS, a.key) ||
+        !point(a.aim) ||
+        !Number.isInteger(a.count) ||
+        a.count < 1 ||
+        a.count > 6
+      )
+        return invalid;
+      if (a.siteId != null && (!validId(a.siteId) || !own(s, side, a.siteId)))
+        return 'Пусковая вам не принадлежит';
+      if (
+        a.aim.waypoints != null &&
+        (!Array.isArray(a.aim.waypoints) ||
+          a.aim.waypoints.length > 10 ||
+          !a.aim.waypoints.every(point))
+      )
+        return invalid;
+      return E.launch(s, side, a.key, a.aim, a.count, a.siteId ?? null);
+    }
+    case 'recruit':
+      if (
+        !configured(E.GROUND_UNITS, a.key) ||
+        !Number.isInteger(a.count) ||
+        a.count < 1 ||
+        a.count > 5
+      )
+        return invalid;
+      if (a.siteId != null && (!validId(a.siteId) || !own(s, side, a.siteId)))
+        return 'Казармы вам не принадлежат';
+      return E.recruit(s, side, a.key, a.siteId ?? null, a.count);
+    case 'order':
+      if (
+        !unitsOwned(s, side, a.ids) ||
+        !point(a.aim) ||
+        !['move', 'attack', 'attackmove'].includes(a.aim.mode)
+      )
+        return invalid;
+      if (
+        a.aim.targetId != null &&
+        (!validId(a.aim.targetId) || E.observedTarget(s, side, a.aim.targetId)?.side !== 1 - side)
+      )
+        return 'Недоступная цель';
+      return E.orderGround(s, side, a.ids, a.aim);
+    case 'stance':
+      if (
+        !unitsOwned(s, side, a.ids) ||
+        !['stop', 'dig', 'camo', 'fire', 'retreat', 'unload'].includes(a.command)
+      )
+        return invalid;
+      return E.commandUnits(s, side, a.ids, a.command);
+    case 'guard':
+      if (!unitsOwned(s, side, a.ids)) return invalid;
+      if (a.here === true) {
+        let changed = 0;
+        for (const id of a.ids) {
+          const u = s.groundUnits.find((u) => u.id === id);
+          if (typeof E.guardGround(s, side, [id], u) === 'number') changed++;
+        }
+        return changed || 'Нет доступных бойцов';
+      }
+      return point(a.point) ? E.guardGround(s, side, a.ids, a.point) : invalid;
+    case 'defend-line':
+      return unitsOwned(s, side, a.ids) && point(a.a) && point(a.b)
+        ? E.defendLineGround(s, side, a.ids, a.a, a.b)
+        : invalid;
+    case 'board':
+      return unitsOwned(s, side, a.ids) && validId(a.id) && own(s, side, a.id)
+        ? E.boardGround(s, side, a.ids, a.id)
+        : invalid;
+    case 'fpv':
+      return unitsOwned(s, side, a.ids) && point(a.point)
+        ? E.launchFPV(s, side, a.ids, a.point)
+        : invalid;
+    case 'rally':
+    case 'rally-mode':
+    case 'repeat':
+      if (!validId(a.id) || !own(s, side, a.id)) return 'Казармы вам не принадлежат';
+      if (type === 'rally') return point(a.point) ? E.setRally(s, side, a.id, a.point) : invalid;
+      if (type === 'rally-mode')
+        return ['guard', 'wait', 'attackmove'].includes(a.mode)
+          ? E.setRallyMode(s, side, a.id, a.mode)
+          : invalid;
+      return typeof a.enabled === 'boolean' && configured(E.GROUND_UNITS, a.key)
+        ? E.setRecruitRepeat(s, side, a.id, a.key, a.enabled)
+        : invalid;
+    case 'formation':
+      if (!['line', 'column', 'spread'].includes(a.value)) return invalid;
+      s.formations[side] = a.value;
+      return true;
+    case 'group':
+      return Number.isInteger(a.index) &&
+        a.index >= 1 &&
+        a.index <= 9 &&
+        Array.isArray(a.ids) &&
+        (a.ids.length === 0 || unitsOwned(s, side, a.ids))
+        ? E.saveGroup(s, side, a.index, a.ids)
+        : invalid;
+    default:
+      return invalid;
+  }
+}

@@ -1,0 +1,198 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as game from '../../src/game/index.js';
+import { GUARD_POST_CLEARANCE, GUARD_POST_RADIUS } from '../../src/game/units/ground/guard.js';
+
+const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+
+function fresh() {
+  const s = game.createGame(39);
+  s.mode = 'multiplayer';
+  for (const side of s.sides) {
+    side.credits = 1e6;
+    side.materials = 1e6;
+    side.tech = Object.keys(game.TECH);
+  }
+  return s;
+}
+
+function barracks(s) {
+  const b = game.build(s, 0, 'barracks', -680, -10);
+  assert.notEqual(typeof b, 'string', b);
+  b.progress = 1;
+  b.hp = b.maxHp;
+  return b;
+}
+
+function unit(s, key, x = -700, z = 300) {
+  const u = game.makeGround(s, 0, key, x, z);
+  s.groundUnits.push(u);
+  return u;
+}
+
+function produce(key, count, setup = () => ({ x: -500, z: -40 })) {
+  const s = fresh();
+  const b = barracks(s);
+  const rally = setup(s);
+  assert.equal(game.setRally(s, 0, b.id, rally), true);
+  assert.equal(game.setRallyMode(s, 0, b.id, 'guard'), true);
+  assert.equal(game.setRecruitRepeat(s, 0, b.id, key), true);
+  while (s.groundUnits.length < count && s.time < 2000) game.step(s, 0.05);
+  assert.equal(s.groundUnits.length, count);
+  assert.equal(game.setRecruitRepeat(s, 0, b.id, key, false), true);
+  game.advance(s, 90);
+  assert.equal(b.armyQueue.length, 0);
+  assert.equal(s.groundUnits.length, count);
+  return { s, b, rally, units: s.groundUnits };
+}
+
+function separated({ s, rally, units }) {
+  assert.ok(
+    units.every((u) => u.guard),
+    'every recruit must receive a reachable reserved post',
+  );
+  assert.equal(new Set(units.map((u) => `${u.guard.x},${u.guard.z}`)).size, units.length);
+  for (const u of units) {
+    assert.ok(distance(u.guard, rally) <= GUARD_POST_RADIUS + 1e-6);
+    assert.ok(Math.abs(u.guard.x) <= 864 && Math.abs(u.guard.z) <= 576);
+    assert.equal(
+      game.walkable(s, u.guard.x, u.guard.z, game.GROUND_UNITS[u.key].size * 0.42),
+      true,
+    );
+    assert.ok(
+      distance(u, u.guard) <= 3,
+      'the recruit must walk to its post instead of waiting at base',
+    );
+  }
+  for (let i = 0; i < units.length; i++)
+    for (let j = i + 1; j < units.length; j++) {
+      const required =
+        (game.GROUND_UNITS[units[i].key].size + game.GROUND_UNITS[units[j].key].size) * 0.5 +
+        GUARD_POST_CLEARANCE;
+      assert.ok(distance(units[i].guard, units[j].guard) >= required - 1e-6);
+      assert.ok(distance(units[i], units[j]) > 2, 'settled recruits must not overlap');
+    }
+}
+
+test('twenty actual auto-recruited soldiers reserve distinct posts at one rally', () => {
+  const result = produce('infantry', 20);
+  separated(result);
+  assert.deepEqual(
+    produce('infantry', 20).units.map((u) => u.guard),
+    result.units.map((u) => u.guard),
+    'the same seed and recruitment orders must reserve exactly the same posts',
+  );
+  const restored = game.load(game.save(result.s));
+  assert.deepEqual(
+    restored.groundUnits.map((u) => u.guard),
+    result.units.map((u) => u.guard),
+  );
+  const ownPost = structuredClone(result.units[0].guard);
+  const ownPosition = { x: result.units[0].x, z: result.units[0].z };
+  assert.equal(game.guardGround(result.s, 0, [result.units[0].id], ownPost), 1);
+  assert.deepEqual(result.units[0].guard, ownPost, 'a unit must not block its own reservation');
+  assert.deepEqual({ x: result.units[0].x, z: result.units[0].z }, ownPosition);
+  assert.equal(
+    game.orderGround(result.s, 0, [result.units[0].id], { x: -450, z: -100, mode: 'move' }),
+    1,
+  );
+  assert.equal(result.units[0].guard, null);
+  assert.ok(result.units.slice(1).every((u) => u.guard));
+});
+
+test('ten actual auto-recruited APCs reserve space for their larger footprints', () => {
+  separated(produce('apc', 10));
+});
+
+test('rally reservations remain separated near a city wall, forest, river bank and map corner', async (t) => {
+  const setups = {
+    wall(s) {
+      const wall = game.build(s, 0, 'launcher', -350, 100);
+      assert.notEqual(typeof wall, 'string', wall);
+      wall.progress = 1;
+      wall.hp = wall.maxHp;
+      return { x: wall.x + game.BUILDINGS.launcher.size * 0.56 + 25, z: wall.z };
+    },
+    forest: () => ({ x: -523.1944160442799, z: -183.21451216936111 }),
+    river: () => ({ x: game.riverX(0) - 84, z: 0 }),
+    corner: () => ({ x: -855, z: -570 }),
+  };
+  for (const [name, setup] of Object.entries(setups))
+    await t.test(name, () => {
+      const result = produce('infantry', 20, setup);
+      separated(result);
+      if (name === 'wall') assert.equal(game.coverInfo(result.s, result.units[0]).kind, 'Стена');
+      if (name === 'forest') assert.equal(game.coverInfo(result.s, result.units[0]).kind, 'Лес');
+      assert.doesNotThrow(() => game.load(game.save(result.s)));
+    });
+});
+
+test('mixed infantry, MOG and vehicles reserve different spacing without teleporting', () => {
+  const s = fresh();
+  const units = [unit(s, 'infantry'), unit(s, 'mog'), unit(s, 'apc')];
+  const rally = { x: -500, z: -40 };
+  for (const u of units) {
+    const before = { x: u.x, z: u.z };
+    assert.equal(game.guardGround(s, 0, [u.id], rally), 1);
+    assert.deepEqual({ x: u.x, z: u.z }, before, 'assigning a post must only set an order');
+  }
+  game.advance(s, 90);
+  separated({ s, units, rally });
+});
+
+test('a drawn line keeps every exact preview post even when close spacing would fail rally occupancy', () => {
+  const s = fresh();
+  const units = Array.from({ length: 5 }, () => unit(s, 'apc'));
+  const a = { x: -520, z: 250 },
+    b = { x: -500, z: 250 };
+  assert.equal(
+    game.defendLineGround(
+      s,
+      0,
+      units.map((u) => u.id),
+      a,
+      b,
+    ),
+    units.length,
+  );
+  assert.deepEqual(
+    units.map((u) => u.guard),
+    [
+      { x: -520, z: 250 },
+      { x: -515, z: 250 },
+      { x: -510, z: 250 },
+      { x: -505, z: 250 },
+      { x: -500, z: 250 },
+    ],
+  );
+});
+
+test('a saturated rally refuses more posts and a paid recruit waits at its safe spawn', () => {
+  const s = fresh();
+  const b = barracks(s);
+  const rally = { x: -500, z: -40 };
+  let rejected = 0;
+  for (let i = 0; i < 80; i++) {
+    const u = unit(s, 'apc');
+    if (typeof game.guardGround(s, 0, [u.id], rally) === 'string') {
+      assert.equal(u.guard, undefined);
+      assert.equal(u.order, null);
+      s.groundUnits.pop();
+      rejected++;
+    }
+  }
+  assert.ok(rejected > 0);
+  assert.ok(s.groundUnits.length >= 10);
+  const before = s.groundUnits.length;
+  assert.equal(game.setRally(s, 0, b.id, rally), true);
+  assert.equal(game.recruit(s, 0, 'apc', b.id), true);
+  b.armyQueue[0].progress = 0.999;
+  for (let i = 0; i < 10 && s.groundUnits.length === before; i++) game.step(s, 0.05);
+  assert.equal(s.groundUnits.length, before + 1);
+  const recruit = s.groundUnits.at(-1);
+  assert.equal(recruit.guard, undefined);
+  assert.equal(recruit.order, null);
+  assert.ok(distance(recruit, b) < 80);
+  assert.equal(game.walkable(s, recruit.x, recruit.z, game.GROUND_UNITS.apc.size * 0.42), true);
+  assert.doesNotThrow(() => game.load(game.save(s)));
+});

@@ -1,5 +1,5 @@
 import { buildAPC } from './vehicles/apc.js';
-import { buildTrackedVehicle } from './vehicles/tracked-chassis.js';
+import { buildTrackedVehicle, animateVehicleDrive } from './vehicles/tracked-chassis.js';
 import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
 import { isInfantry } from '../../game/config.js';
@@ -27,23 +27,10 @@ export function groundModel(world, u) {
       root.userData.turret.userData.backward = true;
       dynamic.add(root.userData.turret);
     } else if (u.key === 'apc') {
-      buildAPC(world, root, paint);
+      buildAPC(world, root, paint, dynamic);
     } else {
       buildTrackedVehicle(world, u, root, paint, accent, dynamic);
     }
-    const ring = new T.Mesh(
-      new T.RingGeometry(u.key === 'infantry' ? 5 : 7, u.key === 'infantry' ? 5.2 : 7.3, 32),
-      new T.MeshBasicMaterial({
-        color: accent,
-        transparent: true,
-        opacity: 0.28,
-        side: T.DoubleSide,
-        depthWrite: false,
-      }),
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.1;
-    root.add(ring);
     batchStatic(root, dynamic);
     root.traverse((o) => {
       if (o.geometry) world.sharedGeometries.add(o.geometry);
@@ -64,10 +51,11 @@ export function groundModel(world, u) {
   root.userData.turret = root.getObjectByName('turret');
   root.userData.pitch = root.getObjectByName('pitch');
   root.userData.dish = root.getObjectByName('dish');
+  root.userData.recoil = root.getObjectByName('recoil');
   return root;
 }
 const dummy = new T.Object3D();
-export function animateGround(model, u, time) {
+export function animateGround(model, u, time, dt = 0) {
   model.position.set(u.x, u.y || 1, u.z);
   model.rotation.y = u.yaw || 0;
   if (u.key === 'mog') {
@@ -85,14 +73,25 @@ export function animateGround(model, u, time) {
       model.rotation.y +
       (turret.userData.backward ? Math.PI : 0);
     turret.rotation.y +=
-      (((desired - turret.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * 0.2;
+      (((desired - turret.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI) *
+      (1 - Math.exp(-12 * dt));
   }
   const pitch = model.userData.pitch;
   if (pitch)
-    pitch.rotation.x = -Math.atan2(
-      (u.targetY || 5) - 5,
-      Math.hypot((u.targetX || u.x) - u.x, (u.targetZ || u.z) - u.z) || 1,
-    );
+    pitch.rotation.x =
+      (turret?.userData.backward ? 1 : -1) *
+      Math.atan2(
+        (u.targetY ?? 5) - (u.y || 1) - (u.key === 'mog' ? 2.1 : 5.1),
+        Math.hypot((u.targetX ?? u.x) - u.x, (u.targetZ ?? u.z) - u.z) || 1,
+      );
+  if (model.userData.recoil) {
+    const age = Math.max(0, time - (u.lastFire ?? -100));
+    model.userData.recoil.position.z = age < 0.32 ? -Math.sin((Math.PI * age) / 0.32) * 0.65 : 0;
+  }
+  if (u.moving && dt > 0) {
+    model.userData.drivePhase = (model.userData.drivePhase || 0) + dt * 8;
+    animateVehicleDrive(model, model.userData.drivePhase);
+  }
   const dish = model.userData.dish;
   if (dish) dish.rotation.y = time * 1.4;
   const legs = model.getObjectByName('legs');

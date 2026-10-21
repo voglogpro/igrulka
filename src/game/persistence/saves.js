@@ -1,7 +1,8 @@
-import { VERSION, BUILDINGS, GROUND_UNITS, TECH, WEAPONS } from '../config.js';
+import { VERSION, MAP, BUILDINGS, GROUND_UNITS, TECH, WEAPONS } from '../config.js';
 import { ROAD_HP, normalizeRoadOverlaps } from '../city/road-network.js';
 import { campRoads } from '../city/roads.js';
 import { log } from '../shared/events.js';
+const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
   const copy = structuredClone(s);
   copy.events = [];
@@ -91,20 +92,23 @@ export function load(raw) {
     if (
       !['credits', 'materials', 'science'].every((k) => Number.isFinite(f[k]) && f[k] >= 0) ||
       !Array.isArray(f.tech) ||
-      f.tech.some((k) => !TECH[k]) ||
+      f.tech.some((k) => !configured(TECH, k)) ||
       !f.inventory ||
+      typeof f.inventory !== 'object' ||
+      Array.isArray(f.inventory) ||
+      Object.keys(f.inventory).some((k) => !configured(WEAPONS, k)) ||
       Object.keys(WEAPONS).some((k) => !Number.isFinite(f.inventory[k]) || f.inventory[k] < 0)
     )
       throw Error('Повреждены ресурсы');
-    if (f.research && (!TECH[f.research.key] || !Number.isFinite(f.research.progress)))
+    if (f.research && (!configured(TECH, f.research.key) || !Number.isFinite(f.research.progress)))
       throw Error('Повреждены исследования');
   }
   for (const b of s.buildings)
     if (
       !['id', 'x', 'z', 'hp', 'maxHp', 'progress'].every((k) => Number.isFinite(b[k])) ||
-      (b.key !== 'hq' && !BUILDINGS[b.key]) ||
+      (b.key !== 'hq' && !configured(BUILDINGS, b.key)) ||
       ![0, 1].includes(b.side) ||
-      b.queue?.some((q) => !WEAPONS[q.key] || !Number.isFinite(q.progress))
+      b.queue?.some((q) => !configured(WEAPONS, q.key) || !Number.isFinite(q.progress))
     )
       throw Error('Повреждены постройки');
   if (s.version === 3) {
@@ -132,7 +136,7 @@ export function load(raw) {
   }
   for (const u of s.units)
     if (
-      !WEAPONS[u.key] ||
+      !configured(WEAPONS, u.key) ||
       !['x', 'y', 'z', 'hp', 'startX', 'startZ', 'tx', 'tz', 'total', 'travelled', 'delay'].every(
         (k) => Number.isFinite(u[k]),
       )
@@ -156,15 +160,51 @@ export function load(raw) {
   if (!Array.isArray(s.groundUnits) || s.groundUnits.length > 600) throw Error('Повреждена армия');
   for (const u of s.groundUnits)
     if (
-      !GROUND_UNITS[u.key] ||
+      !configured(GROUND_UNITS, u.key) ||
       ![0, 1].includes(u.side) ||
       !['id', 'x', 'z', 'hp', 'maxHp'].every((k) => Number.isFinite(u[k])) ||
       u.path?.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.z))
     )
       throw Error('Повреждён отряд');
+  for (const u of s.groundUnits) {
+    if (u.xp != null && (!Number.isFinite(u.xp) || u.xp < 0 || u.xp > 450))
+      throw Error('Повреждён опыт бойца');
+    if (
+      u.guard != null &&
+      (!Number.isFinite(u.guard.x) ||
+        !Number.isFinite(u.guard.z) ||
+        Math.abs(u.guard.x) > 864 ||
+        Math.abs(u.guard.z) > 576)
+    )
+      throw Error('Повреждён оборонительный пост');
+    for (const key of ['guardNextThink', 'guardRepathAt'])
+      if (u[key] != null && (!Number.isFinite(u[key]) || u[key] < 0))
+        throw Error('Повреждена реакция гарнизона');
+    if (u.guardTargetId != null && (!Number.isSafeInteger(u.guardTargetId) || u.guardTargetId <= 0))
+      throw Error('Повреждена цель гарнизона');
+  }
   for (const b of s.buildings) {
-    if (b.armyQueue?.some((q) => !GROUND_UNITS[q.key] || !Number.isFinite(q.progress)))
+    if (
+      b.rally != null &&
+      (typeof b.rally !== 'object' ||
+        Array.isArray(b.rally) ||
+        !Number.isFinite(b.rally.x) ||
+        !Number.isFinite(b.rally.z) ||
+        Math.abs(b.rally.x) > MAP.width / 2 - 16 ||
+        Math.abs(b.rally.z) > MAP.depth / 2 - 16)
+    )
+      throw Error('Повреждена точка сбора');
+    if (b.rallyMode != null && !['guard', 'wait', 'attackmove'].includes(b.rallyMode))
+      throw Error('Повреждены приказы новобранцам');
+    if (b.armyQueue?.some((q) => !configured(GROUND_UNITS, q.key) || !Number.isFinite(q.progress)))
       throw Error('Повреждена очередь казарм');
+    if (
+      b.recruitRepeat != null &&
+      (b.key !== 'barracks' ||
+        !configured(GROUND_UNITS, b.recruitRepeat.key) ||
+        typeof b.recruitRepeat.enabled !== 'boolean')
+    )
+      throw Error('Повреждён автоматический набор');
     if (b.level != null && (!Number.isInteger(b.level) || b.level < 0 || b.level > 2))
       throw Error('Повреждена модернизация');
   }

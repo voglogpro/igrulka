@@ -6,6 +6,7 @@ import { orderGround, commandUnits } from '../units/ground/orders.js';
 import { unloadGround, boardGround } from '../units/vehicles/transport.js';
 import { launchFPV } from '../units/infantry/fpv.js';
 export function updateArmyAI(s, hooks) {
+  if (s.mode === 'multiplayer') return;
   const { random } = hooks;
   if (s.time > 230 && (s.ai.nextArmy || 0) < s.time) {
     s.ai.nextArmy = s.time + 17;
@@ -31,6 +32,7 @@ export function updateArmyAI(s, hooks) {
     const hq = s.buildings.find((b) => b.side === 0 && b.key === 'hq' && b.hp > 0);
     for (const u of s.groundUnits)
       if (u.side === 1 && !u.carrierId && !u.boardingId && hq) {
+        if (u.guard) continue;
         if (u.aiDefender && u.hp / u.maxHp > 0.35) {
           const own = s.buildings.find((b) => b.side === 1 && b.key === 'hq');
           u.defensePoint ||= COVER_PATCHES.filter(

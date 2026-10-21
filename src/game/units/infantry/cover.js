@@ -15,18 +15,36 @@ for (let i = 0; i < 180 && COVER_PATCHES.length < 82; i++) {
     continue;
   COVER_PATCHES.push({ x, z, r, forest: i % 3 !== 0 });
 }
-export function coverInfo(s, u) {
+function coverForDirection(value, from, u) {
+  if (!value.wall) return { cover: value.cover, concealment: value.concealment, kind: value.kind };
+  const range = Math.hypot(from?.x - u.x, from?.z - u.z);
+  const facing =
+    range > 0 ? ((from.x - u.x) * value.wall.nx + (from.z - u.z) * value.wall.nz) / range : 1;
+  const wallCover = facing > 0.45 ? 0.33 : 0.08;
+  return wallCover > value.cover
+    ? { cover: wallCover, concealment: value.concealment, kind: 'Стена' }
+    : { cover: value.cover, concealment: value.concealment, kind: value.kind };
+}
+
+export function coverInfo(s, u, from = null) {
   let cache = coverCache.get(s);
   if (!cache) {
     cache = new WeakMap();
     coverCache.set(s, cache);
   }
   const previous = cache.get(u);
-  if (previous && previous.time === s.time && previous.x === u.x && previous.z === u.z)
-    return previous.value;
+  if (
+    previous &&
+    previous.time === s.time &&
+    previous.revision === s.networkRevision &&
+    previous.x === u.x &&
+    previous.z === u.z
+  )
+    return coverForDirection(previous.value, from, u);
   let cover = 0,
     concealment = 0,
-    kind = 'Открыто';
+    kind = 'Открыто',
+    wall = null;
   for (const p of COVER_PATCHES)
     if (Math.hypot(u.x - p.x, u.z - p.z) < p.r) {
       cover = p.forest ? 0.4 : 0.25;
@@ -44,15 +62,28 @@ export function coverInfo(s, u) {
       concealment = Math.max(concealment, 0.4);
       kind = 'Руины';
     }
+  if (isInfantry(u.key))
+    for (const b of s.buildings) {
+      if (b.hp <= 0 || b.demolished || b.progress < 1) continue;
+      const half = (BUILDINGS[b.key]?.size || 30) * 0.56;
+      const dx = u.x - b.x;
+      const dz = u.z - b.z;
+      const edgeX = Math.abs(dx) - half;
+      const edgeZ = Math.abs(dz) - half;
+      if (edgeX >= 0 && edgeX <= 12 && Math.abs(dz) <= half + 4 && (!wall || edgeX < wall.distance))
+        wall = { nx: Math.sign(dx), nz: 0, distance: edgeX };
+      if (edgeZ >= 0 && edgeZ <= 12 && Math.abs(dx) <= half + 4 && (!wall || edgeZ < wall.distance))
+        wall = { nx: 0, nz: Math.sign(dz), distance: edgeZ };
+    }
   for (const t of s.trenches || [])
     if (t.progress >= 1 && Math.hypot(t.x - u.x, t.z - u.z) < 5) {
       cover = Math.max(cover, 0.72);
       concealment = Math.max(concealment, 0.55);
       kind = 'Окоп';
     }
-  const value = { cover, concealment, kind };
-  cache.set(u, { time: s.time, x: u.x, z: u.z, value });
-  return value;
+  const value = { cover, concealment, kind, wall };
+  cache.set(u, { time: s.time, revision: s.networkRevision, x: u.x, z: u.z, value });
+  return coverForDirection(value, from, u);
 }
 export function lineOfSight(s, a, b) {
   return !s.buildings.some(
@@ -62,7 +93,6 @@ export function lineOfSight(s, a, b) {
       o.id !== a.id &&
       o.id !== b.id &&
       (BUILDINGS[o.key]?.height || 15) > 4 &&
-      Math.hypot(a.x - o.x, a.z - o.z) > (BUILDINGS[o.key]?.size || 30) * 0.65 &&
       segmentDistance(o.x, o.z, a.x, a.z, b.x, b.z) < (BUILDINGS[o.key]?.size || 30) * 0.48,
   );
 }

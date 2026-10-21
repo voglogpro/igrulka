@@ -44,7 +44,7 @@ export function economy(s, owner) {
     .filter((u) => u.side === owner && u.hp > 0)
     .reduce((n, u) => n + GROUND_UNITS[u.key].upkeep, 0);
   upkeep += armyUpkeep;
-  const bonus = owner === 1 ? 1.25 : 1;
+  const bonus = owner === 1 && s.mode !== 'multiplayer' ? 1.25 : 1;
   return {
     gross: income * bonus,
     upkeep,

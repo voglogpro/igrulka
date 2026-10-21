@@ -4,7 +4,13 @@ import globals from 'globals';
 export default [
   { ignores: ['vendor/**', 'archive/**', 'play/**', 'artifacts/**', 'node_modules/**'] },
   {
-    files: ['src/**/*.js', 'scripts/**/*.mjs', 'tests/**/*.mjs', 'eslint.config.mjs'],
+    files: [
+      'src/**/*.js',
+      'server/**/*.mjs',
+      'scripts/**/*.mjs',
+      'tests/**/*.mjs',
+      'eslint.config.mjs',
+    ],
     ...js.configs.recommended,
     languageOptions: {
       ecmaVersion: 'latest',
@@ -17,15 +23,21 @@ export default [
     },
   },
   {
-    files: ['src/rendering/**/*.js', 'src/ui/**/*.js', 'src/audio/**/*.js', 'src/main.js'],
+    files: [
+      'src/rendering/**/*.js',
+      'src/ui/**/*.js',
+      'src/audio/**/*.js',
+      'src/network/client.js',
+      'src/main.js',
+    ],
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['src/game/**/*.js'],
+    files: ['src/game/**/*.js', 'src/network/commands.js', 'src/network/perspective.js'],
     languageOptions: { globals: { structuredClone: 'readonly' } },
   },
   {
-    files: ['scripts/**/*.mjs', 'tests/**/*.mjs', 'eslint.config.mjs'],
+    files: ['server/**/*.mjs', 'scripts/**/*.mjs', 'tests/**/*.mjs', 'eslint.config.mjs'],
     languageOptions: { globals: globals.node },
   },
 ];

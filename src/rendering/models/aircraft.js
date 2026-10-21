@@ -192,6 +192,7 @@ export function aircraftModel(world, u) {
     world.aircraftTemplates.set(key, buildTemplate(world, modelKey, u.side));
   const g = world.aircraftTemplates.get(key).clone(true);
   g.userData = {
+    signature: key,
     props: [],
     wings: [g.getObjectByName('wing-left'), g.getObjectByName('wing-right')],
     details: g.getObjectByName('details'),

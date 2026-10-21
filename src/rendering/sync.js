@@ -5,8 +5,22 @@ import { BUILDINGS } from '../game/index.js';
 import { aircraftModel } from './models/aircraft.js';
 import { groundModel, animateGround } from './models/ground.js';
 export function sync() {
+  const buildingIds = new Set(this.state.buildings.filter((b) => !b.demolished).map((b) => b.id));
+  for (const [id, model] of this.models) {
+    if (!buildingIds.has(id)) {
+      disposeTree(model.root, this.sharedGeometries, this.sharedMaterials);
+      this.models.delete(id);
+      this.renderer.shadowMap.needsUpdate = true;
+    }
+  }
   for (const b of this.state.buildings) {
     let m = this.models.get(b.id);
+    const signature = [b.key, b.side, b.x, b.z, b.rotation || 0].join('/');
+    if (m && (m.signature !== signature || (m.dead && b.hp > 0))) {
+      disposeTree(m.root, this.sharedGeometries, this.sharedMaterials);
+      this.models.delete(b.id);
+      m = null;
+    }
     if (b.demolished) {
       if (m) {
         disposeTree(m.root, this.sharedGeometries, this.sharedMaterials);
@@ -17,6 +31,7 @@ export function sync() {
     }
     if (!m) {
       m = this.model(b);
+      m.signature = signature;
       this.models.set(b.id, m);
       this.renderer.shadowMap.needsUpdate = true;
     }
@@ -77,7 +92,7 @@ export function sync() {
         const aim = Math.atan2(b.targetX - b.x, b.targetZ - b.z) - m.root.rotation.y + Math.PI,
           delta =
             T.MathUtils.euclideanModulo(aim - turret.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
-        turret.rotation.y += delta * 0.28;
+        turret.rotation.y += delta * (1 - Math.exp(-17 * this.visualDt));
       }
       if (m.root.userData.pitch) {
         const pitch = m.root.userData.pitch;
@@ -91,7 +106,7 @@ export function sync() {
     }
   }
   const roads = this.state.roads.filter((r) => !r.removed),
-    layout = roads.map((r) => r.id).join(',');
+    layout = roads.map((r) => [r.id, r.side, r.ax, r.az, r.bx, r.bz].join('/')).join(',');
   if (layout !== this.roadLayout) {
     this.roadLayout = layout;
     this.streetLayout = roads.map((r) => ({
@@ -120,6 +135,12 @@ export function sync() {
   for (const u of this.state.units) {
     ids.add(u.id);
     let m = this.unitModels.get(u.id);
+    const signature = (u.subtype === 'fpv' ? 'fpv' : u.key) + '/' + u.side;
+    if (m && m.userData.signature !== signature) {
+      m.removeFromParent();
+      this.unitModels.delete(u.id);
+      m = null;
+    }
     if (!m && u.delay > 0) continue;
     if (!m) {
       m = aircraftModel(this, u);
@@ -137,7 +158,7 @@ export function sync() {
       bank = u.spin * u.fallAge;
       const wings = m.userData.wings;
       if (wings?.[u.missingWing < 0 ? 0 : 1]) wings[u.missingWing < 0 ? 0 : 1].visible = false;
-    }
+    } else for (const wing of m.userData.wings || []) if (wing) wing.visible = true;
     m.rotation.set(pitch, yaw, bank, 'YXZ');
     for (const rotor of m.userData.props || [])
       if (u.status !== 'falling') {
@@ -156,13 +177,22 @@ export function sync() {
   for (const u of this.state.groundUnits || []) {
     groundIds.add(u.id);
     let m = this.groundModels.get(u.id);
+    const signature = u.key + ':' + u.side;
+    if (m && m.userData.signature !== signature) {
+      m.traverse((o) => {
+        if (o.isInstancedMesh) o.dispose();
+      });
+      m.removeFromParent();
+      m = null;
+    }
     if (!m) {
       m = groundModel(this, u);
+      m.userData.signature = signature;
       this.scene.add(m);
       this.groundModels.set(u.id, m);
     }
     m.visible = !u.carrierId && E.groundVisible(this.state, 0, u);
-    animateGround(m, u, this.battleTime);
+    animateGround(m, u, this.state.time, this.visualDt);
   }
   for (const [id, m] of this.groundModels)
     if (!groundIds.has(id)) {
@@ -181,9 +211,13 @@ export function sync() {
       this.selection.visible = this.coverage.visible = false;
     }
   }
-  this.infantry.sync(this.state.groundUnits || [], this.battleTime);
+  this.infantry.sync(this.state.groundUnits || [], this.state.time);
   this.syncTrenches();
   this.tactical?.previewGround(this.state.groundUnits?.find((u) => u.id === this.selected));
+  if (this.groundTargeting !== 'defendline')
+    this.tactical?.showGuardPosts(
+      this.state.groundUnits.filter((u) => this.armySelection.includes(u.id)),
+    );
   this.combatFX.updateTracers(this.state.projectiles);
   for (const e of this.state.events)
     if (e.id > this.eventId) {

@@ -4,9 +4,12 @@ import { groundVisible, lineOfSight, recordFire } from '../infantry/cover.js';
 import { updateInfantrySupport } from '../infantry/support.js';
 import { buildingConnected } from '../../city/road-network.js';
 import { freeSpot } from '../vehicles/transport.js';
-import { makeGround } from './recruitment.js';
+import { makeGround, defaultRallyMode } from './recruitment.js';
 import { orderGround } from './orders.js';
 import { updateArmyAI } from '../../ai/army-ai.js';
+import { updateGuard, guardGround } from './guard.js';
+import { updateRecruitRepeat } from './repeat.js';
+import { veteranAccuracy, veteranSuppression } from './veterancy.js';
 export function tickUnit(s, u, dt, rates, hooks) {
   const { event, random } = hooks,
     d = GROUND_UNITS[u.key] || BUILDINGS[u.key],
@@ -26,7 +29,13 @@ export function tickUnit(s, u, dt, rates, hooks) {
   u.prevX = u.x;
   u.prevY = u.y;
   u.prevZ = u.z;
-  u.suppression = Math.max(0, (u.suppression || 0) - dt * 0.09);
+  u.suppression = Math.max(0, (u.suppression || 0) - dt * 0.09 * (2 - veteranSuppression(u)));
+  if (!d.range)
+    u.heat = Math.max(
+      0,
+      (u.heat || 0) -
+        (d.cooling || 0.12) * (s.sides[u.side].tech.includes('cooling') ? 1.5 : 1) * dt,
+    );
   u.groundCooldown = Math.max(0, (u.groundCooldown || 0) - dt);
   const aaMagazine = (foot || u.key === 'gun') && d.range ? defenseStats(s.sides[u.side], u) : null,
     maxMagazine = aaMagazine?.magazine || d.groundMagazine || 30;
@@ -56,6 +65,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
       u.boardRepath = s.time + 1;
     }
   }
+  updateGuard(s, u);
   const findTarget = () => {
     const enemies = s.groundUnits.filter(
       (t) =>
@@ -67,9 +77,9 @@ export function tickUnit(s, u, dt, rates, hooks) {
         lineOfSight(s, u, t),
     );
     enemies.sort((a, b) =>
-      a.id === u.order?.targetId
+      a.id === (u.guardTargetId || u.order?.targetId)
         ? -1
-        : b.id === u.order?.targetId
+        : b.id === (u.guardTargetId || u.order?.targetId)
           ? 1
           : Math.hypot(a.x - u.x, a.z - u.z) - Math.hypot(b.x - u.x, b.z - u.z),
     );
@@ -148,7 +158,8 @@ export function tickUnit(s, u, dt, rates, hooks) {
       (blind ? 18 : u.key === 'sniper' ? 1 : 3) *
       (u.moving ? 2 : 1) *
       (1 + u.suppression * 2) *
-      (1 + Math.pow(u.heat || 0, 2) * 2),
+      (1 + Math.pow(u.heat || 0, 2) * 2) *
+      veteranAccuracy(u),
     tx = aim.x + (random(s) - 0.5) * spread,
     tz = aim.z + (random(s) - 0.5) * spread,
     tank = u.key === 'leopard',
@@ -218,6 +229,7 @@ export function updateGround(s, rates, dt, hooks) {
   s.contacts ||= [[], []];
   for (let side = 0; side < 2; side++)
     s.contacts[side] = s.contacts[side].filter((c) => c.expires > s.time);
+  updateRecruitRepeat(s);
   for (const b of s.buildings)
     if (b.key === 'barracks' && b.hp > 0 && b.progress >= 1 && b.armyQueue?.length) {
       const q = b.armyQueue[0],
@@ -237,7 +249,10 @@ export function updateGround(s, rates, dt, hooks) {
           const u = makeGround(s, b.side, q.key, p.x, p.z);
           s.groundUnits.push(u);
           event(s, 'recruited', { ...p, side: b.side, key: q.key, unitId: u.id });
-          if (b.rally) orderGround(s, b.side, [u.id], b.rally);
+          const rallyMode = defaultRallyMode(s, b);
+          if (rallyMode === 'guard') guardGround(s, b.side, [u.id], b.rally || p);
+          else if (rallyMode === 'attackmove' && b.rally)
+            orderGround(s, b.side, [u.id], { ...b.rally, mode: 'attackmove' });
         }
       }
     }

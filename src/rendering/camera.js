@@ -36,6 +36,7 @@ export class FixedCamera {
     canvas.addEventListener(
       'wheel',
       (e) => {
+        if (this.canInteract && !this.canInteract()) return;
         e.preventDefault();
         this.focusInput();
         this.zoomDistance = MathUtils.clamp(
@@ -47,6 +48,7 @@ export class FixedCamera {
       { passive: false },
     );
     canvas.addEventListener('pointerdown', (e) => {
+      if (this.canInteract && !this.canInteract()) return;
       if (e.button !== 2 || !this.enableRotate || e.buttons & 1) return;
       e.preventDefault();
       this.drag = {
@@ -77,7 +79,7 @@ export class FixedCamera {
       if (this.drag?.id !== e.pointerId) return;
       const click = e.button === 2 && !this.drag.moved;
       this.cancelRotation();
-      if (click) this.onContextClick?.();
+      if (click) this.onContextClick?.(e);
     });
     for (const name of ['pointercancel', 'lostpointercapture'])
       canvas.addEventListener(name, (e) => {

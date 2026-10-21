@@ -26,10 +26,15 @@ for (const match of [...fonts.matchAll(/url\(([^)]+)\)/g)]) {
   const mime = fontPath.endsWith('.woff2') ? 'font/woff2' : 'font/ttf';
   fonts = fonts.replace(match[0], `url(data:${mime};base64,${bytes.toString('base64')})`);
 }
-const base = (await readFile(path.join(root, 'src/ui/style.css'), 'utf8')).replace(
-  /@import\s+url\([^)]*\)\s*;/g,
-  '',
-);
+const base = (
+  await Promise.all(
+    ['src/ui/style.css', 'src/ui/army.css', 'src/ui/multiplayer.css'].map((file) =>
+      readFile(path.join(root, file), 'utf8'),
+    ),
+  )
+)
+  .join('\n')
+  .replace(/@import\s+url\([^)]*\)\s*;/g, '');
 const css = (await transform(fonts + '\n' + base, { loader: 'css', minify: true, charset: 'utf8' }))
   .code;
 const js = bundle.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');

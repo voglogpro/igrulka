@@ -14,6 +14,7 @@ import {
   setBuild as setBuildForWorld,
   cancelRoad as cancelRoadForWorld,
   pointerUp as pointerUpForWorld,
+  groundCommandAt,
   groundPoint as groundPointForWorld,
   updateGhost as updateGhostForWorld,
 } from './input/build-tools.js';
@@ -76,9 +77,15 @@ export class RTSWorld {
     this.camera = new T.PerspectiveCamera(45, host.clientWidth / host.clientHeight, 2, 9000);
     this.camera.position.set(-850, 430, 480);
     this.controls = new FixedCamera(this.camera, this.renderer.domElement);
-    this.controls.onContextClick = () => {
+    this.controls.canInteract = () => !this.callbacks.isModal?.();
+    this.controls.onContextClick = (e) => {
+      if (this.callbacks.isModal?.()) return;
       this.selectionBox.hidden = true;
       this.down = null;
+      if (this.armySelection.length && !this.buildKey && !this.aiming && !this.groundTargeting) {
+        groundCommandAt.call(this, e);
+        return;
+      }
       this.callbacks.onCancelTool?.(true);
     };
     this.hemi = new T.HemisphereLight('#9eaed3', '#3d5147', 1.1);
@@ -153,6 +160,7 @@ export class RTSWorld {
     this.selectionBox.hidden = true;
     host.appendChild(this.selectionBox);
     this.renderer.domElement.addEventListener('pointerdown', (e) => {
+      if (this.callbacks.isModal?.()) return;
       if (e.button !== 0 || this.controls.rotating) return;
       this.down = {
         x: e.clientX,
@@ -166,10 +174,12 @@ export class RTSWorld {
     });
     this.renderer.domElement.addEventListener('pointermove', (e) => {
       this.lastPointer = e;
+      if (this.callbacks.isModal?.()) return;
       if (
         this.down &&
         !this.buildKey &&
         !this.aiming &&
+        !this.groundTargeting &&
         Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y) > 7
       ) {
         this.selectionBox.hidden = false;
@@ -190,6 +200,10 @@ export class RTSWorld {
             (u) => this.armySelection.includes(u.id) && u.key === 'operator',
           );
         if (p && u) this.tactical?.previewTactical(u, p);
+      }
+      if (this.groundTargeting === 'defendline' && this.down?.ground) {
+        const p = this.groundPoint(e);
+        if (p) this.tactical?.previewDefenseLine(this.down.ground, p, this.armySelection);
       }
       this.updateGhost(e);
     });
@@ -316,6 +330,7 @@ export class RTSWorld {
   }
   setArmySelection(ids) {
     this.armySelection = [...ids];
+    if (ids.length > 1) this.coverage.visible = false;
   }
   setGroundTargeting(mode) {
     const previous = this.groundTargeting;
@@ -323,6 +338,7 @@ export class RTSWorld {
     this.host.classList.toggle('ground-targeting', !!mode);
     if (previous) {
       this.tactical?.preview(null);
+      this.tactical?.previewDefenseLine(null);
       this.coverage.visible = false;
     }
     if (mode === 'fpv') {
@@ -375,7 +391,7 @@ export class RTSWorld {
         : b.key === 'radar'
           ? 320
           : (BUILDINGS[b.key] || E.GROUND_UNITS[b.key])?.range;
-    if (range && b.side === 0) {
+    if (range && b.side === 0 && (!b.ground || this.armySelection.length <= 1)) {
       this.coverage.visible = true;
       this.coverage.scale.setScalar(range);
       this.coverage.position.set(b.x, 1.4, b.z);
@@ -385,7 +401,7 @@ export class RTSWorld {
       b.key === 'road' ? 8 : ((BUILDINGS[b.key] || E.GROUND_UNITS[b.key])?.size || 30) * 0.8,
     );
     this.selection.material.color.set(b.side === 0 ? '#a4ecc3' : '#f5ac8b');
-    if (E.isInfantry(b.key)) this.selection.visible = false;
+    if (b.ground && b.side === 0) this.selection.visible = false;
   }
   focus(x, z, distance = 570) {
     this.controls.focus(x, z, distance);

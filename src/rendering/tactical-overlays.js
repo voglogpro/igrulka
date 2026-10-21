@@ -99,6 +99,76 @@ export class TacticalView {
     );
     this.groundRoute.frustumCulled = false;
     world.scene.add(this.groundRoute);
+    this.defenseLine = new T.Group();
+    this.defenseLine.visible = false;
+    world.scene.add(this.defenseLine);
+    const lineGeometry = new T.BufferGeometry();
+    lineGeometry.setAttribute('position', new T.BufferAttribute(new Float32Array(6), 3));
+    this.postLine = new T.Line(
+      lineGeometry,
+      new T.LineBasicMaterial({ color: '#b9e9bb', depthTest: false }),
+    );
+    this.postLine.frustumCulled = false;
+    this.postMarkers = new T.InstancedMesh(
+      new T.RingGeometry(2.2, 2.8, 20),
+      new T.MeshBasicMaterial({ color: '#ffffff', side: T.DoubleSide, depthTest: false }),
+      120,
+    );
+    this.postMarkers.frustumCulled = false;
+    this.defenseLine.add(this.postLine, this.postMarkers);
+  }
+  previewDefenseLine(a, b, ids = []) {
+    this.postsSignature = '';
+    this.defenseLine.visible = !!a && !!b;
+    if (!this.defenseLine.visible) return;
+    this.postLine.visible = true;
+    const units = this.world.state.groundUnits.filter(
+      (u) => ids.includes(u.id) && u.hp > 0 && !u.carrierId,
+    );
+    const positions = this.postLine.geometry.attributes.position;
+    positions.setXYZ(0, a.x, 2.8, a.z);
+    positions.setXYZ(1, b.x, 2.8, b.z);
+    positions.needsUpdate = true;
+    this.postMarkers.count = Math.min(units.length, 120);
+    for (let i = 0; i < this.postMarkers.count; i++) {
+      const t = units.length === 1 ? 0.5 : i / (units.length - 1);
+      const x = a.x + (b.x - a.x) * t,
+        z = a.z + (b.z - a.z) * t;
+      this.dummy.position.set(x, 2.8, z);
+      this.dummy.rotation.set(-Math.PI / 2, 0, 0);
+      this.dummy.scale.setScalar(1);
+      this.dummy.updateMatrix();
+      this.postMarkers.setMatrixAt(i, this.dummy.matrix);
+      this.postMarkers.setColorAt(
+        i,
+        new T.Color(
+          E.walkable(this.world.state, x, z, E.GROUND_UNITS[units[i].key].size * 0.42)
+            ? '#b9e9bb'
+            : '#e7997a',
+        ),
+      );
+    }
+    this.postMarkers.instanceMatrix.needsUpdate = true;
+    if (this.postMarkers.instanceColor) this.postMarkers.instanceColor.needsUpdate = true;
+  }
+  showGuardPosts(units) {
+    const posts = units.filter((u) => u.guard && !u.carrierId && u.hp > 0);
+    const signature = posts.map((u) => `${u.id}:${u.guard.x}:${u.guard.z}`).join('/');
+    this.defenseLine.visible = posts.length > 0;
+    this.postLine.visible = false;
+    if (signature === this.postsSignature) return;
+    this.postsSignature = signature;
+    this.postMarkers.count = Math.min(posts.length, 120);
+    for (let i = 0; i < this.postMarkers.count; i++) {
+      this.dummy.position.set(posts[i].guard.x, 2.8, posts[i].guard.z);
+      this.dummy.rotation.set(-Math.PI / 2, 0, 0);
+      this.dummy.scale.setScalar(0.75);
+      this.dummy.updateMatrix();
+      this.postMarkers.setMatrixAt(i, this.dummy.matrix);
+      this.postMarkers.setColorAt(i, this.postLine.material.color);
+    }
+    this.postMarkers.instanceMatrix.needsUpdate = true;
+    if (this.postMarkers.instanceColor) this.postMarkers.instanceColor.needsUpdate = true;
   }
   previewGround(u) {
     this.groundRoute.visible = !!u?.path?.length;

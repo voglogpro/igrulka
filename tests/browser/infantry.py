@@ -28,10 +28,11 @@ with sync_playwright() as p:
     page.mouse.move(x1,y1);page.mouse.down();page.mouse.move(x2,y2,steps=7);page.mouse.up()
     assert len(page.evaluate('skyfront.getOrder().armySelection'))>=2
     selection=page.evaluate('skyfront.getOrder().armySelection')
-    page.keyboard.press('Control+1');page.mouse.click(600,450,button='right');assert not page.evaluate('skyfront.getOrder().armySelection');page.keyboard.press('1')
+    page.keyboard.press('Control+1');page.keyboard.press('Escape');assert not page.evaluate('skyfront.getOrder().armySelection');page.keyboard.press('1')
     assert page.evaluate('skyfront.getOrder().armySelection')==selection
     assert page.evaluate('skyfront.getWorld().buildKey') is None
-    target=pt(-450,-170);page.mouse.click(target['x'],target['y']);assert page.evaluate('skyfront.getState().groundUnits.filter(u=>u.path.length).length')>=2
+    target=pt(-450,-170);page.mouse.click(target['x'],target['y'],button='right');assert page.evaluate('skyfront.getState().groundUnits.filter(u=>u.path.length).length')>=2
+    assert page.evaluate('skyfront.getOrder().armySelection')==selection
     page.locator('[data-troop="stop"]').click();page.locator('[data-troop="dig"]').click()
     assert page.evaluate('skyfront.getState().trenches.length')>=2
     page.evaluate('''()=>{const w=skyfront.getWorld();skyfront.engine.advance(w.state,13);w.sync();}''')
@@ -45,7 +46,9 @@ with sync_playwright() as p:
     page.evaluate('(id)=>skyfront.selectArmy([id])',selection[0]);page.locator('[data-troop="board"]').click();point=pt(-450,-40);page.mouse.click(point['x'],point['y'])
     page.evaluate('skyfront.engine.advance(skyfront.getWorld().state,1)')
     assert page.evaluate('(id)=>skyfront.getState().groundUnits.find(u=>u.id===id).carrierId',selection[0])==apc['id']
-    page.evaluate('(id)=>skyfront.selectArmy([id])',apc['id']);page.locator('[data-troop="unload"]').click()
+    page.wait_for_function('(id)=>skyfront.getOrder().armySelection.includes(id)',arg=apc['id'])
+    assert page.locator('[data-troop="unload"]').is_enabled()
+    page.locator('[data-troop="unload"]').click()
     assert page.evaluate('(id)=>skyfront.getState().groundUnits.find(u=>u.id===id).carrierId',selection[0]) is None
     operator=next(u for u in fixture['units'] if u['key']=='operator')
     page.evaluate('(id)=>skyfront.selectArmy([id])',operator['id']);page.locator('[data-troop="fpv"]').click();point=pt(-300,-100);page.mouse.move(point['x'],point['y']);page.mouse.click(point['x'],point['y'])

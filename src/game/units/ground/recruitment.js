@@ -1,9 +1,9 @@
-import { GROUND_UNITS } from '../../config.js';
+import { GROUND_UNITS, defenseStats } from '../../config.js';
 import { clamp } from '../../shared/math.js';
 import { GROUND_LIMIT, walkable } from './navigation.js';
 export function makeGround(s, side, key, x, z) {
   const d = GROUND_UNITS[key];
-  return {
+  const u = {
     id: s.nextId++,
     side,
     key,
@@ -19,6 +19,7 @@ export function makeGround(s, side, key, x, z) {
     groundReload: 0,
     heat: 0,
     level: 0,
+    xp: 0,
     path: [],
     order: null,
     yaw: 0,
@@ -29,6 +30,8 @@ export function makeGround(s, side, key, x, z) {
       ['mog', 'sniper', 'machinegunner'].includes(key) &&
       s.groundUnits.filter((u) => u.side === side && u.aiDefender).length < 3,
   };
+  if (d.infantry && d.range) u.groundAmmo = defenseStats(s.sides[side], u).magazine;
+  return u;
 }
 
 export function recruit(s, side, key, siteId = null, count = 1) {
@@ -71,7 +74,31 @@ export function setRally(s, side, id, point) {
   const b = s.buildings.find(
     (b) => b.id === id && b.side === side && b.key === 'barracks' && b.hp > 0,
   );
-  if (!b || !walkable(s, point.x, point.z, 2)) return 'Точка сбора должна быть на доступной суше';
+  if (
+    !b ||
+    !point ||
+    ![point.x, point.z].every(Number.isFinite) ||
+    !walkable(s, point.x, point.z, 2)
+  )
+    return 'Точка сбора должна быть на доступной суше';
   b.rally = { x: point.x, z: point.z };
+  return true;
+}
+
+export const RALLY_MODES = ['guard', 'wait', 'attackmove'];
+
+export function defaultRallyMode(s, site) {
+  return site.rallyMode || (s.mode !== 'multiplayer' && site.side === 1 ? 'wait' : 'guard');
+}
+
+export function setRallyMode(s, side, id, mode) {
+  if (s.result) return 'Кампания завершена';
+  const b = s.buildings.find(
+    (site) =>
+      site.id === Number(id) && site.side === side && site.key === 'barracks' && site.hp > 0,
+  );
+  if (!b) return 'Выберите свои действующие казармы';
+  if (!RALLY_MODES.includes(mode)) return 'Неизвестный режим точки сбора';
+  b.rallyMode = mode;
   return true;
 }

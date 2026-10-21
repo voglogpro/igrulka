@@ -1,11 +1,12 @@
 {
   "name": "skyfront-city-defense",
-  "version": "8.0.1",
+  "version": "8.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node scripts/dev-server.mjs",
     "dev": "node scripts/dev-server.mjs",
+    "multiplayer": "node server/index.mjs",
     "build": "node scripts/build-portable.mjs",
     "test": "node --test tests/unit/*.test.mjs tests/legacy/*.test.mjs",
     "test:soak": "node tests/soak/campaign.mjs",
@@ -29,5 +30,8 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
   }
 }

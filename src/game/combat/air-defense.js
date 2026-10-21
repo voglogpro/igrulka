@@ -159,6 +159,7 @@ export function fireDefenses(s, rates, dt) {
     b.rounds = (b.rounds || 0) + 1;
     if (infantry) recordFire(s, b, random);
     s.projectiles.push({
+      sourceId: b.id,
       abm,
       gravity: missile ? 0 : COMBAT.gravity,
       tracer: missile || !fast || b.rounds % 3 === 0,

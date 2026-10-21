@@ -1,5 +1,15 @@
+import { recruitmentHTML } from './army-recruitment.js';
 import * as E from '../game/index.js';
-export function panelHTML({ panel, weapon, count, settings, state }) {
+export function panelHTML({
+  panel,
+  weapon,
+  count,
+  settings,
+  state,
+  armyCategory,
+  recruitCount,
+  armyAutomation,
+}) {
   let html = `<div class="panel-head"><span class="eyebrow">${{ attack: 'АРСЕНАЛ И АТАКА', research: 'ИССЛЕДОВАНИЯ', economy: 'ЭКОНОМИКА', settings: 'НАСТРОЙКИ', help: 'ПРАВИЛА', army: 'НАЗЕМНАЯ АРМИЯ' }[panel]}</span><button data-action="close-panel" aria-label="Закрыть">×</button></div>`;
   if (panel === 'attack') {
     html += `<p class="pipeline">Завод → склад → выбор вооружения → ЛКМ по карте</p><div class="weapons">${Object.entries(
@@ -33,16 +43,7 @@ export function panelHTML({ panel, weapon, count, settings, state }) {
       .join('')}`;
   }
   if (panel === 'army') {
-    html += `<p class="status-note">Рамка выделяет бойцов; Shift добавляет к выбору. Ctrl+1…9 сохраняет группу, цифра выбирает её. ЛКМ по земле — движение, по врагу — атака. Пехота садится в свой БТР по клику на него. ПКМ снимает выбор.</p><div class="recruit-batch"><span>Заказать за клик</span><button data-recruit-count="1">×1</button><button data-recruit-count="5">×5</button></div><div class="army-recruit">${Object.entries(
-      E.GROUND_UNITS,
-    )
-      .map(
-        ([key, d]) =>
-          `<button data-recruit="${key}" title="${d.role}"><b>+ ${d.name}</b><small>${d.cost} ₡ · ${d.metal} спл. · ${d.time} с</small></button>`,
-      )
-      .join(
-        '',
-      )}</div><div id="army-queue" class="small-muted"></div><div id="army-list"></div><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-rally="auto">Сбор в точке ↗</button><button data-action="army-all">Выбрать всю армию</button></div>`;
+    html += recruitmentHTML({ state, armyCategory, recruitCount, armyAutomation });
   }
   if (panel === 'economy') {
     html += `<h2>Город и снабжение</h2><div id="economy-values"></div><div id="economy-buildings"></div><p class="status-note">Предприятие у связанной со штабом дороги работает на 100%. При разрыве пути его выпуск падает до 20%. Дефицит электричества и повреждения снижают его дополнительно.</p><p class="status-note">Пусковые автономны и не требуют дороги. Дороги снабжают заводы и экономику; их можно чинить или обходить новой улицей. Бонус бота ×1,25 действует на поступления ресурсов, цены совпадают.</p>`;

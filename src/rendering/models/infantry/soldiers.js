@@ -154,8 +154,14 @@ export class InfantryBatch {
           wz = u.z + z * c - x * s,
           index = pool.count++,
           height = crouch ? 0.67 : 1;
-        temp.position.set(wx, u.y || 1, wz);
-        temp.rotation.set(0, angle, 0);
+        const stride = u.moving ? Math.sin(time * 12 + m * 1.7) : 0;
+        const recoil = Math.exp(-Math.max(0, time - (u.lastFire ?? -100)) * 22) * 0.06;
+        temp.position.set(
+          wx - Math.sin(angle) * recoil,
+          (u.y || 1) + Math.abs(stride) * 0.055,
+          wz - Math.cos(angle) * recoil,
+        );
+        temp.rotation.set(u.moving ? 0.065 : 0, angle, stride * 0.018);
         temp.scale.set(1, height, 1);
         temp.updateMatrix();
         pool.body.setMatrixAt(index, temp.matrix);
@@ -177,7 +183,7 @@ export class InfantryBatch {
       if (this.world.armySelection?.includes(u.id) && selected < 600) {
         temp.position.set(u.x, 1.4, u.z);
         temp.rotation.set(-Math.PI / 2, 0, 0);
-        temp.scale.setScalar(d.size + 1.6);
+        temp.scale.setScalar(u.key === 'mog' ? 7 : u.key === 'assault' ? 4.5 : 1.8);
         temp.updateMatrix();
         this.selected.setMatrixAt(selected++, temp.matrix);
       }
@@ -191,7 +197,7 @@ export class InfantryBatch {
       ) {
         temp.position.set(u.x, 1.4, u.z);
         temp.rotation.set(-Math.PI / 2, 0, 0);
-        temp.scale.setScalar(GROUND_UNITS[u.key].size + 1.6);
+        temp.scale.setScalar(Math.max(4, GROUND_UNITS[u.key].size * 0.72));
         temp.updateMatrix();
         this.selected.setMatrixAt(selected++, temp.matrix);
       }

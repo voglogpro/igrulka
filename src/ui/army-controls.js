@@ -1,0 +1,110 @@
+import * as E from '../game/index.js';
+import { $ } from './format.js';
+import { renderDefenseDetail } from './defense-inspector.js';
+
+export function setArmyContextVisible(visible) {
+  const host = $('#army-controls');
+  if (!host) return;
+  host.hidden = !visible;
+  $('#game').classList.toggle('army-selected', visible);
+  if (!visible) {
+    host.innerHTML = '';
+    delete host.dataset.id;
+  }
+}
+
+const commands = [
+  ['stop', 'Стоять', 'Остановить движение и отменить приказ'],
+  ['attackmove', 'Наступать', 'M · Двигаться с боем до указанной точки'],
+  ['guard', 'Охрана', 'Охранять текущие позиции, помогать соседям и возвращаться на пост'],
+  [
+    'defendline',
+    'Линия обороны',
+    'L · Провести линию на карте, чтобы распределить выбранные войска',
+  ],
+  ['dig', 'Окоп', 'H · Окопаться на текущей позиции'],
+  ['camo', 'Маскировка', 'K · Скрытность в лесу, кустах и окопе'],
+  ['fire', 'Огонь', 'F · Разрешить или запретить стрельбу'],
+  ['retreat', 'Отход', 'T · Отступить к базе и восстановиться'],
+  ['board', 'Посадка', 'Указать свой БТР для посадки бойцов'],
+  ['unload', 'Высадка', 'U · Высадить бойцов из выбранного БТР'],
+];
+
+export function renderArmyControls({ state, armySelection }, primary) {
+  const host = $('#army-controls');
+  if (!host) return;
+  const units = state.groundUnits.filter((u) => armySelection.includes(u.id) && u.hp > 0);
+  if (!units.length) {
+    setArmyContextVisible(false);
+    return;
+  }
+  setArmyContextVisible(true);
+  const signature = units.map((u) => u.id).join(',');
+  const d = E.GROUND_UNITS[primary.key];
+  if (host.dataset.id !== signature) {
+    host.dataset.id = signature;
+    host.innerHTML = `<div class="army-summary"><button class="army-name" data-action="army-focus" title="Показать выбранную группу"><b>${units.length > 1 ? `${units.length} единиц` : d.name}</b><small id="ground-info"></small></button><div class="health"><i id="inspect-health"></i></div><small id="ground-state"></small></div><div class="army-orders"><div class="army-primary-orders">${commands.map(([key, label, title]) => `<button data-troop="${key}" title="${title}">${label}</button>`).join('')}${units.some((u) => u.key === 'operator') ? '<button class="fpv-button" data-troop="fpv" title="Q · Навести FPV выбранного оператора">FPV ↗</button>' : ''}</div><div class="army-tools"><label>Строй <select id="formation" aria-label="Построение армии"><option value="line">Линия</option><option value="column">Колонна</option><option value="spread">Рассредоточить</option></select></label><button data-action="army-all" title="Ctrl+A · Все свои войска">Вся армия</button><button data-panel="army">Набор ↗</button><details class="army-details"><summary>Состояние</summary><div><p id="army-detail-text"></p><div id="defense-detail"></div></div></details><span class="army-mouse-hint">ПКМ — приказ · Esc — снять выбор</span></div></div><button class="army-close" data-action="deselect" aria-label="Снять выделение">×</button>`;
+    $('#formation').value = state.formations[0];
+  }
+  const hp = units.reduce((n, u) => n + u.hp, 0),
+    maxHp = units.reduce((n, u) => n + u.maxHp, 0);
+  $('#inspect-health').style.width = `${(hp / maxHp) * 100}%`;
+  const moving = units.filter((u) => u.path?.length).length;
+  const reloading = units.filter((u) => (u.groundReload || u.reloadLeft) > 0).length;
+  $('#ground-info').textContent =
+    `${Math.ceil(hp)} / ${maxHp} · ${moving ? `${moving} в пути` : 'на позиции'}`;
+  const cover = E.coverInfo(state, primary);
+  const rank = E.veteranRank(primary);
+  const magazineText = d.groundRange
+    ? primary.groundReload > 0
+      ? `Перезарядка ${primary.groundReload.toFixed(1)} с.`
+      : `Патроны: ${primary.groundAmmo ?? d.groundMagazine ?? 30}.`
+    : '';
+  $('#ground-state').textContent =
+    units.length > 1
+      ? `${units.filter((u) => E.isInfantry(u.key)).length} пехота · ${units.filter((u) => !E.isInfantry(u.key)).length} техника${reloading ? ` · ${reloading} перезарядка` : ''}${units.some((u) => u.guard) ? ' · охрана' : ''}`
+      : `${rank ? '★'.repeat(rank) + ' · ' : ''}${primary.guard ? 'Охрана · ' : ''}${cover.kind} · ${Math.round((primary.suppression || 0) * 100)}% подавление${primary.digging ? ' · роет окоп' : ''}${primary.carrierId ? ' · в транспорте' : ''}`;
+  $('#army-detail-text').textContent =
+    `${d.role} Опыт ${Math.floor(primary.xp || 0)}/450 · ранг ${rank}. ${magazineText} ${primary.key === 'operator' ? `FPV ${primary.fpvAmmo ?? 3}/3, готов через ${Math.max(0, Math.ceil((primary.fpvReady || 0) - state.time))} с.` : ''}`;
+  if (units.length === 1 && d.capacity) {
+    const seats = (field) =>
+      state.groundUnits
+        .filter((p) => p[field] === primary.id && p.hp > 0)
+        .reduce((n, p) => n + (E.GROUND_UNITS[p.key].members || 1), 0);
+    $('#ground-state').textContent =
+      `Места: ${seats('carrierId')}/${d.capacity}${seats('boardingId') ? ` · подходят ${seats('boardingId')}` : ''}`;
+  }
+  if (units.length === 1 && d.range) {
+    const stats = E.defenseStats(state.sides[0], primary),
+      shared = d.infantry;
+    const rounds = shared ? primary.groundAmmo : primary.ammo,
+      reload = shared ? primary.groundReload : primary.reloadLeft;
+    $('#ground-state').textContent +=
+      primary.key === 'mog' && (primary.setup || 0) < 1
+        ? ` · развёртывание ${Math.round((primary.setup || 0) * 100)}%`
+        : reload > 0
+          ? ` · перезарядка ${reload.toFixed(1)} с`
+          : ` · ${rounds ?? stats.magazine}/${stats.magazine} · нагрев ${Math.round((primary.heat || 0) * 100)}%`;
+  }
+  const foot = units.some((u) => E.isInfantry(u.key) && !u.carrierId);
+  const held = units.every((u) => u.holdFire);
+  host.querySelector('[data-troop="fire"]').textContent = held ? 'Разрешить огонь' : 'Огонь';
+  host.querySelector('[data-troop="fire"]').classList.toggle('held', held);
+  host.querySelector('[data-troop="guard"]').classList.toggle(
+    'active',
+    units.every((u) => u.guard),
+  );
+  host
+    .querySelector('[data-troop="camo"]')
+    .classList.toggle(
+      'active',
+      foot && units.filter((u) => E.isInfantry(u.key) && !u.carrierId).every((u) => u.camouflaged),
+    );
+  for (const command of ['dig', 'camo', 'board'])
+    host.querySelector(`[data-troop="${command}"]`).disabled = !foot;
+  host.querySelector('[data-troop="unload"]').disabled = !units.some(
+    (u) => E.GROUND_UNITS[u.key].capacity && state.groundUnits.some((p) => p.carrierId === u.id),
+  );
+  if (d.range && units.length === 1) renderDefenseDetail(state, primary);
+  else $('#defense-detail').innerHTML = '';
+}

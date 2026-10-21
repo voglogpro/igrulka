@@ -88,6 +88,23 @@
 - `src/ui/icons.js`, `format.js`, `style.css`, `fonts.css` — оформление и форматирование.
 - `src/audio/game-audio.js` — процедурный звук и пространственная громкость.
 
+## Новые механики армии
+
+| Задача                                          | Где менять                                  |
+| ----------------------------------------------- | ------------------------------------------- |
+| Опыт, пороги рангов и бонус точности            | `src/game/units/ground/veterancy.js`        |
+| Охрана поста, линия обороны, помощь соседям     | `src/game/units/ground/guard.js`            |
+| Автоматический повтор набора и причины ожидания | `src/game/units/ground/repeat.js`           |
+| Режимы новых бойцов и точка сбора               | `src/game/units/ground/recruitment.js`      |
+| Компактные приказы выбранной армии              | `src/ui/army-controls.js`, `army.css`       |
+| Категории набора, лимит, повторный набор        | `src/ui/army-recruitment.js`                |
+| Состояние ПВО и модернизация                    | `src/ui/defense-inspector.js`               |
+| Процедурные бронепанели, люки и стволы          | `src/rendering/models/vehicles/geometry.js` |
+
+## Сетевая дуэль
+
+`server/index.mjs` запускает сервер. `server/rooms.mjs` хранит комнаты, места и симуляцию; `src/network/commands.js` проверяет команды; `perspective.js` подготавливает разрешённые данные игроку; `client.js` связывает WebSocket и сглаживание. `src/ui/multiplayer.js` / `multiplayer.css` — меню комнаты. Подробности и тесты — [MULTIPLAYER.md](MULTIPLAYER.md).
+
 ## Общие модули
 
 `src/game/index.js` — стабильный вход для интерфейса и тестов. `api.js` собирает экспорт правил из тематических файлов. `config.js` собирает справочники и общие функции характеристик. `shared/random.js`, `shared/events.js`, `shared/math.js` обслуживают системы без зависимости от браузера.

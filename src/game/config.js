@@ -1,6 +1,7 @@
 import { BUILDINGS } from './city/buildings.config.js';
 import { WEAPONS } from './units/aviation/weapons.config.js';
 import { GROUND_UNITS } from './units/ground/types.js';
+import { veteranAccuracy } from './units/ground/veterancy.js';
 export { BUILDINGS, WEAPONS, GROUND_UNITS };
 export { TECH } from './research/tech-tree.config.js';
 export { isInfantry } from './units/ground/types.js';
@@ -17,14 +18,21 @@ export function weaponStats(f, key) {
 }
 export function defenseStats(f, b) {
   const d = BUILDINGS[b.key] || GROUND_UNITS[b.key],
-    level = b.level || 0;
+    level = b.level || 0,
+    shared = d.infantry || b.key === 'gun';
   return {
     ...d,
     range: d.range * (1 + level * 0.08),
     damage: d.damage * (1 + level * 0.15),
-    accuracy: (f.tech.includes('targeting') ? 0.75 : 1) * Math.pow(0.82, level),
-    magazine: Math.ceil(d.magazine * (f.tech.includes('magazines') ? 1.5 : 1)),
-    reload: d.reload * (f.tech.includes('magazines') ? 0.75 : 1),
+    accuracy:
+      (f.tech.includes('targeting') ? 0.75 : 1) * Math.pow(0.82, level) * veteranAccuracy(b),
+    magazine: Math.ceil(
+      (shared ? (d.groundMagazine ?? d.magazine) : d.magazine) *
+        (f.tech.includes('magazines') ? 1.5 : 1),
+    ),
+    reload:
+      (shared ? (d.groundReload ?? d.reload) : d.reload) *
+      (f.tech.includes('magazines') ? 0.75 : 1),
     cooling: d.cooling * (f.tech.includes('cooling') ? 1.5 : 1),
     heatPerShot: d.heatPerShot * (f.tech.includes('cooling') ? 0.85 : 1),
   };

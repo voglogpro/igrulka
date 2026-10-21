@@ -34,6 +34,8 @@ export function orderGround(s, side, ids, aim) {
       },
       path = groundPath(s, u, destination, GROUND_UNITS[u.key].size * 0.42);
     if (!path.length) continue;
+    u.guard = null;
+    u.guardTargetId = null;
     u.path = path;
     u.order = {
       ...destination,
@@ -73,6 +75,8 @@ export function commandUnits(s, side, ids, command) {
   let changed = 0;
   for (const u of units) {
     if (command === 'stop') {
+      u.guard = null;
+      u.guardTargetId = null;
       u.path = [];
       u.order = null;
       u.boardingId = null;
@@ -89,6 +93,8 @@ export function commandUnits(s, side, ids, command) {
       changed++;
     }
     if (command === 'dig' && isInfantry(u.key) && !u.carrierId) {
+      u.guard = null;
+      u.guardTargetId = null;
       u.path = [];
       u.order = null;
       u.moving = false;

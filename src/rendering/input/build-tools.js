@@ -58,18 +58,20 @@ export function cancelRoad() {
   return false;
 }
 
-export function pointerUp(e) {
+export async function pointerUp(e) {
   if (e.button !== 0) return;
   this.selectionBox.hidden = true;
   this.keys.MouseLeft = false;
   const down = this.down;
   this.down = null;
+  if (this.callbacks.isModal?.()) return;
   if (!down || this.controls.rotating) return;
   const p = this.groundPoint(e);
   if (!p) return;
   const dragged = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 7;
   if (this.groundTargeting) {
-    if (!dragged) this.callbacks.onGroundTarget?.(p);
+    if (this.groundTargeting === 'defendline') this.callbacks.onGroundLine?.(down.ground, p);
+    else if (!dragged) this.callbacks.onGroundTarget?.(p);
     return;
   }
   if (this.aiming) {
@@ -87,7 +89,8 @@ export function pointerUp(e) {
     }
     const start = this.roadAnchor;
     if (Math.hypot(start.x - end.x, start.z - end.z) < 8) return;
-    const result = this.callbacks.onRoad?.(start, end);
+    const result = await this.callbacks.onRoad?.(start, end);
+    if (this.buildKey !== 'road' || this.roadAnchor !== start) return;
     if (result) this.roadAnchor = end;
     this.updateGhost(e);
     return;
@@ -115,65 +118,75 @@ export function pointerUp(e) {
     this.updateGhost(e);
     return;
   }
-  this.ray.setFromCamera(this.pointer, this.camera);
-  const hits = this.ray.intersectObjects(
-    [...this.models.values()]
-      .filter((m) => m.root.visible)
-      .map((m) => m.root)
-      .concat([...this.groundModels.values()], this.infantry.meshes),
-    true,
-  );
-  for (const hit of hits) {
-    if (hit.object.userData.infantryBatch) {
-      const id = hit.object.userData.unitIds[hit.instanceId];
-      if (id) {
-        const u = this.state.groundUnits.find((u) => u.id === id);
-        if (E.groundVisible(this.state, 0, u)) {
-          const chosen = E.targetById(this.state, this.selected);
-          if (chosen?.ground && chosen.side === 0 && u.side === 1)
-            this.callbacks.onGroundOrder?.({ x: u.x, z: u.z, targetId: id });
-          else this.callbacks.onSelect?.(id, e.shiftKey);
-          return;
-        }
-      }
-      continue;
-    }
-    let obj = hit.object;
-    while (obj && !obj.userData.buildingId && !obj.userData.groundId) obj = obj.parent;
-    if (obj) {
-      const id = obj.userData.buildingId || obj.userData.groundId,
-        t = E.targetById(this.state, id),
-        chosen = E.targetById(this.state, this.selected);
-      if (
-        chosen?.ground &&
-        chosen.side === 0 &&
-        E.isInfantry(chosen.key) &&
-        t?.key === 'apc' &&
-        t.side === 0 &&
-        !e.shiftKey
-      ) {
-        this.callbacks.onGroundOrder?.({ x: t.x, z: t.z, boardId: t.id });
+  const clicked = pickTarget.call(this),
+    chosen = E.targetById(this.state, this.selected);
+  if (clicked) {
+    if (chosen?.ground && chosen.side === 0) {
+      if (E.isInfantry(chosen.key) && clicked.key === 'apc' && clicked.side === 0 && !e.shiftKey) {
+        this.callbacks.onGroundOrder?.({ x: clicked.x, z: clicked.z, boardId: clicked.id });
         return;
       }
-      if (chosen?.ground && chosen.side === 0 && t?.side === 1) {
-        this.callbacks.onGroundOrder?.({ x: t.x, z: t.z, targetId: id });
+      if (clicked.side === 1) {
+        this.callbacks.onGroundOrder?.({ x: clicked.x, z: clicked.z, targetId: clicked.id });
         return;
       }
-      this.callbacks.onSelect?.(id, e.shiftKey);
-      return;
     }
+    this.callbacks.onSelect?.(clicked.id, e.shiftKey);
+    return;
   }
   const road = this.state.roads
     .filter((r) => !r.removed && E.observedTarget(this.state, 0, r.id))
     .map((r) => ({ r, d: E.segmentDistance(p.x, p.z, r.ax, r.az, r.bx, r.bz) }))
     .filter((v) => v.d < 7)
     .sort((a, b) => a.d - b.d)[0];
-  const chosen = E.targetById(this.state, this.selected);
   if (chosen?.ground && chosen.side === 0) {
     this.callbacks.onGroundOrder?.({ x: p.x, z: p.z });
     return;
   }
   this.callbacks.onSelect?.(road?.r.id ?? null);
+}
+
+function pickTarget() {
+  this.ray.setFromCamera(this.pointer, this.camera);
+  const roots = [...this.models.values()]
+    .map((m) => m.root)
+    .concat([...this.groundModels.values()], this.infantry.meshes)
+    .filter((root) => root.visible);
+  for (const hit of this.ray.intersectObjects(roots, true)) {
+    let id;
+    if (hit.object.userData.infantryBatch) id = hit.object.userData.unitIds[hit.instanceId];
+    else {
+      let obj = hit.object;
+      while (obj && !obj.userData.buildingId && !obj.userData.groundId) obj = obj.parent;
+      id = obj?.userData.buildingId || obj?.userData.groundId;
+    }
+    if (id) {
+      const target = E.observedTarget(this.state, 0, id);
+      if (target) return target;
+    }
+  }
+  return null;
+}
+
+// Short right-click gives an order. A dragged right button is reserved for the camera.
+export function groundCommandAt(e) {
+  const p = this.groundPoint(e);
+  if (!p) return;
+  const target = pickTarget.call(this);
+  const canBoard =
+    target?.side === 0 &&
+    target.key === 'apc' &&
+    this.armySelection.some((id) => {
+      const unit = E.targetById(this.state, id);
+      return unit && E.isInfantry(unit.key);
+    });
+  this.callbacks.onGroundOrder?.(
+    target?.side === 1
+      ? { x: target.x, z: target.z, targetId: target.id }
+      : canBoard
+        ? { x: target.x, z: target.z, boardId: target.id }
+        : { x: p.x, z: p.z },
+  );
 }
 
 export function groundPoint(e) {

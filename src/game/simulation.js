@@ -43,7 +43,7 @@ export function step(s, dt) {
   impacts(s);
   s.units = s.units.filter((u) => u.hp > 0 || u.status === 'falling');
   s.projectiles = s.projectiles.filter((p) => !p.dead);
-  ai(s);
+  if (s.mode !== 'multiplayer') ai(s);
   for (let owner = 0; owner < 2; owner++)
     if (!s.buildings.some((b) => b.side === owner && b.key === 'hq' && b.hp > 0)) {
       s.result = owner === 0 ? 'defeat' : 'victory';
