@@ -293,24 +293,24 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
   assert.equal((await rapid.closed()).code, 1008);
 });
 
-test('protocol one is explicitly refused and protocol two creates and joins a real room', async (t) => {
+test('old protocols are explicitly refused and protocol three creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 2);
+  assert.equal(PROTOCOL_VERSION, 3);
   const host = await connect();
   host.send({ type: 'create', protocol: 1, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
   assert.equal(server.rooms.size, 0);
-  host.send({ type: 'create', protocol: 2, name: 'Current host' });
+  host.send({ type: 'create', protocol: PROTOCOL_VERSION, name: 'Current host' });
   const joinedHost = await host.next((m) => m.type === 'joined');
-  assert.equal(joinedHost.protocol, 2);
+  assert.equal(joinedHost.protocol, PROTOCOL_VERSION);
   assert.equal(joinedHost.side, 0);
   const guest = await connect();
-  guest.send({ type: 'join', protocol: 1, code: joinedHost.room.code });
+  guest.send({ type: 'join', protocol: 2, code: joinedHost.room.code });
   assert.match((await guest.next((m) => m.type === 'error')).message, /Версии/);
   assert.equal(server.rooms.get(joinedHost.room.code).players[1], null);
-  guest.send({ type: 'join', protocol: 2, code: joinedHost.room.code });
+  guest.send({ type: 'join', protocol: PROTOCOL_VERSION, code: joinedHost.room.code });
   const joinedGuest = await guest.next((m) => m.type === 'joined');
-  assert.equal(joinedGuest.protocol, 2);
+  assert.equal(joinedGuest.protocol, PROTOCOL_VERSION);
   assert.equal(joinedGuest.side, 1);
 });
 

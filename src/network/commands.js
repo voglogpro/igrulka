@@ -1,6 +1,6 @@
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -83,6 +83,22 @@ export function executeCommand(s, side, type, a = {}) {
       if (a.siteId != null && (!validId(a.siteId) || !own(s, side, a.siteId)))
         return 'Казармы вам не принадлежат';
       return E.recruit(s, side, a.key, a.siteId ?? null, a.count);
+    case 'deploy': {
+      if (
+        !configured(E.GROUND_UNITS, a.key) ||
+        !point(a.point) ||
+        !Number.isInteger(a.count) ||
+        a.count < 1 ||
+        a.count > 5
+      )
+        return invalid;
+      if (a.siteId != null && (!validId(a.siteId) || !own(s, side, a.siteId)))
+        return 'Казармы вам не принадлежат';
+      const plan = E.deploymentPlan(s, side, a.key, a.point, a.count, a.siteId ?? null);
+      return plan.ok
+        ? E.deployGround(s, side, a.key, plan.point, a.count, plan.siteId)
+        : plan.reason;
+    }
     case 'order':
       if (
         !unitsOwned(s, side, a.ids) ||
@@ -95,14 +111,27 @@ export function executeCommand(s, side, type, a = {}) {
         (!validId(a.aim.targetId) || E.observedTarget(s, side, a.aim.targetId)?.side !== 1 - side)
       )
         return 'Недоступная цель';
-      return E.orderGround(s, side, a.ids, a.aim);
+      {
+        const result = E.orderGround(s, side, a.ids, a.aim);
+        if (typeof result === 'number' && result === a.ids.length)
+          E.retargetSquadReserves(s, side, a.ids, {
+            ...a.aim,
+            mode: a.aim.mode === 'move' ? 'move' : 'attackmove',
+          });
+        return result;
+      }
     case 'stance':
       if (
         !unitsOwned(s, side, a.ids) ||
         !['stop', 'dig', 'camo', 'fire', 'retreat', 'unload'].includes(a.command)
       )
         return invalid;
-      return E.commandUnits(s, side, a.ids, a.command);
+      {
+        const result = E.commandUnits(s, side, a.ids, a.command);
+        if (a.command === 'stop' && typeof result === 'number')
+          E.retargetSquadReserves(s, side, a.ids, null);
+        return result;
+      }
     case 'guard':
       if (!unitsOwned(s, side, a.ids)) return invalid;
       if (a.here === true) {
@@ -133,9 +162,16 @@ export function executeCommand(s, side, type, a = {}) {
         ? E.appendGroundOrder(s, side, a.ids, a.aim)
         : invalid;
     case 'district':
-      return unitsOwned(s, side, a.ids) && configured(E.DISTRICT_BY_ID, a.id)
-        ? E.captureDistrict(s, side, a.ids, a.id)
-        : invalid;
+      if (!unitsOwned(s, side, a.ids) || !configured(E.DISTRICT_BY_ID, a.id)) return invalid;
+      {
+        const result = E.captureDistrict(s, side, a.ids, a.id);
+        if (typeof result === 'number' && result === a.ids.length)
+          E.retargetSquadReserves(s, side, a.ids, {
+            ...E.DISTRICT_BY_ID[a.id],
+            mode: 'attackmove',
+          });
+        return result;
+      }
     case 'district-repair':
       return configured(E.DISTRICT_BY_ID, a.id) && typeof a.enabled === 'boolean'
         ? E.setDistrictRepair(s, side, a.id, a.enabled)

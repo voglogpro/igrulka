@@ -289,6 +289,108 @@
   padding: 8px;
   width: 100%;
 }
+#groups-bar {
+  display: block;
+  max-width: min(660px, calc(100% - 590px));
+  max-height: 100px;
+  padding: 8px;
+}
+.squad-cards {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  margin-top: 6px;
+  max-width: 100%;
+  padding-bottom: 3px;
+}
+#groups-bar .squad-cards button {
+  min-width: 120px;
+  flex: 0 0 150px;
+  overflow: hidden;
+  padding: 7px 9px;
+  text-align: left;
+}
+.squad-cards b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+#groups-bar .squad-cards small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.squad-cards button.active {
+  background: #b5d1a723;
+  border-color: #b5d1a788;
+}
+#deployment-hud {
+  position: absolute;
+  right: 24px;
+  bottom: 190px;
+  width: 270px;
+  padding: 14px;
+  z-index: 12;
+}
+.deployment-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.deployment-top span {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #aec9ad;
+}
+.deployment-top button {
+  padding: 0 4px;
+  font-size: 20px;
+}
+#deployment-key {
+  margin: 9px 0;
+  width: 100%;
+  padding: 8px;
+  font-size: 12px;
+}
+.deployment-count {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.deployment-count button {
+  border: 1px solid #a4c5ac44;
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+.deployment-count button.active {
+  background: #b7cda9;
+  color: #20372b;
+}
+.deployment-count span {
+  margin-left: auto;
+  font-size: 10px;
+  color: #c6d6bd;
+}
+#deployment-note {
+  font-size: 11px;
+  line-height: 1.5;
+  min-height: 33px;
+  color: #c0d6be;
+}
+#deployment-hud small {
+  font-size: 9px;
+  color: #94b19b;
+}
+#game:has(#deployment-hud:not([hidden])) #groups-bar {
+  display: none;
+}
+#deployment-note.warning {
+  color: #e9b393;
+}
 @media (max-width: 1100px) {
   #army-controls {
     gap: 10px;
@@ -310,6 +412,12 @@
   }
 }
 @media (max-width: 760px) {
+  #groups-bar {
+    max-width: calc(100% - 30px);
+  }
+  #district-strip {
+    top: 215px;
+  }
   #army-controls {
     align-items: flex-start;
     gap: 8px;

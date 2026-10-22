@@ -23,6 +23,11 @@ with sync_playwright() as p:
     assert report['instancing']['memoryBefore']==report['instancing']['memoryAfter'],report['instancing']
     page.screenshot(path=str((ARTIFACTS/'infantry8-mass.png')),timeout=120000)
     print('80 additional riflemen do not add draw calls or geometries',flush=True)
+    page.keyboard.press('Escape')
+    moved=page.evaluate('''()=>{const w=skyfront.getWorld(),u=w.state.groundUnits[0];u.x=-250;u.z=160;w.focus(u.x,u.z,160);w.controls.update(3);w.sync();w.scene.updateMatrixWorld(true);return u.id;}''')
+    point=pt(-250,160);page.mouse.click(point['x'],point['y'])
+    assert page.evaluate('skyfront.getOrder().armySelection')==[moved]
+    print('A moved instanced soldier remains clickable outside its initial bounds',flush=True)
     report['concealment']=page.evaluate('''()=>{const w=skyfront.getWorld(),E=skyfront.engine,s=w.state,p=E.COVER_PATCHES.find(p=>p.x>100&&p.x<450&&Math.abs(p.z)<400);s.groundUnits=[];const hidden=E.makeGround(s,1,'sniper',p.x,p.z),observer=E.makeGround(s,0,'machinegunner',p.x-130,p.z);hidden.camouflaged=true;observer.holdFire=true;s.groundUnits.push(hidden,observer);s.contacts=[[],[]];E.advance(s,1);w.controls.focus(p.x-40,p.z,240);w.controls.update(3);w.sync();w.post.render(w.scene,w.camera,w.elapsed);let drawn=false;for(const pool of w.infantry.pools.values())if(pool.body.userData.unitIds.slice(0,pool.body.count).includes(hidden.id))drawn=true;return {visible:E.groundVisible(s,0,hidden),drawn,contacts:s.contacts[0].length,contactRings:w.contactRings.count};}''')
     assert not report['concealment']['visible'] and not report['concealment']['drawn']
     assert report['concealment']['contacts']>0 and report['concealment']['contactRings']>0

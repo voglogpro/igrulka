@@ -1,5 +1,6 @@
 import { setArmyContextVisible } from './army-controls.js';
 import { updateArmyRecruitment } from './army-recruitment.js';
+import { updateDeploymentHUD, renderSquadRoster } from './deployment.js';
 import {
   factoryPlanRequest,
   loadFactoryPlanFields,
@@ -26,6 +27,10 @@ try {
   if (raw) {
     state = E.load(raw);
     resumed = state.time > 0 || state.buildings.length > 2;
+    if (JSON.parse(raw).version < 10 && !localStorage.getItem(SAVE + '-before-deployment10')) {
+      localStorage.setItem(SAVE + '-before-deployment10', raw);
+      loadNotice = 'Пополнение обновлено: выберите тип бойца и укажите место назначения на карте.';
+    }
     if (JSON.parse(raw).version < 9 && !localStorage.getItem(SAVE + '-before-districts9')) {
       localStorage.setItem(SAVE + '-before-districts9', raw);
       loadNotice =
@@ -88,6 +93,10 @@ let world,
   troopMode = null,
   rallyId = null,
   recruitCount = 1,
+  deployKey = null,
+  deployPlan = null,
+  deployPoint = null,
+  deployHoverAt = 0,
   armyCategory = 'infantry',
   armyAutomation = { siteId: null, key: 'infantry' },
   network = null,
@@ -109,6 +118,7 @@ try {
     onBoxSelect: selectArmy,
     onGroundOrder: commandGround,
     onGroundTarget: troopTarget,
+    onGroundHover: previewDeployment,
     onGroundLine: defendLine,
     onAimPoint: chooseAimPoint,
     onAimHover: previewAimPoint,
@@ -344,6 +354,7 @@ function frame(dt) {
     updateHUD();
     updateLivePanel();
     if (aiming) updateStrikeHUD();
+    if (troopMode === 'deploy') previewDeployment(deployPoint, true);
     if (
       !pointerBusy &&
       armySelection.some(
@@ -464,6 +475,9 @@ function clearArmySelection() {
 function clearTroopTarget() {
   interactionRevision++;
   troopMode = null;
+  deployKey = null;
+  deployPlan = null;
+  updateDeploymentHUD(state, null);
   world.setGroundTargeting(null);
   $('#mode-status').textContent = 'ПКМ — приказ · зажать ПКМ — ракурс · Esc — отмена';
 }
@@ -480,6 +494,7 @@ function setTroopTarget(mode) {
       fpv: 'FPV · ЛКМ по цели',
       rally: 'Точка сбора · ЛКМ по карте',
       deliver: 'Доставка пехоты · ЛКМ по точке высадки',
+      deploy: 'Пополнение · ЛКМ — место назначения',
     }[mode] || '') + ' · ПКМ / Esc — отмена';
 }
 function chooseBuild(key) {
@@ -729,25 +744,52 @@ function selectArmy(ids, extend = false) {
     setArmyContextVisible(false);
   }
   renderGroups();
-  $('#mode-status').textContent = 'Рамка / Shift — выбор · Ctrl+цифра — группа · ПКМ — приказ';
+  $('#mode-status').textContent = 'Рамка / карточка — выбрать отряд · ПКМ — приказ';
 }
 function renderGroups() {
-  const host = $('#groups-bar');
-  if (!host) return;
-  const signature = Array.from({ length: 9 }, (_, i) => E.getGroup(state, 0, i + 1).length).join(
-    ',',
-  );
-  host.hidden = !state.groundUnits.some((u) => u.side === 0 && u.hp > 0);
-  if (host.dataset.signature !== signature) {
-    host.dataset.signature = signature;
-    host.innerHTML =
-      '<span>ГРУППЫ</span>' +
-      Array.from(
-        { length: 9 },
-        (_, i) =>
-          `<button data-group="${i + 1}" title="${i + 1}: выбрать · Ctrl+${i + 1}: сохранить выделение">${i + 1}<small>${E.getGroup(state, 0, i + 1).length || '·'}</small></button>`,
-      ).join('');
+  renderSquadRoster(state, armySelection);
+}
+function beginDeployment(key) {
+  if (!E.GROUND_UNITS[key]) return;
+  cancelTool(true);
+  deployKey = key;
+  deployPoint = null;
+  setTroopTarget('deploy');
+  updateDeploymentHUD(state, deployKey, recruitCount, null);
+  world.controls.focusInput();
+}
+function previewDeployment(point, force = false) {
+  if (troopMode !== 'deploy' || !deployKey) return;
+  if (point) deployPoint = { x: point.x, z: point.z };
+  const now = performance.now();
+  if (!force && now - deployHoverAt < 100) return;
+  deployHoverAt = now;
+  deployPlan = deployPoint
+    ? E.deploymentPlan(state, 0, deployKey, deployPoint, recruitCount)
+    : null;
+  world.deploymentPreview.set(deployPlan);
+  updateDeploymentHUD(state, deployKey, recruitCount, deployPlan);
+}
+async function deployAt(point) {
+  const revision = interactionRevision;
+  const key = deployKey;
+  const plan = E.deploymentPlan(state, 0, key, point, recruitCount);
+  if (!plan.ok) {
+    toast(plan.reason, true);
+    previewDeployment(point, true);
+    return;
   }
+  const result = await execute('deploy', { key, point: plan.point, count: recruitCount });
+  if (revision !== interactionRevision) return;
+  if (!result || typeof result === 'string')
+    toast(typeof result === 'string' ? result : 'Не удалось назначить пополнение', true);
+  else {
+    toast(`${E.GROUND_UNITS[key].name} ×${result.count}: подготовка → выбранная точка`);
+    persist();
+    renderGroups();
+    updateHUD();
+  }
+  previewDeployment(point, true);
 }
 async function commandGround(p) {
   if (!started || !armySelection.length) return;
@@ -790,6 +832,10 @@ async function troopTarget(p) {
   const revision = interactionRevision,
     issuedMode = troopMode;
   let result;
+  if (troopMode === 'deploy') {
+    await deployAt(p);
+    return;
+  }
   if (troopMode === 'rally') result = await execute('rally', { id: rallyId, point: p });
   else if (troopMode === 'fpv')
     result = await execute('fpv', { ids: [...armySelection], point: p });
@@ -928,7 +974,11 @@ function select(id, extend = false) {
   }
   if (tool) chooseBuild(tool);
   if (t?.ground && t.side === 0) {
-    selectArmy([id], extend);
+    const ids =
+      !extend && t.squadId
+        ? E.squadRoster(state, 0).find((g) => g.id === t.squadId)?.ids || [id]
+        : [id];
+    selectArmy(ids, extend);
     return;
   }
   clearArmySelection();
@@ -1167,6 +1217,19 @@ document.addEventListener('click', async (ev) => {
       .map((u) => u.id);
     selectArmy(ids, ev.shiftKey);
   }
+  if (d.squad) {
+    const ids = d.squad.startsWith('role-')
+      ? state.groundUnits
+          .filter((u) => u.side === 0 && u.hp > 0 && !u.squadId && u.key === d.squad.slice(5))
+          .map((u) => u.id)
+      : E.squadRoster(state, 0).find((g) => g.id === Number(d.squad))?.ids || [];
+    if (ids.length) selectArmy(ids, ev.shiftKey);
+  }
+  if (d.deployCount) {
+    recruitCount = Number(d.deployCount);
+    previewDeployment(deployPoint, true);
+  }
+  if (d.action === 'cancel-deploy') cancelTool(true);
   if (d.weapon) armStrike(d.weapon);
   if (d.unit) {
     select(Number(d.unit), ev.shiftKey);
@@ -1227,13 +1290,7 @@ document.addEventListener('click', async (ev) => {
     } else toast(id, true);
   }
   if (d.recruit) {
-    const r = await execute('recruit', { key: d.recruit, count: recruitCount });
-    if (typeof r === 'string') toast(r, true);
-    else {
-      toast('Отряд добавлен в очередь казарм');
-      persist();
-      updateLivePanel();
-    }
+    beginDeployment(d.recruit);
   }
   if (d.upgrade) {
     const r = await execute('upgrade', { id: Number(d.upgrade) });
@@ -1418,6 +1475,7 @@ document.addEventListener('change', async (ev) => {
     if (typeof result === 'string') toast(result, true);
     else persist();
   }
+  if (ev.target.id === 'deployment-key') beginDeployment(ev.target.value);
   if (ev.target.id === 'repeat-site' || ev.target.id === 'repeat-key') {
     armyAutomation.siteId = Number($('#repeat-site').value);
     armyAutomation.key = $('#repeat-key').value;

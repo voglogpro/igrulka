@@ -4,9 +4,9 @@ import { $ } from './format.js';
 export const ARMY_CATEGORIES = {
   infantry: {
     name: 'Пехота',
-    keys: ['infantry', 'machinegunner', 'sniper', 'assault', 'engineer', 'operator'],
+    keys: ['infantry', 'machinegunner', 'sniper', 'assault', 'atgm', 'engineer', 'operator'],
   },
-  vehicles: { name: 'Техника', keys: ['apc', 'leopard'] },
+  vehicles: { name: 'Техника', keys: ['apc', 'leopard', 'tankdestroyer'] },
   defense: { name: 'ПВО', keys: ['mog', 'shilka', 'gepard'] },
 };
 
@@ -32,7 +32,7 @@ export function recruitmentHTML({
     })
     .join(
       '',
-    )}</div><div id="army-queue" class="status-note"></div>${autoRecruitmentHTML(state, armyAutomation)}<details class="army-roster"><summary id="army-roster-label">На поле</summary><div id="army-list"></div></details><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-rally="auto" title="Назначить точку сбора новых бойцов">Точка сбора ↗</button><button data-action="army-all">Выбрать армию</button></div><p class="army-panel-hint">Рамка — выбрать · ПКМ — приказ · L — линия обороны · Ctrl+1…9 — группы</p>`;
+    )}</div><div id="army-queue" class="status-note"></div>${autoRecruitmentHTML(state, armyAutomation)}<details class="army-roster"><summary id="army-roster-label">На поле</summary><div id="army-list"></div></details><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-rally="auto" title="Назначить точку сбора новых бойцов">Точка сбора ↗</button><button data-action="army-all">Выбрать армию</button></div><p class="army-panel-hint">Рамка — выбрать · ПКМ — приказ · L — линия обороны</p>`;
 }
 
 function autoRecruitmentHTML(state, choice = { siteId: null, key: 'infantry' }) {
@@ -124,6 +124,6 @@ export function updateArmyRecruitment({ state, recruitCount }) {
           ? 'Не хватает ресурсов'
           : full
             ? 'Очередь заполнена'
-            : `Нанять ×${recruitCount}`;
+            : `Указать точку ×${recruitCount} ↗`;
   }
 }

@@ -1,5 +1,28 @@
 // Fictional game values. Change balance here, not in rendering code.
 export const INFANTRY_TYPES = {
+  atgm: {
+    infantry: true,
+    members: 2,
+    name: 'Расчёт ПТРК',
+    cost: 180,
+    metal: 13,
+    time: 14,
+    hp: 74,
+    speed: 15,
+    size: 3,
+    upkeep: 0.1,
+    range: 0,
+    groundRange: 235,
+    groundDamage: 240,
+    groundCooldown: 6.5,
+    groundMagazine: 2,
+    groundReload: 8,
+    groundWeapon: 'antiArmor',
+    suppression: 0.1,
+    sight: 245,
+    tech: 'armor',
+    role: 'Два бойца с ПТРК. Приоритет — бронетехника; стрельба с остановки. Подавление срывает огонь, против пехоты ракеты малоэффективны. По воздуху не стреляет.',
+  },
   infantry: {
     infantry: true,
     members: 1,

@@ -9,6 +9,7 @@
 - Солдаты: `src/game/units/infantry/`; техника: `src/game/units/vehicles/`; общая наземная логика: `src/game/units/ground/`.
 - Параметры солдат: `infantry/types.js`; параметры машин: `vehicles/types.js`. `ground/types.js` только собирает общий справочник.
 - Модели солдат: `src/rendering/models/infantry/`; модели машин: `src/rendering/models/vehicles/`. Модель Leopard имеет отдельный файл.
+- Пополнение и состав отрядов: `units/ground/deployment.js`, `squads.js`; поиск целей и классы оружия/брони: `engagement.js`. Пути от `src/game/`. UI набора в точку и карточки — `src/ui/deployment.js`.
 - ПВО и снаряды: `src/game/combat/`; экономика и улицы: `src/game/city/`; бот: `src/game/ai/`.
 - Захват, доход и ремонт районов: `src/game/territory/`; планы заводов: `units/aviation/factory-plans.js`; очередь путей: `units/ground/route-queue.js`; доставка БТР: `units/vehicles/transport-orders.js` (пути от `src/game/`).
 - Камера: `src/rendering/camera.js`; маршрутизация кликов: `src/rendering/input/build-tools.js`; освещение: `src/rendering/lighting.js`.

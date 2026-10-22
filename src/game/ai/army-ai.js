@@ -25,10 +25,22 @@ export function updateArmyAI(s, hooks) {
         'assault',
         'apc',
         ...(f.tech.includes('mobileAA') ? ['gepard'] : []),
-        ...(f.tech.includes('armor') ? ['leopard'] : []),
+        ...(f.tech.includes('armor') ? ['leopard', 'atgm', 'tankdestroyer'] : []),
         ...(f.tech.includes('fpvTeams') ? ['operator'] : []),
       ];
-      recruit(s, 1, choices[Math.floor(random(s) * choices.length)], null, 1);
+      const armorThreat = s.groundUnits.some(
+        (u) => u.side === 0 && u.hp > 0 && u.key === 'leopard',
+      );
+      const antiArmor = s.groundUnits.filter(
+        (u) => u.side === 1 && u.hp > 0 && ['atgm', 'tankdestroyer'].includes(u.key),
+      ).length;
+      const key =
+        armorThreat && f.tech.includes('armor') && antiArmor < 2
+          ? antiArmor
+            ? 'tankdestroyer'
+            : 'atgm'
+          : choices[Math.floor(random(s) * choices.length)];
+      recruit(s, 1, key, null, 1);
     }
     updateDistrictAI(s);
     const hq = s.buildings.find((b) => b.side === 0 && b.key === 'hq' && b.hp > 0);

@@ -1,5 +1,27 @@
 // Fictional game values. Change balance here, not in rendering code.
 export const VEHICLE_TYPES = {
+  tankdestroyer: {
+    name: 'Противотанковая машина',
+    cost: 520,
+    metal: 40,
+    time: 28,
+    hp: 260,
+    speed: 24,
+    size: 8,
+    upkeep: 0.4,
+    range: 0,
+    groundRange: 245,
+    groundDamage: 240,
+    groundCooldown: 6,
+    groundMagazine: 4,
+    groundReload: 9,
+    groundWeapon: 'antiArmor',
+    groundArmor: 'light',
+    suppression: 0.12,
+    sight: 255,
+    tech: 'armor',
+    role: 'Лёгкая машина с противотанковыми ракетами. Дальний огонь с остановки против брони; нуждается в прикрытии от пехоты. По воздуху не стреляет.',
+  },
   shilka: {
     name: 'Шилка',
     cost: 380,

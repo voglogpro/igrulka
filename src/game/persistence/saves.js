@@ -4,6 +4,7 @@ import { campRoads } from '../city/roads.js';
 import { log } from '../shared/events.js';
 import { restoreDistricts } from '../territory/persistence.js';
 import { isFactoryPlan } from '../units/aviation/factory-plans.js';
+import { validateSquadMetadata } from './squads.js';
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
   const copy = structuredClone(s);
@@ -14,7 +15,7 @@ export function save(s) {
 export function load(raw) {
   const s = JSON.parse(raw);
   if (
-    ![3, 4, 5, 6, 7, 8, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, 9, VERSION].includes(s.version) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
@@ -155,7 +156,8 @@ export function load(raw) {
     if (
       !['x', 'y', 'z', 'vx', 'vy', 'vz', 'speed', 'life', 'maxLife'].every((k) =>
         Number.isFinite(p[k]),
-      )
+      ) ||
+      ['originX', 'originZ'].some((key) => p[key] != null && !Number.isFinite(p[key]))
     )
       throw Error('Повреждены снаряды');
   s.groundUnits ||= [];
@@ -169,6 +171,7 @@ export function load(raw) {
     )
       throw Error('Повреждён отряд');
   for (const u of s.groundUnits) {
+    validateSquadMetadata(u);
     if (
       u.routeQueue != null &&
       (!Array.isArray(u.routeQueue) ||
@@ -220,6 +223,7 @@ export function load(raw) {
       throw Error('Повреждена цель гарнизона');
   }
   for (const b of s.buildings) {
+    for (const q of b.armyQueue || []) validateSquadMetadata(q, true);
     if (b.productionPlan != null) {
       if (b.key !== 'factory' || !isFactoryPlan(b.productionPlan))
         throw Error('Повреждён план боезапаса');

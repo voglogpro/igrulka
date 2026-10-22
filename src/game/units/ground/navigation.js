@@ -50,15 +50,43 @@ export function groundPath(s, from, to, radius = 3) {
   const nearest = (p) => {
     let found = -1,
       best = Infinity;
-    for (let i = 0; i < blocked.length; i++)
-      if (!blocked[i]) {
-        const q = point(i),
-          dist = Math.hypot(q.x - p.x, q.z - p.z);
-        if (dist < best && (!walkable(s, p.x, p.z, radius) || clear(p, q))) {
-          best = dist;
-          found = i;
+    const cx = Math.max(0, Math.min(WIDTH - 1, Math.round((p.x - OX) / CELL)));
+    const cz = Math.max(0, Math.min(DEPTH - 1, Math.round((p.z - OZ) / CELL)));
+    const sourceWalkable = walkable(s, p.x, p.z, radius);
+    const consider = (x, z) => {
+      if (x < 0 || x >= WIDTH || z < 0 || z >= DEPTH) return;
+      const i = z * WIDTH + x;
+      if (blocked[i]) return;
+      const q = point(i),
+        dist = (q.x - p.x) ** 2 + (q.z - p.z) ** 2;
+      if ((dist < best || (dist === best && i < found)) && (!sourceWalkable || clear(p, q))) {
+        best = dist;
+        found = i;
+      }
+    };
+    // Nearby endpoints should never ray march to hundreds of distant cells first.
+    for (let ring = 0; ring < Math.max(WIDTH, DEPTH); ring++) {
+      if (ring === 0) consider(cx, cz);
+      else {
+        for (let x = cx - ring; x <= cx + ring; x++) {
+          consider(x, cz - ring);
+          consider(x, cz + ring);
+        }
+        for (let z = cz - ring + 1; z < cz + ring; z++) {
+          consider(cx - ring, z);
+          consider(cx + ring, z);
         }
       }
+      let outside = Infinity;
+      if (cx - ring > 0) outside = Math.min(outside, Math.abs(OX + (cx - ring - 1) * CELL - p.x));
+      if (cx + ring < WIDTH - 1)
+        outside = Math.min(outside, Math.abs(OX + (cx + ring + 1) * CELL - p.x));
+      if (cz - ring > 0) outside = Math.min(outside, Math.abs(OZ + (cz - ring - 1) * CELL - p.z));
+      if (cz + ring < DEPTH - 1)
+        outside = Math.min(outside, Math.abs(OZ + (cz + ring + 1) * CELL - p.z));
+      if (found >= 0 && best < outside * outside) break;
+      if (outside === Infinity) break;
+    }
     return found;
   };
   const start = nearest(from),

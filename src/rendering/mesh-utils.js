@@ -1,15 +1,57 @@
 import * as T from '../../vendor/three/three.module.js';
+function colorBatchKey(m) {
+  const material = m.material;
+  if (
+    !material.isMeshStandardMaterial ||
+    material.map ||
+    material.vertexColors ||
+    material.onBeforeCompile !== T.Material.prototype.onBeforeCompile ||
+    Object.keys(material).some((key) => /Map$/.test(key) && material[key]) ||
+    material.emissive.getHex() !== 0 ||
+    material.alphaTest ||
+    material.wireframe
+  )
+    return null;
+  return [
+    'color',
+    material.roughness,
+    material.metalness,
+    material.side,
+    material.flatShading,
+    material.depthTest,
+    material.depthWrite,
+    material.polygonOffset,
+    material.polygonOffsetFactor,
+    material.polygonOffsetUnits,
+    material.fog,
+    material.toneMapped,
+  ].join('/');
+}
 // Batch a static subtree by material. Rotors, wings and turrets keep their independent transforms.
 export function batchStatic(root, excluded = new Set()) {
   root.updateMatrixWorld(true);
   const inverse = root.matrixWorld.clone().invert(),
     groups = new Map();
   root.traverse((m) => {
-    if (!m.isMesh || m.isInstancedMesh || Array.isArray(m.material) || m.material.transparent)
+    if (
+      !m.isMesh ||
+      !m.visible ||
+      m.isInstancedMesh ||
+      Array.isArray(m.material) ||
+      m.material.transparent ||
+      m.material.vertexColors
+    )
       return;
     for (let p = m; p && p !== root; p = p.parent)
-      if (excluded.has(p) || p.userData.dynamic) return;
-    const key = m.material.uuid + '/' + m.castShadow + '/' + m.receiveShadow + '/' + m.renderOrder;
+      if (!p.visible || excluded.has(p) || p.userData.dynamic) return;
+    const key =
+      (colorBatchKey(m) || m.material.uuid) +
+      '/' +
+      m.castShadow +
+      '/' +
+      m.receiveShadow +
+      '/' +
+      m.renderOrder;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(m);
   });
@@ -22,7 +64,9 @@ export function batchStatic(root, excluded = new Set()) {
       count += m.geometry.index?.count || m.geometry.attributes.position.count;
     const positions = new Float32Array(count * 3),
       normals = new Float32Array(count * 3),
-      uvs = new Float32Array(count * 2);
+      uvs = new Float32Array(count * 2),
+      colored = !!colorBatchKey(meshes[0]),
+      colors = colored ? new Float32Array(count * 3) : null;
     let cursor = 0;
     for (const m of meshes) {
       const geo = m.geometry,
@@ -41,16 +85,24 @@ export function batchStatic(root, excluded = new Set()) {
           normals.set([normal.x, normal.y, normal.z], cursor * 3);
         }
         if (uv) uvs.set([uv.getX(index), uv.getY(index)], cursor * 2);
+        if (colors)
+          colors.set([m.material.color.r, m.material.color.g, m.material.color.b], cursor * 3);
       }
     }
     const geometry = new T.BufferGeometry();
     geometry.setAttribute('position', new T.BufferAttribute(positions, 3));
     geometry.setAttribute('normal', new T.BufferAttribute(normals, 3));
     geometry.setAttribute('uv', new T.BufferAttribute(uvs, 2));
+    if (colors) geometry.setAttribute('color', new T.BufferAttribute(colors, 3));
     geometry.computeBoundingSphere();
     geometry.userData.owned = true;
     const first = meshes[0],
-      combined = new T.Mesh(geometry, first.material);
+      material = colored ? first.material.clone() : first.material;
+    if (colored) {
+      material.color.set('#ffffff');
+      material.vertexColors = true;
+    }
+    const combined = new T.Mesh(geometry, material);
     combined.castShadow = first.castShadow;
     combined.receiveShadow = first.receiveShadow;
     combined.renderOrder = first.renderOrder;

@@ -114,6 +114,10 @@
 
 ## Общие модули
 
+Пополнение с индивидуальным назначением: `units/ground/deployment.js`; состав и ожидающие бойцы отряда: `squads.js`; выбор целей, классы брони и упреждение: `engagement.js`. Все пути здесь от `src/game/`. Интерфейс наведения и карточек — `src/ui/deployment.js`; линия пути — `src/rendering/deployment-preview.js`. Формат метаданных проверяется в `game/persistence/squads.js`.
+
+Расход пикселей — `src/rendering/performance/render-budget.js`; общий снимок видимости для отрисовки — `ground-visibility.js` рядом. Разбиение леса — `rendering/terrain/instance-tiles.js`; цветное объединение геометрии — `rendering/mesh-utils.js`; разворот самолётов — `rendering/models/aircraft-motion.js`. Сравнение тяжёлых сцен — `tests/browser/performance.py`, проверка нового набора — `tests/browser/deployment.py`.
+
 `src/game/index.js` — стабильный вход для интерфейса и тестов. `api.js` собирает экспорт правил из тематических файлов. `config.js` собирает справочники и общие функции характеристик. `shared/random.js`, `shared/events.js`, `shared/math.js` обслуживают системы без зависимости от браузера.
 
 `archive/legacy/` нужен только тестам прежнего прототипа. `docs/history/` хранит планы прошлых версий. Готовый `play/Skyfront.html` объединяет текущие исходники и не служит местом ручных изменений.

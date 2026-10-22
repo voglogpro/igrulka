@@ -1,9 +1,13 @@
 import * as T from '../../../../vendor/three/three.module.js';
 import { GROUND_UNITS, isInfantry } from '../../../game/config.js';
-import { groundVisible, coverInfo } from '../../../game/units/infantry/cover.js';
+import { groundVisible } from '../../../game/units/infantry/cover.js';
+import { buildInfantryAT } from './anti-tank.js';
 const temp = new T.Object3D(),
   normal = new T.Vector3(),
-  vertex = new T.Vector3();
+  vertex = new T.Vector3(),
+  frustum = new T.Frustum(),
+  viewProjection = new T.Matrix4(),
+  bounds = new T.Sphere(new T.Vector3(), 12);
 function bodyGeometry(w, key, side) {
   const root = new T.Group(),
     paint = side === 0 ? '#75836b' : '#8f7966',
@@ -48,6 +52,7 @@ function bodyGeometry(w, key, side) {
   if (key === 'mog') {
     w.box(root, 0, 1.3, 0.4, 0.9, 0.7, 0.2, '#485d47');
   }
+  if (key === 'atgm') buildInfantryAT(w, root, paint);
   root.updateMatrixWorld(true);
   let count = 0;
   root.traverse((m) => {
@@ -126,15 +131,25 @@ export class InfantryBatch {
     }
     return this.pools.get(id);
   }
-  sync(units, time) {
+  sync(units, time, visibleIds = null) {
+    const camera = this.world.camera;
+    camera.updateMatrixWorld();
+    frustum.setFromProjectionMatrix(
+      viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
+    );
     for (const p of this.pools.values()) p.count = 0;
     let selected = 0;
     for (const u of units) {
-      if (!isInfantry(u.key) || !groundVisible(this.world.state, 0, u)) continue;
+      if (
+        !isInfantry(u.key) ||
+        !(visibleIds ? visibleIds.has(u.id) : groundVisible(this.world.state, 0, u))
+      )
+        continue;
+      bounds.center.set(u.x, (u.y || 1) + 2, u.z);
+      if (!frustum.intersectsSphere(bounds)) continue;
       const d = GROUND_UNITS[u.key],
         pool = this.pool(u.key, u.side),
         members = Math.max(1, Math.ceil(((d.members || 1) * u.hp) / u.maxHp)),
-        cover = coverInfo(this.world.state, u),
         crouch =
           (u.key === 'mog' && (u.setup || 0) > 0.8) ||
           u.digging ||
@@ -146,7 +161,7 @@ export class InfantryBatch {
             ? Math.atan2(u.targetX - u.x, u.targetZ - u.z)
             : u.yaw || 0;
       for (let m = 0; m < members && pool.count < 512; m++) {
-        const x = members > 1 ? (m - 1) * 2.7 : 0,
+        const x = members > 1 ? (m - (members - 1) / 2) * 2.7 : 0,
           z = members > 1 ? (m % 2) * 2 - 1 : 0,
           c = Math.cos(angle),
           s = Math.sin(angle),
@@ -192,6 +207,7 @@ export class InfantryBatch {
       if (
         !isInfantry(u.key) &&
         !u.carrierId &&
+        (!visibleIds || visibleIds.has(u.id)) &&
         this.world.armySelection?.includes(u.id) &&
         selected < 600
       ) {
@@ -206,6 +222,12 @@ export class InfantryBatch {
       p.legs.count = p.count * 2;
       p.body.instanceMatrix.needsUpdate = true;
       p.legs.instanceMatrix.needsUpdate = true;
+      // Raycaster uses these bounds even though rendering frustum culling is manual.
+      // A squad that moved outside its original bounds must remain clickable.
+      if (p.count) {
+        p.body.computeBoundingSphere();
+        p.legs.computeBoundingSphere();
+      }
     }
     this.selected.count = selected;
     this.selected.instanceMatrix.needsUpdate = true;

@@ -4,6 +4,7 @@ import * as E from '../game/index.js';
 import { BUILDINGS } from '../game/index.js';
 import { aircraftModel } from './models/aircraft.js';
 import { groundModel, animateGround } from './models/ground.js';
+import { aircraftAttitude } from './models/aircraft-motion.js';
 export function sync() {
   const buildingIds = new Set(this.state.buildings.filter((b) => !b.demolished).map((b) => b.id));
   for (const [id, model] of this.models) {
@@ -149,9 +150,7 @@ export function sync() {
     }
     m.visible = u.delay <= 0;
     m.position.set(u.x, u.y, u.z);
-    const yaw = Math.atan2(u.vx || u.tx - u.x, u.vz || u.tz - u.z),
-      speed = Math.hypot(u.vx || 0, u.vz || 0) || 1,
-      pitch = -Math.atan2(u.vy || 0, speed);
+    const { yaw, pitch } = aircraftAttitude(u);
     let bank = Math.sin(u.phase + u.travelled * 0.018) * 0.07;
     if (u.hp / u.maxHp < 0.45) bank += Math.sin(this.battleTime * 12 + u.phase) * 0.12;
     if (u.status === 'falling') {
@@ -173,6 +172,7 @@ export function sync() {
       m.removeFromParent();
       this.unitModels.delete(id);
     }
+  const visibleGround = this.groundVisibility.sync(this.state);
   const groundIds = new Set();
   for (const u of this.state.groundUnits || []) {
     groundIds.add(u.id);
@@ -191,8 +191,8 @@ export function sync() {
       this.scene.add(m);
       this.groundModels.set(u.id, m);
     }
-    m.visible = !u.carrierId && E.groundVisible(this.state, 0, u);
-    animateGround(m, u, this.state.time, this.visualDt);
+    m.visible = visibleGround.has(u.id);
+    if (m.visible) animateGround(m, u, this.state.time, this.visualDt);
   }
   for (const [id, m] of this.groundModels)
     if (!groundIds.has(id)) {
@@ -211,7 +211,7 @@ export function sync() {
       this.selection.visible = this.coverage.visible = false;
     }
   }
-  this.infantry.sync(this.state.groundUnits || [], this.state.time);
+  this.infantry.sync(this.state.groundUnits || [], this.state.time, visibleGround);
   this.districtView?.sync(this.state);
   this.syncTrenches();
   this.tactical?.previewGround(this.state.groundUnits?.find((u) => u.id === this.selected));

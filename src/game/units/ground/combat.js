@@ -7,8 +7,9 @@ import { gainGroundExperience } from './veterancy.js';
 import { damageDistricts } from '../../territory/districts.js';
 import { cancelTransportDelivery } from '../vehicles/transport.js';
 import { clearGroundRoute } from './route-queue.js';
+import { groundDamageMultiplier, groundWeaponProfile } from './engagement.js';
 export function damageGround(s, u, amount, event = emit, kind = 'bullet', from = null) {
-  if (u.hp <= 0 || u.carrierId) return;
+  if (u.hp <= 0 || u.carrierId || !Number.isFinite(amount) || amount <= 0) return;
   const c = isInfantry(u.key) ? coverInfo(s, u, from) : { cover: 0 };
   const cover = kind === 'blast' && c.kind === 'Стена' ? 0 : c.cover;
   const hp = Math.max(0, u.hp - amount * (1 - cover * (kind === 'blast' ? 0.4 : 1)));
@@ -47,28 +48,63 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
 }
 
 export function impactGround(s, p, event = emit) {
-  const radius = p.kind === 'shell' ? 14 : 4.5;
-  if (p.kind === 'shell') damageDistricts(s, p.tx, p.tz, p.damage, radius);
+  const profile =
+    GROUND_UNITS[p.shooterKey] || p.shooterKey === 'gun'
+      ? groundWeaponProfile(p.shooterKey).id
+      : p.kind === 'shell'
+        ? 'cannon'
+        : 'rifle';
+  const splash = profile === 'cannon';
+  const radius = splash ? 14 : profile === 'antiArmor' ? 3 : 4.5;
+  const from = {
+    x: p.originX ?? p.px ?? p.x ?? p.tx,
+    z: p.originZ ?? p.pz ?? p.z ?? p.tz,
+    id: p.source,
+  };
+  if (splash) damageDistricts(s, p.tx, p.tz, p.damage, radius);
+  let direct = null,
+    directDistance = Infinity;
   for (const u of s.groundUnits)
     if (u.hp > 0 && !u.carrierId && u.side !== p.side) {
       const dist = Math.hypot(u.x - p.tx, u.z - p.tz);
+      const hitRadius = GROUND_UNITS[u.key].size * 0.55 + 0.8;
+      if (dist >= Math.max(radius + 7, hitRadius)) continue;
+      if (!lineOfSight(s, from, u)) continue;
       if (dist < radius + 7 && isInfantry(u.key))
         u.suppression = clamp(
-          (u.suppression || 0) +
-            (p.suppression || 0.05) * (1 - coverInfo(s, u, { x: p.px, z: p.pz }).cover * 0.6),
+          (u.suppression || 0) + (p.suppression || 0.05) * (1 - coverInfo(s, u, from).cover * 0.6),
           0,
           1.5,
         );
-      if (dist < radius && lineOfSight(s, { x: p.px, z: p.pz, id: p.source }, u)) {
-        const armour = !isInfantry(u.key) && p.kind !== 'shell' ? 0.15 : 1;
+      if (!splash && dist < hitRadius && dist < directDistance) {
+        direct = u;
+        directDistance = dist;
+      }
+      if (splash && dist < radius) {
         const before = u.hp;
-        damageGround(s, u, p.damage * armour * (1 - dist / (radius * 1.5)), event, 'bullet', {
-          x: p.px,
-          z: p.pz,
-        });
+        damageGround(
+          s,
+          u,
+          p.damage * groundDamageMultiplier(p.shooterKey, u, p.kind) * (1 - dist / (radius * 1.5)),
+          event,
+          'blast',
+          from,
+        );
         if (before > u.hp) gainGroundExperience(s, p.source, before - u.hp, u.hp <= 0);
       }
     }
+  if (direct) {
+    const before = direct.hp;
+    damageGround(
+      s,
+      direct,
+      p.damage * groundDamageMultiplier(p.shooterKey, direct, p.kind),
+      event,
+      'bullet',
+      from,
+    );
+    if (before > direct.hp) gainGroundExperience(s, p.source, before - direct.hp, direct.hp <= 0);
+  }
   for (const b of s.buildings)
     if (b.id === p.targetId && b.side !== p.side && b.hp > 0) {
       const half = (BUILDINGS[b.key]?.size || 30) * 0.55;
@@ -76,14 +112,10 @@ export function impactGround(s, p, event = emit) {
         Math.max(0, Math.abs(p.tx - b.x) - half),
         Math.max(0, Math.abs(p.tz - b.z) - half),
       );
-      if (
-        distance > radius ||
-        !lineOfSight(s, { x: p.px ?? p.x ?? p.tx, z: p.pz ?? p.z ?? p.tz, id: p.source }, b)
-      )
-        continue;
+      if (distance > radius || !lineOfSight(s, from, b)) continue;
       const amount =
         p.damage *
-        (p.kind === 'shell' ? 1 : GROUND_UNITS[p.shooterKey]?.infantry ? 1.2 : 1) *
+        groundDamageMultiplier(p.shooterKey, b, p.kind) *
         (1 - distance / (radius * 1.5));
       const before = b.hp;
       b.hp = Math.max(0, b.hp - amount);

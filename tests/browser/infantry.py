@@ -64,8 +64,17 @@ with sync_playwright() as p:
     page.evaluate('(id)=>skyfront.select(id)',fixture['gun']);page.locator('[data-redeploy]').click()
     assert page.evaluate('skyfront.getState().buildings.find(b=>b.id==='+str(fixture['gun'])+').demolished')
     page.locator('[data-tab="military"]').click();assert page.locator('[data-build="cannon"]').count()==0
+    page.evaluate('''()=>{const w=skyfront.getWorld();w.focus(-450,-100,320);w.controls.update(3);w.scene.updateMatrixWorld(true);}''')
     page.keyboard.press('b');page.locator('[data-recruit-count="5"]').click();page.locator('#panel [data-recruit="infantry"]').click()
+    assert page.locator('#panel').is_hidden()
+    assert page.locator('#deployment-hud').is_visible()
+    point=pt(-400,-160)
+    assert page.evaluate('p=>document.elementFromPoint(p.x,p.y)===skyfront.getWorld().renderer.domElement',point),point
+    page.mouse.click(point['x'],point['y'])
+    if not page.evaluate('skyfront.getState().buildings.find(b=>b.key==="barracks").armyQueue?.length'):
+        print(json.dumps(page.evaluate('''p=>({point:p,element:document.elementFromPoint(p.x,p.y)?.outerHTML,order:skyfront.getOrder(),notice:document.querySelector('#notice').textContent,plan:skyfront.engine.deploymentPlan(skyfront.getWorld().state,0,'infantry',{x:-400,z:-160},5)})''',point),ensure_ascii=True),flush=True)
     assert page.evaluate('skyfront.getState().buildings.find(b=>b.key==="barracks").armyQueue.length')==5
+    page.keyboard.press('Escape');page.keyboard.press('b')
     page.locator('#panel [data-rally="auto"]').click();point=pt(-400,-160);page.mouse.click(point['x'],point['y'])
     assert page.evaluate('Boolean(skyfront.getState().buildings.find(b=>b.key==="barracks").rally)')
     page.evaluate('skyfront.save()');before=page.evaluate('({units:skyfront.getState().groundUnits.length,trenches:skyfront.getState().trenches.length,group:skyfront.engine.getGroup(skyfront.getState(),0,1)})')

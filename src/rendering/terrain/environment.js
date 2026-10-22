@@ -3,6 +3,7 @@ import { riverDistance, riverX } from '../../game/index.js';
 import { clamp } from '../../game/shared/math.js';
 import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
+import { tileInstances } from './instance-tiles.js';
 export function height(x, z) {
   const edge = Math.max(0, (Math.abs(x) - 900) / 140, (Math.abs(z) - 620) / 160);
   const hills = (Math.sin(x * 0.011 + z * 0.007) + Math.sin(z * 0.021) * 0.5 + 1.7) * edge * 12;
@@ -146,7 +147,6 @@ export function environment() {
   };
   const dummy = new T.Object3D();
   this.trees = [];
-  this.forest = { trunks, leaves };
   for (let i = 0; i < 8000 && count < 3200; i++) {
     const x = (rnd() - 0.5) * 4400,
       z = (rnd() - 0.5) * 4000;
@@ -172,7 +172,7 @@ export function environment() {
   }
   trunks.count = leaves.count = count;
   trunks.castShadow = leaves.castShadow = true;
-  this.scene.add(trunks, leaves);
+  this.forest = tileInstances(this.scene, [trunks, leaves], this.trees);
   // Layered distant hills give the valley a horizon without hiding the battlefield.
   for (let i = 0; i < 34; i++) {
     const a = (i / 34) * Math.PI * 2,
@@ -265,12 +265,11 @@ export function clearTrees(x, z, radius) {
   for (const tree of this.trees)
     if (!tree.cleared && Math.hypot(x - tree.x, z - tree.z) < radius) {
       tree.cleared = true;
-      this.forest.trunks.setMatrixAt(tree.index, zero);
-      this.forest.leaves.setMatrixAt(tree.index, zero);
+      for (const mesh of tree.meshes) {
+        mesh.setMatrixAt(tree.index, zero);
+        mesh.instanceMatrix.needsUpdate = true;
+      }
       changed = true;
     }
-  if (changed) {
-    this.forest.trunks.instanceMatrix.needsUpdate = true;
-    this.forest.leaves.instanceMatrix.needsUpdate = true;
-  }
+  if (changed && this.renderer) this.renderer.shadowMap.needsUpdate = true;
 }

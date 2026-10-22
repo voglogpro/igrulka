@@ -28,6 +28,7 @@ export function updateDistrictAI(s) {
       u.side === 1 &&
       u.hp / u.maxHp > 0.55 &&
       isInfantry(u.key) &&
+      u.key !== 'atgm' &&
       !u.aiDefender &&
       !u.carrierId &&
       !u.boardingId &&

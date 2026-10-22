@@ -116,8 +116,14 @@ export class DistrictView {
       m.flag.rotation.y = 0.12 + Math.sin(state.time * 1.9 + d.x) * 0.12;
       m.flag.rotation.z = Math.sin(state.time * 2.4 + d.z) * 0.035;
       m.ring.material.color.set(d.contested || d.blocked ? '#e2ad7c' : color);
+      m.ring.visible =
+        !!this.world.armySelection.length ||
+        this.world.groundTargeting === 'deploy' ||
+        d.contested ||
+        d.capturing != null;
       m.ring.material.opacity = d.contested ? 0.3 + Math.sin(state.time * 4) * 0.1 : 0.18;
       m.progress.material.color.set(d.control >= 0 ? COLORS[0] : COLORS[1]);
+      m.progress.visible = d.capturing != null || d.contested;
       m.progress.material.opacity = Math.abs(d.control) < 0.999 ? 0.7 : 0.2;
       m.progress.geometry.setDrawRange(0, Math.floor(Math.abs(d.control) * 96) * 6);
     }

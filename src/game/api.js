@@ -26,6 +26,8 @@ export {
   isFactoryPlan,
 } from './units/aviation/factory-plans.js';
 export { deliverGround, transportDeliveryStatus } from './units/vehicles/transport-orders.js';
+export { deploymentPlan, deployGround } from './units/ground/deployment.js';
+export { squadRoster, retargetSquadReserves } from './units/ground/squads.js';
 export {
   appendGroundOrder,
   groundRouteStatus,

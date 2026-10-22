@@ -1,4 +1,5 @@
 import { buildAPC } from './vehicles/apc.js';
+import { buildTankDestroyer } from './vehicles/tank-destroyer.js';
 import { buildTrackedVehicle, animateVehicleDrive } from './vehicles/tracked-chassis.js';
 import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
@@ -28,6 +29,8 @@ export function groundModel(world, u) {
       dynamic.add(root.userData.turret);
     } else if (u.key === 'apc') {
       buildAPC(world, root, paint, dynamic);
+    } else if (u.key === 'tankdestroyer') {
+      buildTankDestroyer(world, root, paint, accent, dynamic);
     } else {
       buildTrackedVehicle(world, u, root, paint, accent, dynamic);
     }

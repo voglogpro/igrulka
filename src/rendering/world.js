@@ -30,6 +30,9 @@ import { aircraftModel } from './models/aircraft.js';
 import { FixedCamera } from './camera.js';
 import { TacticalView } from './tactical-overlays.js';
 import { EveningPost } from './effects/post-processing.js';
+import { RenderBudget, renderPixelRatio } from './performance/render-budget.js';
+import { GroundVisibility } from './performance/ground-visibility.js';
+import { DeploymentPreview } from './deployment-preview.js';
 import * as E from '../game/index.js';
 import { BUILDINGS, riverX } from '../game/index.js';
 const clamp = T.MathUtils.clamp;
@@ -51,6 +54,8 @@ export class RTSWorld {
     this.shakeEnergy = 0;
     this.shakeStrength = 0.45;
     this.roadVisuals = new Map();
+    this.renderBudget = new RenderBudget();
+    this.groundVisibility = new GroundVisibility();
     this.keys = {};
     this.armySelection = [];
     this.trenchModels = new Map();
@@ -63,11 +68,14 @@ export class RTSWorld {
     this.scene.background = new T.Color('#253749');
     this.scene.fog = new T.FogExp2('#33424d', 0.00085);
     this.renderer = new T.WebGLRenderer({
-      antialias: true,
+      // Geometry is multisampled in EveningPost; the canvas draws a fullscreen quad.
+      antialias: false,
       powerPreference: 'high-performance',
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: false,
     });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(
+      renderPixelRatio(host.clientWidth, host.clientHeight, devicePixelRatio),
+    );
     this.renderer.setSize(host.clientWidth, host.clientHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = T.PCFSoftShadowMap;
@@ -203,6 +211,10 @@ export class RTSWorld {
           );
         if (p && u) this.tactical?.previewTactical(u, p);
       }
+      if (this.groundTargeting === 'deploy') {
+        const p = this.groundPoint(e);
+        if (p) this.callbacks.onGroundHover?.(p);
+      }
       if (this.groundTargeting === 'defendline' && this.down?.ground) {
         const p = this.groundPoint(e);
         if (p) this.tactical?.previewDefenseLine(this.down.ground, p, this.armySelection);
@@ -259,7 +271,6 @@ export class RTSWorld {
       this.last = performance.now();
       if (document.hidden) this.keys = {};
     });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.sun.shadow.mapSize.set(4096, 4096);
     Object.assign(this.sun.shadow.camera, { left: -480, right: 480, top: 480, bottom: -480 });
     this.sun.shadow.normalBias = 0.35;
@@ -269,13 +280,13 @@ export class RTSWorld {
     this.resizeObserver = new ResizeObserver(() => {
       this.camera.aspect = host.clientWidth / host.clientHeight;
       this.camera.updateProjectionMatrix();
-      this.renderer.setSize(host.clientWidth, host.clientHeight);
-      this.post.resize(host.clientWidth, host.clientHeight);
+      this.resizeRender();
     });
     this.resizeObserver.observe(host);
     this.infantry = new InfantryBatch(this);
     this.combatFX = new CombatEffects(this);
     this.tactical = new TacticalView(this);
+    this.deploymentPreview = new DeploymentPreview(this.scene);
     this.sync();
     // Let the app finish wiring its UI before the first GPU frame.
     this.frame = requestAnimationFrame(this.animate);
@@ -338,6 +349,7 @@ export class RTSWorld {
   setGroundTargeting(mode) {
     const previous = this.groundTargeting;
     this.groundTargeting = mode;
+    if (mode !== 'deploy') this.deploymentPreview?.set(null);
     this.host.classList.toggle('ground-targeting', !!mode);
     if (previous) {
       this.tactical?.preview(null);
@@ -439,6 +451,15 @@ export class RTSWorld {
   setQuality() {
     this.quality = 'ultra';
   }
+  resizeRender() {
+    const { clientWidth: width, clientHeight: height } = this.host;
+    if (!width || !height) return;
+    this.renderer.setPixelRatio(
+      renderPixelRatio(width, height, devicePixelRatio, this.renderBudget.scale),
+    );
+    this.renderer.setSize(width, height);
+    this.post.resize(width, height);
+  }
   updateMinimap(...args) {
     return updateMinimapForWorld.call(this, ...args);
   }
@@ -472,6 +493,8 @@ export class RTSWorld {
       grain: true,
       bloom: true,
       shadows: 4096,
+      pixelRatio: this.renderer.getPixelRatio(),
+      renderScale: this.renderBudget.scale,
       camera: this.controls.diagnostics(),
       riverBed: this.height(riverX(0), 0),
       waterLevel: -2.5,
@@ -483,6 +506,7 @@ export class RTSWorld {
       wallDt = Math.max(0, (now - this.last) / 1000);
     this.last = now;
     if (document.hidden) return;
+    if (this.renderBudget.observe(wallDt)) this.resizeRender();
     this.elapsed += wallDt;
     this.callbacks.onFrame?.(wallDt);
     const simDt = Math.max(0, this.state.time - this.previousSimTime);

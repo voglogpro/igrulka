@@ -1,6 +1,6 @@
 import { GROUND_UNITS, BUILDINGS, isInfantry, defenseStats, riverDistance } from '../../config.js';
 import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
-import { groundVisible, lineOfSight, recordFire } from '../infantry/cover.js';
+import { lineOfSight, recordFire } from '../infantry/cover.js';
 import { updateInfantrySupport } from '../infantry/support.js';
 import { buildingConnected } from '../../city/road-network.js';
 import { freeSpot } from '../vehicles/transport.js';
@@ -12,6 +12,14 @@ import { updateArmyAI } from '../../ai/army-ai.js';
 import { updateGuard, guardGround } from './guard.js';
 import { updateRecruitRepeat } from './repeat.js';
 import { veteranAccuracy, veteranSuppression } from './veterancy.js';
+import { squadArrivalPoint } from './squads.js';
+import {
+  prepareGroundEngagement,
+  groundEngagement,
+  groundWeaponProfile,
+  canGroundFire,
+  groundAimPoint,
+} from './engagement.js';
 export function tickUnit(s, u, dt, rates, hooks) {
   const { event, random } = hooks,
     d = GROUND_UNITS[u.key] || BUILDINGS[u.key],
@@ -68,45 +76,8 @@ export function tickUnit(s, u, dt, rates, hooks) {
     }
   }
   updateGuard(s, u);
-  const findTarget = () => {
-    const enemies = s.groundUnits.filter(
-      (t) =>
-        t.side !== u.side &&
-        t.hp > 0 &&
-        !t.carrierId &&
-        groundVisible(s, u.side, t) &&
-        Math.hypot(t.x - u.x, t.z - u.z) < (d.groundRange || 0) &&
-        lineOfSight(s, u, t),
-    );
-    enemies.sort((a, b) =>
-      a.id === (u.guardTargetId || u.order?.targetId)
-        ? -1
-        : b.id === (u.guardTargetId || u.order?.targetId)
-          ? 1
-          : Math.hypot(a.x - u.x, a.z - u.z) - Math.hypot(b.x - u.x, b.z - u.z),
-    );
-    return (
-      enemies[0] ||
-      s.buildings.find(
-        (t) =>
-          t.side !== u.side &&
-          t.hp > 0 &&
-          Math.hypot(t.x - u.x, t.z - u.z) < (d.groundRange || 0) &&
-          lineOfSight(s, u, t),
-      )
-    );
-  };
-  if ((u.nextThink || 0) <= s.time) {
-    const t = findTarget();
-    u.enemyId = t?.id ?? null;
-    u.nextThink = s.time + 0.25;
-  }
-  const target =
-      s.groundUnits.find(
-        (t) => t.id === u.enemyId && t.hp > 0 && !t.carrierId && groundVisible(s, u.side, t),
-      ) || s.buildings.find((t) => t.id === u.enemyId && t.hp > 0),
-    retreat = u.order?.mode === 'retreat',
-    stopToFight = !!target && !u.holdFire && ['attack', 'attackmove'].includes(u.order?.mode);
+  const { target, stopToFight } = groundEngagement(s, u);
+  const retreat = u.order?.mode === 'retreat';
   u.moving = false;
   if (mobile && u.path?.length && !stopToFight) {
     const p = u.path[0],
@@ -141,14 +112,16 @@ export function tickUnit(s, u, dt, rates, hooks) {
     (u.key === 'mog' && u.setup < 1) ||
     u.groundCooldown > 0 ||
     u.groundReload > 0 ||
-    u.groundAmmo <= 0
+    u.groundAmmo <= 0 ||
+    !canGroundFire(u)
   )
     return;
   let aim = target;
   if (aim && (!lineOfSight(s, u, aim) || Math.hypot(aim.x - u.x, aim.z - u.z) > d.groundRange))
     aim = null;
-  const blind = !aim;
-  if (!aim)
+  const blind = !aim,
+    shot = groundWeaponProfile(u.key);
+  if (!aim && shot.canBlind)
     aim = s.contacts?.[u.side]?.find(
       (c) =>
         c.expires > s.time &&
@@ -157,17 +130,18 @@ export function tickUnit(s, u, dt, rates, hooks) {
     );
   if (!aim) return;
   const spread =
-      (blind ? 18 : u.key === 'sniper' ? 1 : 3) *
+      (blind ? 18 : shot.spread) *
       (u.moving ? 2 : 1) *
       (1 + u.suppression * 2) *
       (1 + Math.pow(u.heat || 0, 2) * 2) *
       veteranAccuracy(u),
-    tx = aim.x + (random(s) - 0.5) * spread,
-    tz = aim.z + (random(s) - 0.5) * spread,
-    tank = u.key === 'leopard',
-    speed = tank ? 180 : 270,
+    predicted = blind ? aim : groundAimPoint(u, aim, shot.speed, s),
+    tx = predicted.x + (random(s) - 0.5) * spread,
+    tz = predicted.z + (random(s) - 0.5) * spread,
+    tank = shot.kind === 'shell',
+    speed = shot.speed,
     length = Math.hypot(tx - u.x, tz - u.z) || 1,
-    cost = tank ? 0.8 : 0.025,
+    cost = shot.cost,
     f = s.sides[u.side];
   if (f.credits < cost) return;
   f.credits -= cost;
@@ -184,6 +158,8 @@ export function tickUnit(s, u, dt, rates, hooks) {
     id: s.nextId++,
     side: u.side,
     source: u.id,
+    originX: u.x,
+    originZ: u.z,
     shooterKey: u.key,
     targetId: blind ? null : aim.id,
     domain: 'ground',
@@ -249,15 +225,39 @@ export function updateGround(s, rates, dt, hooks) {
         if (p) {
           b.armyQueue.shift();
           const u = makeGround(s, b.side, q.key, p.x, p.z);
+          if (q.squadId != null) {
+            u.squadId = q.squadId;
+            u.squadSlot = q.squadSlot;
+            u.squadGoal = q.destination ? { ...q.destination } : null;
+          }
           s.groundUnits.push(u);
           event(s, 'recruited', { ...p, side: b.side, key: q.key, unitId: u.id });
-          const rallyMode = defaultRallyMode(s, b);
-          if (rallyMode === 'guard') guardGround(s, b.side, [u.id], b.rally || p);
-          else if (rallyMode === 'attackmove' && b.rally)
-            orderGround(s, b.side, [u.id], { ...b.rally, mode: 'attackmove' });
+          if (Object.hasOwn(q, 'destination')) {
+            const arrival = squadArrivalPoint(q);
+            if (arrival) {
+              const accepted =
+                walkable(s, arrival.x, arrival.z, d.size * 0.42) &&
+                typeof orderGround(s, b.side, [u.id], arrival) === 'number';
+              if (!accepted) {
+                u.path = [];
+                u.order = { ...arrival };
+              }
+              u.routeQueue = [];
+              u.routeState = {
+                status: accepted ? 'moving' : 'blocked',
+                retryAt: s.time + (accepted ? 0 : 1),
+              };
+            }
+          } else {
+            const rallyMode = defaultRallyMode(s, b);
+            if (rallyMode === 'guard') guardGround(s, b.side, [u.id], b.rally || p);
+            else if (rallyMode === 'attackmove' && b.rally)
+              orderGround(s, b.side, [u.id], { ...b.rally, mode: 'attackmove' });
+          }
         }
       }
     }
+  prepareGroundEngagement(s);
   for (const u of s.groundUnits) tickUnit(s, u, dt, rates, hooks);
   for (const b of s.buildings)
     if (b.key === 'gun' && b.hp > 0 && b.progress >= 1) tickUnit(s, b, dt, rates, hooks);
