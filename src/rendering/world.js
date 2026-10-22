@@ -277,7 +277,8 @@ export class RTSWorld {
     this.combatFX = new CombatEffects(this);
     this.tactical = new TacticalView(this);
     this.sync();
-    this.animate();
+    // Let the app finish wiring its UI before the first GPU frame.
+    this.frame = requestAnimationFrame(this.animate);
   }
   mat(color, extra = {}) {
     const key = color + JSON.stringify(extra);

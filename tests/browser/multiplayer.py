@@ -14,31 +14,46 @@ try:
         browser=launch_browser(p)
         contexts=[browser.new_context(viewport={'width':1280,'height':800}) for _ in range(2)]
         pages=[context.new_page() for context in contexts]
+        def activate(target):
+            # Two real network clients, one software-rendered world at a time.
+            for candidate in pages:
+                if candidate != target:
+                    candidate.evaluate('window.__qaRenderEnabled=false')
+            target.evaluate('window.__qaRenderEnabled=true')
         backups=[]
         for i,page in enumerate(pages):
             page.set_default_timeout(90000)
             page.on('pageerror',lambda e:(report['errors'].append(str(e)),print('PAGE ERROR '+str(e),flush=True)))
             page.on('response',lambda r:report['responses'].append({'url':r.url,'status':r.status}))
+            # Apply the software-GPU budget before the first frame, including both world initializations.
+            # Match simulation and WebSocket traffic still run on the real authoritative server.
+            page.add_init_script('''Object.defineProperty(window,'devicePixelRatio',{get:()=>.5});window.__qaRenderEnabled=false;const qaFrame=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>{const run=()=>{if(!window.__qaRenderEnabled){setTimeout(run,50);return;}qaFrame(()=>setTimeout(()=>{const w=window.skyfront?.getWorld();if(w&&!window.__qaFirstFrame){window.__qaFirstFrame=true;w.sun.shadow.mapSize.set(1024,1024);}callback(performance.now());},100));};return setTimeout(run,0);};''')
             page.add_init_script('''const NativeSocket=window.WebSocket;window.__qaSockets=[];window.WebSocket=class extends NativeSocket{constructor(...args){super(...args);window.__qaSockets.push(this);}};''')
             page.add_init_script('if(!localStorage.getItem("skyfront-realtime-v3"))localStorage.setItem("skyfront-realtime-v3",'+json.dumps(fixtures[i])+');')
             print('Loading network player '+str(i+1),flush=True)
             page.goto(address,wait_until='commit',timeout=30000)
             print('HTTP response received for player '+str(i+1),flush=True)
-            page.wait_for_function('Boolean(window.skyfront)')
+            page.wait_for_function('Boolean(window.skyfront)',timeout=120000,polling=50)
+            print('World initialized for player '+str(i+1),flush=True)
             # Keep two real WebGL worlds affordable in the software-rendered QA browser.
             page.evaluate('''()=>{const w=skyfront.getWorld();w.renderer.setPixelRatio(.5);w.sun.shadow.mapSize.set(1024,1024);w.post.resize(1280,800);}''')
             backups.append(page.evaluate('localStorage.getItem("skyfront-realtime-v3")'))
+        for i,page in enumerate(pages):
             page.locator('[data-action="network"]').click()
             page.locator('#net-name').fill('Commander '+str(i+1))
+            print('Lobby opened for player '+str(i+1),flush=True)
         first,second=pages
         first.locator('[data-net="create"]').click()
         first.locator('.net-room-code').wait_for()
+        print('Room created',flush=True)
         code=first.locator('.net-room-code').inner_text().strip()
         second.locator('#net-code').fill(code);second.locator('[data-net="join"]').click()
         second.locator('[data-net="ready"]').wait_for()
         first.locator('[data-net="ready"]').click();second.locator('[data-net="ready"]').click()
         first.locator('[data-net="start"]').click()
+        print('Authoritative match started',flush=True)
         for page in pages:
+            activate(page)
             page.wait_for_function('skyfront.getState().mode==="multiplayer" && skyfront.network()?.room.phase==="playing"')
             assert page.locator('#welcome').is_hidden()
             assert page.locator('#network-lobby').is_hidden()
@@ -49,21 +64,25 @@ try:
         assert second.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).x')==615
         print('Two isolated browsers joined one authoritative match with opposite perspectives',flush=True)
         for side,page in enumerate(pages):
+            activate(page)
             page.locator('[data-build="power"]').click()
             point=page.evaluate('''side=>{const w=skyfront.getWorld(),v=w.camera.position.clone().set(side?670:-670,0,-80).project(w.camera),r=w.renderer.domElement.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}''',side)
             page.mouse.click(point['x'],point['y'])
             page.wait_for_function('skyfront.getState().buildings.some(b=>b.key==="power"&&b.side===0)')
             page.keyboard.press('Escape')
         for page in pages:
+            activate(page)
             page.wait_for_function('skyfront.getState().buildings.filter(b=>b.key==="power").length===2')
         enemy=first.evaluate('skyfront.getState().buildings.find(b=>b.key==="power"&&b.side===1).id')
         denied=first.evaluate('(id)=>skyfront.command("demolish",{id})',enemy)
         assert isinstance(denied,str) and 'принадлеж' in denied,denied
         assert second.evaluate('(id)=>skyfront.getState().buildings.find(b=>b.id===id).hp',enemy)>0
         for i,page in enumerate(pages):
+            activate(page)
             assert page.evaluate('localStorage.getItem("skyfront-realtime-v3")')==backups[i]
             page.screenshot(path=str(ARTIFACTS/f'multiplayer-player-{i+1}.png'),timeout=120000)
         print('Real map building clicks synchronize both cities; foreign demolition refused and solo saves preserved',flush=True)
+        activate(first)
         contexts[1].set_offline(True)
         second.evaluate('window.__qaSockets.at(-1).close()')
         first.wait_for_function('skyfront.network().room.phase==="disconnected"')
@@ -74,17 +93,20 @@ try:
         contexts[1].set_offline(False)
         for page in pages:
             page.wait_for_function('skyfront.network()?.room.phase==="playing"',timeout=30000)
+        activate(second)
         result=second.evaluate('skyfront.command("formation",{value:"column"})')
         assert result is True,result
         second.wait_for_function('skyfront.getState().formations[0]==="column"')
         print('Connection loss pauses both campaigns; automatic resume retains the slot and command sequence',flush=True)
         second.reload(wait_until='load',timeout=120000)
-        second.wait_for_function('Boolean(window.skyfront)')
+        second.wait_for_function('Boolean(window.skyfront)',polling=50)
+        second.evaluate('window.__qaRenderEnabled=true')
         second.locator('[data-action="network"]').click()
         second.locator('[data-net="resume"]').click()
         second.wait_for_function('skyfront.network()?.room.phase==="playing" && skyfront.getState().mode==="multiplayer"')
         assert second.evaluate('skyfront.getState().formations[0]')=='column'
         for page in pages: assert page.evaluate('skyfront.network().room.code')==code
+        activate(first)
         first.locator('[data-panel="settings"]').click()
         first.locator('#panel [data-action="network"]').click()
         first.wait_for_timeout(1200)
@@ -101,14 +123,7 @@ try:
         browser.close()
 except Exception as error:
     report['failure']=str(error)
-    report['clients']=[]
-    for i,page in enumerate(pages if 'pages' in locals() else []):
-        try:
-            report['clients'].append(page.evaluate('''()=>({title:document.title,mode:window.skyfront?.getState().mode,side:window.skyfront?.network()?.side,phase:window.skyfront?.network()?.room?.phase,room:window.skyfront?.network()?.room?.code,lobby:document.querySelector('#network-lobby')?.textContent,notice:document.querySelector('#notice')?.textContent})'''))
-            page.screenshot(path=str(ARTIFACTS/f'multiplayer-failure-{i+1}.png'),timeout=30000)
-        except Exception as diagnostic_error:
-            report['clients'].append({'diagnosticFailure':str(diagnostic_error)})
-    print(json.dumps({'failure':report['failure'],'clients':report['clients']},ensure_ascii=True),flush=True)
+    print(json.dumps({'failure':report['failure'],'errors':report['errors']},ensure_ascii=True),flush=True)
     (ARTIFACTS/'multiplayer-failure.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
     raise
 finally:
