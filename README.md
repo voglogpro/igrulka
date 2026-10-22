@@ -1,6 +1,6 @@
 # Небесный рубеж
 
-3D-стратегия в реальном времени: строительство города, дорожное снабжение, экономика, налёты, ПВО, пехота и техника. Текущая игровая версия — **8.1.0**.
+3D-стратегия в реальном времени: строительство города, дорожное снабжение, экономика, налёты, ПВО, пехота и техника. Текущая игровая версия — **8.2.0**.
 
 ## Как играть
 
@@ -9,6 +9,8 @@
 Управление: WASD — движение камеры, перетаскивание ПКМ — ракурс, колесо — масштаб, пробел — пауза. Рамка ЛКМ выделяет армию, Ctrl+1…9 сохраняет группы. Подробные правила и клавиши — в [руководстве игрока](docs/GAMEPLAY.md).
 
 Выбранной армии отдавайте приказы коротким ПКМ. «Линия обороны» / L позволяет провести линию ЛКМ и расставить войска; «Охрана» включает самостоятельную защиту постов и помощь соседям. Набор разделён на пехоту, технику и ПВО, а автонабор включается и отключается для конкретных казарм. Бойцы получают опыт за настоящий урон, используют стены и руины. [Правила новых механик](docs/NIGHT_GAMEPLAY.md).
+
+В 8.2 пехота захватывает четыре стратегических района: склады дают сплавы, узлы связи — деньги и науку. Инфраструктуру можно разрушать и восстанавливать. Shift + ПКМ добавляет точки маршрута армии; БТР умеет доставлять и автоматически высаживать десант. В арсенале заводам можно задать план пополнения склада с резервом денег и сплавов. [Правила районов, маршрутов и производства](docs/EXPANSION_82.md).
 
 ## Игра вдвоём
 
@@ -35,30 +37,34 @@ npm run format       # привести исходники к общему оф�
 
 ## Где менять код
 
-| Что изменить                                | Файл или папка                                                                         |
-| ------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Цена, здоровье, урон и роли солдат          | [src/game/units/infantry/types.js](src/game/units/infantry/types.js)                   |
-| Характеристики Leopard, БТР, Шилки и Gepard | [src/game/units/vehicles/types.js](src/game/units/vehicles/types.js)                   |
-| Вид солдат и их анимация                    | [src/rendering/models/infantry/soldiers.js](src/rendering/models/infantry/soldiers.js) |
-| Вид танка Leopard                           | [src/rendering/models/vehicles/leopard.js](src/rendering/models/vehicles/leopard.js)   |
-| Вид БТР                                     | [src/rendering/models/vehicles/apc.js](src/rendering/models/vehicles/apc.js)           |
-| Вид Шилки и Gepard                          | [src/rendering/models/vehicles/anti-air.js](src/rendering/models/vehicles/anti-air.js) |
-| Посадка и высадка                           | [src/game/units/vehicles/transport.js](src/game/units/vehicles/transport.js)           |
-| Приказы и группы армии                      | [src/game/units/ground/orders.js](src/game/units/ground/orders.js)                     |
-| Укрытия и маскировка                        | [src/game/units/infantry/cover.js](src/game/units/infantry/cover.js)                   |
-| Окопы, лечение и сапёры                     | [src/game/units/infantry/support.js](src/game/units/infantry/support.js)               |
-| Запуск FPV оператором                       | [src/game/units/infantry/fpv.js](src/game/units/infantry/fpv.js)                       |
-| Дроны, ракеты, производство и полёт         | [src/game/units/aviation/](src/game/units/aviation/)                                   |
-| ПВО, перезарядка, снаряды и урон            | [src/game/combat/](src/game/combat/)                                                   |
-| Экономика, дороги и строительство           | [src/game/city/](src/game/city/)                                                       |
-| Исследования                                | [src/game/research/](src/game/research/)                                               |
-| Поведение бота                              | [src/game/ai/](src/game/ai/)                                                           |
-| Камера и WASD                               | [src/rendering/camera.js](src/rendering/camera.js), [world.js](src/rendering/world.js) |
-| Солнце, освещение и смена суток             | [src/rendering/lighting.js](src/rendering/lighting.js), [clock.js](src/game/clock.js)  |
-| Взрывы, трассеры, дым                       | [src/rendering/effects/combat-effects.js](src/rendering/effects/combat-effects.js)     |
-| Звук                                        | [src/audio/game-audio.js](src/audio/game-audio.js)                                     |
-| Меню, инспектор и оформление                | [src/ui/](src/ui/)                                                                     |
-| Сохранения и обновление старых кампаний     | [src/game/persistence/saves.js](src/game/persistence/saves.js)                         |
+| Что изменить                                | Файл или папка                                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Цена, здоровье, урон и роли солдат          | [src/game/units/infantry/types.js](src/game/units/infantry/types.js)                       |
+| Характеристики Leopard, БТР, Шилки и Gepard | [src/game/units/vehicles/types.js](src/game/units/vehicles/types.js)                       |
+| Вид солдат и их анимация                    | [src/rendering/models/infantry/soldiers.js](src/rendering/models/infantry/soldiers.js)     |
+| Вид танка Leopard                           | [src/rendering/models/vehicles/leopard.js](src/rendering/models/vehicles/leopard.js)       |
+| Вид БТР                                     | [src/rendering/models/vehicles/apc.js](src/rendering/models/vehicles/apc.js)               |
+| Вид Шилки и Gepard                          | [src/rendering/models/vehicles/anti-air.js](src/rendering/models/vehicles/anti-air.js)     |
+| Посадка и высадка                           | [src/game/units/vehicles/transport.js](src/game/units/vehicles/transport.js)               |
+| Доставка десанта                            | [src/game/units/vehicles/transport-orders.js](src/game/units/vehicles/transport-orders.js) |
+| Захват районов и доход                      | [src/game/territory/](src/game/territory/)                                                 |
+| Очередь маршрута армии                      | [src/game/units/ground/route-queue.js](src/game/units/ground/route-queue.js)               |
+| План пополнения боезапаса                   | [src/game/units/aviation/factory-plans.js](src/game/units/aviation/factory-plans.js)       |
+| Приказы и группы армии                      | [src/game/units/ground/orders.js](src/game/units/ground/orders.js)                         |
+| Укрытия и маскировка                        | [src/game/units/infantry/cover.js](src/game/units/infantry/cover.js)                       |
+| Окопы, лечение и сапёры                     | [src/game/units/infantry/support.js](src/game/units/infantry/support.js)                   |
+| Запуск FPV оператором                       | [src/game/units/infantry/fpv.js](src/game/units/infantry/fpv.js)                           |
+| Дроны, ракеты, производство и полёт         | [src/game/units/aviation/](src/game/units/aviation/)                                       |
+| ПВО, перезарядка, снаряды и урон            | [src/game/combat/](src/game/combat/)                                                       |
+| Экономика, дороги и строительство           | [src/game/city/](src/game/city/)                                                           |
+| Исследования                                | [src/game/research/](src/game/research/)                                                   |
+| Поведение бота                              | [src/game/ai/](src/game/ai/)                                                               |
+| Камера и WASD                               | [src/rendering/camera.js](src/rendering/camera.js), [world.js](src/rendering/world.js)     |
+| Солнце, освещение и смена суток             | [src/rendering/lighting.js](src/rendering/lighting.js), [clock.js](src/game/clock.js)      |
+| Взрывы, трассеры, дым                       | [src/rendering/effects/combat-effects.js](src/rendering/effects/combat-effects.js)         |
+| Звук                                        | [src/audio/game-audio.js](src/audio/game-audio.js)                                         |
+| Меню, инспектор и оформление                | [src/ui/](src/ui/)                                                                         |
+| Сохранения и обновление старых кампаний     | [src/game/persistence/saves.js](src/game/persistence/saves.js)                             |
 
 Полная навигация с пояснениями — [карта кода](docs/CODE_MAP.md). Перед изменениями читайте [AGENTS.md](AGENTS.md) и [инструкцию разработчика](docs/DEVELOPMENT.md).
 

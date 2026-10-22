@@ -1,6 +1,12 @@
 import { setArmyContextVisible } from './army-controls.js';
 import { updateArmyRecruitment } from './army-recruitment.js';
+import {
+  factoryPlanRequest,
+  loadFactoryPlanFields,
+  updateFactoryPlansPanel,
+} from './factory-plans.js';
 import { MultiplayerUI } from './multiplayer.js';
+import { DistrictHUD } from './districts.js';
 import { executeCommand } from '../network/commands.js';
 import { $, num, time, rate, escape } from './format.js';
 import { icon, short } from './icons.js';
@@ -20,6 +26,11 @@ try {
   if (raw) {
     state = E.load(raw);
     resumed = state.time > 0 || state.buildings.length > 2;
+    if (JSON.parse(raw).version < 9 && !localStorage.getItem(SAVE + '-before-districts9')) {
+      localStorage.setItem(SAVE + '-before-districts9', raw);
+      loadNotice =
+        'Открыты стратегические районы: захватывайте пехотой, защищайте доход и инфраструктуру.';
+    }
     if (JSON.parse(raw).version < 8) {
       localStorage.setItem(SAVE + '-before-infantry8', raw);
       loadNotice = 'Пехота и группы обновлены. Старые пушки заменены на МОГ с компенсацией.';
@@ -125,6 +136,18 @@ lobby = new MultiplayerUI({
   },
 });
 const networkStatus = document.createElement('div');
+const districtHUD = new DistrictHUD({
+  canInteract: () => started && !panel && !aiming && !troopMode && !tool && lobby.host.hidden,
+  onFocus: (id) => {
+    const d = E.DISTRICT_BY_ID[id];
+    if (d) {
+      world.focus(d.x, d.z, 260);
+      world.controls.focusInput();
+    }
+  },
+  onCapture: orderDistrict,
+  onRepair: repairDistrict,
+});
 networkStatus.id = 'network-status';
 networkStatus.hidden = true;
 $('#game').append(networkStatus);
@@ -353,6 +376,15 @@ function handleEvent(e) {
           500
       : 0,
   );
+  if (e.type === 'districtCaptured')
+    toast(
+      `${e.side === 0 ? 'Район захвачен' : 'Противник занял район'}: ${E.DISTRICT_BY_ID[e.districtId]?.name || ''}`,
+      e.side === 1,
+    );
+  if (e.type === 'districtLost' && e.side === 0)
+    toast('Контроль района потерян. Его доход остановлен.', true);
+  if (e.type === 'districtDestroyed' && e.side === 0)
+    toast('Инфраструктура района разрушена. Для дохода нужно восстановление.', true);
   if (e.type === 'roadCut' && e.side === 0)
     toast('Дорога перебита. Проверьте снабжение и начните ремонт.', true);
   if (e.type === 'salvo' && e.side === 1 && state.time - lastRaid > 10) {
@@ -366,6 +398,11 @@ function handleEvent(e) {
   }
 }
 function updateHUD() {
+  districtHUD.update(
+    state,
+    armySelection,
+    started && !panel && !aiming && !troopMode && !tool && lobby.host.hidden,
+  );
   const f = state.sides[0],
     e = E.economy(state, 0);
   $('#money').textContent = num(f.credits);
@@ -397,7 +434,7 @@ function updateHUD() {
   }
   $('#mission').textContent = inbound
     ? `Воздушная тревога: ${inbound} целей. Прикройте снабжение и командный пункт.`
-    : 'Уничтожьте командный пункт противника. Сохраните свой.';
+    : `Уничтожьте штаб врага. Районы: ${e.districts.owned}/4 · работают ${e.districts.active}.`;
 }
 function buildList() {
   const keys =
@@ -433,6 +470,7 @@ function clearTroopTarget() {
 function setTroopTarget(mode) {
   interactionRevision++;
   troopMode = mode;
+  districtHUD.host.hidden = true;
   world.setGroundTargeting(mode);
   $('#mode-status').textContent =
     ({
@@ -441,6 +479,7 @@ function setTroopTarget(mode) {
       board: 'Посадка · ЛКМ по своему БТР',
       fpv: 'FPV · ЛКМ по цели',
       rally: 'Точка сбора · ЛКМ по карте',
+      deliver: 'Доставка пехоты · ЛКМ по точке высадки',
     }[mode] || '') + ' · ПКМ / Esc — отмена';
 }
 function chooseBuild(key) {
@@ -454,6 +493,7 @@ function chooseBuild(key) {
     return;
   }
   tool = tool === key ? null : key;
+  if (tool) districtHUD.host.hidden = true;
   aiming = false;
   $('#strike-controls').hidden = true;
   world.setAiming(false);
@@ -713,22 +753,33 @@ async function commandGround(p) {
   if (!started || !armySelection.length) return;
   const revision = interactionRevision,
     issuedMode = troopMode;
-  const r = p.boardId
-    ? await execute('board', { ids: [...armySelection], id: p.boardId })
-    : await execute('order', {
+  const r = p.append
+    ? await execute('route-add', {
         ids: [...armySelection],
-        aim: {
-          ...p,
-          mode: issuedMode === 'attackmove' ? 'attackmove' : p.targetId ? 'attack' : 'move',
-        },
-      });
+        aim: { x: p.x, z: p.z, mode: p.targetId ? 'attackmove' : 'move' },
+      })
+    : p.districtId
+      ? await execute('district', { ids: [...armySelection], id: p.districtId })
+      : p.boardId
+        ? await execute('board', { ids: [...armySelection], id: p.boardId })
+        : await execute('order', {
+            ids: [...armySelection],
+            aim: {
+              ...p,
+              mode: issuedMode === 'attackmove' ? 'attackmove' : p.targetId ? 'attack' : 'move',
+            },
+          });
   if (revision !== interactionRevision) return;
   if (typeof r === 'string') toast(r, true);
   else {
     toast(
-      p.boardId
-        ? 'Бойцы направляются к транспорту'
-        : `Приказ: ${r} ед. → ${Math.round(p.x)}, ${Math.round(p.z)}`,
+      p.append
+        ? `Точка добавлена в маршрут: ${r} ед. · Shift+ПКМ — следующая`
+        : p.districtId
+          ? 'Войска направлены захватывать и охранять район'
+          : p.boardId
+            ? 'Бойцы направляются к транспорту'
+            : `Приказ: ${r} ед. → ${Math.round(p.x)}, ${Math.round(p.z)}`,
     );
     if (issuedMode === 'attackmove') clearTroopTarget();
     persist();
@@ -749,6 +800,13 @@ async function troopTarget(p) {
     result = vehicle
       ? await execute('board', { ids: [...armySelection], id: vehicle.id })
       : 'Нажмите рядом со своим бронетранспортёром';
+  } else if (troopMode === 'deliver') {
+    const carrier = state.groundUnits.find(
+      (u) => armySelection.includes(u.id) && u.side === 0 && E.GROUND_UNITS[u.key].capacity,
+    );
+    result = carrier
+      ? await execute('deliver', { id: carrier.id, point: p })
+      : 'Выберите свой БТР с пассажирами';
   } else if (troopMode === 'attackmove') {
     commandGround(p);
     return;
@@ -763,7 +821,9 @@ async function troopTarget(p) {
       ? 'Точка сбора установлена'
       : issuedMode === 'fpv'
         ? 'FPV запущен'
-        : 'Приказ посадки принят',
+        : issuedMode === 'deliver'
+          ? 'Доставка назначена. БТР высадит бойцов по прибытии.'
+          : 'Приказ посадки принят',
   );
   clearTroopTarget();
   persist();
@@ -786,14 +846,21 @@ async function troopCommand(command) {
     renderInspector();
     return;
   }
-  if (command === 'fpv' || command === 'board' || command === 'attackmove') {
+  if (
+    command === 'fpv' ||
+    command === 'board' ||
+    command === 'attackmove' ||
+    command === 'deliver'
+  ) {
     setTroopTarget(command);
     toast(
       command === 'fpv'
         ? 'ЛКМ — точка удара FPV в радиусе 320'
         : command === 'board'
           ? 'ЛКМ по своему бронетранспортёру'
-          : 'ЛКМ — наступать, останавливаясь для боя',
+          : command === 'deliver'
+            ? 'ЛКМ — точка доставки и автоматической высадки'
+            : 'ЛКМ — наступать, останавливаясь для боя',
     );
     return;
   }
@@ -803,6 +870,32 @@ async function troopCommand(command) {
   else {
     persist();
     renderInspector();
+  }
+}
+
+async function orderDistrict(id) {
+  if (!started || !armySelection.length) return;
+  clearTroopTarget();
+  const revision = interactionRevision;
+  const result = await execute('district', { id, ids: [...armySelection] });
+  if (typeof result !== 'string') persist();
+  if (revision !== interactionRevision) return;
+  toast(
+    typeof result === 'string' ? result : `К району направлено ${result} ед. · захватывает пехота`,
+    typeof result === 'string',
+  );
+  renderInspector();
+}
+async function repairDistrict(id) {
+  const epoch = campaignEpoch,
+    d = E.districtStatus(state, id);
+  if (!d) return;
+  const result = await execute('district-repair', { id, enabled: !d.repairing });
+  if (epoch !== campaignEpoch) return;
+  if (typeof result === 'string') toast(result, true);
+  else {
+    persist();
+    updateHUD();
   }
 }
 
@@ -965,6 +1058,7 @@ function updateLivePanel() {
     $('#launch-status').textContent =
       error || 'Выберите название вооружения — затем запускайте кликами по карте.';
     $('#launch-status').classList.toggle('warning', !!error);
+    updateFactoryPlansPanel(state);
   }
   if (panel === 'army') {
     updateArmyRecruitment({ state, recruitCount });
@@ -992,6 +1086,11 @@ function updateLivePanel() {
       ['Население', e.population],
       ['Сплавы', rate(e.materials) + '/мин'],
       ['Наука', rate(e.science) + '/мин'],
+      ['Районы под контролем / работают', `${e.districts.owned} / ${e.districts.active}`],
+      [
+        'Доход районов',
+        `${rate(e.districts.income)} ₡ · ${rate(e.districts.materials)} спл. · ${rate(e.districts.science)} науки / мин`,
+      ],
       ['Связаны со штабом', e.connected],
       ['Нет снабжения', e.isolated],
       ['Боеприпасы потрачены', num(f.spentAmmo) + ' ₡'],
@@ -1158,6 +1257,23 @@ document.addEventListener('click', async (ev) => {
       updateLivePanel();
     }
   }
+  if (d.action === 'factory-plan-save' || d.action === 'factory-plan-stop') {
+    const request = factoryPlanRequest(state, d.action === 'factory-plan-save');
+    if (!request) return;
+    const epoch = campaignEpoch;
+    const result = await execute('factory-plan', request);
+    if (epoch !== campaignEpoch) return;
+    if (typeof result === 'string') toast(result, true);
+    else {
+      persist();
+      updateLivePanel();
+      toast(
+        request.plan.enabled
+          ? 'План пополнения боезапаса включён'
+          : 'План остановлен; оплаченные заказы сохраняются',
+      );
+    }
+  }
   if (d.research) {
     const r = await execute('research', { key: d.research });
     if (typeof r === 'string') toast(r, true);
@@ -1292,6 +1408,11 @@ document.addEventListener('input', (ev) => {
   }
 });
 document.addEventListener('change', async (ev) => {
+  if (ev.target.id === 'factory-plan-site') {
+    loadFactoryPlanFields(state);
+    ev.target.dataset.loaded = ev.target.value;
+    updateLivePanel();
+  }
   if (ev.target.id === 'rally-mode') {
     const result = await execute('rally-mode', { id: selected, mode: ev.target.value });
     if (typeof result === 'string') toast(result, true);

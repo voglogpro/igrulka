@@ -13,7 +13,7 @@ with sync_playwright() as p:
     old=page.evaluate('''()=>{const E=skyfront.engine,s=E.createGame(817);s.version=7;s.time=90;s.sides[0].credits=1700;const u=E.makeGround(s,0,'infantry',-480,-70);u.hp=55;u.maxHp=110;s.groundUnits.push(u);s.buildings.push({id:s.nextId++,side:0,key:'cannon',x:-450,z:0,hp:140,maxHp:280,progress:1,rotation:0,cooldown:0});delete s.groups;delete s.contacts;delete s.trenches;delete s.formations;return E.save(s);}''')
     page.evaluate('raw=>localStorage.setItem("skyfront-realtime-v3",raw)',old)
     page.reload(wait_until='load',timeout=120000);page.wait_for_function('Boolean(window.skyfront)',timeout=60000)
-    assert '8.1.0' in page.title();assert page.evaluate('skyfront.getState().version')==8
+    assert '8.2.0' in page.title();assert page.evaluate('skyfront.getState().version')==9
     assert page.evaluate('skyfront.getState().groundUnits.length')==5
     assert page.evaluate('skyfront.getState().sides[0].credits')==2000
     assert page.evaluate('skyfront.getState().sides[0].materials')==218

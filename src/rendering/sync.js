@@ -212,6 +212,7 @@ export function sync() {
     }
   }
   this.infantry.sync(this.state.groundUnits || [], this.state.time);
+  this.districtView?.sync(this.state);
   this.syncTrenches();
   this.tactical?.previewGround(this.state.groundUnits?.find((u) => u.id === this.selected));
   if (this.groundTargeting !== 'defendline')

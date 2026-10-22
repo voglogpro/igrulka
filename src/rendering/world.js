@@ -8,6 +8,7 @@ import {
   clearTrees as clearTreesForWorld,
 } from './terrain/environment.js';
 import { syncTrenches as syncTrenchesForWorld } from './terrain/trenches.js';
+import { DistrictView } from './terrain/districts.js';
 import { updateDaylight as updateDaylightForWorld } from './lighting.js';
 import { model as modelForWorld } from './models/buildings.js';
 import {
@@ -118,6 +119,7 @@ export class RTSWorld {
     this.environment();
     this.bridges();
     this.makeCover();
+    this.districtView = new DistrictView(this);
     this.selection = new T.Mesh(
       new T.RingGeometry(0.96, 1, 100),
       new T.MeshBasicMaterial({

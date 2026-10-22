@@ -1,6 +1,6 @@
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -46,6 +46,10 @@ export function executeCommand(s, side, type, a = {}) {
       return E.redeployMOG(s, side, a.id);
     case 'produce':
       return configured(E.WEAPONS, a.key) ? E.produce(s, side, a.key) : invalid;
+    case 'factory-plan':
+      return validId(a.id) && own(s, side, a.id) && object(a.plan)
+        ? E.setFactoryPlan(s, side, a.id, a.plan)
+        : invalid;
     case 'research':
       return configured(E.TECH, a.key) ? E.research(s, side, a.key) : invalid;
     case 'launch': {
@@ -117,6 +121,24 @@ export function executeCommand(s, side, type, a = {}) {
     case 'board':
       return unitsOwned(s, side, a.ids) && validId(a.id) && own(s, side, a.id)
         ? E.boardGround(s, side, a.ids, a.id)
+        : invalid;
+    case 'deliver':
+      return validId(a.id) && own(s, side, a.id) && point(a.point)
+        ? E.deliverGround(s, side, a.id, a.point)
+        : invalid;
+    case 'route-add':
+      return unitsOwned(s, side, a.ids) &&
+        point(a.aim) &&
+        ['move', 'attackmove'].includes(a.aim.mode)
+        ? E.appendGroundOrder(s, side, a.ids, a.aim)
+        : invalid;
+    case 'district':
+      return unitsOwned(s, side, a.ids) && configured(E.DISTRICT_BY_ID, a.id)
+        ? E.captureDistrict(s, side, a.ids, a.id)
+        : invalid;
+    case 'district-repair':
+      return configured(E.DISTRICT_BY_ID, a.id) && typeof a.enabled === 'boolean'
+        ? E.setDistrictRepair(s, side, a.id, a.enabled)
         : invalid;
     case 'fpv':
       return unitsOwned(s, side, a.ids) && point(a.point)

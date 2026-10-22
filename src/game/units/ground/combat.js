@@ -4,6 +4,9 @@ import { coverInfo, groundVisible, lineOfSight } from '../infantry/cover.js';
 import { freeSpot } from '../vehicles/transport.js';
 import { clamp } from '../../shared/math.js';
 import { gainGroundExperience } from './veterancy.js';
+import { damageDistricts } from '../../territory/districts.js';
+import { cancelTransportDelivery } from '../vehicles/transport.js';
+import { clearGroundRoute } from './route-queue.js';
 export function damageGround(s, u, amount, event = emit, kind = 'bullet', from = null) {
   if (u.hp <= 0 || u.carrierId) return;
   const c = isInfantry(u.key) ? coverInfo(s, u, from) : { cover: 0 };
@@ -16,6 +19,8 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
       : undefined;
   u.hp = hp;
   if (!u.hp) {
+    cancelTransportDelivery(u);
+    clearGroundRoute(u);
     s.sides[u.side].losses++;
     event(s, 'groundDestroyed', {
       x: u.x,
@@ -43,6 +48,7 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
 
 export function impactGround(s, p, event = emit) {
   const radius = p.kind === 'shell' ? 14 : 4.5;
+  if (p.kind === 'shell') damageDistricts(s, p.tx, p.tz, p.damage, radius);
   for (const u of s.groundUnits)
     if (u.hp > 0 && !u.carrierId && u.side !== p.side) {
       const dist = Math.hypot(u.x - p.tx, u.z - p.tz);

@@ -1,6 +1,7 @@
 import { VERSION } from './config.js';
 import { campRoads } from './city/roads.js';
 import { log } from './shared/events.js';
+import { createDistricts } from './territory/state.js';
 export const newSide = () => ({
   credits: 3200,
   materials: 200,
@@ -52,6 +53,7 @@ export function createGame(seed = Date.now() >>> 0) {
     units: [],
     groundUnits: [],
     trenches: [],
+    districts: createDistricts(),
     contacts: [[], []],
     groups: [{}, {}],
     formations: ['line', 'line'],
@@ -69,6 +71,8 @@ export function createGame(seed = Date.now() >>> 0) {
       roadsCut: 0,
       crashes: 0,
       airbursts: 0,
+      districtsCaptured: 0,
+      districtsDestroyed: 0,
     },
   };
   campRoads(s);

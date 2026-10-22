@@ -51,7 +51,13 @@ with sync_playwright() as p:
     page.locator('[data-troop="unload"]').click()
     assert page.evaluate('(id)=>skyfront.getState().groundUnits.find(u=>u.id===id).carrierId',selection[0]) is None
     operator=next(u for u in fixture['units'] if u['key']=='operator')
-    page.evaluate('(id)=>skyfront.selectArmy([id])',operator['id']);page.locator('[data-troop="fpv"]').click();point=pt(-300,-100);page.mouse.move(point['x'],point['y']);page.mouse.click(point['x'],point['y'])
+    page.evaluate('(id)=>skyfront.selectArmy([id])',operator['id']);page.locator('[data-troop="fpv"]').click()
+    assert page.locator('#district-strip').is_hidden(), 'District cards must release the map during FPV targeting'
+    point=pt(-300,-100);page.mouse.move(point['x'],point['y']);page.mouse.click(point['x'],point['y'])
+    if not page.evaluate('skyfront.getState().units.some(u=>u.subtype==="fpv")'):
+        report['fpvDebug']=page.evaluate('''p=>({point:p,element:document.elementFromPoint(p.x,p.y)?.outerHTML,order:skyfront.getOrder(),notice:document.querySelector('#notice').textContent,operator:skyfront.getState().groundUnits.find(u=>u.key==='operator')})''',point)
+        page.screenshot(path=str(ARTIFACTS/'infantry-fpv-failure.png'),timeout=120000)
+        print(json.dumps(report,ensure_ascii=True),flush=True)
     assert page.evaluate('skyfront.getState().units.some(u=>u.subtype==="fpv")')
     page.evaluate('''()=>{const w=skyfront.getWorld();skyfront.engine.advance(w.state,.5);w.sync();w.post.render(w.scene,w.camera,w.elapsed);}''')
     print('Real transport boarding/unloading and operator FPV launch passed',flush=True)

@@ -1,6 +1,7 @@
 import { ROAD_REQUIRED } from './rules.js';
 import { buildingConnected } from './road-network.js';
 import { BUILDINGS, GROUND_UNITS } from '../config.js';
+import { districtIncome } from '../territory/districts.js';
 export function supplyFactor(s, b) {
   return ROAD_REQUIRED.has(b.key) && !buildingConnected(s, b, BUILDINGS[b.key].size) ? 0.2 : 1;
 }
@@ -44,6 +45,10 @@ export function economy(s, owner) {
     .filter((u) => u.side === owner && u.hp > 0)
     .reduce((n, u) => n + GROUND_UNITS[u.key].upkeep, 0);
   upkeep += armyUpkeep;
+  const districts = districtIncome(s, owner);
+  income += districts.income;
+  materials += districts.materials;
+  science += districts.science;
   const bonus = owner === 1 && s.mode !== 'multiplayer' ? 1.25 : 1;
   return {
     gross: income * bonus,
@@ -59,6 +64,12 @@ export function economy(s, owner) {
     connected,
     isolated,
     armyUpkeep,
+    districts: {
+      ...districts,
+      income: districts.income * bonus,
+      materials: districts.materials * bonus,
+      science: districts.science * bonus,
+    },
     population: alive.filter((b) => b.key === 'housing').length * 120,
   };
 }

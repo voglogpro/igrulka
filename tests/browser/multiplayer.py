@@ -101,6 +101,14 @@ try:
         browser.close()
 except Exception as error:
     report['failure']=str(error)
+    report['clients']=[]
+    for i,page in enumerate(pages if 'pages' in locals() else []):
+        try:
+            report['clients'].append(page.evaluate('''()=>({title:document.title,mode:window.skyfront?.getState().mode,side:window.skyfront?.network()?.side,phase:window.skyfront?.network()?.room?.phase,room:window.skyfront?.network()?.room?.code,lobby:document.querySelector('#network-lobby')?.textContent,notice:document.querySelector('#notice')?.textContent})'''))
+            page.screenshot(path=str(ARTIFACTS/f'multiplayer-failure-{i+1}.png'),timeout=30000)
+        except Exception as diagnostic_error:
+            report['clients'].append({'diagnosticFailure':str(diagnostic_error)})
+    print(json.dumps({'failure':report['failure'],'clients':report['clients']},ensure_ascii=True),flush=True)
     (ARTIFACTS/'multiplayer-failure.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
     raise
 finally:

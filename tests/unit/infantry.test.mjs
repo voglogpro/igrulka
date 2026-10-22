@@ -279,7 +279,7 @@ test('v7 cannon conversion refunds the difference and legacy five-man units beco
   });
   const cash = s.sides[0].credits,
     restored = E.load(E.save(s));
-  assert.equal(restored.version, 8);
+  assert.equal(restored.version, E.VERSION);
   assert.equal(restored.groundUnits.length, 5);
   assert.ok(restored.groundUnits.every((u) => u.hp / u.maxHp === 0.5));
   assert.equal(restored.sides[0].credits, cash + 300);

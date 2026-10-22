@@ -10,6 +10,7 @@
 - Параметры солдат: `infantry/types.js`; параметры машин: `vehicles/types.js`. `ground/types.js` только собирает общий справочник.
 - Модели солдат: `src/rendering/models/infantry/`; модели машин: `src/rendering/models/vehicles/`. Модель Leopard имеет отдельный файл.
 - ПВО и снаряды: `src/game/combat/`; экономика и улицы: `src/game/city/`; бот: `src/game/ai/`.
+- Захват, доход и ремонт районов: `src/game/territory/`; планы заводов: `units/aviation/factory-plans.js`; очередь путей: `units/ground/route-queue.js`; доставка БТР: `units/vehicles/transport-orders.js` (пути от `src/game/`).
 - Камера: `src/rendering/camera.js`; маршрутизация кликов: `src/rendering/input/build-tools.js`; освещение: `src/rendering/lighting.js`.
 - Сохранения: `src/game/persistence/saves.js`. История решений: `docs/history/`.
 

@@ -5,6 +5,7 @@ import { GROUND_UNITS, isInfantry } from '../config.js';
 import { orderGround, commandUnits } from '../units/ground/orders.js';
 import { unloadGround, boardGround } from '../units/vehicles/transport.js';
 import { launchFPV } from '../units/infantry/fpv.js';
+import { updateDistrictAI } from './district-ai.js';
 export function updateArmyAI(s, hooks) {
   if (s.mode === 'multiplayer') return;
   const { random } = hooks;
@@ -29,10 +30,13 @@ export function updateArmyAI(s, hooks) {
       ];
       recruit(s, 1, choices[Math.floor(random(s) * choices.length)], null, 1);
     }
+    updateDistrictAI(s);
     const hq = s.buildings.find((b) => b.side === 0 && b.key === 'hq' && b.hp > 0);
     for (const u of s.groundUnits)
       if (u.side === 1 && !u.carrierId && !u.boardingId && hq) {
         if (u.guard) continue;
+        if (u.delivery) continue;
+        if (u.routeState) continue;
         if (u.aiDefender && u.hp / u.maxHp > 0.35) {
           const own = s.buildings.find((b) => b.side === 1 && b.key === 'hq');
           u.defensePoint ||= COVER_PATCHES.filter(

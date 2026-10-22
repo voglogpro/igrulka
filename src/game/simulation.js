@@ -8,6 +8,8 @@ import { moveUnits, impacts } from './units/aviation/flight.js';
 import { fireDefenses } from './combat/air-defense.js';
 import { moveProjectiles } from './combat/projectiles.js';
 import { ai } from './ai/city-ai.js';
+import { updateDistricts } from './territory/districts.js';
+import { updateFactoryPlans } from './units/aviation/factory-plans.js';
 export function step(s, dt) {
   if (s.result || !Number.isFinite(dt) || dt <= 0) return;
   dt = Math.min(0.1, dt);
@@ -35,6 +37,7 @@ export function step(s, dt) {
       }
     }
   }
+  updateFactoryPlans(s);
   updateConstruction(s, rates, dt);
   updateGround(s, rates, dt, { event, random });
   moveUnits(s, dt);
@@ -43,6 +46,7 @@ export function step(s, dt) {
   impacts(s);
   s.units = s.units.filter((u) => u.hp > 0 || u.status === 'falling');
   s.projectiles = s.projectiles.filter((p) => !p.dead);
+  updateDistricts(s, dt);
   if (s.mode !== 'multiplayer') ai(s);
   for (let owner = 0; owner < 2; owner++)
     if (!s.buildings.some((b) => b.side === owner && b.key === 'hq' && b.hp > 0)) {

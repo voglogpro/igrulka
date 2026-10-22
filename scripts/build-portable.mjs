@@ -28,8 +28,8 @@ for (const match of [...fonts.matchAll(/url\(([^)]+)\)/g)]) {
 }
 const base = (
   await Promise.all(
-    ['src/ui/style.css', 'src/ui/army.css', 'src/ui/multiplayer.css'].map((file) =>
-      readFile(path.join(root, file), 'utf8'),
+    ['src/ui/style.css', 'src/ui/army.css', 'src/ui/multiplayer.css', 'src/ui/districts.css'].map(
+      (file) => readFile(path.join(root, file), 'utf8'),
     ),
   )
 )

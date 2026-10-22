@@ -4,6 +4,8 @@ import { groundVisible, lineOfSight, recordFire } from '../infantry/cover.js';
 import { updateInfantrySupport } from '../infantry/support.js';
 import { buildingConnected } from '../../city/road-network.js';
 import { freeSpot } from '../vehicles/transport.js';
+import { updateTransportDeliveries } from '../vehicles/transport-orders.js';
+import { updateGroundRoutes } from './route-queue.js';
 import { makeGround, defaultRallyMode } from './recruitment.js';
 import { orderGround } from './orders.js';
 import { updateArmyAI } from '../../ai/army-ai.js';
@@ -104,7 +106,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
         (t) => t.id === u.enemyId && t.hp > 0 && !t.carrierId && groundVisible(s, u.side, t),
       ) || s.buildings.find((t) => t.id === u.enemyId && t.hp > 0),
     retreat = u.order?.mode === 'retreat',
-    stopToFight = !!target && ['attack', 'attackmove'].includes(u.order?.mode);
+    stopToFight = !!target && !u.holdFire && ['attack', 'attackmove'].includes(u.order?.mode);
   u.moving = false;
   if (mobile && u.path?.length && !stopToFight) {
     const p = u.path[0],
@@ -259,6 +261,8 @@ export function updateGround(s, rates, dt, hooks) {
   for (const u of s.groundUnits) tickUnit(s, u, dt, rates, hooks);
   for (const b of s.buildings)
     if (b.key === 'gun' && b.hp > 0 && b.progress >= 1) tickUnit(s, b, dt, rates, hooks);
+  updateGroundRoutes(s);
+  updateTransportDeliveries(s);
   s.groundUnits = s.groundUnits.filter((u) => u.hp > 0);
   updateArmyAI(s, hooks);
 }

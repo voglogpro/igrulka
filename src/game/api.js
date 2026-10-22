@@ -1,6 +1,17 @@
 export { ROAD_REQUIRED } from './city/rules.js';
 export { COMBAT } from './combat/config.js';
 export { random } from './shared/random.js';
+export {
+  DISTRICTS,
+  DISTRICT_TYPES,
+  DISTRICT_BY_ID,
+  DISTRICT_RULES,
+  districtStatus,
+  districtIncome,
+  captureDistrict,
+  setDistrictRepair,
+  damageDistricts,
+} from './territory/districts.js';
 export { createGame } from './state.js';
 export { supplyFactor, economy, buildingOutput } from './city/economy.js';
 export { placementPlan, canPlace, build, demolish, repair } from './city/construction.js';
@@ -8,6 +19,18 @@ export { roadPreview, buildRoad } from './city/roads.js';
 export { targetById, targetName } from './targets.js';
 export { research } from './research/research.js';
 export { produce } from './units/aviation/production.js';
+export {
+  setFactoryPlan,
+  factoryPlanStatus,
+  updateFactoryPlans,
+  isFactoryPlan,
+} from './units/aviation/factory-plans.js';
+export { deliverGround, transportDeliveryStatus } from './units/vehicles/transport-orders.js';
+export {
+  appendGroundOrder,
+  groundRouteStatus,
+  GROUND_ROUTE_LIMIT,
+} from './units/ground/route-queue.js';
 export { upgradeDefense } from './combat/upgrades.js';
 export {
   resolveAim,

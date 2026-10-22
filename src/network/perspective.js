@@ -197,6 +197,11 @@ export function playerView(authority, side) {
   view.log = [];
 
   if (side === 0) return view;
+  for (const d of view.districts || []) {
+    if (d.owner != null) d.owner = 1 - d.owner;
+    if (d.capturing != null) d.capturing = 1 - d.capturing;
+    d.control = -d.control;
+  }
   for (const key of ['sides', 'groups', 'formations', 'contacts'])
     if (Array.isArray(view[key])) view[key].reverse();
   for (const list of [

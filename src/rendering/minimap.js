@@ -59,6 +59,28 @@ export function updateMinimap(canvas) {
     ctx.lineTo(px(E.riverX(z) + 110), pz(z));
     ctx.stroke();
   }
+  for (const d of E.DISTRICTS) {
+    const value = E.districtStatus(this.state, d.id);
+    if (!value) continue;
+    ctx.strokeStyle =
+      value.contested || value.blocked
+        ? '#f0bd80'
+        : value.owner === 0
+          ? '#b2e6bf'
+          : value.owner === 1
+            ? '#eea080'
+            : '#b9c4af';
+    ctx.fillStyle = value.hp > 0 ? '#293b34' : '#5f5145';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(px(d.x), pz(d.z) - 4);
+    ctx.lineTo(px(d.x) + 4, pz(d.z));
+    ctx.lineTo(px(d.x), pz(d.z) + 4);
+    ctx.lineTo(px(d.x) - 4, pz(d.z));
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
   for (const u of this.state.units)
     if (E.unitVisible(this.state, 0, u, sensors)) {
       ctx.fillStyle = u.side === 0 ? '#c8f4db' : '#ffb5a0';

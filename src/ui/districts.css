@@ -1,0 +1,94 @@
+#district-strip {
+  position: absolute;
+  top: 111px;
+  right: 14px;
+  width: min(540px, calc(100vw - 340px));
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  z-index: 8;
+}
+#game:has(#panel:not([hidden])) #district-strip,
+#game:has(#strike-controls:not([hidden])) #district-strip {
+  display: none;
+}
+.district-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  padding: 3px;
+  border-radius: 4px;
+  overflow: hidden;
+  border-color: #b7c5b52e;
+}
+.district-focus {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 3px;
+  text-align: left;
+}
+.district-focus b {
+  display: block;
+  font-size: 9px;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.district-focus small {
+  display: block;
+  color: #a6b5a7;
+  font-size: 8px;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.district-order,
+.district-repair {
+  align-self: center;
+  padding: 4px;
+  font-size: 14px;
+}
+.district-repair {
+  color: #e2c49a;
+}
+.district-control {
+  position: absolute;
+  height: 2px;
+  bottom: 0;
+  left: 0;
+  background: #bac4b0;
+  pointer-events: none;
+}
+.district-card[data-owner='own'] {
+  border-color: #a5d3b14f;
+}
+.district-card[data-owner='own'] .district-control {
+  background: #a5d3b1;
+}
+.district-card[data-owner='enemy'] .district-control {
+  background: #dda181;
+}
+.district-card.contested {
+  border-color: #e0a7779c;
+}
+.district-card.contested small {
+  color: #e6b58c;
+}
+@media (max-width: 1100px) {
+  #district-strip {
+    width: min(540px, calc(100vw - 355px));
+  }
+  .district-card {
+    padding: 2px;
+  }
+  .district-focus b {
+    font-size: 8px;
+  }
+  .district-order,
+  .district-repair {
+    font-size: 12px;
+    padding: 3px;
+  }
+}

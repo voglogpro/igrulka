@@ -1,8 +1,9 @@
 import { isInfantry, GROUND_UNITS } from '../../config.js';
 import { clamp } from '../../shared/math.js';
 import { groundPath } from './navigation.js';
-import { unloadGround } from '../vehicles/transport.js';
-export function orderGround(s, side, ids, aim) {
+import { unloadGround, cancelTransportDelivery } from '../vehicles/transport.js';
+import { clearGroundRoute } from './route-queue.js';
+export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
   if (s.result) return 'Кампания завершена';
   if (
     !aim ||
@@ -14,26 +15,15 @@ export function orderGround(s, side, ids, aim) {
   const units = (s.groundUnits || []).filter(
     (u) => u.side === side && u.hp > 0 && !u.carrierId && ids.includes(u.id),
   );
+  const destinations = groundFormationDestinations(s, side, units, aim);
   let count = 0;
   for (let index = 0; index < units.length; index++) {
     const u = units[index],
-      spacing = units.some((v) => !isInfantry(v.key)) ? 18 : 7,
-      cols = sqrtCols(units.length),
-      formation = s.formations?.[side] || 'line',
-      dx =
-        formation === 'column'
-          ? ((index % 2) - 0.5) * spacing
-          : ((index % cols) - (Math.min(cols, units.length) - 1) / 2) * spacing,
-      dz =
-        formation === 'column'
-          ? Math.floor(index / 2) * spacing
-          : Math.floor(index / cols) * spacing * (formation === 'spread' ? 1.8 : 1);
-    const destination = {
-        x: clamp(aim.x + (units.length > 1 ? dx : 0), -850, 850),
-        z: clamp(aim.z + (units.length > 1 ? dz : 0), -560, 560),
-      },
+      destination = destinations[index],
       path = groundPath(s, u, destination, GROUND_UNITS[u.key].size * 0.42);
     if (!path.length) continue;
+    if (!preserveRoute) clearGroundRoute(u);
+    cancelTransportDelivery(u);
     u.guard = null;
     u.guardTargetId = null;
     u.path = path;
@@ -53,6 +43,26 @@ export function orderGround(s, side, ids, aim) {
 }
 
 export const sqrtCols = (n) => Math.max(1, Math.ceil(Math.sqrt(n * 1.8)));
+
+export function groundFormationDestinations(s, side, units, aim) {
+  const spacing = units.some((u) => !isInfantry(u.key)) ? 18 : 7;
+  const cols = sqrtCols(units.length);
+  const formation = s.formations?.[side] || 'line';
+  return units.map((u, index) => {
+    const dx =
+      formation === 'column'
+        ? ((index % 2) - 0.5) * spacing
+        : ((index % cols) - (Math.min(cols, units.length) - 1) / 2) * spacing;
+    const dz =
+      formation === 'column'
+        ? Math.floor(index / 2) * spacing
+        : Math.floor(index / cols) * spacing * (formation === 'spread' ? 1.8 : 1);
+    return {
+      x: clamp(aim.x + (units.length > 1 ? dx : 0), -850, 850),
+      z: clamp(aim.z + (units.length > 1 ? dz : 0), -560, 560),
+    };
+  });
+}
 
 export function saveGroup(s, side, index, ids) {
   s.groups ||= [{}, {}];
@@ -75,6 +85,8 @@ export function commandUnits(s, side, ids, command) {
   let changed = 0;
   for (const u of units) {
     if (command === 'stop') {
+      clearGroundRoute(u);
+      cancelTransportDelivery(u);
       u.guard = null;
       u.guardTargetId = null;
       u.path = [];
@@ -93,6 +105,7 @@ export function commandUnits(s, side, ids, command) {
       changed++;
     }
     if (command === 'dig' && isInfantry(u.key) && !u.carrierId) {
+      clearGroundRoute(u);
       u.guard = null;
       u.guardTargetId = null;
       u.path = [];

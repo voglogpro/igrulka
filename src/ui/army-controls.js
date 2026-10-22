@@ -27,6 +27,7 @@ const commands = [
   ['fire', 'Огонь', 'F · Разрешить или запретить стрельбу'],
   ['retreat', 'Отход', 'T · Отступить к базе и восстановиться'],
   ['board', 'Посадка', 'Указать свой БТР для посадки бойцов'],
+  ['deliver', 'Доставить ↗', 'Отвезти пассажиров и автоматически высадить в указанной точке'],
   ['unload', 'Высадка', 'U · Высадить бойцов из выбранного БТР'],
 ];
 
@@ -73,6 +74,18 @@ export function renderArmyControls({ state, armySelection }, primary) {
         .reduce((n, p) => n + (E.GROUND_UNITS[p.key].members || 1), 0);
     $('#ground-state').textContent =
       `Места: ${seats('carrierId')}/${d.capacity}${seats('boardingId') ? ` · подходят ${seats('boardingId')}` : ''}`;
+    const delivery = E.transportDeliveryStatus(state, 0, primary.id);
+    if (delivery?.status !== 'idle')
+      $('#ground-state').textContent +=
+        delivery.status === 'blocked' ? ' · высадка/проезд заблокированы' : ' · доставка в пути';
+    const button = host.querySelector('[data-troop="deliver"]');
+    button.disabled = !delivery?.passengers || seats('boardingId') > 0;
+    button.title =
+      seats('boardingId') > 0
+        ? 'Дождитесь посадки бойцов'
+        : !delivery?.passengers
+          ? 'Сначала посадите пехоту в БТР'
+          : 'Указать точку доставки и автоматической высадки';
   }
   if (units.length === 1 && d.range) {
     const stats = E.defenseStats(state.sides[0], primary),
@@ -85,6 +98,16 @@ export function renderArmyControls({ state, armySelection }, primary) {
         : reload > 0
           ? ` · перезарядка ${reload.toFixed(1)} с`
           : ` · ${rounds ?? stats.magazine}/${stats.magazine} · нагрев ${Math.round((primary.heat || 0) * 100)}%`;
+  }
+  host.querySelector('[data-troop="deliver"]').hidden = units.length !== 1 || !d.capacity;
+  const routed = units.filter((u) => u.routeState);
+  if (routed.length) {
+    $('#ground-state').textContent += routed.some((u) => u.routeState.status === 'blocked')
+      ? ' · маршрут заблокирован'
+      : ` · маршрут: ${routed.length} ед.`;
+    const route = E.groundRouteStatus(state, 0, primary.id);
+    $('#army-detail-text').textContent +=
+      ` Маршрут: ${route.pending}/12 ожидающих точек. Shift+ПКМ добавляет, «Стоять» отменяет.`;
   }
   const foot = units.some((u) => E.isInfantry(u.key) && !u.carrierId);
   const held = units.every((u) => u.holdFire);

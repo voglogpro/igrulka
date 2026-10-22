@@ -176,17 +176,25 @@ export function groundCommandAt(e) {
   const canBoard =
     target?.side === 0 &&
     target.key === 'apc' &&
+    !e.shiftKey &&
     this.armySelection.some((id) => {
       const unit = E.targetById(this.state, id);
       return unit && E.isInfantry(unit.key);
     });
-  this.callbacks.onGroundOrder?.(
+  const pickedDistrict = !target && !e.shiftKey && this.districtView?.pick(this.ray);
+  const district =
+    !target &&
+    !e.shiftKey &&
+    E.DISTRICTS.find((d) => d.id === pickedDistrict || Math.hypot(d.x - p.x, d.z - p.z) < 18);
+  const order =
     target?.side === 1
       ? { x: target.x, z: target.z, targetId: target.id }
       : canBoard
         ? { x: target.x, z: target.z, boardId: target.id }
-        : { x: p.x, z: p.z },
-  );
+        : district
+          ? { x: district.x, z: district.z, districtId: district.id }
+          : { x: p.x, z: p.z };
+  this.callbacks.onGroundOrder?.({ ...order, append: !!e.shiftKey });
 }
 
 export function groundPoint(e) {

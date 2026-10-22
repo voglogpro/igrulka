@@ -99,6 +99,45 @@ export class TacticalView {
     );
     this.groundRoute.frustumCulled = false;
     world.scene.add(this.groundRoute);
+    this.groundPlans = new T.Group();
+    this.groundPlans.visible = false;
+    world.scene.add(this.groundPlans);
+    this.planPositions = new Float32Array(14 * 3);
+    this.planDistances = new Float32Array(14);
+    const plannedGeometry = new T.BufferGeometry();
+    plannedGeometry.setAttribute(
+      'position',
+      new T.BufferAttribute(this.planPositions, 3).setUsage(T.DynamicDrawUsage),
+    );
+    plannedGeometry.setAttribute(
+      'lineDistance',
+      new T.BufferAttribute(this.planDistances, 1).setUsage(T.DynamicDrawUsage),
+    );
+    this.plannedRoute = new T.Line(
+      plannedGeometry,
+      new T.LineDashedMaterial({
+        color: '#b7d9e7',
+        dashSize: 5,
+        gapSize: 4,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.75,
+      }),
+    );
+    this.plannedRoute.frustumCulled = false;
+    this.plannedMarkers = new T.InstancedMesh(
+      new T.RingGeometry(2.4, 3.2, 20),
+      new T.MeshBasicMaterial({
+        color: '#b7d9e7',
+        depthTest: false,
+        side: T.DoubleSide,
+        transparent: true,
+        opacity: 0.85,
+      }),
+      13,
+    );
+    this.plannedMarkers.frustumCulled = false;
+    this.groundPlans.add(this.plannedRoute, this.plannedMarkers);
     this.defenseLine = new T.Group();
     this.defenseLine.visible = false;
     world.scene.add(this.defenseLine);
@@ -172,12 +211,41 @@ export class TacticalView {
   }
   previewGround(u) {
     this.groundRoute.visible = !!u?.path?.length;
-    if (!this.groundRoute.visible) return;
-    const points = [u, ...u.path].slice(0, 256);
-    for (let i = 0; i < points.length; i++)
-      this.groundPositions.set([points[i].x, 2.8, points[i].z], i * 3);
-    this.groundRoute.geometry.setDrawRange(0, points.length);
-    this.groundRoute.geometry.attributes.position.needsUpdate = true;
+    if (this.groundRoute.visible) {
+      const points = [u, ...u.path].slice(0, 256);
+      for (let i = 0; i < points.length; i++)
+        this.groundPositions.set([points[i].x, 2.8, points[i].z], i * 3);
+      this.groundRoute.geometry.setDrawRange(0, points.length);
+      this.groundRoute.geometry.attributes.position.needsUpdate = true;
+    }
+    this.groundPlans.visible = !!u && !!(u.routeState || u.delivery);
+    if (!this.groundPlans.visible) return;
+    const route = u.delivery
+      ? [u.delivery]
+      : [...(u.order ? [u.order] : []), ...(u.routeQueue || [])];
+    const color = (u.delivery || u.routeState)?.status === 'blocked' ? '#eca47c' : '#b7d9e7';
+    this.plannedRoute.material.color.set(color);
+    this.plannedMarkers.material.color.set(color);
+    const points = [u.path?.at(-1) || u, ...route].slice(0, 14);
+    for (let i = 0; i < points.length; i++) {
+      this.planPositions.set([points[i].x, 3, points[i].z], i * 3);
+      this.planDistances[i] = i
+        ? this.planDistances[i - 1] +
+          Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z)
+        : 0;
+    }
+    this.plannedRoute.geometry.setDrawRange(0, points.length);
+    this.plannedRoute.geometry.attributes.position.needsUpdate = true;
+    this.plannedRoute.geometry.attributes.lineDistance.needsUpdate = true;
+    this.plannedMarkers.count = Math.min(13, route.length);
+    for (let i = 0; i < this.plannedMarkers.count; i++) {
+      this.dummy.position.set(route[i].x, 3, route[i].z);
+      this.dummy.rotation.set(-Math.PI / 2, 0, 0);
+      this.dummy.scale.setScalar(1);
+      this.dummy.updateMatrix();
+      this.plannedMarkers.setMatrixAt(i, this.dummy.matrix);
+    }
+    this.plannedMarkers.instanceMatrix.needsUpdate = true;
   }
   previewTactical(unit, aim) {
     if (!unit || !aim) return;

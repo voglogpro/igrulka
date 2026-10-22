@@ -1,6 +1,8 @@
 import { GROUND_UNITS, isInfantry } from '../../config.js';
 import { groundPath, walkable } from './navigation.js';
 import { coverInfo, groundVisible, lineOfSight } from '../infantry/cover.js';
+import { cancelTransportDelivery } from '../vehicles/transport.js';
+import { clearGroundRoute } from './route-queue.js';
 
 const GUARD_RADIUS = 95;
 const ALLY_RADIUS = 68;
@@ -97,6 +99,8 @@ function assignPost(s, u, p, snapToCover = false) {
       };
   if (!placement || (!placement.path.length && distance(u, placement.point) > 3)) return false;
   const post = { x: placement.point.x, z: placement.point.z };
+  clearGroundRoute(u);
+  cancelTransportDelivery(u);
   u.guard = post;
   u.guardTargetId = null;
   u.guardNextThink = 0;

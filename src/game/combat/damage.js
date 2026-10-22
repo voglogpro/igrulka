@@ -3,6 +3,7 @@ import { event } from '../shared/events.js';
 import { clamp } from '../shared/math.js';
 import { BUILDINGS, GROUND_UNITS } from '../config.js';
 import { damageGround } from '../units/ground/index.js';
+import { damageDistricts } from '../territory/districts.js';
 export function damageRoad(s, r, amount) {
   const before = passable(r);
   r.hp = Math.max(0, r.hp - amount);
@@ -32,6 +33,7 @@ export function damageBuilding(s, b, amount) {
 }
 
 export function applyBlast(s, x, z, damage, radius) {
+  damageDistricts(s, x, z, damage, radius);
   const at = (distance) =>
     distance > radius
       ? 0

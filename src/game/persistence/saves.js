@@ -2,6 +2,8 @@ import { VERSION, MAP, BUILDINGS, GROUND_UNITS, TECH, WEAPONS } from '../config.
 import { ROAD_HP, normalizeRoadOverlaps } from '../city/road-network.js';
 import { campRoads } from '../city/roads.js';
 import { log } from '../shared/events.js';
+import { restoreDistricts } from '../territory/persistence.js';
+import { isFactoryPlan } from '../units/aviation/factory-plans.js';
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
   const copy = structuredClone(s);
@@ -12,7 +14,7 @@ export function save(s) {
 export function load(raw) {
   const s = JSON.parse(raw);
   if (
-    ![3, 4, 5, 6, 7, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, VERSION].includes(s.version) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
@@ -167,6 +169,40 @@ export function load(raw) {
     )
       throw Error('Повреждён отряд');
   for (const u of s.groundUnits) {
+    if (
+      u.routeQueue != null &&
+      (!Array.isArray(u.routeQueue) ||
+        u.routeQueue.length > 12 ||
+        u.routeQueue.some(
+          (p) =>
+            !p ||
+            !Number.isFinite(p.x) ||
+            !Number.isFinite(p.z) ||
+            Math.abs(p.x) > 850 ||
+            Math.abs(p.z) > 560 ||
+            !['move', 'attackmove'].includes(p.mode),
+        ))
+    )
+      throw Error('Повреждён маршрут отряда');
+    if (
+      u.routeState != null &&
+      (!['moving', 'blocked'].includes(u.routeState.status) ||
+        !Number.isFinite(u.routeState.retryAt) ||
+        u.routeState.retryAt < 0)
+    )
+      throw Error('Повреждено состояние маршрута');
+    if (
+      u.delivery != null &&
+      (!GROUND_UNITS[u.key].capacity ||
+        typeof u.delivery !== 'object' ||
+        Array.isArray(u.delivery) ||
+        !['x', 'z', 'retryAt'].every((key) => Number.isFinite(u.delivery[key])) ||
+        Math.abs(u.delivery.x) > 850 ||
+        Math.abs(u.delivery.z) > 560 ||
+        u.delivery.retryAt < 0 ||
+        !['moving', 'blocked'].includes(u.delivery.status))
+    )
+      throw Error('Повреждена доставка');
     if (u.xp != null && (!Number.isFinite(u.xp) || u.xp < 0 || u.xp > 450))
       throw Error('Повреждён опыт бойца');
     if (
@@ -184,6 +220,12 @@ export function load(raw) {
       throw Error('Повреждена цель гарнизона');
   }
   for (const b of s.buildings) {
+    if (b.productionPlan != null) {
+      if (b.key !== 'factory' || !isFactoryPlan(b.productionPlan))
+        throw Error('Повреждён план боезапаса');
+      const { key, target, reserveCredits, reserveMaterials, enabled } = b.productionPlan;
+      b.productionPlan = { key, target, reserveCredits, reserveMaterials, enabled };
+    }
     if (
       b.rally != null &&
       (typeof b.rally !== 'object' ||
@@ -274,6 +316,7 @@ export function load(raw) {
       if (u[k] != null && (!Number.isFinite(u[k]) || u[k] < 0))
         throw Error('Повреждено состояние бойца');
   }
+  restoreDistricts(s);
   s.version = VERSION;
   s.events = [];
   s.stats = {
@@ -285,6 +328,8 @@ export function load(raw) {
     roadsCut: 0,
     crashes: 0,
     airbursts: 0,
+    districtsCaptured: 0,
+    districtsDestroyed: 0,
     ...s.stats,
   };
   s.networkRevision = (s.networkRevision || 0) + 1;

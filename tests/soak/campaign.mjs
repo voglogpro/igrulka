@@ -12,6 +12,12 @@ for (let seed = 1; seed <= 12; seed++) {
     for (const key of ['hp', 'progress', 'x', 'z']) assert.ok(Number.isFinite(b[key]));
   for (const u of s.groundUnits)
     for (const key of ['hp', 'x', 'z']) assert.ok(Number.isFinite(u[key]));
+  for (const d of s.districts) {
+    assert.ok(Number.isFinite(d.hp) && d.hp >= 0);
+    assert.ok(Number.isFinite(d.control) && Math.abs(d.control) <= 1);
+    assert.ok([null, 0, 1].includes(d.owner));
+  }
+  assert.ok(s.stats.districtsCaptured >= 2, `seed ${seed}: bot must capture sites`);
   assert.ok(s.buildings.some((b) => b.side === 1 && b.key === 'barracks'));
   assert.ok(s.groundUnits.some((u) => u.side === 1));
   assert.ok(s.buildings.some((b) => b.side === 1 && (b.level || 0) > 0));
@@ -22,6 +28,7 @@ for (let seed = 1; seed <= 12; seed++) {
   const restored = E.load(E.save(s));
   assert.deepEqual(restored.sides, s.sides);
   assert.equal(restored.time, s.time);
+  assert.deepEqual(restored.districts, s.districts);
   summaries.push({
     seed,
     buildings: s.buildings.length,
@@ -30,6 +37,8 @@ for (let seed = 1; seed <= 12; seed++) {
     army: s.groundUnits.length,
     crossed: s.groundUnits.filter((u) => u.side === 1 && u.x < 0).length,
     upgraded: s.buildings.filter((b) => b.level > 0).length,
+    districts: s.districts.filter((d) => d.owner === 1).length,
+    captures: s.stats.districtsCaptured,
   });
 }
 console.log(JSON.stringify({ campaigns: summaries.length, minutesPerCampaign: 20, summaries }));

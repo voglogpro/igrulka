@@ -292,10 +292,26 @@ test('default rally guards both human sides but leaves solo bot available for it
   game.advance(s, 0.1);
   const first = s.groundUnits.find((u) => u.side === 1);
   assert.equal(first.guard, undefined);
+  for (let i = 0; i < 6; i++) unit(s, 1, 'infantry', 500, 200 + i * 8);
   s.ai.nextArmy = 0;
   s.time = 231;
   game.advance(s, 0.1);
-  assert.equal(first.order.mode, 'attackmove');
+  assert.ok(
+    first.order?.mode === 'attackmove' ||
+      (first.aiDistrict && first.guard && first.path.length > 0),
+    'the actual army AI must give the recruit an attack or a reachable district post',
+  );
+  const districtGuards = s.groundUnits.filter((u) => u.side === 1 && u.aiDistrict && u.guard);
+  assert.ok(districtGuards.length > 0 && districtGuards.length <= 3);
+  const attacker = s.groundUnits.find((u) => u.side === 1 && u.order?.mode === 'attackmove');
+  assert.ok(attacker, 'district garrisons must leave an actual attacking reserve');
+  const enemyHQ = s.buildings.find((site) => site.side === 0 && site.key === 'hq');
+  const before = Math.hypot(attacker.x - enemyHQ.x, attacker.z - enemyHQ.z);
+  game.advance(s, 2);
+  assert.ok(
+    Math.hypot(attacker.x - enemyHQ.x, attacker.z - enemyHQ.z) < before - 5,
+    'the attacking reserve must really move toward the enemy instead of idling at base',
+  );
   s.mode = 'multiplayer';
   assert.equal(defaultRallyMode(s, b), 'guard');
   s.ai.nextArmy = 1e9;

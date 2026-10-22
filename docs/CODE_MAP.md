@@ -23,16 +23,18 @@
 
 ## Техника
 
-| Задача                                                  | Где менять                                         |
-| ------------------------------------------------------- | -------------------------------------------------- |
-| Цена, здоровье, скорость, вместимость, вооружение машин | `src/game/units/vehicles/types.js`                 |
-| Посадка, места, выбор доступной точки высадки           | `src/game/units/vehicles/transport.js`             |
-| Поиск пути и мосты                                      | `src/game/units/ground/navigation.js`              |
-| Внешний вид Leopard                                     | `src/rendering/models/vehicles/leopard.js`         |
-| Внешний вид БТР                                         | `src/rendering/models/vehicles/apc.js`             |
-| Пушки и радары Шилки/Gepard                             | `src/rendering/models/vehicles/anti-air.js`        |
-| Гусеницы и общий корпус                                 | `src/rendering/models/vehicles/tracked-chassis.js` |
-| Выбор шаблона, клонирование и анимация машин            | `src/rendering/models/ground.js`                   |
+| Задача                                                    | Где менять                                         |
+| --------------------------------------------------------- | -------------------------------------------------- |
+| Цена, здоровье, скорость, вместимость, вооружение машин   | `src/game/units/vehicles/types.js`                 |
+| Посадка, места, выбор доступной точки высадки             | `src/game/units/vehicles/transport.js`             |
+| Доставка, ожидание безопасной высадки и отмена рейса      | `src/game/units/vehicles/transport-orders.js`      |
+| Очередь точек, построение, ожидание заблокированного пути | `src/game/units/ground/route-queue.js`             |
+| Поиск пути и мосты                                        | `src/game/units/ground/navigation.js`              |
+| Внешний вид Leopard                                       | `src/rendering/models/vehicles/leopard.js`         |
+| Внешний вид БТР                                           | `src/rendering/models/vehicles/apc.js`             |
+| Пушки и радары Шилки/Gepard                               | `src/rendering/models/vehicles/anti-air.js`        |
+| Гусеницы и общий корпус                                   | `src/rendering/models/vehicles/tracked-chassis.js` |
+| Выбор шаблона, клонирование и анимация машин              | `src/rendering/models/ground.js`                   |
 
 Снаряд танка проходит через общую систему наземного боя. Изменение танкового урона — `vehicles/types.js`; изменение поведения попадания — `ground/combat.js`.
 
@@ -42,6 +44,7 @@
 | ------------------------------------------------------- | ------------------------------------------- |
 | Параметры лёгкого/тяжёлого дрона и ракет                | `src/game/units/aviation/weapons.config.js` |
 | Очередь сборочного завода                               | `src/game/units/aviation/production.js`     |
+| Целевой запас, резерв ресурсов, автоматический заказ    | `src/game/units/aviation/factory-plans.js`  |
 | Выбор пусковой, резерв склада, очередь запусков         | `src/game/units/aviation/launch.js`         |
 | Маршрут с точками                                       | `src/game/units/aviation/routes.js`         |
 | Полёт, сбитие, падение и удар по цели                   | `src/game/units/aviation/flight.js`         |
@@ -73,6 +76,10 @@
 | Сериализация, миграции и проверка входящих данных    | `src/game/persistence/saves.js`         |
 
 ## Отрисовка, интерфейс, звук
+
+Стратегические районы находятся отдельно в `src/game/territory/`: `districts.config.js` задаёт места и баланс, `state.js` — только изменяемые поля, `districts.js` — захват, доход, взрывы и ремонт, `persistence.js` — миграцию и проверку сохранений. `ai/district-ai.js` распределяет ограниченный гарнизон бота, оставляя резерв наступлению. Конфигурационные цены и координаты не принимаются из импортированного состояния.
+
+Модели районов — `src/rendering/terrain/districts.js`; компактные карточки — `src/ui/districts.js` / `districts.css`. Панель планов заводов — `src/ui/factory-plans.js`; правила находятся в игровом модуле, а не в UI.
 
 - `src/rendering/world.js` — создание сцены, связь модулей, ввод клавиатуры, цикл кадра.
 - `src/rendering/sync.js` — обновление видимых моделей по состоянию.
