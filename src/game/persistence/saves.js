@@ -152,6 +152,12 @@ export function load(raw) {
         ![-1, 1].includes(u.missingWing))
     )
       throw Error('Повреждено падение дрона');
+  for (const u of s.units)
+    if (
+      (u.threatAt != null && !Number.isFinite(u.threatAt)) ||
+      (u.evade != null && (!Number.isFinite(u.evade) || u.evade < 0 || u.evade > 1))
+    )
+      throw Error('Повреждён манёвр дрона');
   for (const p of s.projectiles || [])
     if (
       !['x', 'y', 'z', 'vx', 'vy', 'vz', 'speed', 'life', 'maxLife'].every((k) =>
@@ -221,6 +227,17 @@ export function load(raw) {
         throw Error('Повреждена реакция гарнизона');
     if (u.guardTargetId != null && (!Number.isSafeInteger(u.guardTargetId) || u.guardTargetId <= 0))
       throw Error('Повреждена цель гарнизона');
+    for (const key of ['threatX', 'threatZ', 'threatAt', 'coverCheckAt', 'coverSince'])
+      if (u[key] != null && !Number.isFinite(u[key])) throw Error('Повреждена реакция на огонь');
+    if (
+      u.coverResume != null &&
+      (typeof u.coverResume !== 'object' ||
+        !Number.isFinite(u.coverResume.x) ||
+        !Number.isFinite(u.coverResume.z) ||
+        Math.abs(u.coverResume.x) > 864 ||
+        Math.abs(u.coverResume.z) > 576)
+    )
+      throw Error('Повреждена реакция на огонь');
   }
   for (const b of s.buildings) {
     for (const q of b.armyQueue || []) validateSquadMetadata(q, true);

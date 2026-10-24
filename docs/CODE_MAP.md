@@ -15,6 +15,7 @@
 | Сворачивание стационарной МОГ в мобильную                          | `src/game/units/infantry/mog.js`            |
 | Движение и наземная стрельба всех единиц                           | `src/game/units/ground/update.js`           |
 | Наземные попадания, подавление и последствия гибели транспорта     | `src/game/units/ground/combat.js`           |
+| Укрытие под огнём, отход техники, возврат к наступлению            | `src/game/units/ground/tactics.js`          |
 | Тело, ноги, экипировка и пакетная анимация солдат                  | `src/rendering/models/infantry/soldiers.js` |
 | Мешки, станок, пулемёт и расчёт МОГ                                | `src/rendering/models/infantry/mog.js`      |
 | Отрисовка окопов                                                   | `src/rendering/terrain/trenches.js`         |
@@ -88,7 +89,8 @@
 - `src/rendering/lighting.js` — единственный контроллер солнца, окружения, экспозиции и области теней.
 - `src/rendering/terrain/` — земля, река, лес, мосты, улицы и окопы.
 - `src/rendering/tactical-overlays.js`, `minimap.js` — маршрут, кольца и миникарта.
-- `src/rendering/effects/combat-effects.js` — пулы дыма, вспышек, осколков и трассеров.
+- `src/rendering/effects/combat-effects.js` — пулы дыма, вспышек, осколков и трассеров; дульные эффекты, разрывы в воздухе, след ЗУР, горящие обломки.
+- `src/rendering/effects/weapon-profiles.js` — внешний вид выстрела каждого класса оружия; `streaks.js` — росчерки трассеров и искр; `casings.js` — гильзы; `particles.js` — пакет дыма и свечения.
 - `src/rendering/effects/post-processing.js` — свечение, тональная обработка и зерно.
 - `src/ui/app.js` — текущая сессия, обработчики действий и связь интерфейса с правилами.
 - `src/ui/layout.js`, `panels.js`, `inspector.js` — оболочка, меню и карточка выбранного объекта.

@@ -183,6 +183,7 @@ export function prepareGroundEngagement(s) {
   cache.buckets = new Map();
   cache.ids = new Map();
   cache.visible = new Map();
+  cache.pending = new Map();
   cache.metrics.indexBuilds++;
   for (const u of [...s.groundUnits, ...s.buildings]) {
     if (u.hp <= 0 || u.carrierId || u.demolished || u.progress < 1) continue;
@@ -190,6 +191,17 @@ export function prepareGroundEngagement(s) {
     const cell = `${Math.floor(u.x / ENGAGEMENT_CELL)},${Math.floor(u.z / ENGAGEMENT_CELL)}`;
     if (!cache.buckets.has(cell)) cache.buckets.set(cell, []);
     cache.buckets.get(cell).push(u);
+  }
+  // Damage already in flight lets slow, expensive weapons avoid overkill on a doomed target.
+  for (const p of s.projectiles || []) {
+    if (p.domain !== 'ground' || p.dead || p.targetId == null) continue;
+    const target = cache.ids.get(p.targetId);
+    if (target)
+      cache.pending.set(
+        p.targetId,
+        (cache.pending.get(p.targetId) || 0) +
+          p.damage * groundDamageMultiplier(p.shooterKey, target, p.kind),
+      );
   }
   // Retain only a bounded recent set instead of keeping pairs for destroyed armies forever.
   if (cache.los.size > 4096) cache.los.clear();
@@ -244,7 +256,7 @@ function inRange(u, target, range) {
   );
 }
 
-function rank(u, target, range) {
+function rank(u, target, range, cache) {
   if (target.id === u.order?.targetId) return 10000;
   if (target.id === u.guardTargetId) return 5000;
   const armor = groundArmorClass(target);
@@ -253,7 +265,16 @@ function rank(u, target, range) {
   if (profile === 'antiArmor')
     priority = armor === 'heavy' ? 300 : armor === 'light' ? 260 : armor === 'infantry' ? 20 : 10;
   else if (profile === 'cannon')
-    priority = armor === 'heavy' ? 150 : armor === 'light' ? 130 : armor === 'infantry' ? 90 : 50;
+    priority =
+      armor === 'heavy'
+        ? 150
+        : armor === 'light'
+          ? 130
+          : armor === 'infantry'
+            ? target.key === 'atgm'
+              ? 165
+              : 90
+            : 50;
   else
     priority =
       armor === 'infantry'
@@ -265,10 +286,16 @@ function rank(u, target, range) {
           : armor === 'heavy'
             ? 5
             : 20;
+  const health = target.maxHp > 0 ? Math.max(0, target.hp / target.maxHp) : 1;
+  const pending = cache?.pending?.get(target.id) || 0;
   return (
     priority -
     (Math.hypot(target.x - u.x, target.z - u.z) / range) * 35 +
-    (target.id === u.enemyId ? 8 : 0)
+    (target.id === u.enemyId ? 8 : 0) +
+    // Finish wounded enemies, answer whoever is shooting at us, skip targets already doomed.
+    (1 - health) * 28 +
+    (target.enemyId === u.id ? 14 : 0) -
+    (pending >= target.hp ? 70 : 0)
   );
 }
 
@@ -301,7 +328,7 @@ export function groundEngagement(s, u) {
         x++
       )
         for (const t of cache.buckets.get(`${x},${z}`) || [])
-          if (inRange(u, t, range)) candidates.push({ unit: t, score: rank(u, t, range) });
+          if (inRange(u, t, range)) candidates.push({ unit: t, score: rank(u, t, range, cache) });
     cache.metrics.candidates += candidates.length;
     candidates.sort((a, b) => b.score - a.score || a.unit.id - b.unit.id);
     const head = candidates.slice(0, 2);
@@ -312,7 +339,8 @@ export function groundEngagement(s, u) {
     for (const entry of [...head, ...tail.slice(offset, offset + width)]) {
       const candidate = entry.unit;
       if (!visible(s, cache, u.side, candidate) || !clearLine(s, cache, u, candidate)) continue;
-      if (!target || rank(u, candidate, range) > rank(u, target, range)) target = candidate;
+      if (!target || rank(u, candidate, range, cache) > rank(u, target, range, cache))
+        target = candidate;
       break;
     }
     u.enemyId = target?.id ?? null;

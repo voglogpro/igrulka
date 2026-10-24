@@ -38,6 +38,7 @@ export function mogModel(w, b, content, root, crew = true) {
   pitch.position.y = 1;
   turret.add(pitch);
   root.userData.pitch = pitch;
+  pitch.userData.muzzles = [[0, 0.1, -5.8]];
   w.box(pitch, 0, -0.3, 0.6, 0.85, 0.8, 2.5, '#3a4b41');
   w.box(pitch, 0, 0.5, 0.3, 0.4, 0.35, 0.5, '#536959');
   w.box(pitch, 1, -0.5, 1, 1.3, 0.8, 1.5, '#7a8460');

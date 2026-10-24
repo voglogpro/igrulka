@@ -131,6 +131,16 @@ export async function pointerUp(e) {
         return;
       }
     }
+    const now = performance.now(),
+      own = clicked.ground && clicked.side === 0,
+      twice = this.lastClick?.id === clicked.id && now - this.lastClick.at < 380;
+    this.lastClick = { id: clicked.id, at: now };
+    // Double click or Ctrl+click on an own unit picks every unit of that type on screen.
+    if (own && (twice || e.ctrlKey) && this.callbacks.onSelectSimilar) {
+      this.lastClick = null;
+      this.callbacks.onSelectSimilar(clicked.id, e.shiftKey);
+      return;
+    }
     this.callbacks.onSelect?.(clicked.id, e.shiftKey);
     return;
   }

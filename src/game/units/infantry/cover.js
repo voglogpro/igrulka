@@ -15,6 +15,32 @@ for (let i = 0; i < 180 && COVER_PATCHES.length < 82; i++) {
     continue;
   COVER_PATCHES.push({ x, z, r, forest: i % 3 !== 0 });
 }
+// Patches never move: bucket them once so a lookup checks only the patches around a point.
+const PATCH_CELL = 64;
+const patchCells = new Map();
+for (const p of COVER_PATCHES)
+  for (
+    let cx = Math.floor((p.x - p.r) / PATCH_CELL);
+    cx <= Math.floor((p.x + p.r) / PATCH_CELL);
+    cx++
+  )
+    for (
+      let cz = Math.floor((p.z - p.r) / PATCH_CELL);
+      cz <= Math.floor((p.z + p.r) / PATCH_CELL);
+      cz++
+    ) {
+      const key = cx + ',' + cz;
+      if (!patchCells.has(key)) patchCells.set(key, []);
+      patchCells.get(key).push(p);
+    }
+for (const list of patchCells.values())
+  list.sort((a, b) => COVER_PATCHES.indexOf(a) - COVER_PATCHES.indexOf(b));
+function patchAt(x, z) {
+  for (const p of patchCells.get(Math.floor(x / PATCH_CELL) + ',' + Math.floor(z / PATCH_CELL)) ||
+    [])
+    if (Math.hypot(x - p.x, z - p.z) < p.r) return p;
+  return null;
+}
 function coverForDirection(value, from, u) {
   if (!value.wall) return { cover: value.cover, concealment: value.concealment, kind: value.kind };
   const range = Math.hypot(from?.x - u.x, from?.z - u.z);
@@ -45,29 +71,30 @@ export function coverInfo(s, u, from = null) {
     concealment = 0,
     kind = 'Открыто',
     wall = null;
-  for (const p of COVER_PATCHES)
-    if (Math.hypot(u.x - p.x, u.z - p.z) < p.r) {
-      cover = p.forest ? 0.4 : 0.25;
-      concealment = p.forest ? 0.75 : 0.6;
-      kind = p.forest ? 'Лес' : 'Кустарник';
-      break;
+  const patch = patchAt(u.x, u.z);
+  if (patch) {
+    cover = patch.forest ? 0.4 : 0.25;
+    concealment = patch.forest ? 0.75 : 0.6;
+    kind = patch.forest ? 'Лес' : 'Кустарник';
+  }
+  const infantry = isInfantry(u.key);
+  for (const b of s.buildings) {
+    const dx = u.x - b.x,
+      dz = u.z - b.z,
+      size = BUILDINGS[b.key]?.size || 30;
+    // Ruins reach 0.75 of the footprint, walls 0.56 plus 12 m; anything farther is irrelevant.
+    if (Math.abs(dx) > size * 0.75 + 12 || Math.abs(dz) > size * 0.75 + 12 || b.demolished)
+      continue;
+    if (b.hp <= 0) {
+      if (Math.hypot(dx, dz) < size * 0.75) {
+        cover = Math.max(cover, 0.5);
+        concealment = Math.max(concealment, 0.4);
+        kind = 'Руины';
+      }
+      continue;
     }
-  for (const b of s.buildings)
-    if (
-      b.hp <= 0 &&
-      !b.demolished &&
-      Math.hypot(b.x - u.x, b.z - u.z) < (BUILDINGS[b.key]?.size || 30) * 0.75
-    ) {
-      cover = Math.max(cover, 0.5);
-      concealment = Math.max(concealment, 0.4);
-      kind = 'Руины';
-    }
-  if (isInfantry(u.key))
-    for (const b of s.buildings) {
-      if (b.hp <= 0 || b.demolished || b.progress < 1) continue;
-      const half = (BUILDINGS[b.key]?.size || 30) * 0.56;
-      const dx = u.x - b.x;
-      const dz = u.z - b.z;
+    if (infantry && b.progress >= 1) {
+      const half = size * 0.56;
       const edgeX = Math.abs(dx) - half;
       const edgeZ = Math.abs(dz) - half;
       if (edgeX >= 0 && edgeX <= 12 && Math.abs(dz) <= half + 4 && (!wall || edgeX < wall.distance))
@@ -75,6 +102,7 @@ export function coverInfo(s, u, from = null) {
       if (edgeZ >= 0 && edgeZ <= 12 && Math.abs(dx) <= half + 4 && (!wall || edgeZ < wall.distance))
         wall = { nx: 0, nz: Math.sign(dz), distance: edgeZ };
     }
+  }
   for (const t of s.trenches || [])
     if (t.progress >= 1 && Math.hypot(t.x - u.x, t.z - u.z) < 5) {
       cover = Math.max(cover, 0.72);
@@ -85,16 +113,26 @@ export function coverInfo(s, u, from = null) {
   cache.set(u, { time: s.time, revision: s.networkRevision, x: u.x, z: u.z, value });
   return coverForDirection(value, from, u);
 }
+// Widest building footprint used as a cheap bounding-box reject before the exact segment test.
+const MAX_BLOCKER_RADIUS = Math.max(30, ...Object.values(BUILDINGS).map((b) => b.size || 0)) * 0.48;
 export function lineOfSight(s, a, b) {
-  return !s.buildings.some(
-    (o) =>
-      o.hp > 0 &&
-      !o.demolished &&
-      o.id !== a.id &&
-      o.id !== b.id &&
-      (BUILDINGS[o.key]?.height || 15) > 4 &&
-      segmentDistance(o.x, o.z, a.x, a.z, b.x, b.z) < (BUILDINGS[o.key]?.size || 30) * 0.48,
-  );
+  const minX = Math.min(a.x, b.x) - MAX_BLOCKER_RADIUS,
+    maxX = Math.max(a.x, b.x) + MAX_BLOCKER_RADIUS,
+    minZ = Math.min(a.z, b.z) - MAX_BLOCKER_RADIUS,
+    maxZ = Math.max(a.z, b.z) + MAX_BLOCKER_RADIUS;
+  for (const o of s.buildings) {
+    if (o.x < minX || o.x > maxX || o.z < minZ || o.z > maxZ) continue;
+    if (o.hp <= 0 || o.demolished || o.id === a.id || o.id === b.id) continue;
+    const d = BUILDINGS[o.key];
+    if ((d?.height || 15) <= 4) continue;
+    if (segmentDistance(o.x, o.z, a.x, a.z, b.x, b.z) < (d?.size || 30) * 0.48) return false;
+  }
+  return true;
+}
+function observes(s, v, u, factor, flash, night) {
+  const sight = GROUND_UNITS[v.key]?.sight || (v.key === 'hq' ? 220 : 120),
+    range = Math.max(27, sight * night * (flash ? Math.max(factor, 0.6) : factor));
+  return (v.x - u.x) ** 2 + (v.z - u.z) ** 2 < range * range && lineOfSight(s, v, u);
 }
 export function groundVisible(s, side, u) {
   if (!u || u.hp <= 0 || u.carrierId) return false;
@@ -104,16 +142,13 @@ export function groundVisible(s, side, u) {
   const factor = u.camouflaged ? 0.2 : 0.43,
     flash = s.time - (u.lastFire ?? -1000) < 2.2,
     night = 0.65 + dayPhase(s.time).daylight * 0.35;
-  const observers = [
-    ...(s.groundUnits || []).filter((v) => v.side === side && v.hp > 0 && !v.carrierId),
-    ...s.buildings.filter((b) => b.side === side && b.hp > 0 && b.progress >= 1),
-  ];
-  const value = observers.some((v) => {
-    const sight = GROUND_UNITS[v.key]?.sight || (v.key === 'hq' ? 220 : 120),
-      range = Math.max(27, sight * night * (flash ? Math.max(factor, 0.6) : factor));
-    return Math.hypot(v.x - u.x, v.z - u.z) < range && lineOfSight(s, v, u);
-  });
-  return value;
+  for (const v of s.groundUnits || [])
+    if (v.side === side && v.hp > 0 && !v.carrierId && observes(s, v, u, factor, flash, night))
+      return true;
+  for (const b of s.buildings)
+    if (b.side === side && b.hp > 0 && b.progress >= 1 && observes(s, b, u, factor, flash, night))
+      return true;
+  return false;
 }
 export function recordFire(s, u, random) {
   u.lastFire = s.time;

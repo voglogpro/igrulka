@@ -29,6 +29,8 @@ export function buildAntiAirTurret(world, u, turret, paint, dynamic) {
           [-2.8, 0],
           [2.8, 0],
         ];
+  // Barrel tips in pitch space: muzzle effects start exactly at the end of each barrel.
+  pitch.userData.muzzles = barrels.map(([x, y]) => [x, y, 8]);
   for (const [x, y] of barrels) {
     barrel(world, pitch, x, y, 3.9, 0.14, 7.8, '#273c32');
     barrel(world, pitch, x, y, 2.25, 0.25, 2.4, '#6e8066');

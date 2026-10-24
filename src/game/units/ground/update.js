@@ -13,6 +13,7 @@ import { updateGuard, guardGround } from './guard.js';
 import { updateRecruitRepeat } from './repeat.js';
 import { veteranAccuracy, veteranSuppression } from './veterancy.js';
 import { squadArrivalPoint } from './squads.js';
+import { updateGroundTactics } from './tactics.js';
 import {
   prepareGroundEngagement,
   groundEngagement,
@@ -26,9 +27,10 @@ export function tickUnit(s, u, dt, rates, hooks) {
     foot = isInfantry(u.key),
     mobile = !!GROUND_UNITS[u.key];
   if (u.hp <= 0 || u.progress < 1) return;
+  const index = prepareGroundEngagement(s).ids;
   if (u.carrierId) {
-    const v = s.groundUnits.find((v) => v.id === u.carrierId && v.hp > 0);
-    if (v) {
+    const v = index.get(u.carrierId);
+    if (v?.hp > 0) {
       u.x = v.x;
       u.z = v.z;
       u.moving = false;
@@ -55,8 +57,8 @@ export function tickUnit(s, u, dt, rates, hooks) {
     if (!u.groundReload) u.groundAmmo = maxMagazine;
   } else if (!u.groundAmmo) u.groundReload = aaMagazine?.reload || d.groundReload || 3;
   if (u.boardingId) {
-    const v = s.groundUnits.find((v) => v.id === u.boardingId && v.hp > 0);
-    if (!v) {
+    const v = index.get(u.boardingId);
+    if (!(v?.hp > 0) || !GROUND_UNITS[v.key]) {
       u.boardingId = null;
       u.order = null;
       u.path = [];
@@ -77,6 +79,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
   }
   updateGuard(s, u);
   const { target, stopToFight } = groundEngagement(s, u);
+  if (mobile) updateGroundTactics(s, u, target);
   const retreat = u.order?.mode === 'retreat';
   u.moving = false;
   if (mobile && u.path?.length && !stopToFight) {

@@ -5,6 +5,19 @@ import { BUILDINGS } from '../game/index.js';
 import { aircraftModel } from './models/aircraft.js';
 import { groundModel, animateGround } from './models/ground.js';
 import { aircraftAttitude } from './models/aircraft-motion.js';
+const muzzlePoint = new T.Vector3();
+// The simulation reports a nominal muzzle; move the visual flash to the real end of the barrel.
+function muzzleEvent(world, e) {
+  const model = world.models.get(e.buildingId) || world.groundModels.get(e.buildingId),
+    pitch = model?.userData?.pitch || model?.root?.userData?.pitch,
+    muzzles = pitch?.userData.muzzles;
+  if (!muzzles?.length || !(model.visible ?? model.root?.visible)) return e;
+  const holder = model.userData ?? model;
+  holder.barrel = ((holder.barrel ?? -1) + 1) % muzzles.length;
+  pitch.updateWorldMatrix(true, false);
+  muzzlePoint.fromArray(muzzles[holder.barrel]).applyMatrix4(pitch.matrixWorld);
+  return { ...e, mx: muzzlePoint.x, my: muzzlePoint.y, mz: muzzlePoint.z, barrelTip: true };
+}
 export function sync() {
   const buildingIds = new Set(this.state.buildings.filter((b) => !b.demolished).map((b) => b.id));
   for (const [id, model] of this.models) {
@@ -193,6 +206,14 @@ export function sync() {
     }
     m.visible = visibleGround.has(u.id);
     if (m.visible) animateGround(m, u, this.state.time, this.visualDt);
+    const pitch = m.userData.pitch;
+    if (pitch && m.userData.kick !== undefined) {
+      // Autocannon barrels slam back on each round and run out again.
+      m.userData.pitchZ ??= pitch.position.z;
+      m.userData.kick = Math.max(0, m.userData.kick - this.visualDt * 14);
+      pitch.position.z =
+        m.userData.pitchZ + (pitch.parent?.userData.backward ? 1 : -1) * m.userData.kick * 0.32;
+    }
   }
   for (const [id, m] of this.groundModels)
     if (!groundIds.has(id)) {
@@ -220,10 +241,20 @@ export function sync() {
       this.state.groundUnits.filter((u) => this.armySelection.includes(u.id)),
     );
   this.combatFX.updateTracers(this.state.projectiles);
+  let shooters = null;
+  const shooter = (id) => {
+    shooters ||= new Map(
+      [...this.state.buildings, ...(this.state.groundUnits || [])].map((o) => [o.id, o]),
+    );
+    return shooters.get(id) || null;
+  };
   for (const e of this.state.events)
     if (e.id > this.eventId) {
       this.eventId = e.id;
-      this.combatFX.handle(e);
+      this.combatFX.handle(
+        e.type === 'shot' ? muzzleEvent(this, e) : e,
+        e.type === 'shot' ? shooter(e.buildingId) : null,
+      );
       if (e.type === 'groundDestroyed') {
         if (E.isInfantry(e.key)) {
           for (let i = 0; i < 5; i++)
@@ -234,12 +265,15 @@ export function sync() {
             });
         } else {
           this.combatFX.explode(e.x, 2, e.z, 1);
+          this.combatFX.wreck(e.x, e.z);
           this.addShake(e.x, e.z, 0.5);
         }
       }
       if (e.type === 'shot') {
         const model = this.models.get(e.buildingId);
         if (model) model.recoil = 1;
+        const vehicle = this.groundModels.get(e.buildingId);
+        if (vehicle && !vehicle.userData.recoil) vehicle.userData.kick = 1;
       }
       if (['impact', 'crash'].includes(e.type) || (e.type === 'intercept' && e.mode === 'burst'))
         this.addShake(e.x, e.z, e.key === 'ballistic' ? 2.5 : 1);

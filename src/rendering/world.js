@@ -439,6 +439,17 @@ export class RTSWorld {
     if (kind === 'smoke') this.combatFX.puff(x, y, z, size, life);
     else this.combatFX.spark(x, y, z, size, life);
   }
+  // Own field units whose position projects inside the current viewport.
+  unitsOnScreen(filter = () => true) {
+    const v = new T.Vector3();
+    return (this.state.groundUnits || [])
+      .filter((u) => {
+        if (u.side !== 0 || u.hp <= 0 || u.carrierId || !filter(u)) return false;
+        v.set(u.x, (u.y || 1) + 1, u.z).project(this.camera);
+        return v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1;
+      })
+      .map((u) => u.id);
+  }
   explosion(x, y, z, size = 1) {
     this.combatFX.explode(x, y, z, size);
     this.addShake(x, z, size);

@@ -1,142 +1,34 @@
 import * as T from '../../../vendor/three/three.module.js';
-const particleVertex = `attribute float aOpacity;attribute vec3 aTint;varying vec2 vUv;varying float vAlpha;varying vec3 vTint;
-void main(){vUv=uv;vAlpha=aOpacity;vTint=aTint;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0);}`;
-const particleFragment = `uniform float kind;uniform float clock;varying vec2 vUv;varying float vAlpha;varying vec3 vTint;
-float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
-void main(){vec2 p=(vUv-.5)*2.;float r=length(p);float alpha;
- if(kind<.5){float n=noise(p*3.+vec2(clock*.16,clock*.23))*.6+noise(p*7.)*.25;alpha=smoothstep(1.,.1,r)*(.45+n*.55);}
- else if(kind<1.5){float n=noise(p*5.+vec2(0.,clock*2.));alpha=exp(-r*r*(3.+n))*smoothstep(1.,.5,r)*(.55+.45*n);}
- else{float dust=noise(p*13.+vec2(clock*.2));float edge=r+(dust-.5)*.045;alpha=smoothstep(.83,.93,edge)*(1.-smoothstep(.94,1.,edge))*(.2+.8*dust);}
- alpha*=vAlpha;if(alpha<.003)discard;gl_FragColor=vec4(vTint,alpha);
- #include <colorspace_fragment>
-}`;
+import { ParticleBatch } from './particles.js';
+import { StreakBatch, StreakParticles } from './streaks.js';
+import { CasingPool } from './casings.js';
+import { WEAPON_FX, weaponClass } from './weapon-profiles.js';
 
-class ParticleBatch {
-  constructor(scene, capacity, kind) {
-    this.capacity = capacity;
-    this.kind = kind;
-    this.time = 0;
-    this.cursor = 0;
-    this.active = 0;
-    this.slots = Array.from({ length: capacity }, () => ({ life: 0 }));
-    const geometry = new T.PlaneGeometry(2, 2),
-      opacity = new Float32Array(capacity),
-      tint = new Float32Array(capacity * 3);
-    geometry.setAttribute(
-      'aOpacity',
-      new T.InstancedBufferAttribute(opacity, 1).setUsage(T.DynamicDrawUsage),
-    );
-    geometry.setAttribute(
-      'aTint',
-      new T.InstancedBufferAttribute(tint, 3).setUsage(T.DynamicDrawUsage),
-    );
-    this.mesh = new T.InstancedMesh(
-      geometry,
-      new T.ShaderMaterial({
-        uniforms: { kind: { value: kind }, clock: { value: 0 } },
-        vertexShader: particleVertex,
-        fragmentShader: particleFragment,
-        transparent: true,
-        depthWrite: false,
-        depthTest: true,
-        blending: kind === 1 ? T.AdditiveBlending : T.NormalBlending,
-        toneMapped: false,
-        side: T.DoubleSide,
-      }),
-      capacity,
-    );
-    this.mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = kind === 0 ? 8 : 9;
-    this.dummy = new T.Object3D();
-    this.zero = new T.Matrix4().makeScale(0, 0, 0);
-    this.rotation = new T.Quaternion();
-    this.axis = new T.Vector3(0, 0, 1);
-    for (let i = 0; i < capacity; i++) this.mesh.setMatrixAt(i, this.zero);
-    scene.add(this.mesh);
-  }
-  spawn(x, y, z, options = {}) {
-    const i = this.cursor;
-    this.cursor = (i + 1) % this.capacity;
-    const p = this.slots[i];
-    Object.assign(p, {
-      x,
-      y,
-      z,
-      vx: 0,
-      vy: 0,
-      vz: 0,
-      size: 1,
-      growth: 0,
-      life: 1,
-      total: 1,
-      opacity: 0.5,
-      gravity: 0,
-      drag: 0,
-      aspect: 1,
-      rotation: Math.random() * 6.28,
-      ...options,
-    });
-    p.total = p.life;
-    const c = options.color || (this.kind === 0 ? [0.3, 0.34, 0.36] : [4, 1.5, 0.3]);
-    this.mesh.geometry.attributes.aTint.array.set(c, i * 3);
-    this.mesh.geometry.attributes.aTint.needsUpdate = true;
-  }
-  update(dt, camera) {
-    this.time += dt;
-    this.mesh.material.uniforms.clock.value = this.time;
-    const alpha = this.mesh.geometry.attributes.aOpacity.array;
-    let active = 0;
-    for (let i = 0; i < this.capacity; i++) {
-      const p = this.slots[i];
-      if (p.life <= 0) continue;
-      p.life -= dt;
-      if (p.life <= 0) {
-        alpha[i] = 0;
-        this.mesh.setMatrixAt(i, this.zero);
-        continue;
-      }
-      active++;
-      const age = p.total - p.life,
-        drag = Math.exp(-p.drag * dt);
-      p.vx *= drag;
-      p.vz *= drag;
-      p.vy -= p.gravity * dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.z += p.vz * dt;
-      const fade =
-          Math.min(1, (age + 0.01) / 0.06) *
-          Math.pow(p.life / p.total, this.kind === 0 ? 0.8 : 0.65),
-        size = Math.max(0.01, p.size + p.growth * age);
-      this.dummy.position.set(p.x, p.y, p.z);
-      this.dummy.quaternion.copy(camera.quaternion);
-      this.rotation.setFromAxisAngle(this.axis, p.rotation);
-      this.dummy.quaternion.multiply(this.rotation);
-      if (this.kind === 2) this.dummy.rotation.set(-Math.PI / 2, 0, 0);
-      this.dummy.scale.set(size * p.aspect, size, 1);
-      this.dummy.updateMatrix();
-      this.mesh.setMatrixAt(i, this.dummy.matrix);
-      alpha[i] = p.opacity * fade;
-    }
-    this.active = active;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    this.mesh.geometry.attributes.aOpacity.needsUpdate = true;
-  }
-}
+// Beyond this camera distance shots keep only their flash; nearby combat gets the full detail.
+const DETAIL_DISTANCE = 720;
+const WRECK_LIFE = 14;
+const SPARK_COLOR = [5, 2.4, 0.6];
 
 export class CombatEffects {
   constructor(world) {
     this.world = world;
-    this.smoke = new ParticleBatch(world.scene, 768, 0);
-    this.glow = new ParticleBatch(world.scene, 1024, 1);
-    this.rings = new ParticleBatch(world.scene, 48, 2);
+    this.smoke = new ParticleBatch(world.scene, 1280, 0);
+    this.glow = new ParticleBatch(world.scene, 1280, 1);
+    this.rings = new ParticleBatch(world.scene, 64, 2);
+    this.streaks = new StreakBatch(world.scene, 2048);
+    this.sparks = new StreakParticles(900);
+    this.casings = new CasingPool(world.scene, 320);
     this.clock = 0;
     this.emitters = new Map();
+    this.rounds = new Map();
+    this.airRounds = new Map();
+    this.trails = new Map();
+    this.wrecks = [];
+    this.eye = new T.Vector3();
     this.lights = Array.from({ length: 3 }, () => {
       const light = new T.PointLight('#ffc18a', 0, 120, 2);
       light.userData.life = 0;
+      light.userData.total = 0.24;
       world.scene.add(light);
       return light;
     });
@@ -179,6 +71,17 @@ export class CombatEffects {
     );
     this.tracers.frustumCulled = false;
     world.scene.add(this.tracers);
+    this.tracerHeads = 0;
+  }
+  cameraDistance(x, y, z) {
+    const camera = this.world.camera;
+    if (!camera) return 0;
+    this.eye.setFromMatrixPosition(camera.matrixWorld);
+    return Math.hypot(this.eye.x - x, this.eye.y - y, this.eye.z - z);
+  }
+  floor(x, z) {
+    const h = this.world.height?.(x, z);
+    return Number.isFinite(h) ? Math.max(0, h) : 0;
   }
   puff(x, y, z, size = 2, life = 2, options = {}) {
     this.smoke.spawn(x, y, z, {
@@ -192,11 +95,39 @@ export class CombatEffects {
       ...options,
     });
   }
+  // Sparks are velocity-aligned streaks, so they read as hot fragments rather than dots.
   spark(x, y, z, size = 0.6, life = 0.5, options = {}) {
-    this.glow.spawn(x, y, z, { size, life, opacity: 0.9, gravity: 18, aspect: 0.3, ...options });
+    this.sparks.spawn({
+      x,
+      y,
+      z,
+      life,
+      length: size * 1.4,
+      width: Math.max(0.08, size * 0.32),
+      stretch: 0.035,
+      gravity: options.gravity ?? 18,
+      drag: options.drag ?? 0.6,
+      vx: options.vx ?? 0,
+      vy: options.vy ?? 0,
+      vz: options.vz ?? 0,
+      color: options.color || SPARK_COLOR,
+      opacity: options.opacity ?? 1,
+    });
   }
   flash(x, y, z, size = 3, life = 0.09) {
     this.glow.spawn(x, y, z, { size, life, opacity: 1, growth: 10, color: [6, 3, 0.8] });
+  }
+  light(x, y, z, power, distance, life, steal = true) {
+    let light = null;
+    for (const candidate of this.lights)
+      if (!light || candidate.userData.life < light.userData.life) light = candidate;
+    // Muzzle flashes only use a free light and never cut an explosion short.
+    if (!steal && light.userData.life > 0) return;
+    light.position.set(x, y, z);
+    light.userData.life = life;
+    light.userData.total = life;
+    light.userData.power = power;
+    light.distance = distance;
   }
   fragment(x, y, z, scale = 1, vx = 0, vy = 0, vz = 0) {
     const p = this.debris[this.debrisCursor];
@@ -246,11 +177,11 @@ export class CombatEffects {
           opacity: 0.35,
         },
       );
-    for (let i = 0; i < 18 * size; i++)
-      this.spark(x, y + 2, z, 0.25 + Math.random() * 0.55, 0.5 + Math.random() * 0.9, {
-        vx: (Math.random() - 0.5) * size * 65,
-        vy: 10 + Math.random() * size * 45,
-        vz: (Math.random() - 0.5) * size * 65,
+    for (let i = 0; i < 22 * size; i++)
+      this.spark(x, y + 2, z, 0.3 + Math.random() * 0.6, 0.5 + Math.random() * 0.9, {
+        vx: (Math.random() - 0.5) * size * 70,
+        vy: 10 + Math.random() * size * 48,
+        vz: (Math.random() - 0.5) * size * 70,
       });
     if (!air) {
       this.rings.spawn(x, 1.3, z, {
@@ -271,19 +202,217 @@ export class CombatEffects {
           color: [0.25, 0.22, 0.17],
         });
       }
+      // Clods of earth thrown up by the blast.
+      for (let i = 0; i < 8 * size; i++)
+        this.spark(x, y + 1, z, 0.5 + Math.random() * 0.5, 0.9 + Math.random() * 0.6, {
+          vx: (Math.random() - 0.5) * size * 40,
+          vy: 14 + Math.random() * size * 30,
+          vz: (Math.random() - 0.5) * size * 40,
+          gravity: 34,
+          color: [0.35, 0.28, 0.2],
+          opacity: 0.8,
+        });
     }
     for (let i = 0; i < 5 * size; i++) this.fragment(x, y + 2, z, 0.7 + Math.random() * size);
-    const light = this.lights.reduce((a, b) => (a.userData.life < b.userData.life ? a : b));
-    light.position.set(x, y + 6, z);
-    light.userData.life = 0.24;
-    light.userData.power = 70 * size;
-    light.distance = 100 * size;
+    this.light(x, y + 6, z, 70 * size, 100 * size, 0.24);
   }
-  handle(e) {
+  // Proximity-fused 35 mm round or a missed interceptor: black puff with a hot core.
+  airburst(x, y, z, size = 1) {
+    this.glow.spawn(x, y, z, {
+      size: 2.4 * size,
+      life: 0.12,
+      opacity: 1,
+      growth: 14 * size,
+      color: [6, 3.2, 1],
+    });
+    for (let i = 0; i < 3; i++)
+      this.puff(
+        x + (Math.random() - 0.5) * 2 * size,
+        y + (Math.random() - 0.5) * 2 * size,
+        z + (Math.random() - 0.5) * 2 * size,
+        1.5 * size,
+        2.6 + Math.random(),
+        {
+          vx: (Math.random() - 0.5) * 3,
+          vy: 0.6,
+          vz: (Math.random() - 0.5) * 3,
+          growth: 1.8 * size,
+          opacity: 0.42,
+          color: [0.06, 0.065, 0.07],
+        },
+      );
+    for (let i = 0; i < 7 * size; i++)
+      this.spark(x, y, z, 0.35, 0.35 + Math.random() * 0.3, {
+        vx: (Math.random() - 0.5) * 70,
+        vy: (Math.random() - 0.5) * 70,
+        vz: (Math.random() - 0.5) * 70,
+        gravity: 6,
+      });
+  }
+  muzzle(e, shooter) {
+    const fx = WEAPON_FX[weaponClass(e, shooter?.key)] || WEAPON_FX.rifle,
+      dx0 = e.tx - (e.mx ?? e.x),
+      dy0 = e.ty - (e.my ?? e.y),
+      dz0 = e.tz - (e.mz ?? e.z),
+      d = Math.hypot(dx0, dy0, dz0) || 1,
+      dx = dx0 / d,
+      dy = dy0 / d,
+      dz = dz0 / d,
+      // Ground fire is reported from the unit centre; move the flash out to the muzzle.
+      reach = e.ground && !e.barrelTip ? fx.reach || 1.3 : 0,
+      x = (e.mx ?? e.x + dx * 8) + dx * reach,
+      y = (e.my ?? e.y + dy * 8) + dy * reach,
+      z = (e.mz ?? e.z + dz * 8) + dz * reach,
+      id = e.buildingId ?? -1,
+      round = (this.rounds.get(id) || 0) + 1,
+      far = this.cameraDistance(x, y, z) > DETAIL_DISTANCE;
+    this.rounds.set(id, round);
+    // Hot core plus a short-lived wider bloom.
+    this.glow.spawn(x, y, z, {
+      size: fx.flash,
+      life: 0.06,
+      opacity: 1,
+      growth: fx.flash * 3.5,
+      color: [7, 3.6, 1.1],
+    });
+    if (far) return;
+    this.glow.spawn(x + dx * fx.flash, y + dy * fx.flash, z + dz * fx.flash, {
+      size: fx.flash * 1.2,
+      life: 0.045,
+      opacity: 0.4,
+      growth: fx.flash * 2.5,
+      color: [4.5, 1.6, 0.25],
+    });
+    // Forward jet of burning propellant.
+    this.sparks.spawn({
+      x: x + dx * fx.jet,
+      y: y + dy * fx.jet,
+      z: z + dz * fx.jet,
+      dx,
+      dy,
+      dz,
+      length: fx.jet,
+      width: fx.flash * 0.55,
+      life: 0.055,
+      grow: 0.5,
+      color: [6, 3.2, 1],
+    });
+    // Side petals of the flash hider / muzzle brake, rotated a little every round.
+    if (fx.petals) {
+      const ux = Math.abs(dy) < 0.95 ? 0 : 1,
+        uy = Math.abs(dy) < 0.95 ? 1 : 0,
+        ax = dy * 0 - dz * uy,
+        ay = dz * ux - dx * 0,
+        az = dx * uy - dy * ux,
+        al = Math.hypot(ax, ay, az) || 1,
+        bx = dy * (az / al) - dz * (ay / al),
+        by = dz * (ax / al) - dx * (az / al),
+        bz = dx * (ay / al) - dy * (ax / al);
+      for (let i = 0; i < fx.petals; i++) {
+        const angle = (i / fx.petals) * Math.PI * 2 + round * 0.9,
+          c = Math.cos(angle),
+          s = Math.sin(angle),
+          px = (ax / al) * c + bx * s,
+          py = (ay / al) * c + by * s,
+          pz = (az / al) * c + bz * s,
+          reach = fx.flash * (fx.brake ? 1.3 : 0.8);
+        this.sparks.spawn({
+          x: x + px * reach + dx * 0.3,
+          y: y + py * reach + dy * 0.3,
+          z: z + pz * reach + dz * 0.3,
+          dx: px,
+          dy: py,
+          dz: pz,
+          length: reach,
+          width: fx.flash * 0.3,
+          life: 0.045,
+          color: [5, 2.2, 0.55],
+        });
+      }
+    }
+    if (fx.casing)
+      this.casings.eject(
+        e.x + dx * 1.2,
+        (e.y ?? y) + 0.4,
+        e.z + dz * 1.2,
+        dx,
+        dz,
+        fx.casing,
+        this.floor(e.x, e.z),
+      );
+    if (round % fx.every === 0)
+      this.puff(x + dx * fx.flash, y + dy * fx.flash, z + dz * fx.flash, fx.smoke, 0.9 + fx.smoke, {
+        vx: dx * 6 + (Math.random() - 0.5),
+        vy: dy * 6 + 1.2,
+        vz: dz * 6 + (Math.random() - 0.5),
+        drag: 2.2,
+        growth: fx.smoke * 1.4,
+        opacity: 0.1 + fx.smoke * 0.04,
+        color: [0.36, 0.36, 0.35],
+      });
+    if (fx.brake)
+      for (const side of [-1, 1])
+        this.puff(x - dz * side * 0.8, y, z + dx * side * 0.8, fx.smoke * 0.7, 0.8, {
+          vx: -dz * side * 11,
+          vy: 1.5,
+          vz: dx * side * 11,
+          drag: 3,
+          opacity: 0.2,
+          color: [0.46, 0.45, 0.42],
+        });
+    if (fx.blast) {
+      // Ground-level overpressure ring around a tank gun and dust kicked under the muzzle.
+      const floor = this.floor(x, z) + 0.6;
+      this.rings.spawn(x, floor, z, {
+        size: 1.5,
+        life: 0.4,
+        growth: 34,
+        opacity: 0.18,
+        color: [0.6, 0.52, 0.38],
+      });
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        this.puff(x + dx * 3, y, z + dz * 3, 1.4, 1.6, {
+          vx: Math.cos(a) * 9 + dx * 12,
+          vy: Math.sin(a) * 4 + 2,
+          vz: Math.sin(a) * 9 + dz * 12,
+          drag: 2.4,
+          opacity: 0.24,
+          color: [0.48, 0.46, 0.42],
+        });
+      }
+    }
+    if (fx.backblast) {
+      for (let i = 0; i < 8; i++)
+        this.puff(e.x - dx * 2, (e.y ?? y) + 0.5, e.z - dz * 2, fx.smoke, 2.2 + Math.random(), {
+          vx: -dx * (10 + Math.random() * 12) + (Math.random() - 0.5) * 6,
+          vy: Math.max(0.5, -dy * 8) + Math.random() * 3,
+          vz: -dz * (10 + Math.random() * 12) + (Math.random() - 0.5) * 6,
+          drag: 1.4,
+          growth: fx.smoke * 1.2,
+          opacity: 0.3,
+          color: [0.6, 0.6, 0.58],
+        });
+      this.rings.spawn(e.x, this.floor(e.x, e.z) + 0.6, e.z, {
+        size: 2,
+        life: 0.55,
+        growth: 26,
+        opacity: 0.16,
+        color: [0.62, 0.55, 0.42],
+      });
+    }
+    if (fx.light && round % (fx.lightEvery || 1) === 0)
+      this.light(x, y + 1, z, fx.light, 18 + fx.light * 2, 0.07, false);
+  }
+  wreck(x, z) {
+    if (this.wrecks.length < 24)
+      this.wrecks.push({ x, z, until: this.clock + WRECK_LIFE, next: 0 });
+  }
+  handle(e, shooter = null) {
     if (e.type === 'intercept') {
       if (e.mode === 'fall') {
         this.flash(e.x, e.y, e.z, 5, 0.1);
-        for (let i = 0; i < 12; i++)
+        for (let i = 0; i < 14; i++)
           this.spark(e.x, e.y, e.z, 0.5, 0.5, {
             vx: (Math.random() - 0.5) * 35,
             vy: Math.random() * 14,
@@ -317,29 +446,40 @@ export class CombatEffects {
     if (e.type === 'cleared')
       for (let i = 0; i < 7; i++)
         this.puff(e.x, 1, e.z, 2, 1.1, { color: [0.42, 0.39, 0.32], opacity: 0.25 });
-    if (e.type === 'hit')
-      for (let i = 0; i < 3; i++)
-        this.spark(e.x, e.y, e.z, 0.25, 0.2, {
-          vx: (Math.random() - 0.5) * 20,
-          vy: 4,
-          vz: (Math.random() - 0.5) * 20,
+    if (e.type === 'hit') {
+      const air = (e.y ?? 2) > 6;
+      if (air) {
+        // Rounds striking an airframe: bright sparks and a wisp of smoke.
+        for (let i = 0; i < 5; i++)
+          this.spark(e.x, e.y, e.z, 0.32, 0.25 + Math.random() * 0.2, {
+            vx: (Math.random() - 0.5) * 34,
+            vy: Math.random() * 10,
+            vz: (Math.random() - 0.5) * 34,
+          });
+        this.puff(e.x, e.y, e.z, 0.7, 0.9, { vy: 0.5, opacity: 0.22, color: [0.2, 0.2, 0.22] });
+      } else if (this.cameraDistance(e.x, 2, e.z) < DETAIL_DISTANCE) {
+        // A bullet kicking up dirt.
+        const floor = this.floor(e.x, e.z);
+        this.puff(e.x, floor + 0.6, e.z, 0.55, 0.7, {
+          vx: (Math.random() - 0.5) * 2,
+          vy: 3,
+          vz: (Math.random() - 0.5) * 2,
+          growth: 1.2,
+          opacity: 0.24,
+          color: [0.42, 0.36, 0.27],
         });
-    if (e.type === 'shot') {
-      const dx = e.tx - e.x,
-        dy = e.ty - e.y,
-        dz = e.tz - e.z,
-        d = Math.hypot(dx, dy, dz) || 1,
-        x = e.mx ?? e.x + (dx / d) * 8,
-        y = e.my ?? e.y + (dy / d) * 8,
-        z = e.mz ?? e.z + (dz / d) * 8;
-      if (e.key === 'sam') {
-        this.flash(x, y, z, 3, 0.18);
-        this.puff(x, y, z, 2, 1.5, { vy: 3 });
-      } else {
-        this.flash(x, y, z, e.key === 'gun' ? 1.5 : 3, 0.07);
-        this.puff(x, y, z, 0.5, 0.45, { opacity: 0.15 });
+        for (let i = 0; i < 2; i++)
+          this.spark(e.x, floor + 0.4, e.z, 0.22, 0.35, {
+            vx: (Math.random() - 0.5) * 14,
+            vy: 6 + Math.random() * 8,
+            vz: (Math.random() - 0.5) * 14,
+            gravity: 30,
+            color: [0.5, 0.42, 0.3],
+            opacity: 0.8,
+          });
       }
     }
+    if (e.type === 'shot') this.muzzle(e, shooter);
     if (e.type === 'launch') {
       this.puff(e.x, 2, e.z, 1.4, 0.9, { vy: 2, opacity: 0.2 });
       this.flash(e.x, 5, e.z, 1.4, 0.12);
@@ -396,14 +536,98 @@ export class CombatEffects {
           color: [0.45, 0.49, 0.5],
         });
     }
+    // Interceptors leave a continuous white motor trail with a flickering exhaust.
+    for (const p of state.projectiles) {
+      if (p.kind !== 'interceptor') continue;
+      const speed = Math.hypot(p.vx, p.vy, p.vz) || 1,
+        nx = p.x - (p.vx / speed) * 2,
+        ny = p.y - (p.vy / speed) * 2,
+        nz = p.z - (p.vz / speed) * 2,
+        last = this.trails.get(p.id) || { x: nx, y: ny, z: nz },
+        gap = Math.hypot(nx - last.x, ny - last.y, nz - last.z),
+        steps = Math.min(14, Math.floor(gap / 1.4));
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        this.puff(
+          last.x + (nx - last.x) * t,
+          last.y + (ny - last.y) * t,
+          last.z + (nz - last.z) * t,
+          1.5,
+          2.6 + Math.random() * 0.8,
+          {
+            vx: (Math.random() - 0.5) * 1.5,
+            vy: 0.7,
+            vz: (Math.random() - 0.5) * 1.5,
+            growth: 2.2,
+            opacity: 0.16,
+            color: [0.72, 0.73, 0.74],
+          },
+        );
+      }
+      if (steps || !this.trails.has(p.id)) this.trails.set(p.id, { x: nx, y: ny, z: nz });
+      this.glow.spawn(
+        nx + (p.vx / speed) * 0.8,
+        ny + (p.vy / speed) * 0.8,
+        nz + (p.vz / speed) * 0.8,
+        {
+          size: 1.3 + Math.random() * 0.5,
+          life: 0.05,
+          opacity: 0.9,
+          color: [5, 3, 1.2],
+        },
+      );
+    }
+    if (this.trails.size > 64) {
+      const live = new Set(state.projectiles.map((p) => p.id));
+      for (const id of this.trails.keys()) if (!live.has(id)) this.trails.delete(id);
+    }
+    // Burning wrecks: a smoke column with flickering flames that dies down.
+    this.wrecks = this.wrecks.filter((w) => w.until > this.clock);
+    for (const w of this.wrecks) {
+      if (w.next > this.clock) continue;
+      const left = (w.until - this.clock) / WRECK_LIFE;
+      w.next = this.clock + 0.12 + (1 - left) * 0.25;
+      this.puff(w.x + (Math.random() - 0.5) * 3, 3, w.z + (Math.random() - 0.5) * 3, 1.6, 4, {
+        vx: 1.5,
+        vy: 6 + left * 4,
+        vz: 0.8,
+        growth: 2.4,
+        opacity: 0.2 + left * 0.18,
+        color: [0.08, 0.085, 0.09],
+      });
+      if (Math.random() < left + 0.2)
+        this.glow.spawn(
+          w.x + (Math.random() - 0.5) * 3,
+          2 + Math.random() * 2,
+          w.z + (Math.random() - 0.5) * 3,
+          {
+            size: 1.4 + left * 1.6,
+            life: 0.25,
+            vy: 3,
+            opacity: 0.6,
+            color: [3.6, 0.9, 0.08],
+          },
+        );
+    }
     if (this.emitters.size > 400) {
-      const ids = new Set([...state.buildings, ...state.units].map((o) => o.id));
+      const ids = new Set(
+        [...state.buildings, ...state.units, ...state.projectiles].map((o) => o.id),
+      );
       for (const id of this.emitters.keys()) if (!ids.has(id)) this.emitters.delete(id);
+    }
+    if (this.rounds.size > 400) {
+      const ids = new Set([...state.buildings, ...(state.groundUnits || [])].map((o) => o.id));
+      for (const id of this.rounds.keys()) if (!ids.has(id)) this.rounds.delete(id);
     }
   }
   updateTracers(projectiles) {
     let segment = 0;
+    const seen = new Set();
     for (const p of projectiles) {
+      if (p.domain !== 'ground' && p.kind !== 'bullet') {
+        seen.add(p.id);
+        this.airRounds.set(p.id, { x: p.x, y: p.y, z: p.z, kind: p.kind });
+      }
       if (p.kind === 'bullet' && !p.tracer) continue;
       const tail = Math.min(p.life, 0.07),
         color =
@@ -416,28 +640,71 @@ export class CombatEffects {
         for (let end = 0; end < 2; end++) {
           const t = tail * (1 - (i + end) / 3),
             offset = segment * 6 + end * 3;
-          this.tracePositions.set(
-            [p.x - p.vx * t, p.y - p.vy * t - 0.5 * (p.gravity || 0) * t * t, p.z - p.vz * t],
-            offset,
-          );
+          this.tracePositions[offset] = p.x - p.vx * t;
+          this.tracePositions[offset + 1] = p.y - p.vy * t - 0.5 * (p.gravity || 0) * t * t;
+          this.tracePositions[offset + 2] = p.z - p.vz * t;
           const intensity = 0.2 + (0.8 * (i + end)) / 3;
-          this.traceColors.set(
-            [color[0] * intensity, color[1] * intensity, color[2] * intensity],
-            offset,
-          );
+          this.traceColors[offset] = color[0] * intensity;
+          this.traceColors[offset + 1] = color[1] * intensity;
+          this.traceColors[offset + 2] = color[2] * intensity;
         }
     }
+    this.tracerProjectiles = projectiles;
     this.tracers.geometry.setDrawRange(0, segment * 2);
     this.tracers.geometry.attributes.position.needsUpdate = true;
     this.tracers.geometry.attributes.color.needsUpdate = true;
+    // Air rounds that vanished since the last frame burst where they were last seen.
+    let vanished = 0;
+    for (const [id, round] of this.airRounds) {
+      if (seen.has(id)) continue;
+      this.airRounds.delete(id);
+      // A loaded save or a network snapshot can drop many at once; those are not detonations.
+      if (++vanished > 24 || round.y < 4) continue;
+      if (round.kind === 'shell') this.airburst(round.x, round.y, round.z, 1);
+      else if (round.kind === 'interceptor') this.airburst(round.x, round.y, round.z, 1.6);
+    }
+  }
+  // Glowing heads for every tracer and interceptor, aligned with the flight direction.
+  drawTracerStreaks() {
+    let heads = 0;
+    for (const p of this.tracerProjectiles || []) {
+      if (p.kind === 'bullet' && !p.tracer) continue;
+      const speed = Math.hypot(p.vx, p.vy, p.vz);
+      if (!speed || p.life <= 0) continue;
+      const interceptor = p.kind === 'interceptor',
+        shell = p.kind === 'shell',
+        length = Math.min(interceptor ? 9 : shell ? 14 : 11, speed * 0.04, speed * p.life),
+        width = interceptor ? 1.1 : shell ? 0.62 : 0.36,
+        color = interceptor ? [5, 3.4, 1.4] : shell ? [5, 2.1, 0.45] : [5.5, 3.6, 1.3];
+      this.streaks.add(
+        p.x,
+        p.y,
+        p.z,
+        p.vx / speed,
+        p.vy / speed,
+        p.vz / speed,
+        length,
+        width,
+        color,
+        0.9,
+      );
+      heads++;
+    }
+    this.tracerHeads = heads;
   }
   update(dt, elapsed, camera) {
     this.smoke.update(dt, camera);
     this.glow.update(dt, camera);
     this.rings.update(dt, camera);
+    this.casings.update(dt);
+    this.streaks.begin(camera);
+    this.drawTracerStreaks();
+    this.sparks.update(dt, this.streaks);
+    this.streaks.end();
     for (const light of this.lights) {
       light.userData.life = Math.max(0, light.userData.life - dt);
-      light.intensity = light.userData.power * Math.pow(light.userData.life / 0.24, 2) || 0;
+      light.intensity =
+        light.userData.power * Math.pow(light.userData.life / light.userData.total, 2) || 0;
     }
     for (let i = 0; i < this.debris.length; i++) {
       const p = this.debris[i];
@@ -445,6 +712,7 @@ export class CombatEffects {
       p.life -= dt;
       if (p.life <= 0) {
         this.shards.setMatrixAt(i, this.zero);
+        this.shards.instanceMatrix.needsUpdate = true;
         continue;
       }
       p.vy -= 22 * dt;
@@ -464,16 +732,21 @@ export class CombatEffects {
       this.dummy.scale.setScalar(p.scale * Math.min(1, p.life));
       this.dummy.updateMatrix();
       this.shards.setMatrixAt(i, this.dummy.matrix);
+      this.shards.instanceMatrix.needsUpdate = true;
     }
-    this.shards.instanceMatrix.needsUpdate = true;
   }
   diagnostics() {
     return {
-      particles: this.smoke.active + this.glow.active + this.rings.active,
-      capacity: this.smoke.capacity + this.glow.capacity + this.rings.capacity,
+      particles: this.smoke.active + this.glow.active + this.rings.active + this.sparks.active,
+      capacity:
+        this.smoke.capacity + this.glow.capacity + this.rings.capacity + this.sparks.slots.length,
       lights: this.lights.length,
-      drawBatches: 5,
+      drawBatches: 7,
       tracerSegments: this.tracers.geometry.drawRange.count / 2,
+      streaks: this.streaks.count,
+      tracerHeads: this.tracerHeads,
+      casings: this.casings.active,
+      wrecks: this.wrecks.length,
     };
   }
 }

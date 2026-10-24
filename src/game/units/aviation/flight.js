@@ -69,6 +69,28 @@ export function routePoint(origin, target, key, t, phase = 0, landing = false) {
   };
 }
 
+function basePosition(u, travelled) {
+  const pos = routePoint(
+    { x: u.startX, z: u.startZ },
+    { x: u.tx, z: u.tz },
+    u.key,
+    clamp(travelled / u.total, 0, 1),
+    u.phase,
+  );
+  if (u.route?.length) {
+    const p = pointOnRoute(u.route, Math.min(travelled, u.total));
+    pos.x = p.x;
+    pos.z = p.z;
+    if (u.key !== 'ballistic')
+      pos.y = Math.min(
+        u.altitude || WEAPONS[u.key].altitude,
+        5 + travelled * 0.48,
+        5 + Math.max(0, u.total - travelled) * 0.48,
+      );
+  }
+  return pos;
+}
+
 export function moveUnits(s, dt) {
   for (const u of s.units) {
     u.prevX = u.x;
@@ -127,29 +149,37 @@ export function moveUnits(s, dt) {
       });
     }
     u.travelled += (u.speed || WEAPONS[u.key].speed) * (u.hp / u.maxHp < 0.4 ? 0.85 : 1) * dt;
-    const pos = routePoint(
-      { x: u.startX, z: u.startZ },
-      { x: u.tx, z: u.tz },
-      u.key,
-      clamp(u.travelled / u.total, 0, 1),
-      u.phase,
-    );
-    if (u.route?.length) {
-      const p = pointOnRoute(u.route, Math.min(u.travelled, u.total));
-      pos.x = p.x;
-      pos.z = p.z;
-      if (u.key !== 'ballistic')
-        pos.y = Math.min(
-          u.altitude || WEAPONS[u.key].altitude,
-          5 + u.travelled * 0.48,
-          5 + Math.max(0, u.total - u.travelled) * 0.48,
-        );
-    }
+    const pos = basePosition(u, u.travelled);
+    evade(s, u, pos, basePosition(u, Math.max(0, u.travelled - 2)), dt);
     u.vx = (pos.x - u.x) / dt;
     u.vy = (pos.y - u.y) / dt;
     u.vz = (pos.z - u.z) / dt;
     Object.assign(u, pos);
   }
+}
+
+// Drones locked by air defence weave and change altitude, so lead computed from the current
+// velocity misses more often. The weave fades out near the target to keep the strike point.
+export const EVASION = { drone: { side: 9, lift: 4 }, heavy: { side: 5, lift: 2.5 } };
+function evade(s, u, pos, behind, dt) {
+  const profile = EVASION[u.key];
+  if (!profile) return;
+  const threatened = s.time - (u.threatAt ?? -Infinity) < 1.5;
+  u.evade = clamp((u.evade || 0) + (threatened ? 1.4 : -0.7) * dt, 0, 1);
+  if (!u.evade) return;
+  const remaining = Math.max(0, u.total - u.travelled),
+    fade = clamp((remaining - 25) / 70, 0, 1) * clamp(u.travelled / 50, 0, 1),
+    weight = u.evade * fade * (u.subtype === 'fpv' ? 0.5 : 1);
+  if (!weight) return;
+  const hx = pos.x - behind.x,
+    hz = pos.z - behind.z,
+    heading = Math.hypot(hx, hz) || 1,
+    phase = u.phase || 0,
+    swing = Math.sin(s.time * 1.9 + phase * 3.1) + 0.45 * Math.sin(s.time * 4.3 + phase),
+    lateral = swing * profile.side * weight;
+  pos.x += (-hz / heading) * lateral;
+  pos.z += (hx / heading) * lateral;
+  pos.y = Math.max(6, pos.y + Math.sin(s.time * 2.6 + phase * 1.7) * profile.lift * weight);
 }
 
 export function impacts(s) {

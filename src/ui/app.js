@@ -116,6 +116,7 @@ try {
     onAmbient: ambientAudio,
     onSelect: select,
     onBoxSelect: selectArmy,
+    onSelectSimilar: selectSimilar,
     onGroundOrder: commandGround,
     onGroundTarget: troopTarget,
     onGroundHover: previewDeployment,
@@ -749,6 +750,65 @@ function selectArmy(ids, extend = false) {
 function renderGroups() {
   renderSquadRoster(state, armySelection);
 }
+// Quick unit switching: every field squad is one stop, units without a squad are their own stop.
+function armyStops() {
+  const field = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0 && !u.carrierId),
+    present = new Set(field.map((u) => u.id)),
+    stops = E.squadRoster(state, 0)
+      .map((g) => g.ids.filter((id) => present.has(id)))
+      .filter((ids) => ids.length);
+  const squadded = new Set(stops.flat());
+  for (const u of field) if (!squadded.has(u.id)) stops.push([u.id]);
+  return stops.sort((a, b) => a[0] - b[0]);
+}
+function focusUnits(ids, distance = null) {
+  const units = state.groundUnits.filter((u) => ids.includes(u.id) && u.hp > 0);
+  if (!units.length) return;
+  world.focus(
+    units.reduce((n, u) => n + u.x, 0) / units.length,
+    units.reduce((n, u) => n + u.z, 0) / units.length,
+    distance ?? Math.min(world.controls.zoomDistance, 320),
+  );
+}
+function cycleArmy(step) {
+  const stops = armyStops();
+  if (!stops.length) return toast('Нет войск на поле', true);
+  const current = stops.findIndex((ids) => ids.includes(armySelection[0]));
+  const next = stops[(current + step + stops.length) % stops.length];
+  selectArmy(next);
+  focusUnits(next);
+}
+let idleCursor = 0;
+function nextIdleUnit() {
+  const idle = state.groundUnits
+    .filter(
+      (u) =>
+        u.side === 0 &&
+        u.hp > 0 &&
+        !u.carrierId &&
+        !u.path?.length &&
+        !u.guard &&
+        !u.digging &&
+        !u.delivery &&
+        !u.routeState &&
+        !['attack', 'attackmove', 'deliver'].includes(u.order?.mode),
+    )
+    .sort((a, b) => a.id - b.id);
+  if (!idle.length) return toast('Все войска заняты');
+  const u = idle.find((v) => v.id > idleCursor) || idle[0];
+  idleCursor = u.id;
+  selectArmy([u.id]);
+  focusUnits([u.id], 220);
+  toast(`Без приказа: ${idle.length}`);
+}
+function selectSimilar(id, extend = false) {
+  const t = state.groundUnits.find((u) => u.id === id && u.side === 0 && u.hp > 0);
+  if (!t) return;
+  const ids = world.unitsOnScreen((u) => u.key === t.key);
+  selectArmy(ids.length ? ids : [id], extend);
+  toast(`${E.GROUND_UNITS[t.key].name}: ${ids.length || 1} на экране`);
+}
+let lastGroupTap = { n: 0, at: 0 };
 function beginDeployment(key) {
   if (!E.GROUND_UNITS[key]) return;
   cancelTool(true);
@@ -1572,7 +1632,32 @@ window.addEventListener(
             }
           });
         }
-      } else selectArmy(E.getGroup(state, 0, n), e.shiftKey);
+      } else {
+        const ids = E.getGroup(state, 0, n),
+          now = performance.now();
+        // A second tap of the same group key centres the camera on it.
+        if (!e.shiftKey && lastGroupTap.n === n && now - lastGroupTap.at < 400) focusUnits(ids);
+        lastGroupTap = { n, at: now };
+        selectArmy(ids, e.shiftKey);
+      }
+      return;
+    }
+    if (e.code === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      cycleArmy(e.shiftKey ? -1 : 1);
+      return;
+    }
+    if (e.code === 'Period' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      nextIdleUnit();
+      return;
+    }
+    if (e.code === 'Home' && armySelection.length) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      focusUnits(armySelection);
       return;
     }
     if (e.ctrlKey && e.code === 'KeyA') {
@@ -1669,6 +1754,8 @@ window.skyfront = {
   armStrike,
   commandGround,
   selectArmy,
+  cycleArmy,
+  nextIdleUnit,
   troopCommand,
   getOrder: () => ({
     troopMode,
