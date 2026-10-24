@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
-import { SEA, expandLegacyZ } from '../../src/game/map.js';
+import { SEA, expandLegacyZ, expandLegacyX } from '../../src/game/map.js';
 import { GRID, fogVisible } from '../../src/game/vision-grid.js';
 import { walkable, groundPath } from '../../src/game/units/ground/navigation.js';
 import { moveUnits } from '../../src/game/units/aviation/flight.js';
@@ -11,6 +11,11 @@ function oldCampaign() {
   // Explicit 8.7 coordinates, with current fixture defaults supplying non-spatial fields.
   const s = E.createGame(117);
   s.version = 13;
+  for (const b of s.buildings) if (b.key === 'hq') b.x = b.side === 0 ? -615 : 615;
+  for (const r of s.roads) {
+    r.ax -= Math.sign(r.ax) * 400;
+    r.bx -= Math.sign(r.bx) * 400;
+  }
   s.mode = 'multiplayer';
   s.time = 100;
   s.sides[0].credits = 2345;
@@ -43,8 +48,8 @@ function oldCampaign() {
   return { s, well, moving, central };
 }
 
-test('expanded square map contains the 2240m sea and both land corridors span the field', () => {
-  assert.deepEqual([E.MAP.width, E.MAP.depth, SEA.halfZ * 2], [3200, 3200, 2240]);
+test('expanded 4000x3200 map contains the 2240m sea and both land corridors span the field', () => {
+  assert.deepEqual([E.MAP.width, E.MAP.depth, SEA.halfZ * 2], [4000, 3200, 2240]);
   assert.deepEqual(E.CORRIDORS, [-1360, 1360]);
   const s = E.createGame(117);
   for (const z of E.CORRIDORS) {
@@ -59,7 +64,7 @@ test('expanded square map contains the 2240m sea and both land corridors span th
 test('vision grid covers observers and contacts in both expanded corridors', () => {
   const s = E.createGame(117);
   assert.equal(GRID.rows * GRID.cell, 3200);
-  assert.equal(GRID.cols * GRID.cell, 3200);
+  assert.equal(GRID.cols * GRID.cell, 4000);
   for (const z of E.CORRIDORS) s.groundUnits.push(E.makeGround(s, 0, 'infantry', -20, z));
   for (const z of E.CORRIDORS) {
     assert.equal(fogVisible(s, 0, -20, z), true);
@@ -73,14 +78,14 @@ test('version13 import preserves identity, money and central coordinates while f
   const before = structuredClone(s);
   const restored = E.load(E.save(s));
   assert.deepEqual(s, before, 'save and load must not mutate the caller campaign');
-  assert.equal(restored.version, 14);
+  assert.equal(restored.version, 15);
   assert.deepEqual(
     restored.sides.map((f) => [f.credits, f.materials, f.science, f.oil, f.inventory]),
-    s.sides.map((f) => [f.credits, f.materials, f.science, f.oil, f.inventory]),
+    s.sides.map((f) => [f.credits, f.materials, 0, f.oil, f.inventory]),
   );
   assert.deepEqual(
     restored.buildings.map((b) => [b.id, b.x]),
-    s.buildings.map((b) => [b.id, b.x]),
+    s.buildings.map((b) => [b.id, expandLegacyX(b.x)]),
   );
   assert.equal(restored.nextId, s.nextId);
   for (const hq of restored.buildings.filter((b) => b.key === 'hq')) assert.equal(hq.z, 0);
@@ -96,7 +101,10 @@ test('moving legacy army follows the expanded corridor with a safe rebuilt route
   const { s, moving } = oldCampaign();
   const migrated = E.load(E.save(s));
   const u = migrated.groundUnits.find((unit) => unit.id === moving.id);
-  assert.deepEqual([u.x, u.z, u.order.x, u.order.z], [-400, 1360, 400, 1360]);
+  assert.deepEqual(
+    [u.x, u.z, u.order.x, u.order.z],
+    [expandLegacyX(-400), 1360, expandLegacyX(400), 1360],
+  );
   assert.ok(walkable(migrated, u.x, u.z));
   assert.deepEqual(u.path, groundPath(migrated, u, u.order, E.GROUND_UNITS[u.key].size * 0.42));
   assert.notDeepEqual(u.path, moving.path);
@@ -222,4 +230,53 @@ test('legacy ballistic altitude remains continuous and its migration correction 
   moveUnits(restored, 1 / 30);
   assert.ok(Math.abs(restored.units[0].y - peak) < 0.5, 'no instant altitude jump at the old apex');
   assert.ok(Number.isFinite(restored.units[0].vy));
+});
+
+test('v14 width migration preserves local headquarters, driveway and building offsets exactly once', () => {
+  const { s } = oldCampaign();
+  s.version = 14;
+  const hq = s.buildings.find((b) => b.key === 'hq' && b.side === 0);
+  const b = {
+    id: s.nextId++,
+    side: 0,
+    key: 'barracks',
+    x: hq.x - 65,
+    z: -10,
+    hp: E.BUILDINGS.barracks.hp,
+    maxHp: E.BUILDINGS.barracks.hp,
+    progress: 1,
+    armyQueue: [{ key: 'infantry', progress: 0.42 }],
+    queue: [],
+  };
+  s.buildings.push(b);
+  const road = {
+    id: s.nextId++,
+    side: 0,
+    ax: hq.x,
+    az: 0,
+    bx: b.x,
+    bz: b.z,
+    hp: 100,
+    maxHp: 100,
+    connectorTo: b.id,
+  };
+  s.roads.push(road);
+  const initial = {
+    offset: b.x - hq.x,
+    roadOffset: road.ax - b.x,
+    length: Math.hypot(road.bx - road.ax, road.bz - road.az),
+  };
+  const loaded = E.load(E.save(s));
+  const nextHq = loaded.buildings.find((v) => v.id === hq.id),
+    next = loaded.buildings.find((v) => v.id === b.id);
+  const nextRoad = loaded.roads.find((v) => v.id === road.id);
+  assert.equal(nextHq.x, -E.HQ_X);
+  assert.equal(next.x - nextHq.x, initial.offset);
+  assert.equal(nextRoad.ax - next.x, initial.roadOffset);
+  assert.equal(Math.hypot(nextRoad.bx - nextRoad.ax, nextRoad.bz - nextRoad.az), initial.length);
+  assert.equal(next.armyQueue[0].progress, 0.42);
+  assert.equal(next.z, b.z, 'v14 receives width migration only');
+  const again = E.load(E.save(loaded));
+  assert.deepEqual(again.buildings, loaded.buildings);
+  assert.deepEqual(again.roads, loaded.roads);
 });

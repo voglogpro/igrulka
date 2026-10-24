@@ -14,11 +14,10 @@ function fresh() {
   s.mode = 'multiplayer';
   for (const side of s.sides) {
     side.credits = side.materials = 1e6;
-    side.tech = Object.keys(E.TECH);
   }
   return s;
 }
-function unit(s, key = 'infantry', x = -500, z = 250, side = 0) {
+function unit(s, key = 'infantry', x = -900, z = 250, side = 0) {
   const u = E.makeGround(s, side, key, x, z);
   s.groundUnits.push(u);
   return u;
@@ -44,26 +43,26 @@ test('the first queued click starts idle, guarding and digging units immediately
     const u = unit(s);
     if (state === 'guard') assert.equal(E.guardGround(s, 0, [u.id], u), 1);
     if (state === 'dig') assert.equal(E.commandUnits(s, 0, [u.id], 'dig'), 1);
-    add(s, u, -400);
+    add(s, u, -800);
     assert.equal(u.guard, null);
     assert.equal(u.digging, false);
     assert.equal(u.order.mode, 'move');
     assert.equal(u.routeQueue.length, 0);
     E.advance(s, 1);
-    assert.ok(u.x > -490, state);
+    assert.ok(u.x > -890, state);
     until(s, () => !u.routeState);
-    assert.ok(distance(u, { x: -400, z: 250 }) < 4);
+    assert.ok(distance(u, { x: -800, z: 250 }) < 4);
   }
 });
 
 test('append preserves the current ordinary order and actually visits each leg in order', () => {
   const s = fresh();
   const u = unit(s);
-  assert.equal(E.orderGround(s, 0, [u.id], { x: -400, z: 250 }), 1);
+  assert.equal(E.orderGround(s, 0, [u.id], { x: -800, z: 250 }), 1);
   const current = structuredClone(u.order);
   const path = structuredClone(u.path);
-  add(s, u, -400, 350);
-  add(s, u, -300, 350);
+  add(s, u, -800, 350);
+  add(s, u, -700, 350);
   assert.deepEqual(u.order, current);
   assert.deepEqual(u.path, path);
   const visited = [];
@@ -77,21 +76,21 @@ test('append preserves the current ordinary order and actually visits each leg i
     return !u.routeState;
   });
   assert.equal(visited.length, 2);
-  assert.ok(distance(visited[0], { x: -400, z: 250 }) < 4);
-  assert.deepEqual(visited[0].destination, { x: -400, z: 350 });
-  assert.ok(distance(visited[1], { x: -400, z: 350 }) < 4);
-  assert.ok(distance(u, { x: -300, z: 350 }) < 4);
+  assert.ok(distance(visited[0], { x: -800, z: 250 }) < 4);
+  assert.deepEqual(visited[0].destination, { x: -800, z: 350 });
+  assert.ok(distance(visited[1], { x: -800, z: 350 }) < 4);
+  assert.ok(distance(u, { x: -700, z: 350 }) < 4);
   assert.equal(groundRouteStatus(s, 0, u.id).status, 'idle');
 });
 
 test('twelve pending points fit after the active leg and the next append changes nothing', () => {
   const s = fresh();
   const u = unit(s);
-  add(s, u, -400);
-  for (let i = 0; i < GROUND_ROUTE_LIMIT; i++) add(s, u, -400 + i * 5, 300);
+  add(s, u, -800);
+  for (let i = 0; i < GROUND_ROUTE_LIMIT; i++) add(s, u, -800 + i * 5, 300);
   assert.equal(u.routeQueue.length, GROUND_ROUTE_LIMIT);
   const before = structuredClone(u);
-  assert.match(appendGroundOrder(s, 0, [u.id], { x: -300, z: 300 }), /12/);
+  assert.match(appendGroundOrder(s, 0, [u.id], { x: -700, z: 300 }), /12/);
   assert.deepEqual(u, before);
   assert.equal(groundRouteStatus(s, 0, u.id).points.length, 13);
 });
@@ -99,11 +98,11 @@ test('twelve pending points fit after the active leg and the next append changes
 test('mixed formation offsets are fixed when appended and survive casualties and formation changes', () => {
   const s = fresh();
   const units = ['infantry', 'apc', 'mog', 'infantry', 'machinegunner'].map((key, i) =>
-    unit(s, key, -550 + i * 12, 230),
+    unit(s, key, -950 + i * 12, 230),
   );
   const ids = units.map((u) => u.id);
-  const a = { x: -430, z: 250 };
-  const b = { x: -330, z: 350, mode: 'attackmove' };
+  const a = { x: -830, z: 250 };
+  const b = { x: -730, z: 350, mode: 'attackmove' };
   const expectedA = groundFormationDestinations(s, 0, units, a);
   const expectedB = groundFormationDestinations(s, 0, units, b);
   assert.equal(appendGroundOrder(s, 0, ids, a), units.length);
@@ -125,17 +124,17 @@ test('direct move, stop, guard, dig, retreat and boarding clear queues; fire and
   for (const command of ['move', 'stop', 'guard', 'dig', 'retreat', 'board']) {
     const s = fresh();
     const u = unit(s);
-    add(s, u, -400);
-    add(s, u, -300);
+    add(s, u, -800);
+    add(s, u, -700);
     assert.equal(E.commandUnits(s, 0, [u.id], 'fire'), 1);
     assert.equal(E.commandUnits(s, 0, [u.id], 'camo'), 1);
     assert.equal(u.routeQueue.length, 1);
     assert.ok(u.routeState);
     let result;
-    if (command === 'move') result = E.orderGround(s, 0, [u.id], { x: -450, z: 350 });
-    else if (command === 'guard') result = E.guardGround(s, 0, [u.id], { x: -450, z: 350 });
+    if (command === 'move') result = E.orderGround(s, 0, [u.id], { x: -850, z: 350 });
+    else if (command === 'guard') result = E.guardGround(s, 0, [u.id], { x: -850, z: 350 });
     else if (command === 'board') {
-      const apc = unit(s, 'apc', -450, 350);
+      const apc = unit(s, 'apc', -850, 350);
       result = E.boardGround(s, 0, [u.id], apc.id);
     } else result = E.commandUnits(s, 0, [u.id], command);
     assert.equal(result, 1, command);
@@ -147,15 +146,15 @@ test('direct move, stop, guard, dig, retreat and boarding clear queues; fire and
 test('invalid appends and refused direct commands preserve the active route', () => {
   const s = fresh();
   const u = unit(s);
-  add(s, u, -400);
-  add(s, u, -300);
+  add(s, u, -800);
+  add(s, u, -700);
   const before = structuredClone(u);
   for (const point of [
     null,
     [],
     { x: Infinity, z: 0 },
     { x: E.FIELD.x + 1, z: 0 },
-    { x: -300, z: 300, mode: 'constructor' },
+    { x: -700, z: 300, mode: 'constructor' },
     { x: 0, z: 0 },
   ]) {
     assert.equal(typeof appendGroundOrder(s, 0, [u.id], point), 'string');
@@ -169,41 +168,41 @@ test('invalid appends and refused direct commands preserve the active route', ()
 
 test('boarding, carried passengers and active deliveries refuse route appends without changes', () => {
   const s = fresh();
-  const apc = unit(s, 'apc', -480, 250);
+  const apc = unit(s, 'apc', -880, 250);
   const u = unit(s);
   assert.equal(E.boardGround(s, 0, [u.id], apc.id), 1);
-  assert.match(appendGroundOrder(s, 0, [u.id], { x: -300, z: 300 }), /посадку/);
+  assert.match(appendGroundOrder(s, 0, [u.id], { x: -700, z: 300 }), /посадку/);
   until(s, () => !!u.carrierId);
-  assert.match(appendGroundOrder(s, 0, [u.id], { x: -300, z: 300 }), /пассажиров/);
-  assert.equal(E.deliverGround(s, 0, apc.id, { x: -300, z: 300 }), 1);
+  assert.match(appendGroundOrder(s, 0, [u.id], { x: -700, z: 300 }), /пассажиров/);
+  assert.equal(E.deliverGround(s, 0, apc.id, { x: -700, z: 300 }), 1);
   const before = structuredClone(apc);
-  assert.match(appendGroundOrder(s, 0, [apc.id], { x: -250, z: 300 }), /доставку/);
+  assert.match(appendGroundOrder(s, 0, [apc.id], { x: -650, z: 300 }), /доставку/);
   assert.deepEqual(apc, before);
 });
 
 test('delivery replaces a loaded APC route while preserving all boarded infantry', () => {
   const s = fresh();
-  const apc = unit(s, 'apc', -480, 250);
-  const p = unit(s, 'infantry', -490, 250);
+  const apc = unit(s, 'apc', -880, 250);
+  const p = unit(s, 'infantry', -890, 250);
   assert.equal(E.boardGround(s, 0, [p.id], apc.id), 1);
   until(s, () => p.carrierId === apc.id);
-  add(s, apc, -400);
-  add(s, apc, -300, 300);
-  assert.equal(E.deliverGround(s, 0, apc.id, { x: -350, z: 350 }), 1);
+  add(s, apc, -800);
+  add(s, apc, -700, 300);
+  assert.equal(E.deliverGround(s, 0, apc.id, { x: -750, z: 350 }), 1);
   assert.deepEqual(apc.routeQueue, []);
   assert.equal(apc.routeState, null);
   assert.equal(p.carrierId, apc.id);
   until(s, () => !apc.delivery);
-  assert.ok(distance(apc, { x: -350, z: 350 }) < 4);
+  assert.ok(distance(apc, { x: -750, z: 350 }) < 4);
   assert.equal(p.carrierId, null);
 });
 
 test('a queued march crosses the northern land corridor and continues on the far shore', () => {
   const s = fresh();
   const z = E.CORRIDORS[0];
-  const u = unit(s, 'infantry', -300, z);
-  add(s, u, 300, z);
-  add(s, u, 330, z + 120);
+  const u = unit(s, 'infantry', -700, z);
+  add(s, u, 700, z);
+  add(s, u, 730, z + 120);
   let corridorSamples = 0;
   until(
     s,
@@ -212,82 +211,82 @@ test('a queued march crosses the northern land corridor and continues on the far
       if (Math.abs(u.x) < 40) corridorSamples++;
       return !u.routeState;
     },
-    80,
+    120,
   );
   assert.ok(corridorSamples > 0);
-  assert.ok(distance(u, { x: 330, z: z + 120 }) < 4);
+  assert.ok(distance(u, { x: 730, z: z + 120 }) < 4);
 });
 
 test('a queued point blocked by a new building remains pending until its demolition', () => {
   const s = fresh();
   const u = unit(s);
-  add(s, u, -450);
-  add(s, u, -350);
-  add(s, u, -300, 350);
-  const b = obstacle(s, -350, 250);
+  add(s, u, -850);
+  add(s, u, -750);
+  add(s, u, -700, 350);
+  const b = obstacle(s, -750, 250);
   until(s, () => u.routeState?.status === 'blocked');
   assert.equal(u.routeQueue.length, 2, 'unreachable next point must not be silently popped');
-  assert.ok(distance(u, { x: -450, z: 250 }) < 4);
+  assert.ok(distance(u, { x: -850, z: 250 }) < 4);
   E.advance(s, 2);
   assert.equal(u.routeQueue.length, 2);
   b.hp = 0;
   b.demolished = true;
   s.networkRevision++;
   until(s, () => !u.routeState);
-  assert.ok(distance(u, { x: -300, z: 350 }) < 4);
+  assert.ok(distance(u, { x: -700, z: 350 }) < 4);
 });
 
 test('an active leg blocked after departure cannot advance to a later point through a partial A* path', () => {
   const s = fresh();
   const u = unit(s, 'apc');
-  add(s, u, -350);
-  add(s, u, -300, 350);
-  const b = obstacle(s, -350, 250);
+  add(s, u, -750);
+  add(s, u, -700, 350);
+  const b = obstacle(s, -750, 250);
   until(s, () => u.routeState?.status === 'blocked');
   assert.equal(u.routeQueue.length, 1);
-  assert.ok(distance(u, { x: -350, z: 250 }) > 4);
-  assert.equal(u.order.x, -350);
+  assert.ok(distance(u, { x: -750, z: 250 }) > 4);
+  assert.equal(u.order.x, -750);
   b.hp = 0;
   b.demolished = true;
   s.networkRevision++;
   until(s, () => !u.routeState);
-  assert.ok(distance(u, { x: -300, z: 350 }) < 4);
+  assert.ok(distance(u, { x: -700, z: 350 }) < 4);
 });
 
 test('attackmove fights a real target before proceeding to the next queued leg', () => {
   const s = fresh();
-  const u = unit(s, 'leopard', -500, 250);
-  const enemy = unit(s, 'infantry', -340, 250, 1);
+  const u = unit(s, 'leopard', -900, 250);
+  const enemy = unit(s, 'infantry', -740, 250, 1);
   enemy.holdFire = true;
   enemy.hp = enemy.maxHp = 1e5;
-  add(s, u, -440, 250, 'attackmove');
-  add(s, u, -350, 350);
+  add(s, u, -840, 250, 'attackmove');
+  add(s, u, -750, 350);
   E.advance(s, 4);
   assert.equal(u.routeQueue.length, 1);
   assert.equal(u.order.mode, 'attackmove');
   assert.ok(enemy.hp < enemy.maxHp, 'actual shots must hit while the queue waits');
   enemy.hp = 0;
   until(s, () => !u.routeState);
-  assert.ok(distance(u, { x: -350, z: 350 }) < 4);
+  assert.ok(distance(u, { x: -750, z: 350 }) < 4);
 });
 
 test('hold fire lets an attackmove route resume without waiting for a visible enemy', () => {
   const s = fresh();
   const u = unit(s);
-  const enemy = unit(s, 'infantry', -350, 250, 1);
+  const enemy = unit(s, 'infantry', -750, 250, 1);
   enemy.holdFire = true;
-  add(s, u, -440, 250, 'attackmove');
-  add(s, u, -400, 350);
+  add(s, u, -840, 250, 'attackmove');
+  add(s, u, -800, 350);
   assert.equal(E.commandUnits(s, 0, [u.id], 'fire'), 1);
   until(s, () => !u.routeState);
-  assert.ok(distance(u, { x: -400, z: 350 }) < 4);
+  assert.ok(distance(u, { x: -800, z: 350 }) < 4);
 });
 
 test('active and blocked route states survive save/load, preserve pause and finish deterministically', () => {
   const s = fresh();
   const u = unit(s);
-  add(s, u, -450);
-  add(s, u, -350, 300);
+  add(s, u, -850);
+  add(s, u, -750, 300);
   E.advance(s, 1);
   const loaded = E.load(E.save(s));
   const restored = loaded.groundUnits.find((v) => v.id === u.id);
@@ -300,11 +299,11 @@ test('active and blocked route states survive save/load, preserve pause and fini
   until(loaded, () => !restored.routeState);
   assert.equal(loaded.time, s.time);
   assert.deepEqual({ x: restored.x, z: restored.z }, { x: u.x, z: u.z });
-  const b = obstacle(s, -300, 300);
+  const b = obstacle(s, -700, 300);
   // It was valid when queued; occupation occurs after accepting the command.
   b.demolished = true;
-  add(s, u, -320, 350);
-  add(s, u, -300, 300);
+  add(s, u, -720, 350);
+  add(s, u, -700, 300);
   b.demolished = false;
   s.networkRevision++;
   until(s, () => u.routeState?.status === 'blocked');
@@ -316,9 +315,9 @@ test('active and blocked route states survive save/load, preserve pause and fini
 
 test('side one routes remain under explicit control during a solo AI tick', () => {
   const s = fresh();
-  const u = unit(s, 'apc', 450, 250, 1);
-  add(s, u, 350);
-  add(s, u, 300, 350);
+  const u = unit(s, 'apc', 850, 250, 1);
+  add(s, u, 750);
+  add(s, u, 700, 350);
   s.mode = 'solo';
   s.time = 231;
   s.ai.nextArmy = 0;
@@ -327,5 +326,5 @@ test('side one routes remain under explicit control during a solo AI tick', () =
   assert.equal(u.order.mode, 'move');
   assert.equal(u.routeQueue.length, 1);
   until(s, () => !u.routeState);
-  assert.ok(distance(u, { x: 300, z: 350 }) < 4);
+  assert.ok(distance(u, { x: 700, z: 350 }) < 4);
 });

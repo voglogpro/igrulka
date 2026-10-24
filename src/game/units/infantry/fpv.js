@@ -41,10 +41,6 @@ export function launchFPV(s, side, ids, aim, targetId = null) {
     return 'Цель FPV должна быть видимой и находиться в радиусе';
   if (s.units.filter((v) => v.side === side && v.hp > 0).length >= 120)
     return 'Воздушный лимит достигнут';
-  const f = s.sides[side];
-  if (f.credits < 12 || f.materials < 1) return 'Для запуска нужно 12 денег и 1 сплав';
-  f.credits -= 12;
-  f.materials -= 1;
   u.fpvAmmo = (u.fpvAmmo ?? 3) - 1;
   u.fpvReady = s.time + 25;
   u.lastFire = s.time;

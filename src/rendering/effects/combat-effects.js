@@ -4,6 +4,7 @@ import { StreakBatch, StreakParticles } from './streaks.js';
 import { CasingPool } from './casings.js';
 import { WEAPON_FX, weaponClass } from './weapon-profiles.js';
 import { projectilePoint, projectileHeading } from './tracer-path.js';
+import { GroundScarBatch } from './ground-scars.js';
 
 // Beyond this camera distance shots keep only their flash; nearby combat gets the full detail.
 const DETAIL_DISTANCE = 720;
@@ -43,6 +44,7 @@ export class CombatEffects {
     this.trails = new Map();
     this.groundTracers = new Map();
     this.wrecks = [];
+    this.scars = new GroundScarBatch(world.scene);
     this.eye = new T.Vector3();
     this.lights = Array.from({ length: 3 }, () => {
       const light = new T.PointLight('#ffc18a', 0, 120, 2);
@@ -175,8 +177,11 @@ export class CombatEffects {
     });
   }
   explode(x, y, z, size = 1, air = false) {
+    const detail = this.cameraDistance(x, y, z) > DETAIL_DISTANCE ? 0.4 : 1;
+    const floor = this.floor(x, z);
+    if (!air) y = Math.max(y, floor + 0.5);
     this.flash(x, y + 2, z, size * 9, 0.17);
-    for (let i = 0; i < 14 * size; i++) {
+    for (let i = 0; i < 14 * size * detail; i++) {
       const a = Math.random() * 6.28,
         r = Math.random() * size * 5;
       this.glow.spawn(x + Math.cos(a) * r, y + Math.random() * size * 3, z + Math.sin(a) * r, {
@@ -188,7 +193,7 @@ export class CombatEffects {
         color: i % 2 ? [3.5, 0.55, 0.035] : [1.9, 0.15, 0.008],
       });
     }
-    for (let i = 0; i < 12 * size; i++)
+    for (let i = 0; i < 12 * size * detail; i++)
       this.puff(
         x + (Math.random() - 0.5) * size * 7,
         y + size * 3,
@@ -203,23 +208,23 @@ export class CombatEffects {
           opacity: 0.35,
         },
       );
-    for (let i = 0; i < 22 * size; i++)
+    for (let i = 0; i < 22 * size * detail; i++)
       this.spark(x, y + 2, z, 0.3 + Math.random() * 0.6, 0.5 + Math.random() * 0.9, {
         vx: (Math.random() - 0.5) * size * 70,
         vy: 10 + Math.random() * size * 48,
         vz: (Math.random() - 0.5) * size * 70,
       });
     if (!air) {
-      this.rings.spawn(x, 1.3, z, {
+      this.rings.spawn(x, floor + 0.6, z, {
         size: 2,
         life: 0.6,
         growth: 60 * size,
         opacity: 0.2,
         color: [0.62, 0.5, 0.32],
       });
-      for (let i = 0; i < 16; i++) {
-        const a = (i / 16) * Math.PI * 2;
-        this.puff(x, 1, z, 1.1 * size, 0.75, {
+      for (let i = 0; i < Math.ceil(16 * detail); i++) {
+        const a = (i / Math.ceil(16 * detail)) * Math.PI * 2;
+        this.puff(x, floor + 0.5, z, 1.1 * size, 0.75, {
           vx: Math.cos(a) * size * 32,
           vy: 1,
           vz: Math.sin(a) * size * 32,
@@ -229,7 +234,7 @@ export class CombatEffects {
         });
       }
       // Clods of earth thrown up by the blast.
-      for (let i = 0; i < 8 * size; i++)
+      for (let i = 0; i < 8 * size * detail; i++)
         this.spark(x, y + 1, z, 0.5 + Math.random() * 0.5, 0.9 + Math.random() * 0.6, {
           vx: (Math.random() - 0.5) * size * 40,
           vy: 14 + Math.random() * size * 30,
@@ -239,8 +244,9 @@ export class CombatEffects {
           opacity: 0.8,
         });
     }
-    for (let i = 0; i < 5 * size; i++) this.fragment(x, y + 2, z, 0.7 + Math.random() * size);
-    this.light(x, y + 6, z, 70 * size, 100 * size, 0.24);
+    for (let i = 0; i < 5 * size * detail; i++)
+      this.fragment(x, y + 2, z, 0.7 + Math.random() * size);
+    if (detail === 1) this.light(x, y + 6, z, 70 * size, 100 * size, 0.24);
   }
   // Proximity-fused 35 mm round or a missed interceptor: black puff with a hot core.
   airburst(x, y, z, size = 1) {
@@ -430,13 +436,18 @@ export class CombatEffects {
     if (fx.light && round % (fx.lightEvery || 1) === 0)
       this.light(x, y + 1, z, fx.light, 18 + fx.light * 2, 0.07, false);
   }
-  wreck(x, z, size = 1, life = WRECK_LIFE) {
-    if (this.wrecks.length < 40)
-      this.wrecks.push({ x, z, size, life, until: this.clock + life, next: 0 });
+  wreck(x, z, size = 1, life = WRECK_LIFE, smolder = false) {
+    if (this.wrecks.length >= 40) {
+      let oldest = 0;
+      for (let i = 1; i < this.wrecks.length; i++)
+        if (this.wrecks[i].until < this.wrecks[oldest].until) oldest = i;
+      this.wrecks.splice(oldest, 1);
+    }
+    this.wrecks.push({ x, z, size, life, until: this.clock + life, next: 0, smolder });
   }
   // A destroyed building: blast, rolling dust wave, flying debris and fires that burn for a while.
   collapse(x, z, key) {
-    const big = ['industry', 'power', 'factory', 'hq', 'lab'].includes(key),
+    const big = ['industry', 'power', 'factory', 'vehiclebase', 'hq', 'lab'].includes(key),
       spread = big ? 14 : 10;
     this.explode(x, 3, z, big ? 1.5 : 1.15);
     for (let i = 0; i < 26; i++) {
@@ -576,6 +587,8 @@ export class CombatEffects {
       });
   }
   handle(e, shooter = null) {
+    if (['impact', 'crash'].includes(e.type) && ['drone', 'fpv', 'heavy'].includes(e.key))
+      this.wreck(e.x, e.z, e.key === 'heavy' ? 0.6 : 0.42, 45, true);
     if (e.type === 'intercept') {
       if (e.mode === 'fall') {
         this.flash(e.x, e.y, e.z, 5, 0.1);
@@ -650,10 +663,15 @@ export class CombatEffects {
     }
   }
   emit(state, dt, visible = () => true) {
+    this.scars.update(state.groundScars, state.time, (x, z) => this.floor(x, z));
     if (dt <= 0) return;
     this.clock += dt;
     for (const b of state.buildings) {
-      if (b.hp <= 0 || b.progress < 1 || !['industry', 'power', 'factory'].includes(b.key))
+      if (
+        b.hp <= 0 ||
+        b.progress < 1 ||
+        !['industry', 'power', 'factory', 'vehiclebase'].includes(b.key)
+      )
         continue;
       const interval = b.key === 'factory' && !b.queue?.length ? 0.85 : 0.26;
       if (this.clock - (this.emitters.get(b.id) || 0) < interval) continue;
@@ -786,25 +804,26 @@ export class CombatEffects {
     this.wrecks = this.wrecks.filter((w) => w.until > this.clock);
     for (const w of this.wrecks) {
       if (w.next > this.clock) continue;
+      if (this.cameraDistance(w.x, 3, w.z) > 1100) continue;
       const left = (w.until - this.clock) / (w.life || WRECK_LIFE),
         size = w.size || 1;
-      w.next = this.clock + (0.12 + (1 - left) * 0.25) / Math.sqrt(size);
+      w.next = this.clock + (w.smolder ? 0.75 : (0.12 + (1 - left) * 0.25) / Math.sqrt(size));
       this.puff(
         w.x + (Math.random() - 0.5) * 3 * size,
-        3,
+        this.floor(w.x, w.z) + 1,
         w.z + (Math.random() - 0.5) * 3 * size,
         1.6 * size,
         4 + size * 2,
         {
           vx: 1.5,
-          vy: (6 + left * 4) * Math.sqrt(size),
+          vy: w.smolder ? 2.2 : (6 + left * 4) * Math.sqrt(size),
           vz: 0.8,
-          growth: 2.4 * size,
-          opacity: 0.2 + left * 0.18,
+          growth: (w.smolder ? 1.1 : 2.4) * size,
+          opacity: w.smolder ? 0.12 + left * 0.07 : 0.2 + left * 0.18,
           color: [0.08, 0.085, 0.09],
         },
       );
-      if (Math.random() < left + 0.2)
+      if (!w.smolder && Math.random() < left + 0.2)
         this.glow.spawn(
           w.x + (Math.random() - 0.5) * 3,
           2 + Math.random() * 2,
@@ -1035,7 +1054,8 @@ export class CombatEffects {
       capacity:
         this.smoke.capacity + this.glow.capacity + this.rings.capacity + this.sparks.slots.length,
       lights: this.lights.length,
-      drawBatches: 7,
+      drawBatches: 7 + (this.scars.mesh.visible ? 1 : 0),
+      groundScars: this.scars.mesh.count,
       tracerSegments: this.tracers.geometry.drawRange.count / 2,
       streaks: this.streaks.count,
       tracerHeads: this.tracerHeads,

@@ -14,14 +14,13 @@ import {
 import { damageGround } from '../../src/game/units/ground/combat.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-const destination = { x: -280, z: 250 };
+const destination = { x: -680, z: 250 };
 
 function fresh() {
   const s = E.createGame(82);
   s.mode = 'multiplayer';
   for (const side of s.sides) {
     side.credits = side.materials = 1e6;
-    side.tech = Object.keys(E.TECH);
   }
   return s;
 }
@@ -40,7 +39,7 @@ function until(s, condition, seconds = 30) {
 
 function loaded(keys = ['assault', 'mog', 'infantry', 'engineer'], side = 0) {
   const s = fresh();
-  const apc = unit(s, 'apc', { x: -450, z: 250 }, side);
+  const apc = unit(s, 'apc', { x: -850, z: 250 }, side);
   const passengers = keys.map((key, i) => unit(s, key, { x: apc.x - 6, z: apc.z + i - 2 }, side));
   assert.equal(
     E.boardGround(
@@ -124,18 +123,18 @@ test('boarding reservations count members and reject new boarding during deliver
 
 test('empty, foreign, pending boarding and invalid destination refusals preserve current orders', () => {
   const s = fresh();
-  const apc = unit(s, 'apc', { x: -450, z: 250 });
+  const apc = unit(s, 'apc', { x: -850, z: 250 });
   assert.match(deliverGround(s, 0, apc.id, destination), /посадите/);
   assert.equal(typeof deliverGround(s, 1, apc.id, destination), 'string');
   assert.equal(transportDeliveryStatus(s, 1, apc.id), null);
-  const p = unit(s, 'infantry', { x: -530, z: 250 });
+  const p = unit(s, 'infantry', { x: -930, z: 250 });
   assert.equal(E.boardGround(s, 0, [p.id], apc.id), 1);
   assert.match(deliverGround(s, 0, apc.id, destination), /Дождитесь посадки/);
   until(s, () => p.carrierId === apc.id, 10);
   assert.equal(deliverGround(s, 0, apc.id, destination), 1);
   const mission = structuredClone(apc.delivery);
   const order = structuredClone(apc.order);
-  for (const point of [null, [], { x: NaN, z: 0 }, { x: 1700, z: 0 }, { x: 0, z: 0 }]) {
+  for (const point of [null, [], { x: NaN, z: 0 }, { x: E.FIELD.x + 1, z: 0 }, { x: 0, z: 0 }]) {
     assert.equal(typeof deliverGround(s, 0, apc.id, point), 'string');
     assert.deepEqual(apc.delivery, mission);
     assert.deepEqual(apc.order, order);
@@ -146,7 +145,7 @@ test('a repeated valid delivery retargets the same passengers without duplicatin
   const { s, apc, passengers } = loaded(['infantry', 'machinegunner']);
   assert.equal(deliverGround(s, 0, apc.id, destination), 2);
   E.advance(s, 1);
-  const next = { x: -430, z: 390 };
+  const next = { x: -830, z: 390 };
   assert.equal(deliverGround(s, 0, apc.id, next), 2);
   assert.deepEqual(transportDeliveryStatus(s, 0, apc.id).point, next);
   until(s, () => !apc.delivery);
@@ -161,9 +160,9 @@ test('accepted move, stop, guard and retreat cancel delivery while passengers st
     assert.equal(deliverGround(s, 0, apc.id, destination), 1);
     const result =
       command === 'move'
-        ? E.orderGround(s, 0, [apc.id], { x: -420, z: 390 })
+        ? E.orderGround(s, 0, [apc.id], { x: -820, z: 390 })
         : command === 'guard'
-          ? E.guardGround(s, 0, [apc.id], { x: -420, z: 390 })
+          ? E.guardGround(s, 0, [apc.id], { x: -820, z: 390 })
           : E.commandUnits(s, 0, [apc.id], command);
     assert.equal(result, 1, command);
     assert.equal(apc.delivery, null, `${command} must cancel immediately`);
@@ -256,12 +255,12 @@ test('a newly blocked destination waits for demolition instead of unloading away
 
 test('shore and city-wall exits remain on connected walkable ground', () => {
   const { s, apc, passengers } = loaded(['infantry', 'infantry']);
-  const shore = { x: -275, z: 0 };
+  const shore = { x: -675, z: 0 };
   assert.equal(deliverGround(s, 0, apc.id, shore), 2);
   until(s, () => !apc.delivery, 35);
   assertLanded(s, apc, passengers);
   assert.ok(passengers.every((p) => p.x < 0));
-  const wallCenter = { x: -330, z: 100 };
+  const wallCenter = { x: -730, z: 100 };
   s.buildings.push({
     id: s.nextId++,
     key: 'radar',
@@ -272,7 +271,7 @@ test('shore and city-wall exits remain on connected walkable ground', () => {
     progress: 1,
   });
   s.networkRevision++;
-  const virtual = { ...apc, x: -350, z: 100 };
+  const virtual = { ...apc, x: -750, z: 100 };
   for (const p of passengers) p.carrierId = apc.id;
   const plan = planGroundUnload(s, virtual);
   assert.equal(plan.error, null);
@@ -309,7 +308,7 @@ test('destroyed carrier cancels delivery and existing ejection produces no dupli
 
 test('side one owns its delivery and solo army AI must not unload an active mission early', () => {
   const { s, apc, passengers } = loaded(['infantry'], 1);
-  const next = { x: -300, z: 390 };
+  const next = { x: -700, z: 390 };
   assert.equal(deliverGround(s, 0, apc.id, next), 'Выберите свой действующий БТР');
   assert.equal(deliverGround(s, 1, apc.id, next), 1);
   s.mode = 'solo';

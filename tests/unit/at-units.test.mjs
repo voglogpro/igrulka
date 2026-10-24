@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
+
+// Pre-position already purchased weapons for isolated combat tests; no free rack stock.
+function stage(s, site, key, count) {
+  E.initLaunchStore(site);
+  const accepted = E.acceptLaunchDelivery(
+    site,
+    key,
+    Math.min(count, s.sides[site.side].inventory[key]),
+  );
+  s.sides[site.side].inventory[key] -= accepted;
+  assert.equal(accepted, count);
+}
 import * as T from '../../vendor/three/three.module.js';
 import { groundWeaponProfile, groundEngagement } from '../../src/game/units/ground/engagement.js';
 import { groundModel, animateGround } from '../../src/rendering/models/ground.js';
@@ -14,7 +26,6 @@ function fresh() {
   for (const f of s.sides) {
     f.credits = 1e6;
     f.materials = 1e6;
-    f.tech = Object.keys(E.TECH);
   }
   return s;
 }
@@ -25,8 +36,8 @@ function unit(s, side, key, x, z) {
 }
 function openRow(s, gap) {
   for (const z of [-450, -350, -200, 200, 250, 300, 350, 400, 450]) {
-    const a = { x: -600, z },
-      b = { x: -600 + gap, z };
+    const a = { x: -1000, z },
+      b = { x: -1000 + gap, z };
     if (
       [a, b].every(
         (p) => E.walkable(s, p.x, p.z, 5) && E.coverInfo(s, { key: 'infantry', ...p }).cover === 0,
@@ -52,14 +63,14 @@ function runUntil(s, condition, seconds = 40) {
   assert.ok(condition(), `duel did not finish by ${s.time.toFixed(2)}s`);
 }
 
-test('both anti-tank roles are registered, ground-only, researched and have their own magazines', () => {
+test('both anti-tank roles are registered, ground-only, immediately available and have their own magazines', () => {
   const s = fresh();
   for (const key of ['atgm', 'tankdestroyer']) {
     const d = E.GROUND_UNITS[key];
     assert.ok(d, key);
     assert.equal(d.range, 0);
-    assert.equal(d.tech, 'armor');
-    const u = unit(s, 0, key, -500, 250);
+    assert.equal(d.tech, undefined);
+    const u = unit(s, 0, key, -900, 250);
     assert.equal(u.groundAmmo, d.groundMagazine);
     assert.equal(groundWeaponProfile(key).id, 'antiArmor');
   }
@@ -111,14 +122,15 @@ test('anti-tank vehicle defeats an advancing tank from its intended range withou
 
 test('actual airborne drones receive no AA fire from either new anti-tank role', () => {
   const s = fresh();
-  const at = unit(s, 0, 'atgm', -450, 250);
-  const hunter = unit(s, 0, 'tankdestroyer', -450, 270);
-  const launcher = E.build(s, 1, 'launcher', -300, 250);
+  const at = unit(s, 0, 'atgm', -850, 250);
+  const hunter = unit(s, 0, 'tankdestroyer', -850, 270);
+  const launcher = E.build(s, 1, 'launcher', -700, 250);
   assert.notEqual(typeof launcher, 'string', launcher);
   launcher.progress = 1;
   launcher.hp = launcher.maxHp;
   s.sides[1].inventory.drone = 1;
-  assert.equal(E.launch(s, 1, 'drone', { x: -450, z: 250 }, 1, launcher.id), 1);
+  stage(s, launcher, 'drone', 1);
+  assert.equal(E.launch(s, 1, 'drone', { x: -850, z: 250 }, 1, launcher.id), 1);
   E.advance(s, 1);
   assert.ok(s.units.some((u) => u.key === 'drone' && u.hp > 0));
   assert.ok(!s.projectiles.some((p) => p.sourceId === at.id || p.sourceId === hunter.id));
@@ -165,8 +177,8 @@ test('suppression, movement and hold fire prevent AT launches; recovered crews r
 test('new crews consume two APC seats and new roles actually recruit and round trip for either owner', () => {
   for (const side of [0, 1]) {
     const s = fresh();
-    const apc = unit(s, side, 'apc', -500, 250);
-    const crews = Array.from({ length: 5 }, (_, i) => unit(s, side, 'atgm', -506, 246 + i * 2));
+    const apc = unit(s, side, 'apc', -900, 250);
+    const crews = Array.from({ length: 5 }, (_, i) => unit(s, side, 'atgm', -906, 246 + i * 2));
     assert.equal(
       E.boardGround(
         s,
@@ -179,14 +191,18 @@ test('new crews consume two APC seats and new roles actually recruit and round t
     E.advance(s, 0.1);
     assert.equal(crews.filter((u) => u.carrierId === apc.id).length, 4);
     assert.equal(E.unloadGround(s, side, apc.id), 4);
-    const x = side === 0 ? -680 : 680;
+    const x = side === 0 ? -1080 : 1080;
     const site = E.build(s, side, 'barracks', x, -10);
     assert.notEqual(typeof site, 'string', site);
     site.hp = site.maxHp;
     site.progress = 1;
     assert.equal(E.setRallyMode(s, side, site.id, 'wait'), true);
     assert.equal(E.recruit(s, side, 'atgm', site.id), true);
-    assert.equal(E.recruit(s, side, 'tankdestroyer', site.id), true);
+    const base = E.build(s, side, 'vehiclebase', side === 0 ? -960 : 960, -80);
+    assert.equal(typeof base, 'object', String(base));
+    base.progress = 1;
+    base.hp = base.maxHp;
+    assert.equal(E.recruit(s, side, 'tankdestroyer', base.id), true);
     E.advance(s, 65);
     assert.equal(site.armyQueue.length, 0);
     assert.ok(s.groundUnits.some((u) => u.key === 'tankdestroyer' && u.side === side));
@@ -211,7 +227,7 @@ test('AT models share geometry and a hundred infantry crews use two instanced ro
     box: RTSWorld.prototype.box,
     cyl: RTSWorld.prototype.cyl,
   };
-  const u = unit(s, 0, 'tankdestroyer', -500, 250);
+  const u = unit(s, 0, 'tankdestroyer', -900, 250);
   const a = groundModel(world, u),
     b = groundModel(world, { ...u, id: 999 });
   const geometry = (root) => {
@@ -228,7 +244,7 @@ test('AT models share geometry and a hundred infantry crews use two instanced ro
     if (m.isMesh) draws++;
   });
   assert.ok(draws < 16, `AT machine has ${draws} meshes after batching`);
-  animateGround(a, { ...u, targetX: -400, targetZ: 300, moving: true }, 1, 0.05);
+  animateGround(a, { ...u, targetX: -800, targetZ: 300, moving: true }, 1, 0.05);
   const batch = new InfantryBatch(world);
   world.camera = new T.OrthographicCamera(-1000, 1000, 1000, -1000, 0.1, 3000);
   world.camera.position.set(0, 1500, 0);

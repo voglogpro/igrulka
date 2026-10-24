@@ -109,6 +109,7 @@ export function assignGuardPost(s, u, p, snapToCover = false, { preserveDefense 
   cancelTransportDelivery(u);
   if (!preserveDefense) clearAutoDefense(u);
   u.guard = post;
+  if (['medic', 'supply'].includes(GROUND_UNITS[u.key]?.support)) u.supportManual = true;
   u.stance = null;
   u.guardTargetId = null;
   u.guardNextThink = 0;

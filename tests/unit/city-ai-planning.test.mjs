@@ -19,58 +19,36 @@ function building(s, key, x, progress = 1) {
   return b;
 }
 
-test('city AI fills real parallel lab slots, skips paid projects and never prepays duplicate or locked research', () => {
+test('retired research never consumes AI money or creates lab projects', () => {
   const s = fresh();
-  building(s, 'lab', 500);
-  building(s, 'lab', 580);
-  building(s, 'lab', 660);
-  assert.equal(E.research(s, 1, 'autocannon'), true);
-  const paid = [s.sides[1].credits, s.sides[1].science];
+  const funds = s.sides[1].credits;
   s.ai.nextResearch = 0;
-  ai(s);
-  const projects = E.researchProjects(s, 1);
-  assert.equal(projects.length, 3);
-  assert.equal(new Set(projects.map((p) => p.key)).size, 3);
-  assert.equal(projects[0].key, 'autocannon');
-  assert.ok(projects.some((p) => p.key === 'heavy'));
-  assert.ok(
-    projects.every(
-      (p) => !E.TECH[p.key].requires || s.sides[1].tech.includes(E.TECH[p.key].requires),
-    ),
+  for (let i = 0; i < 4; i++) ai(s);
+  assert.equal(s.sides[1].credits, funds);
+  assert.deepEqual(E.researchProjects(s, 1), []);
+  assert.deepEqual(s.sides[1].tech, []);
+  assert.equal(
+    s.buildings.some((b) => b.key === 'lab'),
+    false,
   );
-  const newlyPaid = projects.slice(1).reduce(
-    (sum, p) => ({
-      cost: sum.cost + E.TECH[p.key].cost,
-      science: sum.science + E.TECH[p.key].science,
-    }),
-    { cost: 0, science: 0 },
-  );
-  assert.deepEqual(
-    [s.sides[1].credits, s.sides[1].science],
-    [paid[0] - newlyPaid.cost, paid[1] - newlyPaid.science],
-  );
-  const before = E.save(s);
-  s.ai.nextResearch = 0;
-  const resources = [s.sides[1].credits, s.sides[1].science];
-  ai(s);
-  assert.deepEqual([s.sides[1].credits, s.sides[1].science], resources);
-  assert.deepEqual(E.researchProjects(s, 1), projects);
-  assert.ok(before.length > 0);
 });
 
-test('destroyed and unfinished labs provide no new AI slots and the original difficulty cadence stays intact', () => {
-  for (const difficulty of Object.keys(E.DIFFICULTY)) {
+test('removing research preserves every difficulty income bonus and army/raid cadence', () => {
+  const expected = {
+    easy: [1, 28, 46],
+    normal: [1.1, 21, 36],
+    hard: [1.25, 17, 28],
+    ultra: [1.45, 12, 21],
+  };
+  for (const [difficulty, [bonus, armyEvery, attackEvery]] of Object.entries(expected)) {
     const s = fresh();
     s.difficulty = difficulty;
-    building(s, 'lab', 500);
-    building(s, 'lab', 580, 0.5);
-    building(s, 'lab', 660).hp = 0;
-    const bonus = E.economy(s, 1).bonus;
     s.ai.nextResearch = 0;
     ai(s);
-    assert.equal(E.researchProjects(s, 1).length, 1);
-    assert.equal(s.ai.nextResearch, E.DIFFICULTY[difficulty].researchEvery);
     assert.equal(E.economy(s, 1).bonus, bonus);
+    assert.equal(E.DIFFICULTY[difficulty].armyEvery, armyEvery);
+    assert.equal(E.DIFFICULTY[difficulty].attackEvery, attackEvery);
+    assert.equal(s.sides[1].research, null);
   }
 });
 

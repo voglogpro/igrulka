@@ -41,6 +41,10 @@ export function restoreServices(s) {
       v.revision > s.networkRevision ||
       !Number.isFinite(v.thinkAt) ||
       v.thinkAt < 0 ||
+      (v.dispatchCursor != null &&
+        (!Number.isSafeInteger(v.dispatchCursor) ||
+          v.dispatchCursor < 0 ||
+          v.dispatchCursor > 5000)) ||
       !Array.isArray(v.path) ||
       v.path.length > 12000 ||
       !v.path.every(point) ||
@@ -81,6 +85,7 @@ export function restoreServices(s) {
       roadIds: [...v.roadIds],
       revision: v.revision,
       thinkAt: v.thinkAt,
+      dispatchCursor: v.dispatchCursor ?? 0,
     };
   });
   if (

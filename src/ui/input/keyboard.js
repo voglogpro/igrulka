@@ -128,8 +128,8 @@ export function createKeyboardController({
     const quick = { KeyZ: 'drone', KeyX: 'heavy', KeyC: 'cruise', KeyV: 'ballistic' }[e.code];
     if (quick && started) strike.armStrike(quick);
     if (e.code === 'KeyB' && started) tools.openPanel('army');
-    // E — research tree, F — army recruitment, N — arsenal and raids.
-    if (e.code === 'KeyE') tools.openPanel('research');
+    // E opens production and raids; F opens the army. N remains an arsenal alias.
+    if (e.code === 'KeyE') tools.openPanel('attack');
     if (e.code === 'KeyF' && started) tools.openPanel('army');
     if (e.code === 'KeyN') tools.openPanel('attack');
     const key = {

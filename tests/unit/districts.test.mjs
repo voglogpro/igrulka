@@ -152,8 +152,8 @@ test('abandoned partial neutral capture decays, while established ownership pers
 
 test('capture orders send real units to separate nearby posts and eventually take the site', () => {
   const s = fresh(),
-    a = soldier(s, 0, { x: -500, z: -200 });
-  const b = soldier(s, 0, { x: -510, z: -220 });
+    a = soldier(s, 0, { x: -900, z: -200 });
+  const b = soldier(s, 0, { x: -910, z: -220 });
   assert.equal(E.captureDistrict(s, 0, [a.id, b.id], E.DISTRICTS[0].id), 2);
   assert.notDeepEqual(a.guard, b.guard);
   assert.ok(a.path.length);
@@ -231,7 +231,7 @@ test('only solo AI receives the same 25 percent bonus on district revenues', () 
 test('version eight imports neutral sites without altering troops, stockpiles or elapsed time', () => {
   const s = fresh();
   // A legacy river-map position within the unchanged town area, not a new sea corridor.
-  soldier(s, 0, { x: -400, z: 200 });
+  soldier(s, 0, { x: -800, z: 200 });
   s.version = 8;
   delete s.districts;
   s.time = 97;
@@ -239,7 +239,10 @@ test('version eight imports neutral sites without altering troops, stockpiles or
   assert.equal(restored.version, E.VERSION);
   assert.equal(restored.time, 97);
   assert.deepEqual(restored.sides, s.sides);
-  assert.deepEqual(restored.groundUnits, s.groundUnits);
+  assert.deepEqual(
+    restored.groundUnits,
+    s.groundUnits.map((u) => ({ ...u, x: u.x - 400 })),
+  );
   assert.equal(restored.districts.length, 4);
   assert.ok(restored.districts.every((d) => d.owner == null));
 });
@@ -322,7 +325,7 @@ test('side one perspective flips control and ownership without changing the site
 
 test('the command gateway binds district capture and repair to the real player side', () => {
   const s = fresh(),
-    u = soldier(s, 1, { x: 500, z: 250 });
+    u = soldier(s, 1, { x: 900, z: 250 });
   assert.equal(executeCommand(s, 1, 'district', { ids: [u.id], id: 'south-depot' }), 1);
   assert.equal(
     typeof executeCommand(s, 0, 'district', { ids: [u.id], id: 'south-depot' }),

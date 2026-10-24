@@ -4,12 +4,36 @@ import { radarModel, defenseModel } from './defenses.js';
 import { detailBuilding, batchStatic } from '../mesh-utils.js';
 import { serviceStationModel } from './city/service-station.js';
 import { oilWellModel, oilTankModel, portModel, trainingModel } from './city/oil.js';
+const tierTemplates = new WeakMap();
+const tiered = new Set(['gun', 'sam', 'cannon', 'launcher', 'silo', 'ammofactory']);
+function cloneTier(template, b, world) {
+  const root = template.clone(true);
+  root.position.set(b.x, Math.max(0, world.height(b.x, b.z)), b.z);
+  root.rotation.y = b.rotation || 0;
+  root.userData.buildingId = b.id;
+  root.userData.turret = root.getObjectByName('building-turret');
+  root.userData.pitch = root.getObjectByName('building-pitch');
+  world.clearTrees(b.x, b.z, (BUILDINGS[b.key]?.size || 30) + 10);
+  world.scene.add(root);
+  return {
+    root,
+    content: root.getObjectByName('building-content'),
+    scaffold: root.getObjectByName('building-scaffold'),
+    dead: false,
+    wasAlive: b.hp > 0,
+  };
+}
 export function model(b) {
+  let cache = tierTemplates.get(this);
+  if (!cache) tierTemplates.set(this, (cache = new Map()));
+  const tierKey = `${b.key}/${b.side}/${b.level || 0}`;
+  if (tiered.has(b.key) && cache.has(tierKey)) return cloneTier(cache.get(tierKey), b, this);
   const root = new T.Group();
   root.position.set(b.x, Math.max(0, this.height(b.x, b.z)), b.z);
   root.rotation.y = b.rotation || 0;
   root.userData.buildingId = b.id;
   const content = new T.Group();
+  content.name = 'building-content';
   root.add(content);
   const d = BUILDINGS[b.key],
     size = d?.size || 30,
@@ -84,6 +108,25 @@ export function model(b) {
       this.box(content, -9 + i * 9, 16.8, 0, 5, 2, 18, '#929b96');
     }
     this.box(content, -10, 1, 17, 5, 3, 4, accent);
+  } else if (b.key === 'vehiclebase') {
+    // Wide assembly bays and an overhead crane distinguish armour production from drones.
+    this.box(content, -3, 0.7, -2, 34, 13, 28, '#747e76');
+    this.box(content, -3, 13.7, -2, 36, 1.2, 30, '#414f50');
+    for (const x of [-13, 1, 12]) {
+      this.box(content, x, 0.8, 12.2, 9, 10, 0.5, '#34443f');
+      this.box(content, x, 11.4, 12.5, 8, 0.6, 0.4, accent, {
+        emissive: accent,
+        emissiveIntensity: 0.6,
+      });
+      for (const z of [-4, 5, 14]) this.box(content, x, 0.8, z, 0.5, 0.1, 5, '#b2a46d');
+    }
+    for (const x of [-20, 18]) this.box(content, x, 0.7, -2, 1, 19, 1, '#b19a60');
+    this.box(content, -1, 19.7, -2, 40, 1, 1.5, '#b19a60');
+    this.box(content, -6, 17, -2, 3, 2.2, 3, '#4f5d54');
+    this.cyl(content, -6, 12, -2, 0.14, 5, '#222b29');
+    this.box(content, -12, 1, -20, 11, 3, 5, '#657564');
+    this.box(content, -12, 4, -20, 5, 2, 4, '#7d8b70');
+    this.box(content, -12, 4.6, -15, 0.6, 0.6, 8, '#414e42');
   } else if (b.key === 'barracks') {
     this.box(content, -5, 0.7, 0, 20, 9, 23, '#738171');
     this.box(content, -5, 9.7, 0, 22, 1.2, 25, '#424f46');
@@ -108,6 +151,29 @@ export function model(b) {
     }
     for (const z of [-7, 7]) this.box(content, 0, 1.8, z, 18, 1, 1.2, '#788779');
     this.box(content, -7, 6, 4, 3, 2, 2, '#304e55');
+  } else if (b.key === 'silo') {
+    this.box(content, 0, 0.7, 0, 23, 1.2, 23, '#515e58');
+    this.box(content, -8, 1.9, 0, 6, 4, 17, '#697c6b');
+    for (const x of [0, 7]) {
+      this.box(content, x, 1.9, 0, 5.6, 0.8, 17, '#394b44');
+      this.box(content, x, 2.7, 0, 5.2, 0.5, 16, '#91a18c');
+      this.box(content, x, 3.2, -5, 4.5, 0.12, 0.7, accent);
+    }
+    this.cyl(content, -8, 6, -5, 0.14, 7, '#6b7b70');
+    this.box(content, -8, 5.9, 5, 3, 1.2, 2, '#314c50');
+  } else if (b.key === 'ammofactory') {
+    this.box(content, -3, 0.7, -3, 25, 11, 23, '#7c8070');
+    this.box(content, -3, 11.7, -3, 27, 1, 25, '#414f4c');
+    for (let i = 0; i < 2 + (b.level || 0); i++) {
+      const x = -12 + i * 7;
+      this.box(content, x, 0.8, 9, 5, 6, 0.4, '#31433d');
+      this.box(content, x, 7.1, 9.2, 5, 0.5, 0.3, accent);
+      this.box(content, x, 0.8, 14, 0.3, 0.08, 7, '#c7b57f');
+    }
+    for (const z of [-8, -1, 6]) {
+      this.box(content, 13, 0.8, z, 5, 3, 5, '#697456');
+      this.box(content, 13, 3.8, z, 5.2, 0.2, 5.2, '#a69b77');
+    }
   } else if (b.key === 'lab') {
     this.box(content, 0, 0.7, 0, 21, 16, 20, windowMat);
     this.box(content, 0, 17, 0, 23, 1, 22, '#bbc2bb');
@@ -159,6 +225,14 @@ export function model(b) {
   } else {
     defenseModel(this, b, content, root);
   }
+  if (['launcher', 'silo'].includes(b.key)) {
+    for (let tier = 0; tier < (b.level || 0); tier++) {
+      const z = -7 + tier * 7;
+      this.box(content, 9, 1, z, 4.5, 4, 5.5, '#586b59');
+      this.box(content, 9, 5, z, 4.8, 0.35, 5.8, '#9aa58b');
+      this.box(content, 9, 3, z + 2.8, 2.5, 0.5, 0.1, accent);
+    }
+  }
   // Warm porch lights are emissive geometry, avoiding a point light per structure.
   if (!['gun', 'cannon', 'sam', 'oilwell', 'oiltank', 'port', 'training'].includes(b.key))
     for (const x of [-size * 0.4, size * 0.4]) {
@@ -182,7 +256,7 @@ export function model(b) {
       glow.position.set(x, 0.73, size * 0.43);
       content.add(glow);
     }
-  if (['housing', 'lab', 'factory', 'industry'].includes(b.key)) {
+  if (['housing', 'lab', 'factory', 'vehiclebase', 'industry'].includes(b.key)) {
     this.box(content, 0, 0.68, -size * 0.5 - 1, size + 4, 0.06, 3, '#909385');
     for (let i = 0; i < 4; i++) {
       this.box(
@@ -205,6 +279,7 @@ export function model(b) {
     }
   }
   const scaffold = new T.Group();
+  scaffold.name = 'building-scaffold';
   const wire = new T.LineSegments(
     new T.EdgesGeometry(new T.BoxGeometry(size + 3, 22, size + 3)),
     new T.LineBasicMaterial({ color: '#d3b97b', transparent: true, opacity: 0.6 }),
@@ -219,6 +294,22 @@ export function model(b) {
   const dynamic = new Set([root.userData.turret, root.userData.pump].filter(Boolean));
   batchStatic(content, dynamic);
   batchStatic(scaffold);
+  if (tiered.has(b.key)) {
+    for (const [key, name] of [
+      ['turret', 'building-turret'],
+      ['pitch', 'building-pitch'],
+    ])
+      if (root.userData[key]) root.userData[key].name = name;
+    const data = root.userData;
+    root.userData = { buildingId: b.id };
+    cache.set(tierKey, root.clone(true));
+    root.userData = data;
+    root.traverse((object) => {
+      if (object.geometry) this.sharedGeometries.add(object.geometry);
+      for (const material of Array.isArray(object.material) ? object.material : [object.material])
+        if (material) this.sharedMaterials.add(material);
+    });
+  }
   this.scene.add(root);
   return { root, content, scaffold, dead: false, wasAlive: b.hp > 0 };
 }

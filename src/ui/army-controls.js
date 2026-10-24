@@ -2,6 +2,7 @@ import * as E from '../game/index.js';
 import { $ } from './format.js';
 import { renderDefenseDetail } from './defense-inspector.js';
 import { icon } from './icons.js';
+import { updateEquipmentDetails } from './equipment-detail.js';
 
 export function setArmyContextVisible(visible) {
   const host = $('#army-controls');
@@ -47,7 +48,7 @@ export function renderArmyControls({ state, armySelection }, primary) {
   const d = E.GROUND_UNITS[primary.key];
   if (host.dataset.id !== signature) {
     host.dataset.id = signature;
-    host.innerHTML = `<div class="army-summary"><button class="army-name" data-action="army-focus" title="Показать выбранную группу"><b>${units.length > 1 ? `${units.length} единиц` : d.name}</b><small id="ground-info"></small></button><div class="health"><i id="inspect-health"></i></div><small id="ground-state"></small></div><div class="army-orders"><div class="stance-row"><span class="stance-label">РЕЖИМ</span><div class="stance-switch" role="group" aria-label="Режим выбранных бойцов"><button data-stance="attack" title="Сразу идти на штаб противника, останавливаясь для боя">${icon('sword')}Атака</button><button data-stance="defend" title="Занять коридор, окопаться и не подпускать врага">${icon('shield')}Оборона</button></div><select id="stance-post" aria-label="Какой коридор оборонять"><option value="auto">Коридор: авто</option><option value="north">Северный коридор</option><option value="south">Южный коридор</option></select><span id="stance-note" class="stance-note"></span></div><div class="army-primary-orders">${commands.map(([key, label, title], i) => `${i && GROUPS.has(key) ? '<i class="order-sep"></i>' : ''}<button data-troop="${key}" title="${title}">${label}</button>`).join('')}${units.some((u) => u.key === 'operator') ? '<button class="fpv-button" data-troop="fpv" title="Q · Навести FPV выбранного оператора">FPV ↗</button>' : ''}</div><div class="army-tools"><label>Строй <select id="formation" aria-label="Построение армии"><option value="line">Линия</option><option value="column">Колонна</option><option value="spread">Рассредоточить</option></select></label><button data-action="army-all" title="Ctrl+A · Все свои войска">Вся армия</button><button data-panel="army">Набор ↗</button><button class="auto-defense-toggle" data-action="auto-defense" data-enabled="true" aria-pressed="false" title="Оборона сама усиливает прорывы; прямой приказ отменяет участие">Поддерживать фронт</button><details class="army-details"><summary>Состояние</summary><div><p id="army-detail-text"></p><p id="army-auto-defense-note"></p><div id="defense-detail"></div></div></details><span class="army-mouse-hint">ПКМ — приказ · Esc — снять выбор</span></div></div><button class="army-close" data-action="deselect" aria-label="Снять выделение">×</button>`;
+    host.innerHTML = `<div class="army-summary"><button class="army-name" data-action="army-focus" title="Показать выбранную группу"><b>${units.length > 1 ? `${units.length} единиц` : d.name}</b><small id="ground-info"></small></button><div class="health"><i id="inspect-health"></i></div><small id="ground-state"></small></div><div class="army-orders"><div class="stance-row"><span class="stance-label">РЕЖИМ</span><div class="stance-switch" role="group" aria-label="Режим выбранных бойцов"><button data-stance="attack" title="Сразу идти на штаб противника, останавливаясь для боя">${icon('sword')}Атака</button><button data-stance="defend" title="Занять коридор, окопаться и не подпускать врага">${icon('shield')}Оборона</button></div><select id="stance-post" aria-label="Какой коридор оборонять"><option value="auto">Коридор: авто</option><option value="north">Северный коридор</option><option value="south">Южный коридор</option></select><span id="stance-note" class="stance-note"></span></div><div class="army-primary-orders">${commands.map(([key, label, title], i) => `${i && GROUPS.has(key) ? '<i class="order-sep"></i>' : ''}<button data-troop="${key}" title="${title}">${label}</button>`).join('')}${units.some((u) => u.key === 'operator') ? '<button class="fpv-button" data-troop="fpv" title="Q · Навести FPV выбранного оператора">FPV ↗</button>' : ''}</div><div class="army-tools"><label>Строй <select id="formation" aria-label="Построение армии"><option value="line">Линия</option><option value="column">Колонна</option><option value="spread">Рассредоточить</option></select></label><button data-action="army-all" title="Ctrl+A · Все свои войска">Вся армия</button><button data-panel="army">Набор ↗</button><details class="army-details"><summary>Состояние</summary><div><p id="army-detail-text"></p><p id="army-auto-defense-note"></p><div id="defense-detail"></div></div></details><span class="army-mouse-hint">ПКМ — приказ · Esc — снять выбор</span></div></div><button class="army-close" data-action="deselect" aria-label="Снять выделение">×</button>`;
     $('#formation').value = state.formations[0];
   }
   const hp = units.reduce((n, u) => n + u.hp, 0),
@@ -58,24 +59,11 @@ export function renderArmyControls({ state, armySelection }, primary) {
     (u) => !E.GROUND_UNITS[u.key]?.support && !u.civil && !u.downed && !u.carrierId,
   );
   const volunteers = candidates.filter((u) => u.autoDefense);
-  const autoButton = host.querySelector('[data-action="auto-defense"]');
-  const autoState = volunteers.length === candidates.length && volunteers.length > 0;
-  autoButton.dataset.enabled = String(!autoState);
-  autoButton.setAttribute(
-    'aria-pressed',
-    autoState ? 'true' : volunteers.length ? 'mixed' : 'false',
-  );
-  autoButton.disabled = !candidates.some((u) => u.guard && !u.boardingId && !u.delivery);
-  autoButton.title = !candidates.length
-    ? 'Поддержка фронта доступна боевым частям вне транспорта'
-    : autoButton.disabled
-      ? 'Сначала назначьте бойцам охрану или оборону поста'
-      : 'Оборона сама усиливает прорывы; прямой приказ отменяет участие';
   const reinforcing = volunteers.filter((u) => u.defenseTask && !u.defenseTask.returning).length;
   const returning = volunteers.filter((u) => u.defenseTask?.returning).length;
   host.querySelector('#army-auto-defense-note').textContent = volunteers.length
-    ? `Поддержка фронта: ${volunteers.length - reinforcing - returning} в резерве · ${reinforcing} усиливают участок · ${returning} возвращаются. Прямой приказ отменяет участие.`
-    : 'Поддержка фронта отключена. Защитники держат назначенные позиции.';
+    ? `Автооборона: ${volunteers.length - reinforcing - returning} в резерве · ${reinforcing} усиливают участок · ${returning} возвращаются. Прямой приказ отменяет участие.`
+    : 'Защитники сами формируют фронт. Прямые приказы управляют выбранной группой.';
   const reloading = units.filter((u) => (u.groundReload || u.reloadLeft) > 0).length;
   $('#ground-info').textContent =
     `${Math.ceil(hp)} / ${maxHp} · ${moving ? `${moving} в пути` : 'на позиции'}`;
@@ -132,6 +120,10 @@ export function renderArmyControls({ state, armySelection }, primary) {
   }
   host.querySelector('[data-troop="deliver"]').hidden = units.length !== 1 || !d.capacity;
   const routed = units.filter((u) => u.routeState);
+  if (units.length === 1 && E.ammunitionStatus) {
+    const ammo = E.ammunitionStatus(state, primary);
+    if (ammo.kind) $('#ground-state').textContent += ` · резерв ${ammo.reserve}/${ammo.capacity}`;
+  }
   if (routed.length) {
     $('#ground-state').textContent += routed.some((u) => u.routeState.status === 'blocked')
       ? ' · маршрут заблокирован'
@@ -176,6 +168,13 @@ export function renderArmyControls({ state, armySelection }, primary) {
   host.querySelector('[data-troop="unload"]').disabled = !units.some(
     (u) => E.GROUND_UNITS[u.key].capacity && state.groundUnits.some((p) => p.carrierId === u.id),
   );
+  let equipment = host.querySelector('#army-equipment-detail');
+  if (!equipment) {
+    equipment = document.createElement('div');
+    equipment.id = 'army-equipment-detail';
+    $('#army-detail-text').parentElement.append(equipment);
+  }
+  updateEquipmentDetails(equipment, state, units.length === 1 ? primary : null);
   if (d.range && units.length === 1) renderDefenseDetail(state, primary);
   else $('#defense-detail').innerHTML = '';
 }

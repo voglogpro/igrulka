@@ -9,8 +9,7 @@ export function supplyFactor(s, b) {
 
 export const COMMUTE_INCOME = 0.07;
 export function economy(s, owner) {
-  const faction = s.sides[owner],
-    alive = s.buildings.filter((b) => b.side === owner && b.hp > 0 && b.progress >= 1);
+  const alive = s.buildings.filter((b) => b.side === owner && b.hp > 0 && b.progress >= 1);
   let power = 10,
     demand = 0,
     upkeep = 0,
@@ -19,7 +18,7 @@ export function economy(s, owner) {
     science = 0,
     connected = 0,
     isolated = 0;
-  const efficient = faction.tech.includes('efficiency') ? 1.2 : 1;
+  const efficient = 1;
   for (const b of alive) {
     const d = BUILDINGS[b.key];
     if (!d) continue;
@@ -103,7 +102,7 @@ export function buildingOutput(s, b) {
     health = 0.5 + (0.5 * b.hp) / b.maxHp,
     factor = b.hp > 0 && b.progress >= 1 ? road * health * e.productivity : 0,
     bonus = e.bonus,
-    efficient = s.sides[b.side].tech.includes('efficiency') ? 1.2 : 1;
+    efficient = 1;
   return {
     road,
     health,

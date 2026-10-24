@@ -61,7 +61,7 @@ export class DistrictHUD {
               : d.blocked
                 ? 'Доход остановлен'
                 : label;
-      focus.title = `${E.DISTRICT_TYPES[d.type].name}. Полный доход: ${perMinute(d.income)} денег, ${perMinute(d.materials)} сплавов, ${perMinute(d.science)} науки в минуту. Состояние ${Math.ceil(d.hp)}/${d.maxHp}. Пехота захватывает за 22 с; техника только оспаривает. Нажмите для перехода.`;
+      focus.title = `${E.DISTRICT_TYPES[d.type].name}. Полный доход: ${perMinute(d.income)} денег, ${perMinute(d.materials)} сплавов в минуту. Состояние ${Math.ceil(d.hp)}/${d.maxHp}. Пехота захватывает за 22 с; техника только оспаривает. Нажмите для перехода.`;
       order.disabled = !units.length || (!foot && d.owner !== 0);
       order.title = !units.length
         ? 'Сначала выделите пехоту или охрану района'

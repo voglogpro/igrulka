@@ -29,7 +29,7 @@ export function sync() {
   }
   for (const b of this.state.buildings) {
     let m = this.models.get(b.id);
-    const signature = [b.key, b.side, b.x, b.z, b.rotation || 0].join('/');
+    const signature = [b.key, b.side, b.x, b.z, b.rotation || 0, b.level || 0].join('/');
     if (m && (m.signature !== signature || (m.dead && b.hp > 0))) {
       disposeTree(m.root, this.sharedGeometries, this.sharedMaterials);
       this.models.delete(b.id);
@@ -157,10 +157,9 @@ export function sync() {
       }
     }
   }
-  const roads = this.state.roads.filter((r) => !r.removed),
-    layout = roads.map((r) => [r.id, r.side, r.ax, r.az, r.bx, r.bz].join('/')).join(',');
-  if (layout !== this.roadLayout) {
-    this.roadLayout = layout;
+  const roadView = this.roadView.update(this.state.roads, E.passable),
+    roads = roadView.roads;
+  if (roadView.layoutChanged) {
     this.streetLayout = roads.map((r) => ({
       a: { x: r.ax, z: r.az },
       b: { x: r.bx, z: r.bz },
@@ -172,17 +171,17 @@ export function sync() {
     this.roadModels.clear();
     this.roadVisuals.clear();
   }
-  for (const r of roads) {
+  for (const r of roadView.layoutChanged ? roads : roadView.changed) {
     const visual = (E.passable(r) ? 1 : 0) + ':' + Math.ceil((r.hp / r.maxHp) * 3);
     if (this.roadVisuals.get(r.id) === visual) continue;
     const old = this.roadModels.get(r.id);
     if (old) disposeTree(old, this.sharedGeometries, this.sharedMaterials);
     const root = this.road(r, this.streetLayout);
-    batchStatic(root);
     this.roadModels.set(r.id, root);
     this.roadVisuals.set(r.id, visual);
     this.renderer.shadowMap.needsUpdate = true;
   }
+  if (roadView.layoutChanged || roadView.changed.length) this.roadBatch.sync(this.roadModels);
   const ids = new Set();
   for (const u of this.state.units) {
     ids.add(u.id);
@@ -228,7 +227,7 @@ export function sync() {
   for (const u of this.state.groundUnits || []) {
     groundIds.add(u.id);
     let m = this.groundModels.get(u.id);
-    const signature = u.key + ':' + u.side;
+    const signature = u.key + ':' + u.side + ':' + (u.level || 0);
     if (m && m.userData.signature !== signature) {
       m.traverse((o) => {
         if (o.isInstancedMesh) o.dispose();
@@ -271,6 +270,10 @@ export function sync() {
     }
   }
   this.infantry.sync(this.state.groundUnits || [], this.state.time, visibleGround);
+  // Moving units use current-frame contact shadows, never an old static sun-map silhouette.
+  for (const mesh of this.infantry.meshes) mesh.castShadow = false;
+  this.vehicleBatch.sync(this.groundModels, this.camera);
+  this.contactShadows.sync(this.state.groundUnits || [], visibleGround);
   this.districtView?.sync(this.state);
   this.syncTrenches();
   this.tactical?.previewGround(this.state.groundUnits?.find((u) => u.id === this.selected));

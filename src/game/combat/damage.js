@@ -4,6 +4,8 @@ import { clamp } from '../shared/math.js';
 import { BUILDINGS, GROUND_UNITS } from '../config.js';
 import { damageGround } from '../units/ground/index.js';
 import { damageDistricts } from '../territory/districts.js';
+import { damageAmmoVehicle } from '../city/ammo-vehicle-damage.js';
+import { AMMUNITION } from '../units/ground/ammunition.js';
 export function damageRoad(s, r, amount) {
   const before = passable(r);
   r.hp = Math.max(0, r.hp - amount);
@@ -51,6 +53,12 @@ export function applyBlast(s, x, z, damage, radius) {
     if (amount) damageGround(s, u, amount, event, 'blast');
   }
   // Driveways are not damaged on their own; they share the fate of their building.
+  for (const vehicle of (s.ammoVehicles || []).slice(0, AMMUNITION.fleetLimit * 2)) {
+    const amount = at(
+      Math.max(0, Math.hypot(vehicle.x - x, vehicle.z - z) - AMMUNITION.vehicle.radius),
+    );
+    if (amount) damageAmmoVehicle(s, vehicle, amount);
+  }
   for (const r of s.roads)
     if (!r.removed && r.hp > 0 && !r.connectorTo) {
       const amount = at(Math.max(0, projectPoint(x, z, r).distance - 5));

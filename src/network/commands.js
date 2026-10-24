@@ -1,7 +1,7 @@
 import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -73,6 +73,17 @@ export function executeCommand(s, side, type, a = {}) {
         return invalid;
       return E.launch(s, side, a.key, a.aim, a.count, a.siteId ?? null);
     }
+    case 'army-target':
+      return configured(E.GROUND_UNITS, a.key) &&
+        Number.isInteger(a.count) &&
+        a.count >= 0 &&
+        a.count <= E.GROUND_LIMIT
+        ? E.setArmyTarget(s, side, a.key, a.count)
+        : invalid;
+    case 'ammo-factory':
+      return validId(a.id) && own(s, side, a.id) && typeof a.enabled === 'boolean'
+        ? E.setAmmoFactoryEnabled(s, side, a.id, a.enabled)
+        : invalid;
     case 'recruit':
       if (
         !configured(E.GROUND_UNITS, a.key) ||

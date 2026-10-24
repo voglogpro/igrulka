@@ -78,10 +78,7 @@ export function moveProjectiles(s, dt) {
         u.side !== p.side &&
         u.hp > 0 &&
         u.delay <= 0 &&
-        ((p.kind === 'interceptor' &&
-          (u.key !== 'ballistic' || (p.abm ?? s.sides[p.side].tech.includes('abm')))) ||
-          u.key === 'drone' ||
-          u.key === 'heavy') &&
+        (p.kind === 'interceptor' || u.key === 'drone' || u.key === 'heavy') &&
         closestRelativeDistance(p, u) < radius
       ) {
         p.dead = true;

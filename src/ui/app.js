@@ -1,6 +1,5 @@
 import { createCommandExecutor } from './session/command-executor.js';
 import { openMultiplayerEntry } from './session/multiplayer-entry.js';
-import { createAutoDefenseAction } from './controllers/army-actions.js';
 import { createStrikeController } from './controllers/strike-controller.js';
 import { createActionRouter } from './controllers/action-router.js';
 import { createCampaignActions, browserCampaignFiles } from './session/campaign-actions.js';
@@ -9,8 +8,7 @@ import { bindPointerActivity, bindMinimap, bindPageLifecycle } from './input/bro
 import { createKeyboardController, bindKeyboard } from './input/keyboard.js';
 import { loadCampaign, loadSettings, createCampaignStore } from './session/campaign-store.js';
 import { setArmyContextVisible } from './army-controls.js';
-import { updateArmyRecruitment } from './army-recruitment.js';
-import { updateTechTree } from './tech-tree.js';
+import { armyTargetRequest, updateArmyRecruitment } from './army-recruitment.js';
 import { updateDeploymentHUD, renderSquadRoster, toggleSquadRoster } from './deployment.js';
 import {
   factoryPlanRequest,
@@ -61,7 +59,6 @@ let world,
   deployPoint = null,
   deployHoverAt = 0,
   armyCategory = 'infantry',
-  armyAutomation = { siteId: null, key: 'infantry', target: 12 },
   network = null,
   soloBackup = null,
   networkApplied = false,
@@ -213,7 +210,10 @@ function execute(type, args) {
 }
 function home(side = 0) {
   return (
-    state.buildings.find((b) => b.side === side && b.key === 'hq') || { x: side ? 615 : -615, z: 0 }
+    state.buildings.find((b) => b.side === side && b.key === 'hq') || {
+      x: side ? E.HQ_X : -E.HQ_X,
+      z: 0,
+    }
   );
 }
 function enterNetwork(session) {
@@ -429,11 +429,6 @@ function handleEvent(e) {
     lastRaid = state.time;
     toast(`Налёт противника: ${e.count} целей`, true);
   }
-  if (e.type === 'research' && e.side === 0) {
-    toast(`Изучено: ${E.TECH[e.key].name}`);
-    buildList();
-    if (panel === 'research' && !pointerBusy) renderPanel();
-  }
 }
 function updateRadarChip() {
   const chip = $('#radar-chip'),
@@ -484,8 +479,6 @@ function updateHUD() {
   $('#oil').textContent = `${num(f.oil ?? 0)} / ${num(E.oilStorage(state, 0))}`;
   $('#oil-rate').textContent = rate(f.oilRate || 0) + '/мин';
   $('#oil').parentElement.classList.toggle('low', (f.oil ?? 0) < 30);
-  $('#science').textContent = num(f.science);
-  $('#science-rate').textContent = rate(e.science) + '/мин';
   $('#power').textContent = `${Math.round(e.power)} / ${e.demand}`;
   $('#supply-status').textContent = e.isolated
     ? `Без снабжения: ${e.isolated}`
@@ -517,14 +510,12 @@ function updateBuildingPrices() {
       d = E.BUILDINGS[key];
     if (!d) continue;
     const quote = E.purchaseQuote(state, 0, 'building', key);
-    const locked = d.tech && !state.sides[0].tech.includes(d.tech);
     let label = button.querySelector('small');
     if (!label) {
       label = document.createElement('small');
       button.append(label);
     }
-    label.textContent = locked ? 'Исследование' : `${quote.cost} ₡ · ${quote.metal} спл.`;
-    button.classList.toggle('locked', !!locked);
+    label.textContent = `${quote.cost} ₡ · ${quote.metal} спл.`;
     button.dataset.priceFactor = quote.factor;
     button.title = `${d.description || d.name} Цена ${Math.round(quote.factor * 100)}% базовой; растёт только у этого типа зданий, максимум 150%.`;
   }
@@ -532,18 +523,17 @@ function updateBuildingPrices() {
 function buildList() {
   const keys =
     tab === 'city'
-      ? ['road', 'housing', 'industry', 'power', 'lab', 'market', 'service']
+      ? ['road', 'housing', 'industry', 'power', 'market', 'service']
       : tab === 'oil'
         ? ['oilwell', 'oiltank', 'port']
         : tab === 'army'
-          ? ['barracks', 'training']
-          : ['factory', 'launcher', 'gun', 'sam', 'radar'];
+          ? ['barracks', 'vehiclebase', 'training', 'ammofactory']
+          : ['factory', 'launcher', 'silo', 'gun', 'sam', 'radar'];
   $('#build-list').innerHTML =
     keys
       .map((key) => {
-        const d = E.BUILDINGS[key],
-          locked = d?.tech && !state.sides[0].tech.includes(d.tech);
-        return `<button data-build="${key}" class="build-card ${tool === key ? 'selected' : ''} ${locked ? 'locked' : ''}" title="${escape(d?.description || 'Связанная дорожная сеть снабжает город. Кликните начало и конец или протяните мышью.')}" aria-label="${d?.name || 'Дорога'}">${icon(key)}<span>${short[key]}<small>${locked ? 'Исследование' : d ? `${d.cost} ₡ · ${d.metal} спл.` : '0,8 ₡ / м'}</small></span></button>`;
+        const d = E.BUILDINGS[key];
+        return `<button data-build="${key}" class="build-card ${tool === key ? 'selected' : ''}" title="${escape(d?.description || 'Связанная дорожная сеть снабжает город. Кликните начало и конец или протяните мышью.')}" aria-label="${d?.name || 'Дорога'}">${icon(key)}<span>${short[key]}<small>${d ? `${d.cost} ₡ · ${d.metal} спл.` : '0,8 ₡ / м'}</small></span></button>`;
       })
       .join('') +
     (tab === 'army'
@@ -583,15 +573,10 @@ function setTroopTarget(mode) {
     }[mode] || '') + ' · ПКМ / Esc — отмена';
 }
 function chooseBuild(key) {
+  const d = E.BUILDINGS[key];
   clearTroopTarget();
   clearArmySelection();
   $('#tool-note').classList.remove('warning');
-  const d = E.BUILDINGS[key];
-  if (d?.tech && !state.sides[0].tech.includes(d.tech)) {
-    openPanel('research');
-    toast('Сначала изучите технологию');
-    return;
-  }
   tool = tool === key ? null : key;
   if (tool) districtHUD.host.hidden = true;
   strike.model.aiming = false;
@@ -883,6 +868,19 @@ function stanceFor(mode, post) {
   return mode === 'attack' ? { mode: 'attack' } : { mode: 'defend', post };
 }
 async function recruitWithStance(key) {
+  if (recruitMode === 'defend') {
+    const target = E.armyCompositionStatus(state, 0).targets[key] || 0;
+    const epoch = campaignEpoch;
+    const result = await execute('army-target', { key, count: target + recruitCount });
+    if (epoch !== campaignEpoch) return;
+    if (typeof result === 'string') toast(result, true);
+    else {
+      persist();
+      updateLivePanel();
+      toast(`${E.GROUND_UNITS[key].name}: цель обороны ${target + recruitCount}`);
+    }
+    return;
+  }
   const revision = interactionRevision,
     stance = stanceFor(recruitMode, recruitPost),
     result = await execute('recruit', { key, count: recruitCount, stance });
@@ -1073,7 +1071,6 @@ function openPanel(name, force = false) {
 function renderPanel() {
   if (!panel) return;
   $('#panel').classList.toggle('army-panel', panel === 'army');
-  $('#panel').classList.toggle('tree-panel', panel === 'research');
   $('#panel').innerHTML = panelHTML({
     panel,
     weapon: strike.model.weapon,
@@ -1082,7 +1079,6 @@ function renderPanel() {
     state,
     armyCategory,
     recruitCount,
-    armyAutomation,
     recruitMode,
     recruitPost,
   });
@@ -1123,30 +1119,40 @@ function updateLivePanel() {
   const f = state.sides[0];
   if (panel === 'attack') {
     updateTargets();
+    const factories = state.buildings.filter(
+      (b) => b.side === 0 && b.key === 'factory' && b.hp > 0 && !b.demolished,
+    );
+    const facility = factories.some((b) => b.progress >= 1);
+    const factoryQueue = factories.reduce((n, b) => n + (b.queue?.length || 0), 0);
     for (const key of Object.keys(E.WEAPONS)) {
       const stock = $(`[data-stock="${key}"]`);
-      if (stock) stock.textContent = f.inventory[key];
+      if (stock) {
+        stock.textContent = E.weaponStock(state, 0, key);
+        stock.title = `Общий склад: ${f.inventory[key] || 0}. Всего включает площадки и груз в пути. Для пуска нужен местный запас.`;
+      }
       const row = $(`[data-row="${key}"]`);
       row?.classList.toggle('chosen', strike.model.weapon === key);
-      const d = E.WEAPONS[key],
-        locked = d.tech && !f.tech.includes(d.tech);
-      $(`[data-produce="${key}"]`).disabled = !!locked;
-      $(`[data-weapon="${key}"]`).disabled = !!locked;
+      const quote = E.purchaseQuote(state, 0, 'weapon', key);
+      $(`[data-produce="${key}"]`).disabled =
+        !!state.result ||
+        !facility ||
+        factoryQueue >= 24 ||
+        f.credits < quote.cost ||
+        f.materials < quote.metal ||
+        (f.oil || 0) < quote.oil;
+      $(`[data-weapon="${key}"]`).disabled = false;
     }
-    const factories = state.buildings.filter(
-      (b) => b.side === 0 && b.key === 'factory' && b.hp > 0,
-    );
     $('#queue-status').textContent = factories.length
       ? factories
           .map((b) =>
             b.progress < 1
-              ? 'Завод строится'
+              ? 'База дронов строится'
               : b.queue?.length
                 ? `${E.WEAPONS[b.queue[0].key].name}: ${Math.floor(b.queue[0].progress * 100)}% · в очереди ${b.queue.length}`
-                : 'Завод свободен',
+                : 'База дронов свободна',
           )
           .join(' · ')
-      : 'Для производства нужен сборочный завод';
+      : 'Для производства нужна база дронов';
     const error = E.launchStatus(
       state,
       0,
@@ -1167,7 +1173,6 @@ function updateLivePanel() {
   if (panel === 'army') {
     updateArmyRecruitment({ state, recruitCount, recruitMode });
   }
-  if (panel === 'research') updateTechTree(state, $('#panel'));
   if (panel === 'economy') {
     const e = E.economy(state, 0);
     $('#economy-values').innerHTML = [
@@ -1177,7 +1182,6 @@ function updateLivePanel() {
       ['В том числе армия', '−' + Math.round(e.armyUpkeep * 60) + ' ₡/мин'],
       ['Население', e.population],
       ['Сплавы', rate(e.materials) + '/мин'],
-      ['Наука', rate(e.science) + '/мин'],
       [
         'Жители / рабочие места',
         `${e.commute.homes} / ${e.commute.jobs} · на работу ездят ${e.commute.employed}`,
@@ -1197,7 +1201,7 @@ function updateLivePanel() {
       ['Районы под контролем / работают', `${e.districts.owned} / ${e.districts.active}`],
       [
         'Доход районов',
-        `${rate(e.districts.income)} ₡ · ${rate(e.districts.materials)} спл. · ${rate(e.districts.science)} науки / мин`,
+        `${rate(e.districts.income)} ₡ · ${rate(e.districts.materials)} спл. / мин`,
       ],
       ['Связаны со штабом', e.connected],
       ['Нет снабжения', e.isolated],
@@ -1228,11 +1232,9 @@ function updateLivePanel() {
         ? rate(o.income) + ' ₡'
         : o.materials
           ? rate(o.materials) + ' спл.'
-          : o.science
-            ? rate(o.science) + ' науки'
-            : o.powerUse < 0
-              ? Math.round(-o.powerUse * o.road * o.health) + ' МВт'
-              : '−' + Math.round(o.upkeep * 60) + ' ₡';
+          : o.powerUse < 0
+            ? Math.round(-o.powerUse * o.road * o.health) + ' МВт'
+            : '−' + Math.round(o.upkeep * 60) + ' ₡';
     }
   }
 }
@@ -1298,18 +1300,7 @@ const actionRouter = createActionRouter({
     cancelTool(true);
   },
 });
-actionRouter.register(
-  'auto-defense',
-  createAutoDefenseAction({
-    getSelection: () => armySelection,
-    getEpoch: () => campaignEpoch,
-    getRevision: () => interactionRevision,
-    execute,
-    persist,
-    renderInspector,
-    toast,
-  }),
-);
+
 bindPointerActivity({
   document,
   window,
@@ -1395,23 +1386,7 @@ document.addEventListener('click', async (ev) => {
       );
     updateLivePanel();
   }
-  if (d.action === 'repeat-toggle') {
-    const id = Number($('#repeat-site').value),
-      key = $('#repeat-key').value,
-      target = Number($('#repeat-target').value);
-    const current = E.recruitRepeatStatus(state, 0, id);
-    const result = await execute('repeat', {
-      id,
-      key,
-      target,
-      enabled: !(current?.enabled && current.key === key && current.target === target),
-    });
-    if (typeof result === 'string') toast(result, true);
-    else {
-      persist();
-      updateLivePanel();
-    }
-  }
+
   if (d.troop) troopCommand(d.troop);
   if (d.rally) {
     const site =
@@ -1447,15 +1422,6 @@ document.addEventListener('click', async (ev) => {
   else if (d.recruit) {
     beginDeployment(d.recruit);
   }
-  if (d.upgrade) {
-    const r = await execute('upgrade', { id: Number(d.upgrade) });
-    if (typeof r === 'string') toast(r, true);
-    else {
-      persist();
-      renderInspector();
-      toast('Установка модернизирована');
-    }
-  }
   if (d.salvo) {
     strike.model.count = Number(d.salvo);
     updateStrikeHUD();
@@ -1486,14 +1452,7 @@ document.addEventListener('click', async (ev) => {
       );
     }
   }
-  if (d.research) {
-    const r = await execute('research', { key: d.research });
-    if (typeof r === 'string') toast(r, true);
-    else {
-      persist();
-      updateLivePanel();
-    }
-  }
+
   if (d.serviceEnabled) {
     const epoch = campaignEpoch,
       revision = interactionRevision,
@@ -1505,6 +1464,16 @@ document.addEventListener('click', async (ev) => {
       persist();
       if (revision === interactionRevision) renderInspector();
     }
+  }
+  if (d.upgrade) {
+    const epoch = campaignEpoch,
+      revision = interactionRevision;
+    b.disabled = true;
+    const result = await execute('upgrade', { id: Number(d.upgrade) });
+    if (epoch !== campaignEpoch) return;
+    if (typeof result === 'string') toast(result, true);
+    else persist();
+    if (revision === interactionRevision) renderInspector();
   }
   if (d.repair) {
     const r = await execute('repair', { id: Number(d.repair) });
@@ -1548,6 +1517,35 @@ document.addEventListener('input', (ev) => {
   }
 });
 document.addEventListener('change', async (ev) => {
+  if (ev.target.dataset.armyTarget) {
+    const input = ev.target,
+      key = input.dataset.armyTarget;
+    const request = armyTargetRequest(key, input.value);
+    if (!request) {
+      toast('Цель состава — целое число от 0 до 120', true);
+      input.value = E.armyCompositionStatus(state, 0).targets[key] || 0;
+      return;
+    }
+    const epoch = campaignEpoch,
+      revision = interactionRevision;
+    const requestId = String((Number(input.dataset.requestId) || 0) + 1);
+    input.dataset.requestId = requestId;
+    input.dataset.pending = 'true';
+    const result = await execute('army-target', request);
+    if (input.dataset.requestId !== requestId) return;
+    delete input.dataset.pending;
+    if (epoch !== campaignEpoch) return;
+    if (typeof result !== 'string') persist();
+    if (revision !== interactionRevision || !input.isConnected) return;
+    const message = $('#composition-message');
+    if (typeof result === 'string') {
+      input.value = E.armyCompositionStatus(state, 0).targets[key] || 0;
+      if (message) message.textContent = result;
+      toast(result, true);
+    } else if (message)
+      message.textContent = `${E.GROUND_UNITS[key].name}: цель ${request.count}. Состав обновлён.`;
+    updateLivePanel();
+  }
   if (ev.target.id === 'factory-plan-site') {
     loadFactoryPlanFields(state);
     ev.target.dataset.loaded = ev.target.value;
@@ -1573,12 +1571,7 @@ document.addEventListener('change', async (ev) => {
     saveSettings();
   }
   if (ev.target.id === 'stance-post' && armySelection.length) setStance('defend');
-  if (['repeat-site', 'repeat-key', 'repeat-target'].includes(ev.target.id)) {
-    armyAutomation.siteId = Number($('#repeat-site').value);
-    armyAutomation.key = $('#repeat-key').value;
-    armyAutomation.target = Number($('#repeat-target').value);
-    updateLivePanel();
-  }
+
   if (ev.target.id === 'formation') {
     const result = await execute('formation', { value: ev.target.value });
     if (typeof result === 'string') toast(result, true);

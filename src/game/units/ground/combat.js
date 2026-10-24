@@ -12,16 +12,13 @@ import { groundDamageMultiplier, groundWeaponProfile } from './engagement.js';
 import { recordThreat } from './tactics.js';
 import { tryDown } from './rear.js';
 import { forgetObservedFrontlineTarget } from '../../defense/frontline.js';
+import { damageAmmoVehicle } from '../../city/ammo-vehicle-damage.js';
+import { AMMUNITION } from './ammunition.js';
 export function damageGround(s, u, amount, event = emit, kind = 'bullet', from = null) {
   if (u.hp <= 0 || u.carrierId || !Number.isFinite(amount) || amount <= 0) return;
   const c = isInfantry(u.key) ? coverInfo(s, u, from) : { cover: 0 };
   const cover = kind === 'blast' && c.kind === 'Стена' ? 0 : c.cover;
-  // Body armour stops part of small-arms fire, not blast or shell fragments.
-  const vest =
-    kind === 'bullet' && isInfantry(u.key) && s.sides[u.side]?.tech.includes('bodyArmor')
-      ? 0.85
-      : 1;
-  const hp = Math.max(0, u.hp - amount * vest * (1 - cover * (kind === 'blast' ? 0.4 : 1)));
+  const hp = Math.max(0, u.hp - amount * (1 - cover * (kind === 'blast' ? 0.4 : 1)));
   // Visibility must be captured while the victim is alive; corpses are removed before snapshots.
   const observedBy = hp === 0 ? [0, 1].filter((side) => groundVisible(s, side, u)) : [];
   const visibleTo =
@@ -129,6 +126,22 @@ export function impactGround(s, p, event = emit) {
         );
         if (before > u.hp) gainGroundExperience(s, p.source, before - u.hp, u.hp <= 0);
       }
+    }
+  if (splash)
+    for (const vehicle of (s.ammoVehicles || []).slice(0, AMMUNITION.fleetLimit * 2)) {
+      if (vehicle.side === p.side || vehicle.hp <= 0 || vehicle.status === 'destroyed') continue;
+      const dist = Math.hypot(vehicle.x - p.tx, vehicle.z - p.tz);
+      if (dist >= radius) continue;
+      const target = { id: vehicle.id, key: 'supplytruck', x: vehicle.x, z: vehicle.z };
+      if (!lineOfSight(s, artillery ? { x: p.tx, z: p.tz, id: p.source } : from, target)) continue;
+      const amount = damageAmmoVehicle(
+        s,
+        vehicle,
+        p.damage *
+          groundDamageMultiplier(p.shooterKey, target, p.kind) *
+          (1 - dist / (radius * (artillery ? 1.15 : 1.5))),
+      );
+      if (amount) gainGroundExperience(s, p.source, amount, vehicle.hp <= 0);
     }
   if (direct) {
     const before = direct.hp;

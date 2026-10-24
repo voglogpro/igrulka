@@ -13,7 +13,7 @@ function quiet() {
 for (const key of ['machinegunner', 'assault']) {
   test(`${key} keeps its actual shared magazine size after reloading`, () => {
     const s = quiet(),
-      u = E.makeGround(s, 0, key, -420, 0);
+      u = E.makeGround(s, 0, key, -820, 0);
     s.groundUnits.push(u);
     const expected = E.GROUND_UNITS[key].groundMagazine;
     assert.equal(u.groundAmmo, expected);
@@ -25,18 +25,17 @@ for (const key of ['machinegunner', 'assault']) {
 }
 
 for (const [key, expected] of [
-  ['infantry', 45],
-  ['machinegunner', 105],
-  ['assault', 54],
-  ['mog', 135],
+  ['infantry', E.GROUND_UNITS.infantry.groundMagazine],
+  ['machinegunner', E.GROUND_UNITS.machinegunner.groundMagazine],
+  ['assault', E.GROUND_UNITS.assault.groundMagazine],
+  ['mog', E.GROUND_UNITS.mog.groundMagazine],
 ]) {
-  test(`${key} recruits with its researched shared magazine and refills the same amount`, () => {
+  test(`${key} recruits with its configured shared magazine and refills the same amount`, () => {
     const s = quiet();
     s.mode = 'multiplayer';
     s.sides[0].credits = 10000;
     s.sides[0].materials = 1000;
-    s.sides[0].tech.push('magazines');
-    const b = E.build(s, 0, 'barracks', -680, -10);
+    const b = E.build(s, 0, 'barracks', -1080, -10);
     assert.notEqual(typeof b, 'string', b);
     b.progress = 1;
     b.hp = b.maxHp;
@@ -58,19 +57,18 @@ for (const [key, expected] of [
   });
 }
 
-test('researched shared magazines preserve the separate sniper, APC and AA-only weapon cycles', () => {
+test('configured shared magazines preserve the separate sniper, APC and AA-only weapon cycles', () => {
   const s = quiet();
   s.mode = 'multiplayer';
-  s.sides[0].tech.push('magazines');
-  const sniper = E.makeGround(s, 0, 'sniper', -430, 250);
-  const apc = E.makeGround(s, 0, 'apc', -450, 250);
-  const shilka = E.makeGround(s, 0, 'shilka', -470, 250);
+  const sniper = E.makeGround(s, 0, 'sniper', -830, 250);
+  const apc = E.makeGround(s, 0, 'apc', -850, 250);
+  const shilka = E.makeGround(s, 0, 'shilka', -870, 250);
   s.groundUnits.push(sniper, apc, shilka);
   assert.equal(sniper.groundAmmo, 5);
   assert.equal(apc.groundAmmo, 80);
   assert.equal(shilka.groundAmmo, 30);
   E.advance(s, 0.05);
-  assert.equal(shilka.ammo, 120);
+  assert.equal(shilka.ammo, E.GROUND_UNITS.shilka.magazine);
   sniper.groundAmmo = 0;
   apc.groundAmmo = 0;
   shilka.ammo = 0;
@@ -78,12 +76,12 @@ test('researched shared magazines preserve the separate sniper, APC and AA-only 
   assert.equal(sniper.groundAmmo, 5);
   assert.equal(apc.groundAmmo, 80);
   assert.equal(shilka.groundAmmo, 30);
-  assert.equal(shilka.ammo, 120);
+  assert.equal(shilka.ammo, E.GROUND_UNITS.shilka.magazine);
 });
 
 test('ground-only sniper cools down without needing an airborne target or an AA weapon', () => {
   const s = quiet(),
-    u = E.makeGround(s, 0, 'sniper', -420, 0);
+    u = E.makeGround(s, 0, 'sniper', -820, 0);
   s.groundUnits.push(u);
   u.heat = 1;
   E.advance(s, 6);
@@ -138,7 +136,7 @@ test('the last ground projectile step lands on its actual destination without ov
       domain: 'ground',
       kind: 'bullet',
       targetId: null,
-      x: -500,
+      x: -900,
       z: 100,
       y: 2,
       px: -500,
@@ -147,7 +145,7 @@ test('the last ground projectile step lands on its actual destination without ov
       vx: 270,
       vz: 0,
       vy: 0,
-      tx: -469,
+      tx: -869,
       tz: 100,
       damage: 4,
       flight: 31 / 270,

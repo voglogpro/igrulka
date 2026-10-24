@@ -15,7 +15,7 @@ function fresh() {
   }
   return s;
 }
-function guard(s, key = 'infantry', x = -430, z = 380, side = 0) {
+function guard(s, key = 'infantry', x = -830, z = 380, side = 0) {
   const u = E.makeGround(s, side, key, x, z);
   u.guard = { x, z };
   u.order = { x, z, mode: 'guard' };
@@ -27,7 +27,7 @@ function guard(s, key = 'infantry', x = -430, z = 380, side = 0) {
 test('ordinary guard and exact drawn defense lines dig without consenting to reserve movement', () => {
   const s = fresh(),
     a = guard(s),
-    b = guard(s, 'infantry', -390);
+    b = guard(s, 'infantry', -790);
   assert.equal(E.defendLineGround(s, 0, [a.id, b.id], a, b), 2);
   const posts = [a, b].map((u) => ({ ...u.guard }));
   E.advance(s, 13);
@@ -41,7 +41,7 @@ test('ordinary guard and exact drawn defense lines dig without consenting to res
 test('stationary positions advance through paid stages and an engineer builds twice as fast', () => {
   const s = fresh(),
     rifle = guard(s),
-    engineer = guard(s, 'engineer', -360);
+    engineer = guard(s, 'engineer', -760);
   E.advance(s, 7);
   assert.ok(s.trenches.find((t) => t.id === rifle.trenchId).progress < 1);
   assert.equal(E.fortificationStatus(s.trenches.find((t) => t.id === engineer.trenchId)).level, 1);
@@ -98,9 +98,9 @@ test('actual damage uses the strongest cover once and reinforced posts remain vu
       progress: 1,
       fortificationWork: work,
     });
-    damageGround(s, u, 100, undefined, 'bullet', { x: -200, z: u.z });
+    damageGround(s, u, 100, undefined, 'bullet', { x: -600, z: u.z });
     const bullet = 1000 - u.hp;
-    damageGround(s, u, 100, undefined, 'blast', { x: -200, z: u.z });
+    damageGround(s, u, 100, undefined, 'blast', { x: -600, z: u.z });
     const blast = 1000 - bullet - u.hp;
     assert.ok(blast > 60, 'blast must still cause most of its nominal damage');
     assert.ok(bullet >= 18 - 1e-8);
@@ -131,7 +131,7 @@ test('threat interrupts automatic earthworks so the defender can shoot and movin
   E.advance(s, 0.6);
   assert.equal(t.progress, stopped);
   assert.ok(s.events.some((e) => e.type === 'shot' && e.buildingId === u.id));
-  assert.equal(E.orderGround(s, 0, [u.id], { x: -500, z: 450 }), 1);
+  assert.equal(E.orderGround(s, 0, [u.id], { x: -900, z: 450 }), 1);
   E.advance(s, 5);
   assert.ok(Math.hypot(u.x - t.x, u.z - t.z) > 15);
   assert.equal(t.progress, stopped);

@@ -1,4 +1,6 @@
 import { trainRecruit } from './training.js';
+import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
+import { initializeAmmunition, reloadFromReserve } from './ammunition.js';
 import { fuelFactor } from '../../city/oil.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry, defenseStats, groundHeight } from '../../config.js';
 import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
@@ -78,20 +80,17 @@ export function tickUnit(s, u, dt, rates, hooks) {
   u.prevY = u.y;
   u.prevZ = u.z;
   u.suppression = Math.max(0, (u.suppression || 0) - dt * 0.09 * (2 - veteranSuppression(u)));
-  if (!d.range)
-    u.heat = Math.max(
-      0,
-      (u.heat || 0) -
-        (d.cooling || 0.12) * (s.sides[u.side].tech.includes('cooling') ? 1.5 : 1) * dt,
-    );
+  if (!d.range) u.heat = Math.max(0, (u.heat || 0) - (d.cooling || 0.12) * dt);
   u.groundCooldown = Math.max(0, (u.groundCooldown || 0) - dt);
   const aaMagazine = (foot || u.key === 'gun') && d.range ? defenseStats(s.sides[u.side], u) : null,
     maxMagazine = aaMagazine?.magazine || d.groundMagazine || 30;
+  initializeAmmunition(u);
   u.groundAmmo ??= maxMagazine;
-  if (u.groundReload > 0) {
+  if (d.groundRange && u.groundReload > 0) {
     u.groundReload = Math.max(0, u.groundReload - dt);
-    if (!u.groundReload) u.groundAmmo = maxMagazine;
-  } else if (!u.groundAmmo) u.groundReload = aaMagazine?.reload || d.groundReload || 3;
+    if (!u.groundReload) u.groundAmmo = reloadFromReserve(u, 'ground');
+  } else if (d.groundRange && !u.groundAmmo && u.ammoReserve > 0)
+    u.groundReload = aaMagazine?.reload || d.groundReload || 3;
   if (u.boardingId) {
     const v = index.get(u.boardingId);
     if (!(v?.hp > 0) || !GROUND_UNITS[v.key]) {
@@ -165,7 +164,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
     minRange = d.groundMinRange || 0,
     reach = (p) => {
       const range = Math.hypot(p.x - u.x, p.z - u.z);
-      return range <= d.groundRange && range >= minRange;
+      return range <= d.groundRange * equipmentModifiers(u).range && range >= minRange;
     };
   // Indirect fire lobs shells over buildings, so only direct weapons need a clear line.
   if (aim && ((!shot.indirect && !lineOfSight(s, u, aim)) || !reach(aim))) aim = null;
@@ -183,6 +182,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
       (1 + u.suppression * 2) *
       (1 + Math.pow(u.heat || 0, 2) * 2) *
       veteranAccuracy(u) *
+      equipmentModifiers(u).spread *
       weatherSpread(s),
     predicted = blind ? aim : groundAimPoint(u, aim, shot.speed, s),
     tx = predicted.x + (random(s) - 0.5) * spread,
@@ -195,12 +195,16 @@ export function tickUnit(s, u, dt, rates, hooks) {
     ground = groundHeight(u.x, u.z),
     originY = ground + (shot.indirect ? 6 : foot ? 2.6 : 4),
     arc = shot.indirect ? Math.min(150, length * 0.33) : 0,
-    loft = arc ? 0 : Math.min(14, (LOFT_GRAVITY * flight * flight) / 8),
+    // Even a close tank shot has a readable shallow curve; small-arms trajectories stay unchanged.
+    loft = arc
+      ? 0
+      : Math.min(
+          shot.id === 'cannon' ? 10 : 14,
+          Math.max(shot.id === 'cannon' ? 0.7 : 0, (LOFT_GRAVITY * flight * flight) / 8),
+        ),
     endY = groundHeight(tx, tz) + (arc ? 2 : 2.4),
     cost = shot.cost,
     f = s.sides[u.side];
-  if (f.credits < cost) return;
-  f.credits -= cost;
   f.spentAmmo += cost;
   // Automatic weapons fire in bursts; the pause keeps the configured average rate of fire.
   let cooldown = d.groundCooldown;
@@ -211,7 +215,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
       ? d.groundBurstGap
       : d.groundCooldown * d.groundBurst - d.groundBurstGap * (d.groundBurst - 1);
   }
-  u.groundCooldown = cooldown * (1 + u.suppression);
+  u.groundCooldown = (cooldown * (1 + u.suppression)) / equipmentModifiers(u).rate;
   u.groundAmmo--;
   if (d.heatPerShot) u.heat = Math.min(1.5, (u.heat || 0) + d.heatPerShot);
   u.targetX = tx;
@@ -278,13 +282,18 @@ export function updateGround(s, rates, dt, hooks) {
     s.contacts[side] = s.contacts[side].filter((c) => c.expires > s.time);
   updateRecruitRepeat(s);
   for (const b of s.buildings)
-    if (b.key === 'barracks' && b.hp > 0 && b.progress >= 1 && b.armyQueue?.length) {
+    if (
+      ['barracks', 'vehiclebase'].includes(b.key) &&
+      b.hp > 0 &&
+      b.progress >= 1 &&
+      b.armyQueue?.length
+    ) {
       const q = b.armyQueue[0],
         d = GROUND_UNITS[q.key];
       q.progress +=
         (dt *
           rates[b.side].productivity *
-          (buildingConnected(s, b, BUILDINGS.barracks.size) ? 1 : 0.2)) /
+          (buildingConnected(s, b, BUILDINGS[b.key].size) ? 1 : 0.2)) /
         d.time;
       if (
         q.progress >= 1 &&

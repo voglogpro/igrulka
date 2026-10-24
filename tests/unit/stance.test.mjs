@@ -9,13 +9,12 @@ function fresh() {
   for (const f of s.sides) {
     f.credits = 1e6;
     f.materials = 1e6;
-    f.tech = Object.keys(E.TECH);
   }
   s.buildings.push({
     id: s.nextId++,
     key: 'barracks',
     side: 0,
-    x: -560,
+    x: -960,
     z: 60,
     hp: 700,
     maxHp: 700,
@@ -42,8 +41,8 @@ test('recruits with a defend stance walk to a bridge, hold the post and dig in',
 
 test('automatic bridge choice balances defenders and attack stance heads for the enemy base', () => {
   const s = fresh();
-  const a = E.makeGround(s, 0, 'infantry', -500, 0),
-    b = E.makeGround(s, 0, 'infantry', -500, 12);
+  const a = E.makeGround(s, 0, 'infantry', -900, 0),
+    b = E.makeGround(s, 0, 'infantry', -900, 12);
   s.groundUnits.push(a, b);
   assert.equal(typeof E.applyStance(s, 0, [a.id], { mode: 'defend', post: 'north' }), 'number');
   assert.equal(E.chooseBridge(s, 0), 'south');
@@ -51,13 +50,13 @@ test('automatic bridge choice balances defenders and attack stance heads for the
   assert.equal(b.order.mode, 'attackmove');
   assert.equal(b.stance.mode, 'attack');
   // A manual order replaces the stance.
-  E.orderGround(s, 0, [b.id], { x: -300, z: 0 });
+  E.orderGround(s, 0, [b.id], { x: -700, z: 0 });
   assert.equal(b.stance, null);
 });
 
 test('network commands validate stances and save/load keeps them', () => {
   const s = fresh();
-  const u = E.makeGround(s, 0, 'infantry', -500, 0);
+  const u = E.makeGround(s, 0, 'infantry', -900, 0);
   s.groundUnits.push(u);
   assert.equal(
     typeof executeCommand(s, 0, 'set-stance', { ids: [u.id], stance: { mode: 'x' } }),

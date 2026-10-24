@@ -146,6 +146,9 @@ export function playerView(authority, side) {
         ? t
         : publicFields(t, ['id', 'side', 'x', 'z', 'yaw', 'progress', 'fortificationWork']),
     );
+  view.groundScars = (view.groundScars || []).filter(
+    (scar) => scar.side === side || fogVisible(authority, side, scar.x, scar.z),
+  );
   view.frontlineMemory = [0, 1].map((owner) => {
     const memory = authority.frontlineMemory?.[owner];
     return owner === side && memory
@@ -172,6 +175,14 @@ export function playerView(authority, side) {
   view.serviceVehicles = (view.serviceVehicles || []).map((v) =>
     v.side === side ? v : publicFields(v, serviceFields),
   );
+  view.ammoVehicles = (view.ammoVehicles || [])
+    .filter((v) => v.side === side || fogVisible(authority, side, v.x, v.z))
+    .map((v) =>
+      v.side === side
+        ? v
+        : publicFields(v, ['id', 'side', 'depotId', 'x', 'y', 'z', 'yaw', 'status', 'hp', 'maxHp']),
+    );
+  delete view.ammoLogisticsAt;
   view.ships = (view.ships || []).map((v) => (v.side === side ? v : publicFields(v, shipFields)));
   view.projectiles = view.projectiles
     .filter((p) => {
@@ -263,9 +274,11 @@ export function playerView(authority, side) {
     'units',
     'groundUnits',
     'serviceVehicles',
+    'ammoVehicles',
     'ships',
     'projectiles',
     'trenches',
+    'groundScars',
     'events',
   ])
     for (const item of view[list] || [])

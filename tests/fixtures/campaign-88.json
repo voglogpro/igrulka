@@ -1,0 +1,1136 @@
+{
+  "version": 14,
+  "difficulty": "hard",
+  "time": 101.04999999999994,
+  "seed": 88089,
+  "weather": {
+    "kind": "clear",
+    "amount": 0,
+    "goal": 0,
+    "until": 159,
+    "next": "rain",
+    "visibility": 0.74,
+    "spread": 1,
+    "speed": 1,
+    "strikeAt": 0
+  },
+  "rules": {
+    "rear": true,
+    "oil": true
+  },
+  "rng": 371668854,
+  "nextId": 41,
+  "networkRevision": 17,
+  "sides": [
+    {
+      "credits": 16666.887000000002,
+      "materials": 1833.8899999999983,
+      "science": 1936.049999999999,
+      "tech": [
+        "autocannon",
+        "missileDefense",
+        "abm",
+        "efficiency",
+        "targeting",
+        "cooling",
+        "magazines",
+        "propulsion",
+        "airframes",
+        "payload",
+        "mobileAA",
+        "lightArmor",
+        "armor",
+        "heavyArmor",
+        "composite",
+        "artillery",
+        "rocketArtillery",
+        "bodyArmor",
+        "fpvTeams"
+      ],
+      "research": {
+        "key": "heavy",
+        "progress": 0.02625
+      },
+      "researchQueue": [],
+      "purchases": {
+        "building": {
+          "power": 1,
+          "industry": 1,
+          "factory": 1,
+          "barracks": 1,
+          "lab": 1,
+          "launcher": 1,
+          "port": 1
+        }
+      },
+      "inventory": {
+        "drone": 4,
+        "heavy": 0,
+        "cruise": 0,
+        "ballistic": 0
+      },
+      "spentAmmo": 0,
+      "rearAuto": true,
+      "oil": 199.97000000000014,
+      "kills": 0,
+      "losses": 0,
+      "oilRate": -0.03
+    },
+    {
+      "credits": 20001.890000000003,
+      "materials": 2000,
+      "science": 2000,
+      "tech": [],
+      "research": null,
+      "researchQueue": [],
+      "purchases": {
+        "building": {}
+      },
+      "inventory": {
+        "drone": 0,
+        "heavy": 0,
+        "cruise": 0,
+        "ballistic": 0
+      },
+      "spentAmmo": 0,
+      "rearAuto": true,
+      "oil": 200,
+      "kills": 0,
+      "losses": 0,
+      "oilRate": 0
+    }
+  ],
+  "buildings": [
+    {
+      "id": 1,
+      "side": 0,
+      "key": "hq",
+      "x": -615,
+      "z": 0,
+      "hp": 1100,
+      "maxHp": 1100,
+      "progress": 1,
+      "rotation": 0,
+      "cooldown": 0,
+      "launchCooldown": 0
+    },
+    {
+      "id": 2,
+      "side": 1,
+      "key": "hq",
+      "x": 615,
+      "z": 0,
+      "hp": 1100,
+      "maxHp": 1100,
+      "progress": 1,
+      "rotation": 3.141592653589793,
+      "cooldown": 0,
+      "launchCooldown": 0
+    },
+    {
+      "id": 9,
+      "side": 0,
+      "key": "power",
+      "x": -670,
+      "z": -80,
+      "rotation": 0,
+      "hp": 250,
+      "maxHp": 250,
+      "progress": 1,
+      "cooldown": 0,
+      "queue": [],
+      "roadLink": 10,
+      "launchCooldown": 0
+    },
+    {
+      "id": 12,
+      "side": 0,
+      "key": "industry",
+      "x": -560,
+      "z": -80,
+      "rotation": 0,
+      "hp": 320,
+      "maxHp": 320,
+      "progress": 1,
+      "cooldown": 0,
+      "queue": [],
+      "roadLink": 13,
+      "launchCooldown": 0
+    },
+    {
+      "id": 15,
+      "side": 0,
+      "key": "factory",
+      "x": -680,
+      "z": -10,
+      "rotation": 3.141592653589793,
+      "hp": 380,
+      "maxHp": 380,
+      "progress": 1,
+      "cooldown": 0,
+      "queue": [
+        {
+          "key": "drone",
+          "progress": 0.08749999999999997
+        }
+      ],
+      "roadLink": 16,
+      "launchCooldown": 0
+    },
+    {
+      "id": 18,
+      "side": 0,
+      "key": "barracks",
+      "x": -550,
+      "z": -10,
+      "rotation": 3.141592653589793,
+      "hp": 360,
+      "maxHp": 360,
+      "progress": 1,
+      "cooldown": 0,
+      "queue": [],
+      "roadLink": 19,
+      "armyQueue": [
+        {
+          "key": "leopard",
+          "progress": 0.030882352941176472
+        }
+      ],
+      "recruitRepeat": {
+        "enabled": true,
+        "key": "infantry",
+        "target": 12,
+        "reserves": {
+          "credits": 250,
+          "materials": 5,
+          "oil": 5
+        },
+        "nextAt": 104.05
+      },
+      "launchCooldown": 0
+    },
+    {
+      "id": 24,
+      "side": 0,
+      "key": "lab",
+      "x": -760,
+      "z": -80,
+      "rotation": 0,
+      "hp": 240,
+      "maxHp": 240,
+      "progress": 1,
+      "cooldown": 0,
+      "queue": [],
+      "roadLink": 25,
+      "launchCooldown": 0
+    },
+    {
+      "id": 28,
+      "side": 0,
+      "key": "launcher",
+      "x": -450,
+      "z": 200,
+      "rotation": 0,
+      "hp": 260,
+      "maxHp": 260,
+      "progress": 1,
+      "cooldown": 0,
+      "queue": [],
+      "nextLaunchAt": 103.5,
+      "launchCooldown": 0
+    },
+    {
+      "id": 36,
+      "side": 0,
+      "key": "port",
+      "x": -234,
+      "z": -20,
+      "rotation": -1.5707963267948966,
+      "hp": 420,
+      "maxHp": 420,
+      "progress": 1,
+      "cooldown": 0,
+      "queue": [],
+      "roadLink": 37,
+      "launchCooldown": 0
+    }
+  ],
+  "roads": [
+    {
+      "id": 3,
+      "side": 0,
+      "ax": -705,
+      "az": -45,
+      "bx": -645,
+      "bz": -45,
+      "hp": 120,
+      "maxHp": 120,
+      "camp": true
+    },
+    {
+      "id": 4,
+      "side": 0,
+      "ax": -645,
+      "az": -45,
+      "bx": -585,
+      "bz": -45,
+      "hp": 120,
+      "maxHp": 120,
+      "camp": true
+    },
+    {
+      "id": 5,
+      "side": 0,
+      "ax": -585,
+      "az": -45,
+      "bx": -525,
+      "bz": -45,
+      "hp": 120,
+      "maxHp": 120,
+      "camp": true
+    },
+    {
+      "id": 6,
+      "side": 1,
+      "ax": 525,
+      "az": -45,
+      "bx": 585,
+      "bz": -45,
+      "hp": 120,
+      "maxHp": 120,
+      "camp": true
+    },
+    {
+      "id": 7,
+      "side": 1,
+      "ax": 585,
+      "az": -45,
+      "bx": 645,
+      "bz": -45,
+      "hp": 120,
+      "maxHp": 120,
+      "camp": true
+    },
+    {
+      "id": 8,
+      "side": 1,
+      "ax": 645,
+      "az": -45,
+      "bx": 705,
+      "bz": -45,
+      "hp": 120,
+      "maxHp": 120,
+      "camp": true
+    },
+    {
+      "id": 10,
+      "side": 0,
+      "ax": -670,
+      "az": -45,
+      "bx": -670,
+      "bz": -65.5,
+      "hp": 120,
+      "maxHp": 120,
+      "connectorTo": 9
+    },
+    {
+      "id": 13,
+      "side": 0,
+      "ax": -560,
+      "az": -45,
+      "bx": -560,
+      "bz": -63,
+      "hp": 120,
+      "maxHp": 120,
+      "connectorTo": 12
+    },
+    {
+      "id": 16,
+      "side": 0,
+      "ax": -680,
+      "az": -45,
+      "bx": -680,
+      "bz": -28.5,
+      "hp": 120,
+      "maxHp": 120,
+      "connectorTo": 15
+    },
+    {
+      "id": 19,
+      "side": 0,
+      "ax": -550,
+      "az": -45,
+      "bx": -550,
+      "bz": -27.5,
+      "hp": 120,
+      "maxHp": 120,
+      "connectorTo": 18
+    },
+    {
+      "id": 21,
+      "side": 0,
+      "ax": -705,
+      "az": -45,
+      "bx": -752.5,
+      "bz": -45,
+      "hp": 120,
+      "maxHp": 120
+    },
+    {
+      "id": 22,
+      "side": 0,
+      "ax": -752.5,
+      "az": -45,
+      "bx": -800,
+      "bz": -45,
+      "hp": 120,
+      "maxHp": 120
+    },
+    {
+      "id": 25,
+      "side": 0,
+      "ax": -760,
+      "az": -45,
+      "bx": -760,
+      "bz": -65,
+      "hp": 120,
+      "maxHp": 120,
+      "connectorTo": 24
+    },
+    {
+      "id": 32,
+      "side": 0,
+      "ax": -525,
+      "az": -45,
+      "bx": -438,
+      "bz": -36.66666666666667,
+      "hp": 120,
+      "maxHp": 120
+    },
+    {
+      "id": 33,
+      "side": 0,
+      "ax": -438,
+      "az": -36.66666666666667,
+      "bx": -351,
+      "bz": -28.333333333333336,
+      "hp": 120,
+      "maxHp": 120
+    },
+    {
+      "id": 34,
+      "side": 0,
+      "ax": -351,
+      "az": -28.333333333333336,
+      "bx": -264,
+      "bz": -20,
+      "hp": 120,
+      "maxHp": 120
+    },
+    {
+      "id": 37,
+      "side": 0,
+      "ax": -264,
+      "az": -20,
+      "bx": -252,
+      "bz": -20,
+      "hp": 120,
+      "maxHp": 120,
+      "connectorTo": 36
+    }
+  ],
+  "serviceVehicles": [],
+  "ships": [
+    {
+      "id": 39,
+      "side": 0,
+      "portId": 36,
+      "x": -174.21796061575586,
+      "z": -14.890423984252656,
+      "yaw": 0,
+      "state": "outbound",
+      "wait": 0,
+      "path": [
+        {
+          "x": -134.1089803078779,
+          "z": -7.945211992126328
+        },
+        {
+          "x": -94,
+          "z": -1
+        }
+      ],
+      "cargo": null
+    }
+  ],
+  "frontlineMemory": [
+    {
+      "nextThink": 101.05,
+      "nextReinforce": 0,
+      "seen": []
+    },
+    {
+      "nextThink": 101.05,
+      "nextReinforce": 0,
+      "seen": []
+    }
+  ],
+  "units": [
+    {
+      "id": 30,
+      "side": 0,
+      "key": "ballistic",
+      "sourceId": 28,
+      "status": "flying",
+      "route": [
+        {
+          "x": -450,
+          "z": 200,
+          "d": 0
+        },
+        {
+          "x": 615,
+          "z": 0,
+          "d": 1083.616629625072
+        }
+      ],
+      "speed": 108,
+      "damage": 744,
+      "x": -338.5482220388345,
+      "z": 179.07008864579052,
+      "y": 80.87577294278333,
+      "prevX": -343.8554495607948,
+      "prevY": 77.38461055987325,
+      "prevZ": 180.06675109122907,
+      "vx": 106.14455043920543,
+      "vy": 69.82324765820152,
+      "vz": -19.933248908770906,
+      "startX": -450,
+      "startZ": 200,
+      "targetId": null,
+      "targetKind": "point",
+      "tx": 615,
+      "tz": 0,
+      "hp": 195,
+      "maxHp": 195,
+      "travelled": 113.4,
+      "total": 1083.616629625072,
+      "delay": 0,
+      "phase": 2.3560910000279547,
+      "launched": true
+    }
+  ],
+  "groundUnits": [
+    {
+      "id": 27,
+      "side": 0,
+      "key": "leopard",
+      "x": -834.3228050776868,
+      "z": 246.20095043148802,
+      "y": 1,
+      "hp": 487.79999999999995,
+      "maxHp": 813,
+      "progress": 1,
+      "cooldown": 0,
+      "groundCooldown": 0,
+      "groundAmmo": 30,
+      "groundReload": 0,
+      "heat": 0,
+      "level": 0,
+      "xp": 0,
+      "path": [
+        {
+          "x": -816,
+          "z": 264
+        },
+        {
+          "x": -792,
+          "z": 288
+        },
+        {
+          "x": -768,
+          "z": 312
+        },
+        {
+          "x": -744,
+          "z": 336
+        },
+        {
+          "x": -720,
+          "z": 360
+        },
+        {
+          "x": -696,
+          "z": 384
+        },
+        {
+          "x": -672,
+          "z": 408
+        },
+        {
+          "x": -648,
+          "z": 432
+        },
+        {
+          "x": -624,
+          "z": 456
+        },
+        {
+          "x": -600,
+          "z": 480
+        },
+        {
+          "x": -576,
+          "z": 504
+        },
+        {
+          "x": -552,
+          "z": 528
+        },
+        {
+          "x": -528,
+          "z": 552
+        },
+        {
+          "x": -504,
+          "z": 576
+        },
+        {
+          "x": -480,
+          "z": 600
+        },
+        {
+          "x": -456,
+          "z": 624
+        },
+        {
+          "x": -432,
+          "z": 648
+        },
+        {
+          "x": -408,
+          "z": 672
+        },
+        {
+          "x": -384,
+          "z": 696
+        },
+        {
+          "x": -360,
+          "z": 720
+        },
+        {
+          "x": -336,
+          "z": 744
+        },
+        {
+          "x": -312,
+          "z": 768
+        },
+        {
+          "x": -288,
+          "z": 792
+        },
+        {
+          "x": -264,
+          "z": 816
+        },
+        {
+          "x": -264,
+          "z": 840
+        },
+        {
+          "x": -264,
+          "z": 864
+        },
+        {
+          "x": -264,
+          "z": 888
+        },
+        {
+          "x": -264,
+          "z": 912
+        },
+        {
+          "x": -264,
+          "z": 936
+        },
+        {
+          "x": -264,
+          "z": 960
+        },
+        {
+          "x": -264,
+          "z": 984
+        },
+        {
+          "x": -264,
+          "z": 1008
+        },
+        {
+          "x": -264,
+          "z": 1032
+        },
+        {
+          "x": -264,
+          "z": 1056
+        },
+        {
+          "x": -240,
+          "z": 1080
+        },
+        {
+          "x": -240,
+          "z": 1104
+        },
+        {
+          "x": -216,
+          "z": 1104
+        },
+        {
+          "x": -192,
+          "z": 1128
+        },
+        {
+          "x": -168,
+          "z": 1152
+        },
+        {
+          "x": -144,
+          "z": 1176
+        },
+        {
+          "x": -120,
+          "z": 1176
+        },
+        {
+          "x": -96,
+          "z": 1176
+        },
+        {
+          "x": -72,
+          "z": 1176
+        },
+        {
+          "x": -48,
+          "z": 1176
+        },
+        {
+          "x": -24,
+          "z": 1176
+        },
+        {
+          "x": 0,
+          "z": 1176
+        },
+        {
+          "x": 24,
+          "z": 1176
+        },
+        {
+          "x": 48,
+          "z": 1176
+        },
+        {
+          "x": 72,
+          "z": 1176
+        },
+        {
+          "x": 96,
+          "z": 1176
+        },
+        {
+          "x": 120,
+          "z": 1176
+        },
+        {
+          "x": 144,
+          "z": 1176
+        },
+        {
+          "x": 168,
+          "z": 1176
+        },
+        {
+          "x": 192,
+          "z": 1152
+        },
+        {
+          "x": 216,
+          "z": 1128
+        },
+        {
+          "x": 240,
+          "z": 1104
+        },
+        {
+          "x": 264,
+          "z": 1080
+        },
+        {
+          "x": 288,
+          "z": 1056
+        },
+        {
+          "x": 312,
+          "z": 1032
+        },
+        {
+          "x": 336,
+          "z": 1008
+        },
+        {
+          "x": 360,
+          "z": 984
+        },
+        {
+          "x": 360,
+          "z": 960
+        },
+        {
+          "x": 360,
+          "z": 936
+        },
+        {
+          "x": 360,
+          "z": 912
+        },
+        {
+          "x": 360,
+          "z": 888
+        },
+        {
+          "x": 360,
+          "z": 864
+        },
+        {
+          "x": 360,
+          "z": 840
+        },
+        {
+          "x": 360,
+          "z": 816
+        },
+        {
+          "x": 360,
+          "z": 792
+        },
+        {
+          "x": 360,
+          "z": 768
+        },
+        {
+          "x": 384,
+          "z": 744
+        },
+        {
+          "x": 408,
+          "z": 720
+        },
+        {
+          "x": 432,
+          "z": 696
+        },
+        {
+          "x": 456,
+          "z": 672
+        },
+        {
+          "x": 480,
+          "z": 648
+        },
+        {
+          "x": 504,
+          "z": 624
+        },
+        {
+          "x": 528,
+          "z": 600
+        },
+        {
+          "x": 552,
+          "z": 576
+        },
+        {
+          "x": 576,
+          "z": 552
+        },
+        {
+          "x": 600,
+          "z": 528
+        },
+        {
+          "x": 624,
+          "z": 504
+        },
+        {
+          "x": 648,
+          "z": 480
+        },
+        {
+          "x": 672,
+          "z": 456
+        },
+        {
+          "x": 696,
+          "z": 432
+        },
+        {
+          "x": 720,
+          "z": 408
+        },
+        {
+          "x": 744,
+          "z": 384
+        },
+        {
+          "x": 768,
+          "z": 360
+        },
+        {
+          "x": 792,
+          "z": 336
+        },
+        {
+          "x": 816,
+          "z": 312
+        },
+        {
+          "x": 816,
+          "z": 288
+        },
+        {
+          "x": 816,
+          "z": 264
+        },
+        {
+          "x": 840,
+          "z": 240
+        },
+        {
+          "x": 850,
+          "z": 250
+        }
+      ],
+      "order": {
+        "x": 850,
+        "z": 250,
+        "targetId": null,
+        "mode": "move"
+      },
+      "yaw": 0.7998968322503479,
+      "suppression": 0,
+      "autoDefense": false,
+      "defenseTask": null,
+      "defensePost": null,
+      "defenseCapture": null,
+      "defenseReadyAt": 0,
+      "fpvAmmo": 0,
+      "civil": false,
+      "aiDefender": false,
+      "routeQueue": [],
+      "routeState": null,
+      "guard": null,
+      "guardTargetId": null,
+      "stance": null,
+      "targetId": null,
+      "digging": false,
+      "trenchId": null,
+      "boardingId": null,
+      "navRevision": 13,
+      "prevX": -835.0759534975764,
+      "prevY": 1,
+      "prevZ": 245.46933068215247,
+      "enemyId": null,
+      "nextThink": 101.20399999999995,
+      "moving": true
+    }
+  ],
+  "trenches": [],
+  "districts": [
+    {
+      "id": "north-depot",
+      "owner": null,
+      "control": 0,
+      "capturing": null,
+      "contested": false,
+      "blocked": false,
+      "hp": 360,
+      "repairing": false
+    },
+    {
+      "id": "north-relay",
+      "owner": null,
+      "control": 0,
+      "capturing": null,
+      "contested": false,
+      "blocked": false,
+      "hp": 300,
+      "repairing": false
+    },
+    {
+      "id": "south-relay",
+      "owner": null,
+      "control": 0,
+      "capturing": null,
+      "contested": false,
+      "blocked": false,
+      "hp": 300,
+      "repairing": false
+    },
+    {
+      "id": "south-depot",
+      "owner": null,
+      "control": 0,
+      "capturing": null,
+      "contested": false,
+      "blocked": false,
+      "hp": 360,
+      "repairing": false
+    }
+  ],
+  "contacts": [
+    [],
+    [
+      {
+        "unitId": -30,
+        "x": -469.57172674359754,
+        "z": 162.78823086526245,
+        "radius": 55,
+        "expires": 109.05,
+        "time": 100.05
+      }
+    ]
+  ],
+  "groups": [{}, {}],
+  "formations": ["line", "line"],
+  "projectiles": [],
+  "events": [
+    {
+      "id": 11,
+      "type": "build",
+      "time": 100,
+      "x": -670,
+      "z": -80,
+      "side": 0
+    },
+    {
+      "id": 14,
+      "type": "build",
+      "time": 100,
+      "x": -560,
+      "z": -80,
+      "side": 0
+    },
+    {
+      "id": 17,
+      "type": "build",
+      "time": 100,
+      "x": -680,
+      "z": -10,
+      "side": 0
+    },
+    {
+      "id": 20,
+      "type": "build",
+      "time": 100,
+      "x": -550,
+      "z": -10,
+      "side": 0
+    },
+    {
+      "id": 23,
+      "type": "build",
+      "time": 100,
+      "x": -800,
+      "z": -45,
+      "side": 0
+    },
+    {
+      "id": 26,
+      "type": "build",
+      "time": 100,
+      "x": -760,
+      "z": -80,
+      "side": 0
+    },
+    {
+      "id": 29,
+      "type": "build",
+      "time": 100,
+      "x": -450,
+      "z": 200,
+      "side": 0
+    },
+    {
+      "id": 31,
+      "type": "salvo",
+      "time": 100,
+      "side": 0,
+      "key": "ballistic",
+      "count": 1,
+      "x": -450,
+      "z": 200
+    },
+    {
+      "id": 35,
+      "type": "build",
+      "time": 100,
+      "x": -264,
+      "z": -20,
+      "side": 0
+    },
+    {
+      "id": 38,
+      "type": "build",
+      "time": 100,
+      "x": -234,
+      "z": -20,
+      "side": 0
+    },
+    {
+      "id": 40,
+      "type": "launch",
+      "time": 100.05,
+      "side": 0,
+      "key": "ballistic",
+      "x": -450,
+      "y": 5,
+      "z": 200,
+      "sourceId": 28
+    }
+  ],
+  "log": [
+    {
+      "time": 100,
+      "text": "Баллистическая ракета ×1 · площадка #28 → 615, 0"
+    },
+    {
+      "time": 0,
+      "text": "Развёртывание. Стройте экономику вдоль подъездной улицы штаба."
+    }
+  ],
+  "ai": {
+    "nextBuild": 7,
+    "nextAttack": 170,
+    "nextResearch": 65,
+    "roadPlan": 0
+  },
+  "result": null,
+  "stats": {
+    "shots": 0,
+    "hits": 0,
+    "misses": 0,
+    "interceptions": 0,
+    "impacts": 0,
+    "roadsCut": 0,
+    "crashes": 0,
+    "airbursts": 0,
+    "districtsCaptured": 0,
+    "districtsDestroyed": 0,
+    "trades": 0
+  },
+  "mode": "multiplayer",
+  "rearNext": 106.05,
+  "tradeNext": 103.05
+}

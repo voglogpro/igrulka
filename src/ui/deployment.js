@@ -13,17 +13,14 @@ export function updateDeploymentHUD(state, key, count, plan) {
   host.hidden = !key;
   if (!key) return;
   const d = E.GROUND_UNITS[key];
-  const signature = key + ':' + count + ':' + state.sides[0].tech.join(',');
+  const signature = key + ':' + count;
   if (host.dataset.signature !== signature) {
     host.dataset.signature = signature;
     host.innerHTML = `<div class="deployment-top"><span>ПОПОЛНЕНИЕ</span><button data-action="cancel-deploy" aria-label="Отменить отправку">×</button></div><select id="deployment-key" aria-label="Тип пополнения">${Object.entries(
       E.GROUND_UNITS,
     )
       .filter(([, t]) => !t.civil)
-      .map(
-        ([k, t]) =>
-          `<option value="${k}" ${key === k ? 'selected' : ''} ${t.tech && !state.sides[0].tech.includes(t.tech) ? 'disabled' : ''}>${t.name}</option>`,
-      )
+      .map(([k, t]) => `<option value="${k}" ${key === k ? 'selected' : ''}>${t.name}</option>`)
       .join(
         '',
       )}</select><div class="deployment-count"><button data-deploy-count="1" class="${count === 1 ? 'active' : ''}">×1</button><button data-deploy-count="5" class="${count === 5 ? 'active' : ''}">×5</button><span>${d.cost * count} ₡ · ${d.metal * count} спл.</span></div><p id="deployment-note"></p><small>ЛКМ — назначить точку · ПКМ — отменить</small>`;
@@ -93,7 +90,7 @@ export function renderSquadRoster(state, selection) {
     if (chosen.has(u.id)) role.active++;
   }
   for (const b of state.buildings)
-    if (b.side === 0 && b.key === 'barracks' && b.hp > 0 && !b.demolished)
+    if (b.side === 0 && ['barracks', 'vehiclebase'].includes(b.key) && b.hp > 0 && !b.demolished)
       for (const q of b.armyQueue || []) {
         if (!roles.has(q.key)) roles.set(q.key, { key: q.key, count: 0, active: 0, queued: 0 });
         roles.get(q.key).queued++;

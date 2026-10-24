@@ -11,11 +11,11 @@ with sync_playwright() as p:
     page.on('console', lambda e: report['consoleErrors'].append(e.text[:2000]) if e.type == 'error' else None)
     page.goto((ROOT/'play/Skyfront.html').as_uri(), wait_until='load', timeout=120000)
     page.wait_for_function('Boolean(window.skyfront)')
-    old = page.evaluate('''()=>{const E=skyfront.engine,s=E.createGame(82);s.version=8;delete s.districts;s.time=60;s.sides[0].credits=1234;const u=E.makeGround(s,0,'infantry',-480,-70);s.groundUnits.push(u);return E.save(s);}''')
+    old = page.evaluate("()=>{const E=skyfront.engine,s=E.createGame(82);s.version=8;delete s.districts;s.time=60;s.sides[0].credits=1234;const u=E.makeGround(s,0,'infantry',-480,-70);s.groundUnits.push(u);return E.save(s);}")
     page.evaluate('raw=>localStorage.setItem("skyfront-realtime-v3",raw)', old)
     page.reload(wait_until='load', timeout=120000)
     page.wait_for_function('Boolean(window.skyfront)')
-    assert page.evaluate('skyfront.getState().version') == 12
+    assert page.evaluate('skyfront.getState().version === skyfront.engine.VERSION')
     assert page.evaluate('skyfront.getState().groundUnits.length') == 1
     assert page.evaluate('skyfront.getState().sides[0].credits') == 1234
     assert page.evaluate('skyfront.getState().time') == 60
@@ -61,12 +61,12 @@ with sync_playwright() as p:
     page.wait_for_function('document.querySelector("[data-district-repair=north-depot]").hidden')
     print('District destruction removes income, ruins render, and real repair clicks spend resources until completion', flush=True)
 
-    carrier = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld();const u=E.makeGround(w.state,0,'apc',-500,-70);u.holdFire=true;w.state.groundUnits.push(u);const ids=[];for(let i=0;i<3;i++){const p=E.makeGround(w.state,0,'infantry',u.x,u.z);p.carrierId=u.id;p.holdFire=true;w.state.groundUnits.push(p);ids.push(p.id);}w.focus(-460,-100,240);w.controls.update(3);w.sync();skyfront.selectArmy([u.id]);return{id:u.id,passengers:ids};}''')
+    carrier = page.evaluate("()=>{const E=skyfront.engine,w=skyfront.getWorld();const u=E.makeGround(w.state,0,'apc',-900,-70);u.holdFire=true;w.state.groundUnits.push(u);const ids=[];for(let i=0;i<3;i++){const p=E.makeGround(w.state,0,'infantry',u.x,u.z);p.carrierId=u.id;p.holdFire=true;w.state.groundUnits.push(p);ids.push(p.id);}w.focus(-860,-100,240);w.controls.update(3);w.sync();skyfront.selectArmy([u.id]);return{id:u.id,passengers:ids};}")
     delivery = page.locator('[data-troop="deliver"]')
     assert delivery.is_visible() and delivery.is_enabled()
     delivery.click()
     assert page.evaluate('skyfront.getOrder().troopMode') == 'deliver'
-    dest = point(-420,-130)
+    dest = point(-820,-130)
     page.mouse.click(dest['x'],dest['y'])
     page.wait_for_function('(id)=>Boolean(skyfront.getState().groundUnits.find(u=>u.id===id).delivery)', arg=carrier['id'])
     page.evaluate('skyfront.engine.advance(skyfront.getWorld().state,8);skyfront.getWorld().sync()')
@@ -84,8 +84,8 @@ with sync_playwright() as p:
     assert page.evaluate('skyfront.getState().districts[1].owner') == 0
     print('Right-clicking the actual 3D district flag sends the selected infantry to capture it',flush=True)
 
-    unit = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),u=E.makeGround(w.state,0,'infantry',-500,-70);u.holdFire=true;w.state.groundUnits.push(u);w.focus(-450,-110,240);w.controls.update(3);w.sync();skyfront.selectArmy([u.id]);E.guardGround(w.state,0,[u.id],u);return u.id;}''')
-    a, b = point(-450,-140), point(-360,-160)
+    unit = page.evaluate("()=>{const E=skyfront.engine,w=skyfront.getWorld(),u=E.makeGround(w.state,0,'infantry',-900,-70);u.holdFire=true;w.state.groundUnits.push(u);w.focus(-850,-110,240);w.controls.update(3);w.sync();skyfront.selectArmy([u.id]);E.guardGround(w.state,0,[u.id],u);return u.id;}")
+    a, b = point(-850,-140), point(-760,-160)
     yaw = page.evaluate('skyfront.diagnostics().camera.yaw')
     page.keyboard.down('Shift')
     page.mouse.click(a['x'],a['y'],button='right')
@@ -98,7 +98,7 @@ with sync_playwright() as p:
     frozen = page.evaluate('(id)=>{const u=skyfront.getState().groundUnits.find(u=>u.id===id);return{x:u.x,z:u.z};}',unit)
     page.wait_for_timeout(750)
     assert page.evaluate('(id)=>{const u=skyfront.getState().groundUnits.find(u=>u.id===id);return{x:u.x,z:u.z};}',unit) == frozen
-    blocker = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld();const b=E.build(w.state,0,'launcher',-360,-160);if(typeof b==='string')throw Error(b);b.progress=1;w.sync();return b.id;}''')
+    blocker = page.evaluate("()=>{const E=skyfront.engine,w=skyfront.getWorld();const b=E.build(w.state,0,'launcher',-760,-160);if(typeof b==='string')throw Error(b);b.progress=1;w.sync();return b.id;}")
     page.evaluate('skyfront.engine.advance(skyfront.getWorld().state,20);skyfront.getWorld().sync()')
     assert page.evaluate('(id)=>skyfront.getState().groundUnits.find(u=>u.id===id).routeState.status',unit) == 'blocked'
     page.wait_for_function('document.querySelector("#ground-state").textContent.includes("заблокирован")')
@@ -106,7 +106,7 @@ with sync_playwright() as p:
     page.evaluate('(id)=>skyfront.engine.demolish(skyfront.getWorld().state,id,0)',blocker)
     page.evaluate('skyfront.engine.advance(skyfront.getWorld().state,15);skyfront.getWorld().sync()')
     assert page.evaluate('(id)=>skyfront.getState().groundUnits.find(u=>u.id===id).routeState',unit) is None
-    assert page.evaluate('(id)=>{const u=skyfront.getState().groundUnits.find(u=>u.id===id);return Math.hypot(u.x+360,u.z+160);}',unit)<4
+    assert page.evaluate('(id)=>{const u=skyfront.getState().groundUnits.find(u=>u.id===id);return Math.hypot(u.x+760,u.z+160);}',unit)<4
     print('Shift-right-click starts from guard, queues a visible path, pauses, waits for a blocked point and resumes after demolition',flush=True)
 
     page.evaluate('skyfront.save()')

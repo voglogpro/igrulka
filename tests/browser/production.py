@@ -13,7 +13,7 @@ with sync_playwright() as p:
     page.wait_for_function('Boolean(window.skyfront)')
     page.locator('[data-action="start"]').click()
     page.keyboard.press('Space')
-    factory = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),s=E.createGame(823);s.ai.nextBuild=s.ai.nextArmy=s.ai.nextAttack=s.ai.nextResearch=1e9;s.sides[0].credits=10000;s.sides[0].materials=1000;const f=E.build(s,0,'factory',-680,-10),l=E.build(s,0,'launcher',-540,-140);if(typeof f==='string'||typeof l==='string')throw Error(String(f)+' '+String(l));for(const b of [f,l]){b.progress=1;b.hp=b.maxHp;}s.sides[0].credits=1000;s.sides[0].materials=100;Object.assign(w.state,s);w.sync();return f.id;}''')
+    factory = page.evaluate("()=>{const E=skyfront.engine,w=skyfront.getWorld(),s=E.createGame(823);s.ai.nextBuild=s.ai.nextArmy=s.ai.nextAttack=s.ai.nextResearch=1e9;s.sides[0].credits=10000;s.sides[0].materials=1000;const f=E.build(s,0,'factory',-1080,-10),l=E.build(s,0,'launcher',-940,-140);if(typeof f==='string'||typeof l==='string')throw Error(String(f)+' '+String(l));for(const b of [f,l]){b.progress=1;b.hp=b.maxHp;}s.sides[0].credits=1000;s.sides[0].materials=100;Object.assign(w.state,s);w.sync();return f.id;}")
     page.locator('[data-panel="attack"]').first.click()
     assert page.locator('#district-strip').is_hidden(), 'District cards must not cover the arsenal or its close button'
     page.locator('[data-action="close-panel"]').click()
@@ -36,12 +36,12 @@ with sync_playwright() as p:
 
     page.evaluate('skyfront.getWorld().state.sides[0].credits=1500;skyfront.engine.advance(skyfront.getWorld().state,60)')
     page.wait_for_function('document.querySelector("#factory-plan-status").textContent.includes("Целевой запас собран")')
-    assert page.evaluate('skyfront.getState().sides[0].inventory.drone') == 3
+    assert page.evaluate('skyfront.engine.weaponStock(skyfront.getState(),0,"drone")') == 3
     assert page.evaluate('skyfront.getState().sides[0].credits') >= 1000
     assert page.evaluate('skyfront.getState().sides[0].materials') >= 50
     assert page.evaluate('(id)=>skyfront.getState().buildings.find(b=>b.id===id).queue.length', factory) == 0
     page.screenshot(path=str(ARTIFACTS/'production-plan-1024.png'), timeout=120000)
-    launched = page.evaluate('skyfront.command("launch",{key:"drone",aim:{x:600,z:80},count:1})')
+    launched = page.evaluate('skyfront.command("launch",{key:"drone",aim:{x:1000,z:80},count:1})')
     assert launched == 1, launched
     page.evaluate('skyfront.engine.advance(skyfront.getWorld().state,.1)')
     assert page.evaluate('(id)=>skyfront.getState().buildings.find(b=>b.id===id).queue.length', factory) == 1
@@ -49,7 +49,7 @@ with sync_playwright() as p:
     page.wait_for_function('(id)=>!skyfront.getState().buildings.find(b=>b.id===id).productionPlan.enabled', arg=factory)
     assert page.evaluate('(id)=>skyfront.getState().buildings.find(b=>b.id===id).queue.length', factory) == 1
     page.evaluate('skyfront.engine.advance(skyfront.getWorld().state,30)')
-    assert page.evaluate('skyfront.getState().sides[0].inventory.drone') == 3
+    assert page.evaluate('skyfront.engine.weaponStock(skyfront.getState(),0,"drone")') == 3
     print('The live plan reaches its target, replaces an actually launched drone and preserves paid work when stopped', flush=True)
 
     page.evaluate('skyfront.save()')

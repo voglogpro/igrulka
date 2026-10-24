@@ -28,8 +28,8 @@ function ready(s, key, x, z, side = 0) {
 }
 function factory(s, side = 0, powered = true) {
   const sign = side === 0 ? -1 : 1;
-  const b = ready(s, 'factory', sign * 680, -10, side);
-  if (powered) ready(s, 'power', sign * 670, -80, side);
+  const b = ready(s, 'factory', sign * (E.HQ_X + 65), -10, side);
+  if (powered) ready(s, 'power', sign * (E.HQ_X + 55), -80, side);
   return b;
 }
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
@@ -73,7 +73,7 @@ test('factory plans validate strict bounded fields and store only their configur
 test('produce targets the selected factory, preserves legacy calls and rejects prototype keys without charging', () => {
   const s = fresh(),
     a = factory(s),
-    b = ready(s, 'factory', -550, -10);
+    b = ready(s, 'factory', -950, -10);
   const credits = s.sides[0].credits;
   assert.equal(E.produce(s, 0, 'drone', 2, b.id), true);
   assert.equal(a.queue.length, 0);
@@ -92,7 +92,7 @@ test('produce targets the selected factory, preserves legacy calls and rejects p
 test('the shared cap and stock include paid queues at all live factories, including an unfinished one', () => {
   const s = fresh(),
     a = factory(s),
-    b = ready(s, 'factory', -550, -10);
+    b = ready(s, 'factory', -950, -10);
   b.progress = 0.5;
   b.queue = Array.from({ length: 23 }, () => ({ key: 'drone', progress: 0 }));
   set(s, a, { target: 30 });
@@ -115,7 +115,7 @@ test('the shared cap and stock include paid queues at all live factories, includ
 test('two planned factories never buy beyond the common target or insert more than one item per empty factory', () => {
   const s = fresh(),
     a = factory(s),
-    b = ready(s, 'factory', -550, -10);
+    b = ready(s, 'factory', -950, -10);
   set(s, a, { target: 1 });
   set(s, b, { target: 1 });
   const before = s.sides[0].credits;
@@ -132,7 +132,7 @@ test('two planned factories never buy beyond the common target or insert more th
     assert.ok(status(s, a).stock <= 3);
     assert.ok(a.queue.length <= 1 && b.queue.length <= 1);
   }
-  assert.equal(s.sides[0].inventory.drone, 3);
+  assert.equal(E.weaponStock(s, 0, 'drone'), 3);
   assert.equal(status(s, a).status, 'stock');
   assert.equal(status(s, b).status, 'stock');
 });
@@ -184,14 +184,14 @@ test('a single initialized simulation produces until its reserve and resumes onl
   f.credits = 1000 + 4 * d.cost + 100;
   f.materials = 50 + 2 * d.metal;
   E.advance(s, 40);
-  assert.equal(f.inventory.drone, 2);
+  assert.equal(E.weaponStock(s, 0, 'drone'), 2);
   assert.equal(b.queue.length, 0);
   assert.equal(status(s, b).status, 'materials');
   near(f.materials, 50);
   assert.ok(f.credits >= 1000);
   f.materials += d.metal;
   E.advance(s, 13);
-  assert.equal(f.inventory.drone, 3);
+  assert.equal(E.weaponStock(s, 0, 'drone'), 3);
   near(f.materials, 50);
   assert.equal(status(s, b).status, 'materials');
 });
@@ -200,16 +200,16 @@ test('reaching stock stops purchases and a real launch triggers exactly one paid
   const s = fresh(),
     b = factory(s),
     f = s.sides[0];
-  const launcher = ready(s, 'launcher', -550, -10);
+  const launcher = b; // launch directly from the paid connected factory rack
   set(s, b, { target: 2 });
   E.advance(s, 30);
-  assert.equal(f.inventory.drone, 2);
+  assert.equal(E.weaponStock(s, 0, 'drone'), 2);
   assert.equal(status(s, b).status, 'stock');
   const materials = f.materials;
   assert.equal(E.launch(s, 0, 'drone', { x: 500, z: 400 }, 1, launcher.id), 1);
-  assert.equal(f.inventory.drone, 1);
+  assert.equal(E.weaponStock(s, 0, 'drone'), 1);
   E.advance(s, 15);
-  assert.equal(f.inventory.drone, 2);
+  assert.equal(E.weaponStock(s, 0, 'drone'), 2);
   assert.equal(b.queue.length, 0);
   near(f.materials, materials - E.WEAPONS.drone.metal);
   assert.equal(s.events.filter((event) => event.type === 'produced' && event.side === 0).length, 3);
@@ -225,47 +225,44 @@ test('disabling and changing the plan preserve every paid item and its progress'
   assert.deepEqual(b.queue, paid);
   assert.equal(status(s, b).status, 'disabled');
   E.advance(s, 13);
-  assert.equal(s.sides[0].inventory.drone, 1);
+  assert.equal(E.weaponStock(s, 0, 'drone'), 1);
   assert.equal(b.queue.length, 0);
-  s.sides[0].tech.push('heavy');
   assert.equal(E.produce(s, 0, 'drone', 1, b.id), true);
   set(s, b, { key: 'heavy', target: 2 });
   assert.equal(status(s, b).status, 'queue');
   E.advance(s, 13);
-  assert.equal(s.sides[0].inventory.drone, 2);
+  assert.equal(E.weaponStock(s, 0, 'drone'), 2);
   assert.equal(b.queue.length, 1);
   assert.equal(b.queue[0].key, 'heavy');
 });
 
-test('locked plans wait through import, allow disabling and resume after real research availability', () => {
+test('formerly locked plans import, disable and produce ordinary paid stock without research', () => {
   const s = fresh(),
     b = factory(s);
-  assert.match(E.setFactoryPlan(s, 0, b.id, plan({ key: 'heavy' })), /исследование/);
-  set(s, b, { key: 'heavy', enabled: false });
-  b.productionPlan.enabled = true;
+  set(s, b, { key: 'heavy', target: 1 });
   const restored = E.load(E.save(s));
   const r = restored.buildings.find((u) => u.id === b.id);
-  assert.equal(status(restored, r).status, 'locked');
+  assert.equal(status(restored, r).status, 'active');
+  set(restored, r, { key: 'heavy', target: 1, enabled: false });
   E.advance(restored, 1);
   assert.equal(r.queue.length, 0);
-  set(restored, r, { key: 'heavy', enabled: false });
-  assert.equal(status(restored, r).status, 'disabled');
-  r.productionPlan.enabled = true;
-  restored.sides[0].tech.push('heavy');
-  E.advance(restored, 0.05);
-  assert.equal(r.queue[0].key, 'heavy');
+  set(restored, r, { key: 'heavy', target: 1 });
+  const materials = restored.sides[0].materials;
+  E.advance(restored, E.WEAPONS.heavy.time + 1);
+  assert.equal(E.weaponStock(restored, 0, 'heavy'), 1);
+  near(restored.sides[0].materials, materials - E.WEAPONS.heavy.metal);
+  assert.deepEqual(restored.sides[0].tech, []);
 });
 
-test('each supported weapon is paid at its own price and actually completes with the required research', () => {
+test('each supported weapon is paid at its own price and actually completes without research', () => {
   for (const key of Object.keys(E.WEAPONS)) {
     const s = fresh(),
       b = factory(s),
       d = E.WEAPONS[key];
-    s.sides[0].tech = Object.keys(E.TECH);
     set(s, b, { key, target: 1 });
     const materials = s.sides[0].materials;
     E.advance(s, d.time + 1);
-    assert.equal(s.sides[0].inventory[key], 1, key);
+    assert.equal(E.weaponStock(s, 0, key), 1, key);
     assert.equal(b.queue.length, 0, key);
     near(s.sides[0].materials, materials - d.metal);
     assert.equal(status(s, b).status, 'stock');
@@ -310,7 +307,9 @@ test('roads and electricity retain their ordinary effects on planned production 
     powered = factory(fast);
   set(fast, powered, { target: 1 });
   const isolated = E.load(E.save(fast));
-  const cut = isolated.roads.find((r) => r.side === 0 && r.camp && r.ax < -615 && r.bx > -615);
+  const cut = isolated.roads.find(
+    (r) => r.side === 0 && r.camp && r.ax < -E.HQ_X && r.bx > -E.HQ_X,
+  );
   E.damageRoad(isolated, cut, 100);
   const slow = fresh(),
     unpowered = factory(slow, 0, false);
@@ -332,8 +331,8 @@ test('two human sides replenish independently and produce identical stocks from 
   set(s, a, { target: 2 });
   set(s, b, { target: 2 });
   E.advance(s, 30);
-  assert.equal(s.sides[0].inventory.drone, 2);
-  assert.equal(s.sides[1].inventory.drone, 2);
+  assert.equal(E.weaponStock(s, 0, 'drone'), 2);
+  assert.equal(E.weaponStock(s, 1, 'drone'), 2);
   near(s.sides[0].materials, s.sides[1].materials);
   near(s.sides[0].credits, s.sides[1].credits);
   assert.deepEqual(status(s, a), status(s, b));

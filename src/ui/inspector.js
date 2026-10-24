@@ -1,5 +1,6 @@
 import { renderArmyControls, setArmyContextVisible } from './army-controls.js';
 import { renderDefenseDetail } from './defense-inspector.js';
+import { updateEquipmentDetails } from './equipment-detail.js';
 import * as E from '../game/index.js';
 import { $, rate } from './format.js';
 export function renderInspector(context) {
@@ -28,16 +29,16 @@ export function renderInspector(context) {
     return;
   }
   const ruin = b.hp <= 0 && b.key !== 'road',
-    sig = String(b.id) + ':' + ruin;
+    sig = String(b.id) + ':' + ruin + ':' + (b.level || 0);
   if (host.dataset.id !== sig) {
     host.dataset.id = sig;
-    host.innerHTML = `<div class="panel-head"><b>${E.targetName(b)}${ruin ? ' · руины' : ''}</b><button data-action="deselect" aria-label="Закрыть">×</button></div><div class="health"><i id="inspect-health"></i></div><div class="inspect-line"><span id="inspect-hp"></span><span id="inspect-status"></span></div><div class="inspect-buttons"><button id="repair-button" data-repair="${b.id}">Ремонт</button>${!ruin && (b.key === 'factory' || b.key === 'launcher') ? '<button data-panel="attack">Арсенал →</button>' : ''}${b.key === 'barracks' && b.side === 0 && !ruin ? `<button data-panel="army">Отряды →</button><button data-rally="${b.id}">Сбор ↗</button>` : ''}${b.key === 'gun' && b.side === 0 && !ruin ? `<button data-redeploy="${b.id}">Свернуть МОГ</button>` : ''}${b.side === 0 && (b.key !== 'hq' || ruin) ? `<button data-demolish="${b.id}">${ruin ? 'Разобрать руины' : 'Снести'}</button>` : ''}</div><div id="building-detail"></div><div id="defense-detail"></div>`;
+    host.innerHTML = `<div class="panel-head"><b>${E.targetName(b)}${ruin ? ' · руины' : ''}</b><button data-action="deselect" aria-label="Закрыть">×</button></div><div class="health"><i id="inspect-health"></i></div><div class="inspect-line"><span id="inspect-hp"></span><span id="inspect-status"></span></div><div class="inspect-buttons"><button id="repair-button" data-repair="${b.id}">Ремонт</button>${!ruin && ['factory', 'launcher', 'silo'].includes(b.key) ? '<button data-panel="attack">Арсенал →</button>' : ''}${['barracks', 'vehiclebase'].includes(b.key) && b.side === 0 && !ruin ? `<button data-panel="army">Отряды →</button><button data-rally="${b.id}">Сбор ↗</button>` : ''}${b.key === 'gun' && b.side === 0 && !ruin ? `<button data-redeploy="${b.id}">Свернуть МОГ</button>` : ''}${b.side === 0 && (b.key !== 'hq' || ruin) ? `<button data-demolish="${b.id}">${ruin ? 'Разобрать руины' : 'Снести'}</button>` : ''}</div><div id="building-detail"></div><div id="defense-detail"></div>`;
   }
-  if (b.key === 'barracks' && b.side === 0 && !ruin) {
+  if (['barracks', 'vehiclebase'].includes(b.key) && b.side === 0 && !ruin) {
     if (!$('#rally-mode'))
       host.insertAdjacentHTML(
         'beforeend',
-        '<label class="barracks-rally-mode">Новобранцы<select id="rally-mode" aria-label="Приказы новым бойцам"><option value="guard">Охранять точку сбора</option><option value="wait">Ждать приказа у казарм</option><option value="attackmove">С боем к точке сбора</option><option value="attack">В атаку на штаб врага</option><option value="defend">Оборонять коридор</option></select></label>',
+        '<label class="barracks-rally-mode">Новобранцы<select id="rally-mode" aria-label="Приказы новым бойцам"><option value="guard">Охранять точку сбора</option><option value="wait">Ждать приказа у базы</option><option value="attackmove">С боем к точке сбора</option><option value="attack">В атаку на штаб врага</option><option value="defend">Оборонять коридор</option></select></label>',
       );
     $('#rally-mode').value = E.defaultRallyMode(state, b);
   }
@@ -85,7 +86,7 @@ export function renderInspector(context) {
   const o = E.buildingOutput(state, b);
   if (o && $('#building-detail') && b.key !== 'service')
     $('#building-detail').innerHTML =
-      `<div class="status-note">Выпуск ${Math.round(o.factor * 100)}% · дорога ${Math.round(o.road * 100)}% · мощность ${Math.round(o.power * 100)}%<br>${o.income ? rate(o.income) + ' ₡/мин · ' : ''}${o.materials ? rate(o.materials) + ' спл./мин · ' : ''}${o.science ? rate(o.science) + ' науки/мин · ' : ''}содержание ${Math.round(o.upkeep * 60)} ₡/мин</div>`;
+      `<div class="status-note">Выпуск ${Math.round(o.factor * 100)}% · дорога ${Math.round(o.road * 100)}% · мощность ${Math.round(o.power * 100)}%<br>${o.income ? rate(o.income) + ' ₡/мин · ' : ''}${o.materials ? rate(o.materials) + ' спл./мин · ' : ''}содержание ${Math.round(o.upkeep * 60)} ₡/мин</div>`;
   if (b.key === 'service' && b.side === 0 && !ruin) {
     if (!$('#service-detail'))
       $('#building-detail').insertAdjacentHTML(
@@ -119,5 +120,12 @@ export function renderInspector(context) {
     toggle.textContent = report.enabled ? 'Отключить службу' : 'Включить службу';
     toggle.disabled = b.progress < 1;
   }
+  let equipment = host.querySelector('#equipment-detail');
+  if (!equipment) {
+    equipment = document.createElement('div');
+    equipment.id = 'equipment-detail';
+    host.append(equipment);
+  }
+  updateEquipmentDetails(equipment, state, b);
   if (!ruin) renderDefenseDetail(state, b);
 }

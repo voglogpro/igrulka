@@ -27,13 +27,14 @@ export const ARMY_CATEGORIES = {
 };
 
 export function availableRecruitment(state, keys) {
-  const facility = state.buildings.some(
-    (b) => b.side === 0 && b.key === 'barracks' && b.hp > 0 && !b.demolished && b.progress >= 1,
-  );
-  if (!facility) return [];
   return keys.filter((key) => {
-    const d = E.GROUND_UNITS[key];
-    return d && !d.civil && (!d.tech || state.sides[0].tech.includes(d.tech));
+    const facility = E.recruitmentFacility(key);
+    return (
+      facility &&
+      state.buildings.some(
+        (b) => b.side === 0 && b.key === facility && b.hp > 0 && !b.demolished && b.progress >= 1,
+      )
+    );
   });
 }
 
@@ -49,7 +50,7 @@ function recruitCardsHTML(state, category, count) {
         return `<button class="recruit-card" data-recruit="${key}" title="${d.role}"><span class="recruit-card-visual">${unitIllustration(key)}<span class="recruit-role">${profile?.[0] || category.name}</span></span><b>${d.name}</b><span class="recruit-specialty">${profile?.[1] || d.role}</span><small class="recruit-cost">${recruitPrice(E.purchaseQuote(state, 0, 'ground', key, count))} · ${d.time} с</small><span class="recruit-readiness" data-recruit-state="${key}">Выбрать роль ↗</span></button>`;
       })
       .join('') ||
-    '<div class="recruit-empty"><b>Нет доступных ролей</b><p>Постройте казармы и изучите технологии этого направления.</p><button data-panel="research">Исследования ↗</button></div>'
+    `<div class="recruit-empty"><b>Нет доступных ролей</b><p>${category.keys.every((key) => E.recruitmentFacility(key) === 'vehiclebase') ? 'Постройте бронезавод для техники.' : category.keys.every((key) => E.recruitmentFacility(key) === 'barracks') ? 'Постройте казармы для пехоты.' : 'Постройте казармы для пехоты или бронезавод для техники.'}</p></div>`
   );
 }
 
@@ -67,42 +68,16 @@ export function refreshRecruitmentChoices(state, count = 1) {
     const label = $(`[data-army-category="${key}"] span`);
     if (label) label.textContent = availableRecruitment(state, d.keys).length;
   }
-  const sites = state.buildings.filter(
-    (b) => b.side === 0 && b.key === 'barracks' && b.hp > 0 && !b.demolished && b.progress >= 1,
-  );
-  const choices = [
-    [$('#repeat-site'), sites.map((b) => [String(b.id), `Казармы #${b.id}`])],
-    [
-      $('#repeat-key'),
-      availableRecruitment(state, Object.keys(E.GROUND_UNITS)).map((key) => [
-        key,
-        E.GROUND_UNITS[key].name,
-      ]),
-    ],
-  ];
-  for (const [select, options] of choices) {
-    if (!select || document.activeElement === select) continue;
-    const next = options.map(([value]) => value).join(',');
-    if (select.dataset.available === next) continue;
-    const selected = select.value;
-    select.innerHTML = options
-      .map(([value, name]) => `<option value="${value}">${name}</option>`)
-      .join('');
-    if (options.some(([value]) => value === selected)) select.value = selected;
-    select.dataset.available = next;
-  }
 }
 
 export function recruitmentHTML({
   state,
   armyCategory = 'infantry',
   recruitCount = 1,
-  armyAutomation,
   recruitMode = 'point',
-  recruitPost = 'auto',
 }) {
   const category = ARMY_CATEGORIES[armyCategory] || ARMY_CATEGORIES.infantry;
-  return `<div class="muster-overview"><div><h2>Соберите свой отряд</h2><p>Выберите роль и назначение пополнения.</p></div><div class="muster-capacity"><b id="army-capacity"></b><span>состав / лимит</span></div></div><nav class="army-category-tabs" aria-label="Роды войск">${Object.entries(
+  return `<div class="muster-overview"><div><h2>Состав и развёртывание</h2><p>Постоянная оборона и ручные приказы.</p></div><div class="muster-capacity"><b id="army-capacity"></b><span>состав / лимит</span></div></div><nav class="army-category-tabs" aria-label="Роды войск">${Object.entries(
     ARMY_CATEGORIES,
   )
     .map(
@@ -111,20 +86,63 @@ export function recruitmentHTML({
     )
     .join(
       '',
-    )}</nav><div class="muster-orders"><div class="recruit-batch"><span>Партия</span><button data-recruit-count="1" aria-pressed="${recruitCount === 1}" class="${recruitCount === 1 ? 'active' : ''}">×1</button><button data-recruit-count="5" aria-pressed="${recruitCount === 5}" class="${recruitCount === 5 ? 'active' : ''}">×5</button></div><div class="recruit-mode"><span>Задача</span><div class="stance-switch" role="group" aria-label="Куда отправлять новых бойцов"><button data-recruit-mode="point" class="${recruitMode === 'point' ? 'active' : ''}" title="Выбрать точку на карте">${icon('hand')}В точку</button><button data-recruit-mode="attack" class="${recruitMode === 'attack' ? 'active' : ''}" title="Сразу идти на штаб противника">${icon('sword')}В атаку</button><button data-recruit-mode="defend" class="${recruitMode === 'defend' ? 'active' : ''}" title="Занять оборону">${icon('shield')}Оборона</button></div><select id="recruit-post" aria-label="Пост для обороны" ${recruitMode === 'defend' ? '' : 'hidden'}><option value="auto" ${recruitPost === 'auto' ? 'selected' : ''}>Пост: авто</option><option value="north" ${recruitPost === 'north' ? 'selected' : ''}>Северный</option><option value="south" ${recruitPost === 'south' ? 'selected' : ''}>Южный</option></select></div></div><p class="muster-destination" id="recruit-destination-note"></p><div class="army-recruit" data-recruit-category="${armyCategory}" aria-label="Выбор роли бойцов">${recruitCardsHTML(state, category, recruitCount)}</div><div class="muster-logistics"><details class="army-queue-details"><summary>Подготовка <span id="army-queue-count"></span></summary><div id="army-queue" class="status-note"></div></details>${autoRecruitmentHTML(state, armyAutomation)}<details class="army-roster"><summary id="army-roster-label">На поле</summary><div id="army-list"></div></details><label class="rear-toggle" title="Санитары поднимают раненых, грузовики чинят технику и пополняют боезапас."><input type="checkbox" id="rear-auto"><span>Автоматическая тыловая помощь<small>Санитары и грузовики снабжения</small></span></label></div><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-rally="auto" title="Назначить точку сбора новых бойцов">Точка сбора ↗</button><button data-action="army-all">Выбрать армию</button></div><p class="army-panel-hint">Рамка — выбрать · ПКМ — приказ · L — линия обороны</p>`;
+    )}</nav>${compositionHTML(state, category)}<div class="manual-recruit-heading"><b>Быстрый заказ</b><span>В точку / атаку — разово; оборона — увеличить цель</span></div><div class="muster-orders"><div class="recruit-batch"><span>Партия</span><button data-recruit-count="1" aria-pressed="${recruitCount === 1}" class="${recruitCount === 1 ? 'active' : ''}">×1</button><button data-recruit-count="5" aria-pressed="${recruitCount === 5}" class="${recruitCount === 5 ? 'active' : ''}">×5</button></div><div class="recruit-mode"><span>Задача</span><div class="stance-switch" role="group" aria-label="Куда отправлять новых бойцов"><button data-recruit-mode="point" class="${recruitMode === 'point' ? 'active' : ''}" title="Выбрать точку на карте">${icon('hand')}В точку</button><button data-recruit-mode="attack" class="${recruitMode === 'attack' ? 'active' : ''}" title="Сразу идти на штаб противника">${icon('sword')}В атаку</button><button data-recruit-mode="defend" class="${recruitMode === 'defend' ? 'active' : ''}" title="Занять оборону">${icon('shield')}Оборона</button></div></div></div><p class="muster-destination" id="recruit-destination-note"></p><div class="army-recruit" data-recruit-category="${armyCategory}" aria-label="Выбор роли бойцов">${recruitCardsHTML(state, category, recruitCount)}</div><div class="muster-logistics"><details class="army-queue-details"><summary>Подготовка <span id="army-queue-count"></span></summary><div id="army-queue" class="status-note"></div></details><details class="army-roster"><summary id="army-roster-label">На поле</summary><div id="army-list"></div></details><label class="rear-toggle" title="Санитары поднимают раненых, грузовики чинят технику и пополняют боезапас."><input type="checkbox" id="rear-auto"><span>Автоматическая тыловая помощь<small>Санитары и грузовики снабжения</small></span></label></div><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-build="vehiclebase">+ Бронезавод</button><button data-rally="auto" title="Назначить точку сбора новых бойцов">Точка сбора ↗</button><button data-action="army-all">Выбрать армию</button></div><p class="army-panel-hint">Рамка — выбрать · ПКМ — приказ · L — линия обороны</p>`;
 }
 
-function autoRecruitmentHTML(state, choice = { siteId: null, key: 'infantry' }) {
-  const sites = state.buildings.filter((b) => b.side === 0 && b.key === 'barracks' && b.hp > 0);
-  const keys = availableRecruitment(state, Object.keys(E.GROUND_UNITS));
-  const currentTarget = choice.target || 12;
-  return `<section class="army-automation" aria-label="Пополнение гарнизона"><div class="garrison-heading"><b>Поддерживать гарнизон</b><span id="repeat-summary"></span></div><div class="auto-recruit-fields"><label>Казармы<select id="repeat-site" aria-label="Казармы для пополнения">${sites.map((b) => `<option value="${b.id}" ${b.id === choice.siteId ? 'selected' : ''}>Казармы #${b.id}</option>`).join('')}</select></label><label>Тип бойца<select id="repeat-key" aria-label="Тип пополнения">${keys.map((key) => `<option value="${key}" ${key === choice.key ? 'selected' : ''}>${E.GROUND_UNITS[key].name}</option>`).join('')}</select></label><label>Численность<select id="repeat-target" aria-label="Поддерживать численность">${[6, 12, 24].map((target) => `<option value="${target}" ${currentTarget === target ? 'selected' : ''}>${target} бойцов</option>`).join('')}</select></label><button data-action="repeat-toggle" id="repeat-toggle">Включить</button></div><p class="status-note" id="repeat-status"></p><p class="army-panel-hint">Численность этого типа во всей армии. Потери пополняются в автооборону. Резерв: 250 ₡ и 5 сплавов; для техники — ещё 5 нефти.</p></section>`;
+export function armyTargetRequest(key, value) {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const count = Number(value);
+  if (typeof value === 'string' && !value.trim()) return null;
+  return E.recruitmentFacility(key) && Number.isInteger(count) && count >= 0 && count <= 120
+    ? { key, count }
+    : null;
+}
+
+function compositionHTML(state, category) {
+  const report = E.armyCompositionStatus(state, 0);
+  return `<section class="composition-panel" aria-label="Постоянный состав обороны"><div class="composition-heading"><div><h3>Состав обороны</h3><p>Задайте цель по типам. Казармы и бронезаводы сами восполняют потери.</p></div><b id="composition-total"></b></div><div class="composition-columns"><span>Тип / состояние</span><span>В строю + очередь</span><span>Цель</span></div><div class="composition-rows">${category.keys
+    .filter((key) => E.recruitmentFacility(key))
+    .map((key) => {
+      const row = report.types.find((t) => t.key === key);
+      return `<label class="composition-row"><span><b>${E.GROUND_UNITS[key].name}</b><small data-composition-status="${key}"></small></span><span data-composition-count="${key}"></span><input type="number" inputmode="numeric" min="0" max="120" step="1" value="${row?.target || 0}" data-army-target="${key}" aria-label="Цель обороны: ${E.GROUND_UNITS[key].name}"></label>`;
+    })
+    .join(
+      '',
+    )}</div><p class="composition-note">0 — не пополнять. Цель учитывает всех живых бойцов этого типа и оплаченные заказы, включая ручную атаку. Новое пополнение само занимает фронт. Резерв: 250 ₡ и 5 сплавов; для техники — ещё 5 нефти.</p><p id="composition-message" role="status" aria-live="polite"></p></section>`;
+}
+
+function updateComposition(state) {
+  const report = E.armyCompositionStatus(state, 0);
+  $('#composition-total').textContent = `${report.totals.desired} / ${report.totals.limit}`;
+  for (const row of report.types) {
+    const input = $(`[data-army-target="${row.key}"]`);
+    if (!input) continue;
+    if (document.activeElement !== input && !input.dataset.pending) input.value = row.target;
+    $(`[data-composition-count="${row.key}"]`).textContent = `${row.alive} + ${row.queued}`;
+    $(`[data-composition-status="${row.key}"]`).textContent =
+      row.reason ||
+      {
+        disabled: 'Цель не задана',
+        met: 'Состав укомплектован',
+        queued: 'Пополнение в очереди',
+        limit: 'Достигнут лимит армии',
+        facility: `Нужна база: ${E.BUILDINGS[E.recruitmentFacility(row.key)].name}`,
+        credits: 'Ожидание денег',
+        materials: 'Ожидание сплавов',
+        oil: 'Ожидание нефти',
+        reserve: 'Сохраняем резерв ресурсов',
+        active: 'Пополняем потери',
+      }[row.status] ||
+      '';
+  }
 }
 
 export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'point' }) {
   refreshRecruitmentChoices(state, recruitCount);
   const faction = state.sides[0];
-  const sites = state.buildings.filter((b) => b.side === 0 && b.key === 'barracks' && b.hp > 0);
+  const sites = state.buildings.filter(
+    (b) => b.side === 0 && ['barracks', 'vehiclebase'].includes(b.key) && b.hp > 0 && !b.demolished,
+  );
   const ready = sites.filter((b) => b.progress >= 1 && !b.demolished);
   const units = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0 && !u.civil);
   const queue = sites.reduce((n, b) => n + (b.armyQueue?.length || 0), 0);
@@ -137,52 +155,19 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
     recruitMode === 'attack'
       ? 'Пополнение сразу выдвинется в атаку на штаб противника.'
       : recruitMode === 'defend'
-        ? $('#recruit-post').value === 'auto'
-          ? 'Сам выбирает коридор и выделяет ограниченный резерв для усиления прорыва.'
-          : 'Пополнение закрепится за выбранным коридором и будет держать свой участок.'
+        ? 'Карточка увеличит постоянную цель состава. Пополнение само займёт фронт.'
         : 'После выбора роли укажите точку назначения на карте.';
   $('#army-queue').textContent =
     sites
       .map((b) =>
         b.progress < 1
-          ? 'Казармы строятся'
+          ? `${E.BUILDINGS[b.key].name} строится`
           : b.armyQueue?.length
             ? `${E.GROUND_UNITS[b.armyQueue[0].key].name} ${Math.floor(b.armyQueue[0].progress * 100)}% · очередь ${b.armyQueue.length}/8`
-            : 'Казармы свободны',
+            : `${E.BUILDINGS[b.key].name}: очередь свободна`,
       )
-      .join(' · ') || 'Сначала постройте казармы у дороги';
-  const automatic = sites.filter((b) => b.recruitRepeat?.enabled);
-  $('#repeat-summary').textContent = automatic.length ? `· вкл. ${automatic.length}` : '· выкл.';
-  const siteId = Number($('#repeat-site').value),
-    repeat = E.recruitRepeatStatus(state, 0, siteId);
-  const same =
-    repeat?.enabled &&
-    repeat.key === $('#repeat-key').value &&
-    (repeat.target ?? 12) === Number($('#repeat-target').value);
-  $('#repeat-toggle').disabled = !repeat;
-  $('#repeat-toggle').textContent = same
-    ? 'Отключить'
-    : repeat?.enabled
-      ? 'Сменить выпуск'
-      : 'Включить';
-  $('#repeat-status').textContent = repeat
-    ? {
-        off: 'Выключен',
-        'target-met': 'Гарнизон укомплектован',
-        reserve: 'Сохраняем резерв ресурсов для города',
-        oil: 'Ожидание нефти',
-        ready: 'Готов к следующему отряду',
-        queued: 'Выполняется оплаченная очередь',
-        resources: 'Ожидание ресурсов',
-        'unit-limit': 'Ожидание свободного места в армии',
-        research: 'Нужно исследование',
-        'site-unavailable': 'Казармы недоступны',
-        finished: 'Кампания завершена',
-      }[repeat.status] +
-      (repeat.enabled
-        ? ` · ${repeat.present ?? 0} / ${repeat.target ?? 12} · ${E.GROUND_UNITS[repeat.key]?.name || ''}`
-        : '')
-    : 'Сначала постройте казармы';
+      .join(' · ') || 'Постройте казармы или бронезавод у дороги';
+  updateComposition(state);
   $('#army-roster-label').textContent = `На поле: ${units.length} · выбрать по типу`;
   const types = Object.entries(E.GROUND_UNITS)
     .map(([key, d]) => ({ key, d, units: units.filter((u) => u.key === key) }))
@@ -203,31 +188,34 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
     if (!button) continue;
     const quote = E.purchaseQuote(state, 0, 'ground', key, recruitCount);
     button.querySelector('.recruit-cost').textContent = `${recruitPrice(quote)} · ${d.time} с/ед.`;
-    const locked = d.tech && !faction.tech.includes(d.tech),
-      resources =
-        faction.credits < quote.cost ||
-        faction.materials < quote.metal ||
-        (faction.oil || 0) < quote.oil;
+    const resources =
+      faction.credits < quote.cost ||
+      faction.materials < quote.metal ||
+      (faction.oil || 0) < quote.oil;
     const full =
       units.length + queue + recruitCount > E.GROUND_LIMIT ||
-      ready.reduce((n, b) => n + 8 - (b.armyQueue?.length || 0), 0) < recruitCount;
-    button.hidden = !!locked || !ready.length;
-    button.disabled = !!locked || !ready.length || resources || full;
-    button.classList.toggle('recruit-locked', !!locked);
+      ready
+        .filter((b) => b.key === E.recruitmentFacility(key))
+        .reduce((n, b) => n + 8 - (b.armyQueue?.length || 0), 0) < recruitCount;
+    const facilityReady = ready.some((b) => b.key === E.recruitmentFacility(key));
+    button.hidden = !facilityReady;
+    button.disabled =
+      recruitMode === 'defend'
+        ? E.armyCompositionStatus(state, 0).totals.desired + recruitCount > E.GROUND_LIMIT
+        : !facilityReady || resources || full;
     button.classList.toggle('recruit-ready', !button.disabled);
     button.setAttribute('aria-label', `${d.name}. ${d.role}`);
-    $(`[data-recruit-state="${key}"]`).textContent = locked
-      ? `Нужно: ${E.TECH[d.tech].name}`
-      : !ready.length
-        ? 'Нужны казармы'
-        : resources
-          ? 'Не хватает ресурсов'
-          : full
-            ? 'Очередь заполнена'
-            : recruitMode === 'attack'
-              ? `В атаку ×${recruitCount}`
-              : recruitMode === 'defend'
-                ? `На оборону ×${recruitCount}`
+    $(`[data-recruit-state="${key}"]`).textContent =
+      recruitMode === 'defend'
+        ? `Цель обороны +${recruitCount}`
+        : !facilityReady
+          ? `Нужна база: ${E.BUILDINGS[E.recruitmentFacility(key)].name}`
+          : resources
+            ? 'Не хватает ресурсов'
+            : full
+              ? 'Очередь заполнена'
+              : recruitMode === 'attack'
+                ? `В атаку ×${recruitCount}`
                 : `Указать точку ×${recruitCount} ↗`;
   }
 }

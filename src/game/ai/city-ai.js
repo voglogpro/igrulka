@@ -1,10 +1,8 @@
-import { BUILDINGS, WEAPONS } from '../config.js';
-import { upgradeDefense } from '../combat/upgrades.js';
+import { BUILDINGS, WEAPONS, HQ_X, SEA, CORRIDORS } from '../config.js';
 import { demolish, repair, canPlace, build } from '../city/construction.js';
 import { passable, overlappingRoad } from '../city/road-network.js';
 import { economy } from '../city/economy.js';
 import { buildRoad } from '../city/roads.js';
-import { research, researchProjects, researchStatus } from '../research/research.js';
 import { purchaseQuote } from '../city/pricing.js';
 import { difficultyOf } from './difficulty.config.js';
 import { random } from '../shared/random.js';
@@ -20,17 +18,6 @@ export function ai(s) {
     ready = (key) => active(key).filter((b) => b.progress >= 1);
   if (s.time >= s.ai.nextBuild) {
     s.ai.nextBuild = s.time + 7;
-    if (f.tech.includes('targeting') && f.credits > 1400 && f.materials > 100) {
-      const gun = s.buildings.find(
-        (b) =>
-          b.side === 1 &&
-          b.hp > 0 &&
-          b.progress >= 1 &&
-          BUILDINGS[b.key]?.range &&
-          (b.level || 0) < 2,
-      );
-      if (gun) upgradeDefense(s, 1, gun.id);
-    }
     const ruin = s.buildings.find(
       (b) => b.side === 1 && b.hp <= 0 && !b.demolished && b.key !== 'hq',
     );
@@ -60,21 +47,21 @@ export function ai(s) {
                 ? 'launcher'
                 : active('gun').length < 3
                   ? 'gun'
-                  : !active('lab').length
-                    ? 'lab'
-                    : null;
+                  : null;
     if (!key && !oilBusy) {
       const goals = [
         ['housing', Math.min(9, 3 + Math.floor(s.time / 130))],
         ['industry', Math.min(5, 2 + Math.floor(s.time / 250))],
         ['radar', s.time > 220 ? 1 : 0],
-        ['sam', f.tech.includes('missileDefense') ? 2 : 0],
+        ['sam', s.time > 220 ? 2 : 0],
         ['launcher', s.time > 600 ? 2 : 1],
         ['factory', s.time > 580 ? 2 : 1],
         ['barracks', s.time > 240 ? 1 : 0],
+        ['ammofactory', s.time > 280 ? 1 : 0],
+        ['silo', s.time > 360 ? 1 : 0],
         ['training', s.time > 640 ? 1 : 0],
         ['market', s.time > 420 ? 1 : 0],
-        ['lab', s.time > 700 ? 2 : 1],
+        ['vehiclebase', s.time > 300 ? 1 : 0],
         ['gun', Math.min(6, 3 + Math.floor(s.time / 240))],
       ];
       key = goals.find(([k, n]) => active(k).length < n)?.[0] || null;
@@ -121,54 +108,15 @@ export function ai(s) {
       }
     }
   }
-  if (s.time >= s.ai.nextResearch) {
-    s.ai.nextResearch = s.time + difficultyOf(s).researchEvery;
-    const running = new Set(researchProjects(s, side).map((project) => project.key));
-    let available = Math.max(0, researchStatus(s, side).slots - running.size);
-    for (const key of [
-      'autocannon',
-      'heavy',
-      'missileDefense',
-      'efficiency',
-      'cruise',
-      'targeting',
-      'mobileAA',
-      'fpvTeams',
-      'abm',
-      'lightArmor',
-      'armor',
-      'bodyArmor',
-      'propulsion',
-      'cooling',
-      'airframes',
-      'magazines',
-      'ballistic',
-      'payload',
-      'composite',
-      'artillery',
-      'heavyArmor',
-      'rocketArtillery',
-    ])
-      if (available > 0 && !f.tech.includes(key) && !running.has(key)) {
-        if (research(s, side, key) === true) {
-          running.add(key);
-          available--;
-        }
-      }
-  }
-  if (ready('factory').length && ready('launcher').length) {
+  if (ready('factory').length) {
     const queued = ready('factory').reduce((n, b) => n + (b.queue?.length || 0), 0),
       stock = Object.values(f.inventory).reduce((a, b) => a + b, 0),
       reserve = purchaseQuote(s, side, 'building', s.ai.plannedBuild)?.cost ?? 150;
     if (queued < 3 && stock < 7 && f.credits > reserve + 90 && f.materials > 30) {
-      let key =
-        f.tech.includes('cruise') && random(s) > 0.5
-          ? 'cruise'
-          : f.tech.includes('heavy') && random(s) > 0.5
-            ? 'heavy'
-            : 'drone';
-      if (f.tech.includes('ballistic') && random(s) > 0.75) key = 'ballistic';
-      produce(s, 1, key);
+      let key = random(s) > 0.5 ? 'cruise' : random(s) > 0.5 ? 'heavy' : 'drone';
+      if (random(s) > 0.75) key = 'ballistic';
+      if (f.credits < reserve + WEAPONS[key].cost) key = 'drone';
+      if (f.credits >= reserve + WEAPONS[key].cost) produce(s, 1, key);
     }
   }
   if (s.time >= s.ai.nextAttack) {
@@ -182,19 +130,19 @@ export function ai(s) {
     const weighted = targets.flatMap((b) =>
         Array(['hq', 'power', 'factory', 'launcher'].includes(b.key) ? 3 : 1).fill(b),
       ),
-      target = weighted[Math.floor(random(s) * weighted.length)] || { x: -615, z: 0 };
+      target = weighted[Math.floor(random(s) * weighted.length)] || { x: -HQ_X, z: 0 };
     if (target)
       for (const key of Object.keys(WEAPONS))
         if (f.inventory[key]) {
           const flank = ['drone', 'heavy', 'cruise'].includes(key) && random(s) < 0.45,
-            z = random(s) < 0.5 ? -350 : 350,
+            z = random(s) < 0.5 ? CORRIDORS[0] : CORRIDORS[1],
             aim = flank
               ? {
                   x: target.x,
                   z: target.z,
                   waypoints: [
-                    { x: 300, z },
-                    { x: -200, z },
+                    { x: SEA.halfX + 90, z },
+                    { x: -SEA.halfX - 90, z },
                   ],
                 }
               : (target.id ?? target);

@@ -49,16 +49,19 @@ export function road(r, network) {
       emissive: '#ffbf6b',
       emissiveIntensity: 5,
     });
-    const pool = new T.Mesh(
-      new T.PlaneGeometry(18, 22),
-      new T.MeshBasicMaterial({
+    if (!this.roadGlowGeometry) {
+      this.roadGlowGeometry = new T.PlaneGeometry(18, 22);
+      this.roadGlowMaterial = new T.MeshBasicMaterial({
         color: '#ffd39b',
         map: this.glowTexture,
         transparent: true,
         opacity: 0.28,
         depthWrite: false,
-      }),
-    );
+      });
+      this.sharedGeometries.add(this.roadGlowGeometry);
+      this.sharedMaterials.add(this.roadGlowMaterial);
+    }
+    const pool = new T.Mesh(this.roadGlowGeometry, this.roadGlowMaterial);
     pool.rotation.x = -Math.PI / 2;
     pool.position.set(width / 2, 0.74, 0);
     root.add(pool);

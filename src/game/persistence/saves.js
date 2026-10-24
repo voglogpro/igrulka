@@ -14,6 +14,11 @@ import { restoreDefense } from '../defense/persistence.js';
 import { restoreOil } from './oil.js';
 import { restoreEconomy } from './economy.js';
 import { migrateMapLayout } from './map-layout.js';
+import { restoreRetiredResearch } from './retired-research.js';
+import { restoreArmyComposition } from '../units/ground/composition.js';
+import { restoreGroundScars } from '../combat/ground-scars.js';
+import { restoreLaunchSupply } from '../units/aviation/launch-supply.js';
+import { restoreAmmunition } from './ammunition.js';
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
   const copy = structuredClone(s);
@@ -25,7 +30,7 @@ export function load(raw) {
   const s = JSON.parse(raw);
   const sourceVersion = s.version;
   if (
-    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, VERSION].includes(s.version) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
@@ -172,6 +177,7 @@ export function load(raw) {
   for (const u of s.units)
     if (
       (u.threatAt != null && !Number.isFinite(u.threatAt)) ||
+      (u.localLaunch != null && typeof u.localLaunch !== 'boolean') ||
       (u.flightHeightOffset != null && !Number.isFinite(u.flightHeightOffset)) ||
       (u.evade != null && (!Number.isFinite(u.evade) || u.evade < 0 || u.evade > 1))
     )
@@ -429,6 +435,12 @@ export function load(raw) {
   migrateMapLayout(s, sourceVersion);
   restoreDefense(s);
   restoreEconomy(s, sourceVersion);
+  restoreRetiredResearch(s, sourceVersion);
+  restoreArmyComposition(s, sourceVersion);
+  restoreGroundScars(s, sourceVersion);
+  restoreLaunchSupply(s, sourceVersion);
+  restoreAmmunition(s, sourceVersion);
+  delete s.ai.nextResearch;
   s.version = VERSION;
   s.events = [];
   s.stats = {

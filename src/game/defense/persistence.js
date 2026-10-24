@@ -51,7 +51,7 @@ export function restoreDefense(s) {
     return { nextThink: memory.nextThink, nextReinforce: memory.nextReinforce ?? 0, seen };
   });
   for (const u of s.groundUnits) {
-    if (s.version < 14) {
+    if (s.version < 15) {
       // Keep the physical guard location; the new planner assigns new posts through real paths.
       u.defensePost = null;
       u.defenseCapture = null;

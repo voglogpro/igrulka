@@ -1,154 +1,112 @@
+// Legacy parallel-project imports remain covered after retiring the research mechanic.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame } from '../../src/game/state.js';
-import { TECH, BUILDINGS } from '../../src/game/config.js';
-import {
-  research,
-  researchProjects,
-  researchStatus,
-  updateResearch,
-} from '../../src/game/research/research.js';
-import { supplyFactor } from '../../src/game/city/economy.js';
+import { TECH, BUILDINGS, VERSION } from '../../src/game/config.js';
 import { restoreEconomy } from '../../src/game/persistence/economy.js';
+import { restoreRetiredResearch } from '../../src/game/persistence/retired-research.js';
 import { save, load } from '../../src/game/persistence/saves.js';
-import { step } from '../../src/game/simulation.js';
 
-function fresh(count = 2) {
+function legacy() {
   const s = createGame(117);
-  for (const f of s.sides) {
-    f.science = 10000;
-    f.credits = 100000;
-    f.purchases = { building: {} };
-    f.researchQueue = [];
-  }
-  for (let i = 0; i < count; i++)
-    s.buildings.push({
-      id: s.nextId++,
-      side: 0,
-      key: 'lab',
-      x: -680 - i * 80,
-      z: -80,
-      hp: BUILDINGS.lab.hp,
-      maxHp: BUILDINGS.lab.hp,
-      progress: 1,
-    });
+  s.version = 14;
+  s.mode = 'multiplayer';
+  for (const f of s.sides) Object.assign(f, { tech: [], research: null, researchQueue: [] });
+  s.sides[0].research = { key: 'heavy', progress: 0.42 };
+  s.sides[0].researchQueue = [{ key: 'autocannon', progress: 0.73 }];
   return s;
 }
 
-test('two ready labs buy two independent projects once, never bypass prerequisites', () => {
-  const s = fresh(),
-    f = s.sides[0];
-  assert.equal(research(s, 0, 'heavy'), true);
-  assert.equal(research(s, 0, 'autocannon'), true);
-  const resources = [f.credits, f.science];
-  assert.equal(typeof research(s, 0, 'heavy'), 'string');
-  assert.equal(typeof research(s, 0, 'efficiency'), 'string');
-  assert.deepEqual([f.credits, f.science], resources);
-  assert.deepEqual(
-    researchProjects(s, 0).map((p) => p.key),
-    ['heavy', 'autocannon'],
-  );
-  assert.equal(f.research.key, 'heavy', 'legacy primary project remains available');
-  assert.equal(researchStatus(s, 0).activeCount, 2);
-  const third = { id: s.nextId++, side: 0, key: 'lab', hp: 100, progress: 1, x: -1000, z: -200 };
-  s.buildings.push(third);
-  assert.match(research(s, 0, 'cruise'), /предыдущее/);
-  assert.ok(!f.tech.includes('heavy'));
+test('legacy parallel projects remain validated before their one-time credit refund', () => {
+  const s = legacy(),
+    f = s.sides[0],
+    credits = f.credits;
+  restoreEconomy(s, 14);
+  restoreRetiredResearch(s, 14);
+  assert.equal(f.credits - credits, TECH.heavy.cost + TECH.autocannon.cost);
+  assert.deepEqual(f.tech, []);
+  assert.equal(f.research, null);
+  assert.deepEqual(f.researchQueue, []);
+  restoreRetiredResearch(s, 15);
+  assert.equal(f.credits - credits, TECH.heavy.cost + TECH.autocannon.cost);
 });
 
-test('power and road efficiency are shared fairly; extra idle labs cannot accelerate one project', () => {
-  const s = fresh();
-  research(s, 0, 'heavy');
-  research(s, 0, 'autocannon');
-  const labs = s.buildings.filter((b) => b.key === 'lab');
-  const meanRoad = labs.reduce((sum, b) => sum + supplyFactor(s, b), 0) / labs.length;
-  updateResearch(s, 0, { productivity: 0.4 }, 1);
-  const [a, b] = researchProjects(s, 0);
-  assert.ok(Math.abs(a.progress * TECH.heavy.time - 0.4 * meanRoad) < 1e-12);
-  assert.ok(Math.abs(a.progress * TECH.heavy.time - b.progress * TECH.autocannon.time) < 1e-12);
-  const single = fresh();
-  research(single, 0, 'heavy');
-  const expected = Math.max(
-    ...single.buildings.filter((b) => b.key === 'lab').map((b) => supplyFactor(single, b)),
-  );
-  updateResearch(single, 0, { productivity: 1 }, 1);
-  assert.ok(Math.abs(single.sides[0].research.progress * TECH.heavy.time - expected) < 1e-12);
-});
-
-test('destroyed and unfinished laboratories pause extras, then resume without repayment or lost progress', () => {
-  const s = fresh();
-  research(s, 0, 'heavy');
-  research(s, 0, 'autocannon');
-  const labs = s.buildings.filter((b) => b.key === 'lab');
-  labs[1].hp = 0;
-  updateResearch(s, 0, { productivity: 1 }, 2);
-  assert.ok(s.sides[0].research.progress > 0);
-  assert.equal(s.sides[0].researchQueue[0].progress, 0);
-  assert.equal(researchStatus(s, 0).activeCount, 1);
-  labs[0].progress = 0.9;
-  const before = structuredClone(researchProjects(s, 0));
-  updateResearch(s, 0, { productivity: 1 }, 5);
-  assert.deepEqual(researchProjects(s, 0), before);
-  labs[0].progress = labs[1].progress = 1;
-  labs[1].hp = labs[1].maxHp;
-  const funds = s.sides[0].credits;
-  updateResearch(s, 0, { productivity: 1 }, 2);
-  assert.ok(s.sides[0].researchQueue[0].progress > 0);
-  assert.equal(s.sides[0].credits, funds);
-});
-
-test('completion emits each technology once and promotes the next legacy primary project', () => {
-  const s = fresh();
-  research(s, 0, 'heavy');
-  research(s, 0, 'autocannon');
-  s.sides[0].research.progress = 1;
-  updateResearch(s, 0, { productivity: 1 }, 0.1);
-  assert.equal(s.sides[0].research.key, 'autocannon');
-  assert.deepEqual(s.sides[0].researchQueue, []);
-  assert.equal(s.events.filter((e) => e.type === 'research').length, 1);
-  s.sides[0].research.progress = 1;
-  updateResearch(s, 0, { productivity: 1 }, 0.1);
-  updateResearch(s, 0, { productivity: 1 }, 0.1);
-  assert.equal(s.sides[0].research, null);
-  assert.equal(s.events.filter((e) => e.type === 'research').length, 2);
-  assert.equal(research(s, 0, 'cruise'), true);
-});
-
-test('research save adapter preserves legacy project and rejects duplicate/unpaid prerequisite projects', () => {
-  const legacy = fresh();
-  legacy.sides[0].research = { key: 'heavy', progress: 0.42 };
-  restoreEconomy(legacy, 13);
-  assert.deepEqual(legacy.sides[0].research, { key: 'heavy', progress: 0.42 });
-  assert.deepEqual(legacy.sides[0].researchQueue, []);
-  research(legacy, 0, 'autocannon');
-  const restored = structuredClone(legacy);
-  restoreEconomy(restored, 14);
-  assert.deepEqual(researchProjects(restored, 0), researchProjects(legacy, 0));
+test('corrupt, duplicate and unpaid prerequisite projects cannot inflate migration compensation', () => {
   for (const project of [
     { key: 'heavy', progress: 0 },
     { key: 'cruise', progress: 0 },
     { key: 'autocannon', progress: -1 },
     { key: 'autocannon', progress: Infinity },
+    { key: 'constructor', progress: 0 },
+    { key: '__proto__', progress: 0 },
   ]) {
-    const bad = structuredClone(legacy);
-    bad.sides[0].researchQueue = [project];
-    assert.throws(() => restoreEconomy(bad, 14), /исследования/);
+    const s = legacy();
+    s.sides[0].researchQueue = [project];
+    assert.throws(() => restoreEconomy(s, 14));
   }
 });
 
-test('simulation and actual save/load keep both research slots progressing', () => {
-  const s = fresh();
-  s.mode = 'multiplayer';
-  research(s, 0, 'heavy');
-  research(s, 0, 'autocannon');
-  step(s, 0.1);
-  const projects = researchProjects(s, 0);
-  assert.ok(projects.every((project) => project.progress > 0));
+test('completed technology receives no project refund while both sides retain their actual paid queues', () => {
+  const s = legacy();
+  s.sides[1].tech = ['heavy'];
+  s.sides[1].research = { key: 'cruise', progress: 0.1 };
+  const credits = s.sides.map((f) => f.credits);
+  restoreEconomy(s, 14);
+  restoreRetiredResearch(s, 14);
+  assert.equal(s.sides[0].credits - credits[0], TECH.heavy.cost + TECH.autocannon.cost);
+  assert.equal(s.sides[1].credits - credits[1], TECH.cruise.cost);
+  assert.deepEqual(s.sides[1].tech, []);
+});
+
+test('earlier demolished lab ordinals preserve the next live lab historical refund', () => {
+  const s = legacy();
+  s.sides[0].research = null;
+  s.sides[0].researchQueue = [];
+  const lab = {
+    id: s.nextId++,
+    side: 0,
+    key: 'lab',
+    x: -800,
+    z: 300,
+    hp: BUILDINGS.lab.hp,
+    maxHp: BUILDINGS.lab.hp,
+    progress: 0.7,
+  };
+  s.buildings.push(lab);
+  s.sides[0].purchases.building.lab = 5;
+  const before = s.sides[0].credits;
+  restoreEconomy(s, 14);
+  restoreRetiredResearch(s, 14);
+  assert.equal(s.sides[0].credits - before, Math.round(BUILDINGS.lab.cost * 1.5));
+  assert.equal(lab.demolished, true);
+});
+
+test('real v14 load migrates paid projects and saves without another refund', () => {
+  const s = legacy(),
+    before = s.sides.map((f) => f.credits);
   const restored = load(save(s));
-  assert.deepEqual(researchProjects(restored, 0), projects);
-  const progress = projects.map((project) => project.progress);
-  step(restored, 0.1);
-  assert.ok(
-    researchProjects(restored, 0).every((project, index) => project.progress > progress[index]),
-  );
+  assert.equal(restored.version, VERSION);
+  assert.equal(restored.sides[0].credits - before[0], TECH.heavy.cost + TECH.autocannon.cost);
+  assert.deepEqual(restored.sides[0].tech, []);
+  assert.equal(restored.sides[0].research, null);
+  const again = load(save(restored));
+  assert.deepEqual(again.sides, restored.sides);
+});
+
+test('current saves reject resurrected projects and legacy lab placement rather than refunding them repeatedly', () => {
+  const s = createGame(117);
+  s.sides[0].research = { key: 'heavy', progress: 0.1 };
+  assert.throws(() => load(save(s)));
+  s.sides[0].research = null;
+  s.buildings.push({
+    id: s.nextId++,
+    side: 0,
+    key: 'lab',
+    x: -800,
+    z: 300,
+    hp: BUILDINGS.lab.hp,
+    maxHp: BUILDINGS.lab.hp,
+    progress: 1,
+  });
+  assert.throws(() => load(save(s)));
 });

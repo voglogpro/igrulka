@@ -1,4 +1,21 @@
 export { ROAD_REQUIRED } from './city/rules.js';
+export {
+  AMMUNITION,
+  ammunitionStatus,
+  ammunitionProfile,
+  createAmmoStock,
+} from './units/ground/ammunition.js';
+export {
+  ammoFactoryStatus,
+  setAmmoFactoryEnabled,
+  updateAmmoProduction,
+} from './city/ammo-production.js';
+export {
+  ammoLogisticsStatus,
+  requestWeaponDelivery,
+  updateAmmoLogistics,
+} from './city/ammo-logistics.js';
+export { setSupportAutomatic } from './units/ground/rear.js';
 export { COMBAT } from './combat/config.js';
 export { random } from './shared/random.js';
 export {
@@ -32,6 +49,8 @@ export { roadPreview, buildRoad } from './city/roads.js';
 export { targetById, targetName } from './targets.js';
 export { research, researchProjects, researchStatus } from './research/research.js';
 export { purchaseQuote } from './city/pricing.js';
+export { recruitmentFacility } from './units/ground/recruitment.js';
+export { setArmyTarget, armyCompositionStatus } from './units/ground/composition.js';
 export { produce } from './units/aviation/production.js';
 export {
   setFactoryPlan,
@@ -47,7 +66,22 @@ export {
   groundRouteStatus,
   GROUND_ROUTE_LIMIT,
 } from './units/ground/route-queue.js';
-export { upgradeDefense } from './combat/upgrades.js';
+export { upgradeDefense, upgradeStatus } from './combat/upgrades.js';
+export { equipmentModifiers, UPGRADE_TIERS } from './combat/upgrade-tiers.js';
+export {
+  initLaunchStore,
+  availableLaunchStock,
+  launchStoreCapacity,
+  launchStoreTotal,
+  launchSiteAllows,
+  acceptLaunchDelivery,
+  weaponStock,
+  movableWeaponStock,
+  launchSupplyRequests,
+  updateLaunchSupply,
+  restoreLaunchSupply,
+} from './units/aviation/launch-supply.js';
+export { launchTempo } from './units/aviation/launch.js';
 export {
   resolveAim,
   launchSites,

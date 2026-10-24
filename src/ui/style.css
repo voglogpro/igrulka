@@ -645,6 +645,21 @@ select {
 .attack-button:hover:not(:disabled) {
   background: #dcbc9f;
 }
+.equipment-detail,
+.supply-detail {
+  border-top: 1px solid var(--line, #43514c);
+  margin-top: 10px;
+  padding-top: 9px;
+}
+.equipment-detail > button {
+  width: 100%;
+  margin-top: 7px;
+}
+.equipment-detail .stat,
+.supply-detail .stat {
+  margin: 3px 0;
+  font-size: 11px;
+}
 .status-note {
   font-size: 9px;
   line-height: 1.7;

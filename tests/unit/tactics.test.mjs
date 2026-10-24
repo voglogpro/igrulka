@@ -14,7 +14,6 @@ function fresh() {
   for (const f of s.sides) {
     f.credits = 1e6;
     f.materials = 1e6;
-    f.tech = Object.keys(E.TECH);
   }
   return s;
 }
@@ -94,11 +93,11 @@ test('a drone locked by air defence weaves off its route but still hits the targ
     maxHp: 30,
     launched: true,
     delay: 0,
-    startX: 300,
+    startX: 700,
     startZ: 0,
-    tx: -300,
+    tx: -700,
     tz: 0,
-    x: 300,
+    x: 700,
     y: 5,
     z: 0,
     total: 600,
@@ -175,9 +174,9 @@ test('reaction fields survive a save round trip', () => {
 
 test('riflemen finish a wounded enemy before an untouched one at the same range', () => {
   const s = fresh(),
-    shooter = unit(s, 0, 'infantry', -500, 250),
-    healthy = unit(s, 1, 'infantry', -440, 240),
-    wounded = unit(s, 1, 'infantry', -440, 260);
+    shooter = unit(s, 0, 'infantry', -900, 250),
+    healthy = unit(s, 1, 'infantry', -840, 240),
+    wounded = unit(s, 1, 'infantry', -840, 260);
   wounded.hp = wounded.maxHp * 0.3;
   for (const u of [healthy, wounded]) u.moving = true;
   const { target } = groundEngagement(s, shooter);
@@ -186,9 +185,9 @@ test('riflemen finish a wounded enemy before an untouched one at the same range'
 
 test('an anti-tank team skips a tank already doomed by a missile in flight', () => {
   const s = fresh(),
-    team = unit(s, 0, 'atgm', -500, 250),
-    doomed = unit(s, 1, 'leopard', -330, 240),
-    other = unit(s, 1, 'leopard', -330, 262);
+    team = unit(s, 0, 'atgm', -900, 250),
+    doomed = unit(s, 1, 'leopard', -730, 240),
+    other = unit(s, 1, 'leopard', -730, 262);
   doomed.hp = 60;
   doomed.maxHp = other.maxHp;
   s.projectiles.push({

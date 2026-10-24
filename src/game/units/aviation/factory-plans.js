@@ -1,6 +1,7 @@
 import { oilCost, hasOil } from '../../city/oil.js';
 import { WEAPONS } from '../../config.js';
 import { produce } from './production.js';
+import { weaponStock } from './launch-supply.js';
 
 const fields = ['key', 'target', 'reserveCredits', 'reserveMaterials', 'enabled'];
 const configured = (key) => typeof key === 'string' && Object.hasOwn(WEAPONS, key);
@@ -31,10 +32,8 @@ export function setFactoryPlan(s, side, id, plan) {
   if (s.result) return 'Кампания завершена';
   const b = factory(s, side, id);
   if (!b || b.hp <= 0 || b.demolished || b.progress < 1)
-    return 'Выберите свой завершённый сборочный завод';
+    return 'Выберите свою завершённую базу дронов';
   if (!isFactoryPlan(plan)) return 'Некорректный план пополнения';
-  const d = WEAPONS[plan.key];
-  if (plan.enabled && d.tech && !s.sides[side].tech.includes(d.tech)) return 'Нужно исследование';
   b.productionPlan = Object.fromEntries(fields.map((key) => [key, plan[key]]));
   return true;
 }
@@ -58,7 +57,7 @@ function status(s, b, counted) {
   const plan = isFactoryPlan(b.productionPlan) ? b.productionPlan : null;
   const f = s.sides[b.side];
   const d = plan ? WEAPONS[plan.key] : null;
-  const inventory = plan ? f.inventory[plan.key] : 0;
+  const inventory = plan ? weaponStock(s, b.side, plan.key) : 0;
   const queued = plan ? counted.weapons[plan.key] : 0;
   const stock = inventory + queued;
   const factoryQueued = b.queue?.length || 0;
@@ -67,7 +66,6 @@ function status(s, b, counted) {
   else if (b.hp <= 0 || b.demolished) value = 'ruined';
   else if (b.progress < 1) value = 'building';
   else if (!plan?.enabled) value = 'disabled';
-  else if (d.tech && !f.tech.includes(d.tech)) value = 'locked';
   else if (stock >= plan.target) value = 'stock';
   else if (factoryQueued || counted.total >= 24) value = 'queue';
   else if (f.credits - d.cost < plan.reserveCredits) value = 'credits';

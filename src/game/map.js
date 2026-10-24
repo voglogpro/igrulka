@@ -1,12 +1,12 @@
-export const VERSION = 14;
+export const VERSION = 15;
 // A wide valley split by an inland sea. Two narrow land corridors at the northern and southern
 // ends are the only ground routes between the cities; drones and missiles cross the water.
-export const MAP = { width: 3200, depth: 3200, riverWidth: 44 };
+export const MAP = { width: 4000, depth: 3200, riverWidth: 44 };
 // The playable field inside the map edge: orders, routes and saved points must stay inside it.
 export const FIELD = { x: MAP.width / 2 - 16, z: MAP.depth / 2 - 16 };
 export const inField = (x, z, margin = 0) =>
   Math.abs(x) <= FIELD.x - margin && Math.abs(z) <= FIELD.z - margin;
-export const SEA = { halfX: 200, halfZ: 1120, round: 120 };
+export const SEA = { halfX: 600, halfZ: 1120, round: 120 };
 // Ground routes around the sea: the centre line of each corridor.
 export const CORRIDORS = [-(SEA.halfZ + MAP.depth / 2) / 2, (SEA.halfZ + MAP.depth / 2) / 2];
 // Keep city centres unchanged while stretching the sea and the two land corridors.
@@ -27,13 +27,30 @@ export function expandLegacyZ(z) {
   }
   return Math.sign(z) * (1584 + value - 1184);
 }
-export const HQ_X = 615;
+// Version 15 widens the sea across the two cities. Translate the town landmass
+// intact, while interpolating the central corridors and neutral sites.
+export function expandLegacyX(x) {
+  const value = Math.abs(x);
+  const anchors = [
+    [0, 0],
+    [170, 460],
+    [240, 640],
+  ];
+  for (let i = 1; i < anchors.length; i++) {
+    const [a, left] = anchors[i - 1],
+      [b, right] = anchors[i];
+    if (value <= b) return Math.sign(x) * (left + ((value - a) / (b - a)) * (right - left));
+  }
+  return Math.sign(x) * (value + 400);
+}
+export const HQ_X = 1015;
+export const DISTRICT_X = 460;
 // The neutral trading island in the middle of the sea. In the rules it is open water: armies
 // cannot walk or build there, but merchant ships of both cities tie up at its quays.
 export const ISLAND = { x: 0, z: 0, r: 62, quay: 94 };
 // Oil fields: wells can only be sunk here. Every western field has a mirrored eastern twin; the
 // two corridor fields lie on the frontier and belong to whoever holds them.
-export const OIL_FIELDS = [
+export const LEGACY_OIL_FIELDS = [
   [-880, -250],
   [-830, 330],
   [-450, -640],
@@ -41,9 +58,15 @@ export const OIL_FIELDS = [
   [-1080, 760],
   [-90, -1010],
 ].flatMap(([x, z], i) => [
-  { id: i * 2 + 1, x, z: expandLegacyZ(z), r: 22 },
-  { id: i * 2 + 2, x: -x, z: -expandLegacyZ(z), r: 22 },
+  { id: i * 2 + 1, x, z, r: 22 },
+  { id: i * 2 + 2, x: -x, z: -z, r: 22 },
 ]);
+export const OIL_FIELDS = LEGACY_OIL_FIELDS.map(({ id, x, z, r }) => ({
+  id,
+  x: expandLegacyX(x),
+  z: expandLegacyZ(z),
+  r,
+}));
 
 // Gentle meander of the sea's long axis.
 export const riverX = (z) => (Math.sin(z / 190) * 42 + Math.sin(z / 470) * 25) * 0.5;
@@ -117,10 +140,10 @@ for (let row = 0; row < H_ROWS; row++)
       i = row * H_COLS + col,
       shore = Math.min(1, Math.max(0, seaDistance(x, z) / 60)),
       core = Math.min(1, Math.max(0, (Math.hypot(Math.abs(x) - HQ_X, z) - 330) / 80)),
-      // District sites in the corridors (x = ±170) and oil fields sit on level ground.
+      // District sites and oil fields sit on level ground.
       site = Math.min(
         1,
-        Math.max(0, (Math.hypot(Math.abs(x) - 170, Math.abs(z) - CORRIDORS[1]) - 70) / 50),
+        Math.max(0, (Math.hypot(Math.abs(x) - DISTRICT_X, Math.abs(z) - CORRIDORS[1]) - 70) / 50),
       );
     let oil = 1;
     for (const f of OIL_FIELDS)

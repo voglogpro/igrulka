@@ -10,6 +10,109 @@ const CELL = 24,
   WIDTH = Math.floor((FIELD.x - OX) / CELL) + 1,
   DEPTH = Math.floor((FIELD.z - OZ) / CELL) + 1;
 const masks = new WeakMap();
+const OBSTACLE_CELL = 64,
+  OBSTACLE_STRIDE = Math.ceil((FIELD.x * 2) / OBSTACLE_CELL) + 1;
+const obstacleColumn = (x) => Math.floor((x + FIELD.x) / OBSTACLE_CELL);
+const obstacleRow = (z) => Math.floor((z + FIELD.z) / OBSTACLE_CELL);
+// Terrain does not change during a campaign. Reuse it across factions and campaigns;
+// new buildings only stamp their small bounding rectangles onto a copied mask.
+const terrainMasks = new Map();
+function compileMask(s, radius) {
+  let terrain = terrainMasks.get(radius);
+  if (!terrain) {
+    terrain = new Uint8Array(WIDTH * DEPTH);
+    for (let row = 0; row < DEPTH; row++)
+      for (let col = 0; col < WIDTH; col++) {
+        const x = OX + col * CELL,
+          z = OZ + row * CELL;
+        terrain[row * WIDTH + col] = riverDistance(x, z) < 77 + radius;
+      }
+    terrain = {
+      blocked: terrain,
+      checked: new Uint8Array(terrain.length),
+      edges: new Uint8Array(terrain.length),
+    };
+    terrainMasks.set(radius, terrain);
+    if (terrainMasks.size > 32) terrainMasks.delete(terrainMasks.keys().next().value);
+  }
+  const blocked = terrain.blocked.slice(),
+    obstacles = new Map();
+  for (const b of s.buildings) {
+    if (b.demolished) continue;
+    const reach = (BUILDINGS[b.key]?.size || 30) * 0.56 + radius;
+    const firstX = Math.max(0, Math.ceil((b.x - reach - OX) / CELL));
+    const lastX = Math.min(WIDTH - 1, Math.floor((b.x + reach - OX) / CELL));
+    const firstZ = Math.max(0, Math.ceil((b.z - reach - OZ) / CELL));
+    const lastZ = Math.min(DEPTH - 1, Math.floor((b.z + reach - OZ) / CELL));
+    const rectangle = {
+      left: b.x - reach,
+      right: b.x + reach,
+      top: b.z - reach,
+      bottom: b.z + reach,
+    };
+    const firstBucketX = Math.max(0, obstacleColumn(rectangle.left));
+    const lastBucketX = Math.min(OBSTACLE_STRIDE - 1, obstacleColumn(rectangle.right));
+    const firstBucketZ = Math.max(0, obstacleRow(rectangle.top));
+    const lastBucketZ = Math.min(
+      Math.ceil((FIELD.z * 2) / OBSTACLE_CELL),
+      obstacleRow(rectangle.bottom),
+    );
+    for (let row = firstBucketZ; row <= lastBucketZ; row++)
+      for (let col = firstBucketX; col <= lastBucketX; col++) {
+        const key = row * OBSTACLE_STRIDE + col;
+        if (!obstacles.has(key)) obstacles.set(key, []);
+        obstacles.get(key).push(rectangle);
+      }
+    for (let row = firstZ; row <= lastZ; row++)
+      for (let col = firstX; col <= lastX; col++)
+        if (Math.abs(OX + col * CELL - b.x) < reach && Math.abs(OZ + row * CELL - b.z) < reach)
+          blocked[row * WIDTH + col] = 1;
+  }
+  return { blocked, obstacles, terrain };
+}
+function crossesRectangle(a, b, rectangle) {
+  let low = 0,
+    high = 1;
+  for (const [start, delta, min, max] of [
+    [a.x, b.x - a.x, rectangle.left + 1e-8, rectangle.right - 1e-8],
+    [a.z, b.z - a.z, rectangle.top + 1e-8, rectangle.bottom - 1e-8],
+  ]) {
+    if (Math.abs(delta) < 1e-12) {
+      if (start < min || start > max) return false;
+      continue;
+    }
+    const enter = (min - start) / delta,
+      exit = (max - start) / delta;
+    low = Math.max(low, Math.min(enter, exit));
+    high = Math.min(high, Math.max(enter, exit));
+    if (low > high) return false;
+  }
+  return true;
+}
+function clearGridEdge(grid, a, b, size, current, bit) {
+  const terrain = grid.terrain;
+  if (!(terrain.checked[current] & bit)) {
+    terrain.checked[current] |= bit;
+    const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 3);
+    let dry = true;
+    for (let i = 0; i <= n; i++)
+      if (riverDistance(a.x + ((b.x - a.x) * i) / n, a.z + ((b.z - a.z) * i) / n) < 77 + size) {
+        dry = false;
+        break;
+      }
+    if (dry) terrain.edges[current] |= bit;
+  }
+  if (!(terrain.edges[current] & bit)) return false;
+  for (let row = obstacleRow(Math.min(a.z, b.z)); row <= obstacleRow(Math.max(a.z, b.z)); row++)
+    for (
+      let col = obstacleColumn(Math.min(a.x, b.x));
+      col <= obstacleColumn(Math.max(a.x, b.x));
+      col++
+    )
+      for (const rectangle of grid.obstacles.get(row * OBSTACLE_STRIDE + col) || [])
+        if (crossesRectangle(a, b, rectangle)) return false;
+  return true;
+}
 export function walkable(s, x, z, radius = 3, ignore = null) {
   if (Math.abs(x) > FIELD.x || Math.abs(z) > FIELD.z) return false;
   if (riverDistance(x, z) < 77 + radius) return false;
@@ -23,12 +126,12 @@ export function walkable(s, x, z, radius = 3, ignore = null) {
 }
 // Bounded A* over the whole field with a binary heap, no diagonal corner cutting.
 export function groundPath(s, from, to, radius = 3) {
-  const clear = (a, b) => {
+  const clear = (a, b, footprint = radius) => {
     // Sample finer than a footprint corner so a straight leg never grazes a building.
     const n = Math.ceil(Math.hypot(a.x - b.x, a.z - b.z) / 3);
     for (let i = 0; i <= n; i++) {
       const t = i / (n || 1);
-      if (!walkable(s, a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, radius)) return false;
+      if (!walkable(s, a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, footprint)) return false;
     }
     return true;
   };
@@ -41,15 +144,18 @@ export function groundPath(s, from, to, radius = 3) {
     masks.set(s, cache);
   }
   const size = Math.ceil(radius * 2) / 2;
-  let blocked = cache.grids.get(size);
-  if (!blocked) {
-    blocked = new Uint8Array(WIDTH * DEPTH);
-    for (let i = 0; i < blocked.length; i++) {
-      const p = point(i);
-      blocked[i] = !walkable(s, p.x, p.z, size);
-    }
-    cache.grids.set(size, blocked);
+  let grid = cache.grids.get(size);
+  if (!grid) {
+    const compiled = compileMask(s, size);
+    const { blocked } = compiled;
+    grid = {
+      ...compiled,
+      checked: new Uint8Array(blocked.length),
+      edges: new Uint8Array(blocked.length),
+    };
+    cache.grids.set(size, grid);
   }
+  const { blocked, checked, edges } = grid;
   const nearest = (p) => {
     let found = -1,
       best = Infinity;
@@ -161,6 +267,7 @@ export function groundPath(s, from, to, radius = 3) {
     closed[current] = 1;
     const cx = current % WIDTH,
       cz = Math.floor(current / WIDTH);
+    let direction = -1;
     for (const [dx, dz] of [
       [1, 0],
       [-1, 0],
@@ -171,6 +278,7 @@ export function groundPath(s, from, to, radius = 3) {
       [-1, 1],
       [-1, -1],
     ]) {
+      direction++;
       const nx = cx + dx,
         nz = cz + dz;
       if (nx < 0 || nx >= WIDTH || nz < 0 || nz >= DEPTH) continue;
@@ -181,6 +289,15 @@ export function groundPath(s, from, to, radius = 3) {
         (dx && dz && (blocked[cz * WIDTH + nx] || blocked[nz * WIDTH + cx]))
       )
         continue;
+      // Dry endpoints alone cannot certify an edge along an irregular shoreline or wall.
+      // Cache each short sweep per map revision/footprint so subsequent routes reuse it.
+      const bit = 1 << direction;
+      if (!(checked[current] & bit)) {
+        checked[current] |= bit;
+        if (clearGridEdge(grid, point(current), point(next), size, current, bit))
+          edges[current] |= bit;
+      }
+      if (!(edges[current] & bit)) continue;
       const score = scores[current] + CELL * (dx && dz ? Math.SQRT2 : 1);
       if (score < scores[next]) {
         scores[next] = score;

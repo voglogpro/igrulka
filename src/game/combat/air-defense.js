@@ -13,6 +13,11 @@ import { random } from '../shared/random.js';
 import { COMBAT } from './config.js';
 import { recordFire } from '../units/infantry/cover.js';
 import { weatherSpread } from '../weather.js';
+import {
+  initializeAmmunition,
+  reloadFromReserve,
+  ammunitionProfile,
+} from '../units/ground/ammunition.js';
 export function interceptPoint(origin, u, speed) {
   const rx = u.x - origin.x,
     ry = u.y - origin.y,
@@ -40,11 +45,16 @@ export function defenseCycle(s, b, dt) {
     d = defenseStats(f, b);
   b.heat = Math.max(0, (b.heat || 0) - d.cooling * dt);
   b.cooldown = Math.max(0, (b.cooldown || 0) - dt);
+  initializeAmmunition(b);
+  if (ammunitionProfile(b)?.shared) {
+    b.ammo = b.groundAmmo;
+    return d;
+  }
   b.ammo ??= d.magazine;
   if (b.reloadLeft > 0) {
     b.reloadLeft = Math.max(0, b.reloadLeft - dt);
-    if (!b.reloadLeft) b.ammo = d.magazine;
-  } else if (b.ammo <= 0) {
+    if (!b.reloadLeft) b.ammo = reloadFromReserve(b);
+  } else if (b.ammo <= 0 && b.ammoReserve > 0) {
     b.reloadLeft = d.reload;
     event(s, 'reload', { x: b.x, z: b.z, side: b.side, key: b.key });
   }
@@ -78,7 +88,7 @@ export function fireDefenses(s, rates, dt) {
         (r) => r.kind === 'radar' && Math.hypot(r.x - b.x, r.z - b.z) < 320,
       ),
       range = d.range * (radar ? 1.2 : 1),
-      abm = f.tech.includes('abm'),
+      abm = missile,
       targets = s.units.filter(
         (u) =>
           u.side !== b.side &&
@@ -121,14 +131,7 @@ export function fireDefenses(s, rates, dt) {
     b.targetY = u.y;
     if ((isInfantry(b.key) || b.key === 'gun') && (b.groundReload > 0 || b.groundAmmo <= 0))
       continue;
-    if (
-      b.cooldown > 0 ||
-      b.reloadLeft > 0 ||
-      b.ammo <= 0 ||
-      f.credits < d.shotCost ||
-      f.materials < d.shotMetal
-    )
-      continue;
+    if (b.cooldown > 0 || b.reloadLeft > 0 || b.ammo <= 0) continue;
     const infantry = isInfantry(b.key),
       fast = ['gun', 'shilka'].includes(b.key) || infantry,
       speed = missile ? 190 : fast ? 390 : 330,
@@ -163,8 +166,6 @@ export function fireDefenses(s, rates, dt) {
       dy = aim.y - oy,
       dz = aim.z - b.z,
       length = Math.hypot(dx, dy, dz) || 1;
-    f.credits -= d.shotCost;
-    f.materials -= d.shotMetal;
     f.spentAmmo += d.shotCost;
     b.cooldown =
       (d.cooldown * (b.heat > 0.9 ? 1.6 : 1)) /
@@ -209,7 +210,7 @@ export function fireDefenses(s, rates, dt) {
       vy: (dy / length) * speed,
       vz: (dz / length) * speed,
       speed,
-      damage: d.damage * (abm ? 1.15 : 1),
+      damage: d.damage,
       kind: missile ? 'interceptor' : fast ? 'bullet' : 'shell',
       life: 0,
       maxLife: missile ? 5 : Math.min(2, range / speed + 0.6),

@@ -126,7 +126,15 @@ test('autonomous FPV prioritizes observed tanks and reserves in-flight damage ra
   );
   assert.equal(strikes.filter((u) => u.fpvTargetId === tank.id).length, 2);
   assert.equal(strikes.filter((u) => u.fpvTargetId === apc.id).length, 2);
-  assert.deepEqual([s.sides[0].credits, s.sides[0].materials], [before[0] - 48, before[1] - 4]);
+  assert.deepEqual(
+    [s.sides[0].credits, s.sides[0].materials],
+    before,
+    'launch consumes the operator’s paid local FPV stock without a second resource charge',
+  );
+  assert.equal(
+    operators.reduce((n, u) => n + u.fpvAmmo, 0),
+    11,
+  );
   assert.equal(operators.filter((u) => u.fpvAmmo === 3).length, 1);
   updateAutomaticFPV(s);
   assert.equal(s.units.length, 4, 'cadence and cooldown prevent duplicate launches');

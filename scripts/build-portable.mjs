@@ -33,7 +33,6 @@ const base = (
       'src/ui/army.css',
       'src/ui/multiplayer.css',
       'src/ui/districts.css',
-      'src/ui/research.css',
       'src/ui/recruitment.css',
       'src/ui/frontline.css',
     ].map(async (file) => (await readFile(path.join(root, file), 'utf8')).replace(/^\uFEFF/, '')),

@@ -125,8 +125,8 @@ test('internet WebSocket compression negotiates and keeps authoritative snapshot
   assert.ok(pair.b.socket.extensions.includes('permessage-deflate'));
   const { viewA, viewB } = await startPair(pair);
   assert.equal(viewA.state.mode, 'multiplayer');
-  assert.equal(viewB.state.buildings.find((b) => b.key === 'hq' && b.side === 0).x, 615);
-  const result = await command(pair.a, 'build', { key: 'power', x: -670, z: -80 });
+  assert.equal(viewB.state.buildings.find((b) => b.key === 'hq' && b.side === 0).x, 1015);
+  const result = await command(pair.a, 'build', { key: 'power', x: -1070, z: -80 });
   assert.ok(result.result?.id);
   const [updatedA, updatedB] = await tickSnapshots(pair, 20);
   assert.equal(updatedA.state.time, updatedB.state.time);
@@ -170,8 +170,8 @@ test('two clients start one authoritative match; side 1 owns its commands and se
   assert.equal(economy(room.state, 1).bonus, 1);
   assert.deepEqual(room.state.sides[0], room.state.sides[1]);
 
-  const own = makeGround(room.state, 1, 'infantry', 330, 510);
-  const foe = makeGround(room.state, 0, 'infantry', 390, 510);
+  const own = makeGround(room.state, 1, 'infantry', 730, 510);
+  const foe = makeGround(room.state, 0, 'infantry', 790, 510);
   room.state.groundUnits.push(own, foe);
   b.send({
     type: 'command',
@@ -193,7 +193,7 @@ test('two clients start one authoritative match; side 1 owns its commands and se
     sequence: 2,
     side: 0,
     command: 'order',
-    args: { ids: [foe.id], aim: { x: 350, z: 510, mode: 'move' } },
+    args: { ids: [foe.id], aim: { x: 750, z: 510, mode: 'move' } },
   });
   assert.ok((await b.next((m) => m.type === 'ack' && m.sequence === 2)).error);
   assert.equal(foe.order, null);
@@ -308,9 +308,9 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
   assert.equal((await rapid.closed()).code, 1008);
 });
 
-test('old protocols are explicitly refused and protocol seven creates and joins a real room', async (t) => {
+test('old protocols are explicitly refused and protocol eight creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 7);
+  assert.equal(PROTOCOL_VERSION, 8);
   const host = await connect();
   host.send({ type: 'create', protocol: 5, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
@@ -347,8 +347,8 @@ test('WebSocket auto-defense belongs to each owner and snapshots preserve only o
     return u;
   });
   const observed = [
-    ground(pair, 0, 'infantry', { x: -450, z: -270 }),
-    ground(pair, 1, 'infantry', { x: -400, z: -270 }),
+    ground(pair, 0, 'infantry', { x: -850, z: -270 }),
+    ground(pair, 1, 'infantry', { x: -800, z: -270 }),
   ];
   for (const u of defenders) {
     u.guard = { x: u.x, z: u.z };
@@ -435,7 +435,11 @@ test('WebSocket district commands capture for both sides, project control and pa
   near(E.economy(capturedA.state, 0).districts.materials, left.materials);
   near(E.economy(capturedB.state, 0).districts.materials, right.materials);
   assert.ok(room.state.sides.every((s, i) => s.materials > materialsBefore[i]));
-  near(room.state.sides[0].materials, room.state.sides[1].materials);
+  assert.ok(
+    Math.abs(room.state.sides[0].materials - room.state.sides[1].materials) <=
+      left.materials * 0.05 + 1e-7,
+    'symmetric physical capture paths finish within one authority tick',
+  );
   near(capturedA.state.sides[0].materials, room.state.sides[0].materials);
   near(capturedB.state.sides[0].materials, room.state.sides[1].materials);
   assert.equal(capturedA.state.sides[1].materials, 0, 'opponent reserves remain private');
@@ -476,12 +480,12 @@ test('side one queues routes and delivers real passengers over WebSocket without
   const pair = await joinedPair(t);
   await startPair(pair);
   const { a, b, room } = pair;
-  const walker = ground(pair, 1, 'infantry', { x: 330, z: 510 });
-  const apc = ground(pair, 1, 'apc', { x: 330, z: 390 });
-  const passenger = ground(pair, 1, 'infantry', { x: 324, z: 390 });
-  ground(pair, 0, 'infantry', { x: 390, z: 510 });
-  const first = { x: 450, z: 510, mode: 'move' };
-  const second = { x: 450, z: 430, mode: 'move' };
+  const walker = ground(pair, 1, 'infantry', { x: 730, z: 510 });
+  const apc = ground(pair, 1, 'apc', { x: 730, z: 390 });
+  const passenger = ground(pair, 1, 'infantry', { x: 724, z: 390 });
+  ground(pair, 0, 'infantry', { x: 790, z: 510 });
+  const first = { x: 850, z: 510, mode: 'move' };
+  const second = { x: 850, z: 430, mode: 'move' };
   assert.ok((await command(a, 'route-add', { ids: [walker.id], aim: first })).error);
   assert.equal(walker.order, null);
   assert.equal((await command(b, 'route-add', { ids: [walker.id], aim: first })).result, 1);
@@ -494,7 +498,7 @@ test('side one queues routes and delivers real passengers over WebSocket without
   assert.equal((await command(b, 'board', { ids: [passenger.id], id: apc.id })).result, 1);
   await tickSnapshots(pair, 2);
   assert.equal(passenger.carrierId, apc.id);
-  const deliveryPoint = { x: 480, z: 390 };
+  const deliveryPoint = { x: 880, z: 390 };
   assert.ok((await command(a, 'deliver', { id: apc.id, point: deliveryPoint })).error);
   assert.equal(apc.delivery, undefined);
   const delivered = await command(b, 'deliver', { id: apc.id, point: deliveryPoint });
@@ -551,9 +555,9 @@ test('both WebSocket players use private paid factory plans, preserve reserves a
   const launchers = [];
   for (const side of [0, 1]) {
     const sign = side === 0 ? -1 : 1;
-    factories.push(ready(side, 'factory', sign * 680, -10));
-    ready(side, 'power', sign * 670, -80);
-    launchers.push(ready(side, 'launcher', sign * 550, -10));
+    factories.push(ready(side, 'factory', sign * (E.HQ_X + 65), -10));
+    ready(side, 'power', sign * (E.HQ_X + 55), -80);
+    launchers.push(ready(side, 'launcher', sign * (E.HQ_X - 65), -10));
     room.state.sides[side].credits = 5000;
     room.state.sides[side].materials = 116;
   }
@@ -576,11 +580,11 @@ test('both WebSocket players use private paid factory plans, preserve reserves a
     [1, stockB],
   ]) {
     const f = room.state.sides[side];
-    assert.equal(f.inventory.drone, 2);
+    assert.equal(E.weaponStock(room.state, side, 'drone'), 2);
     assert.equal(factories[side].queue.length, 0);
     near(f.materials, 100);
     assert.ok(f.credits >= plan.reserveCredits);
-    assert.equal(own.state.sides[0].inventory.drone, 2);
+    assert.equal(E.weaponStock(own.state, 0, 'drone'), 2);
     assert.deepEqual(
       own.state.buildings.find((u) => u.id === factories[side].id).productionPlan,
       plan,
@@ -591,24 +595,24 @@ test('both WebSocket players use private paid factory plans, preserve reserves a
   }
   const launch = await command(b, 'launch', {
     key: 'drone',
-    aim: { x: -400, z: 400 },
+    aim: { x: -800, z: 400 },
     count: 1,
     siteId: launchers[1].id,
   });
   assert.equal(launch.result, 1);
-  assert.equal(room.state.sides[1].inventory.drone, 1);
+  assert.equal(E.weaponStock(room.state, 1, 'drone'), 1);
   const [, waitingB] = await tickSnapshots(pair, 20);
   assert.equal(factories[1].queue.length, 0, 'replacement cannot spend the material reserve');
   assert.equal(E.factoryPlanStatus(waitingB.state, 0, factories[1].id).status, 'materials');
   near(room.state.sides[1].materials, 100);
   room.state.sides[1].materials += E.WEAPONS.drone.metal;
   const [, replacedB] = await tickSnapshots(pair, 300);
-  assert.equal(room.state.sides[1].inventory.drone, 2);
-  assert.equal(replacedB.state.sides[0].inventory.drone, 2);
+  assert.equal(E.weaponStock(room.state, 1, 'drone'), 2);
+  assert.equal(E.weaponStock(replacedB.state, 0, 'drone'), 2);
   assert.equal(E.factoryPlanStatus(replacedB.state, 0, factories[1].id).status, 'stock');
   near(room.state.sides[1].materials, 100);
   assert.ok(room.state.sides[1].credits >= plan.reserveCredits);
-  assert.equal(room.state.sides[0].inventory.drone, 2);
+  assert.equal(E.weaponStock(room.state, 0, 'drone'), 2);
   assert.equal(factories[0].queue.length, 0);
   assert.equal(
     room.state.units.filter((u) => u.side === 1 && u.sourceId === launchers[1].id).length,
@@ -645,7 +649,7 @@ test('team room: two humans command one side against the bot at the chosen diffi
   // Either human spends the shared treasury; the other sees the same building.
   room.state.sides[0].credits = 20000;
   room.state.sides[0].materials = 2000;
-  const placed = await command(b, 'build', { key: 'power', x: -670, z: -80 });
+  const placed = await command(b, 'build', { key: 'power', x: -1070, z: -80 });
   assert.equal(placed.error, undefined, placed.error);
   server.tick();
   server.tick();

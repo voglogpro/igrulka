@@ -2,7 +2,8 @@ import { GROUND_UNITS, BUILDINGS, isInfantry } from '../../config.js';
 import { event as emit } from '../../shared/events.js';
 import { random } from '../../shared/random.js';
 import { groundPath } from './navigation.js';
-import { recruit } from './recruitment.js';
+import { loadSupplyTruck, supplyNearbyAmmo } from '../../city/ammo-logistics.js';
+import { createAmmoStock, ammunitionProfile, ammunitionStatus } from './ammunition.js';
 
 // Everything in this file happens without orders: soldiers who would die are sometimes only
 // wounded, medics find and revive them, supply trucks mend machines and refill magazines, and each
@@ -111,8 +112,12 @@ function walkTo(s, u, point, stopAt = 3) {
 }
 
 function medicTick(s, u, dt) {
+  if (u.supportManual && u.path?.length) return;
   const list = woundedBySide(s)[u.side];
-  let patient = list.find((v) => v.id === u.patientId);
+  let patient = list.find(
+    (v) =>
+      v.id === u.patientId && (!u.supportManual || Math.hypot(v.x - u.x, v.z - u.z) <= MEDIC_RANGE),
+  );
   if (patient && (patient.hp <= 0 || (!patient.downed && patient.hp >= patient.maxHp * 0.95)))
     patient = null;
   if ((u.supportAt || 0) <= s.time) {
@@ -125,15 +130,19 @@ function medicTick(s, u, dt) {
         const taken = s.groundUnits.some(
           (m) => m !== u && m.patientId === v.id && m.hp > 0 && m.key === 'medic',
         );
-        if (score < best && score < 320 && !(taken && !v.downed)) {
+        if (
+          score < best &&
+          score < (u.supportManual ? MEDIC_RANGE : 320) &&
+          !(taken && !v.downed)
+        ) {
           best = score;
           patient = v;
         }
       }
     }
     u.patientId = patient?.id ?? null;
-    if (patient) walkTo(s, u, patient, MEDIC_RANGE - 3);
-    else if (!u.path?.length) {
+    if (patient && !u.supportManual) walkTo(s, u, patient, MEDIC_RANGE - 3);
+    else if (!patient && !u.supportManual && !u.path?.length) {
       const army = centroid(
         s.groundUnits.filter(
           (v) =>
@@ -163,12 +172,14 @@ function medicTick(s, u, dt) {
 
 function truckTick(s, u, dt) {
   const f = s.sides[u.side];
+  u.ammoCargo ||= createAmmoStock();
+  supplyNearbyAmmo(s, u);
   // Mend everything friendly around the truck.
   for (const v of s.groundUnits) {
     if (v.side !== u.side || v.hp <= 0 || v.carrierId || v === u) continue;
     if ((v.x - u.x) ** 2 + (v.z - u.z) ** 2 > TRUCK_RANGE * TRUCK_RANGE) continue;
-    if (v.groundReload > 0) v.groundReload = Math.max(0, v.groundReload - dt * 1.5);
-    if (v.reloadLeft > 0) v.reloadLeft = Math.max(0, v.reloadLeft - dt * 1.5);
+    if (v.groundReload > 0) v.groundReload = Math.max(1e-6, v.groundReload - dt * 1.5);
+    if (v.reloadLeft > 0) v.reloadLeft = Math.max(1e-6, v.reloadLeft - dt * 1.5);
     if (!isInfantry(v.key) && v.hp < v.maxHp && f.credits > 1 && f.materials > 0.1) {
       const amount = Math.min(v.maxHp - v.hp, TRUCK_REPAIR * dt);
       v.hp += amount;
@@ -190,6 +201,15 @@ function truckTick(s, u, dt) {
   }
   if ((u.supportAt || 0) > s.time) return;
   u.supportAt = s.time + THINK * 1.5 + (u.id % 5) * 0.05;
+  if (u.supportManual) return;
+  if (!Object.values(u.ammoCargo).some((n) => n > 0)) {
+    const depot = loadSupplyTruck(s, u);
+    if (depot) {
+      const point = { x: depot.x, z: depot.z + BUILDINGS.ammofactory.size * 0.7 + 8 };
+      walkTo(s, u, point, 10);
+      return;
+    }
+  }
   let goal = null,
     best = Infinity;
   for (const v of s.groundUnits)
@@ -197,9 +217,11 @@ function truckTick(s, u, dt) {
       v.side === u.side &&
       v.hp > 0 &&
       !v.carrierId &&
-      !isInfantry(v.key) &&
       !isSupport(v) &&
-      v.hp < v.maxHp * 0.8
+      ((!isInfantry(v.key) && v.hp < v.maxHp * 0.8) ||
+        (ammunitionProfile(v) &&
+          ammunitionStatus(s, v).reserve < ammunitionStatus(s, v).capacity &&
+          u.ammoCargo[ammunitionProfile(v).kind] > 0))
     ) {
       const d = Math.hypot(v.x - u.x, v.z - u.z);
       if (d < best && d < 380) {
@@ -208,7 +230,16 @@ function truckTick(s, u, dt) {
       }
     }
   for (const b of s.buildings)
-    if (b.side === u.side && b.hp > 0 && b.hp < b.maxHp * 0.7 && b.progress >= 1) {
+    if (
+      b.side === u.side &&
+      b.hp > 0 &&
+      b.progress >= 1 &&
+      !b.demolished &&
+      (b.hp < b.maxHp * 0.7 ||
+        (ammunitionProfile(b) &&
+          ammunitionStatus(s, b).reserve < ammunitionStatus(s, b).capacity &&
+          u.ammoCargo[ammunitionProfile(b).kind] > 0))
+    ) {
       const d = Math.hypot(b.x - u.x, b.z - u.z) + 60;
       if (d < best && d < 380) {
         best = d;
@@ -239,37 +270,27 @@ export function updateRear(s, dt) {
   }
 }
 
-// Each side keeps a rear service in proportion to its army, paid like any other recruitment.
-export function autoRear(s) {
-  if (!rearEnabled(s)) return;
-  for (let side = 0; side < 2; side++) {
-    const f = s.sides[side];
-    if (f.rearAuto === false) continue;
-    const mine = s.groundUnits.filter((u) => u.side === side && u.hp > 0);
-    const queue = s.buildings
-      .filter((b) => b.side === side && b.hp > 0)
-      .flatMap((b) => b.armyQueue || []);
-    const have = (key) =>
-      mine.filter((u) => u.key === key).length + queue.filter((q) => q.key === key).length;
-    const infantry = mine.filter((u) => isInfantry(u.key) && !isSupport(u)).length;
-    const machines = mine.filter((u) => !isInfantry(u.key) && !isSupport(u)).length;
-    const wants = [
-      ['medic', infantry >= 6 ? Math.min(6, 1 + Math.floor(infantry / 8)) : 0],
-      ['supplytruck', machines >= 3 ? Math.min(4, 1 + Math.floor(machines / 5)) : 0],
-    ];
-    // The rear never clogs the barracks: it only queues when the production lines are nearly idle.
-    if (queue.length >= 2) continue;
-    // Serve the role that is furthest from its target first, so medics and trucks alternate.
-    const order = wants
-      .filter(([key, target]) => have(key) < target)
-      .sort((p, q) => have(p[0]) / p[1] - have(q[0]) / q[1]);
-    for (const [key] of order) {
-      const d = GROUND_UNITS[key];
-      if (d.tech && !f.tech.includes(d.tech)) continue;
-      // Never starve the front: the rear is only paid from comfortable reserves.
-      if (f.credits < d.cost + 200 || f.materials < d.metal + 10) continue;
-      recruit(s, side, key, null, 1);
-      break;
+// Purchases belong exclusively to the desired composition, including support roles.
+export function autoRear() {}
+
+export function setSupportAutomatic(s, side, ids, enabled = true) {
+  if (s.result || typeof enabled !== 'boolean') return 'Недоступный режим поддержки';
+  let changed = 0;
+  for (const u of s.groundUnits)
+    if (
+      u.side === side &&
+      u.hp > 0 &&
+      ['medic', 'supplytruck'].includes(u.key) &&
+      ids.includes(u.id)
+    ) {
+      u.supportManual = !enabled;
+      u.supportAt = 0;
+      if (enabled) {
+        u.path = [];
+        u.order = null;
+        u.guard = null;
+      }
+      changed++;
     }
-  }
+  return changed || 'Выберите медика или машину снабжения';
 }

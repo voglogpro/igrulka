@@ -6,8 +6,10 @@ export function mogModel(w, b, content, root, crew = true) {
   position.userData.dynamic = true;
   content.add(position);
   const cloth = '#8b8266',
-    olive = b.side === 0 ? '#71836a' : '#8a7963';
-  for (let row = 0; row < 2; row++)
+    olive = b.side === 0 ? '#71836a' : '#8a7963',
+    level = Math.max(0, Math.min(2, b.level || 0));
+  position.userData.equipmentLevel = level;
+  for (let row = 0; row < level; row++)
     for (let i = 0; i < 17; i++) {
       const a = ((i + row * 0.5) / 20 + 0.08) * Math.PI * 2,
         x = Math.cos(a) * 7.4,
@@ -20,7 +22,7 @@ export function mogModel(w, b, content, root, crew = true) {
       bag.receiveShadow = true;
       position.add(bag);
     }
-  for (const x of [-5, 4]) {
+  for (const x of level ? [-5, 4] : []) {
     w.box(position, x, 0.2, 3, 2.6, 1.6, 3, '#57654c');
     w.box(position, x, 1.8, 3, 2.7, 0.15, 3.1, '#8a9675');
   }
@@ -49,11 +51,14 @@ export function mogModel(w, b, content, root, crew = true) {
   pitch.add(barrel);
   w.box(pitch, 0, -0.2, -1, 0.5, 0.55, 1.8, '#485b4c');
   w.box(pitch, 0, 0.3, -5.5, 0.22, 0.35, 0.2, '#263b32');
+  if (level >= 2) {
+    w.box(pitch, 0.55, 0.65, -0.7, 0.55, 0.6, 1.8, '#334b45');
+    w.box(pitch, 0.55, 0.65, -1.64, 0.35, 0.35, 0.1, '#88b5ad');
+  }
   if (crew)
     for (const [x, z, sitting] of [
       [0, 2.8, true],
       [-3.6, 1, true],
-      [3, -2, false],
     ]) {
       w.box(content, x, 0.3, z, 0.65, sitting ? 0.5 : 1.1, 0.65, olive);
       w.box(content, x, sitting ? 0.7 : 1.3, z, 1, 1.1, 0.7, olive);

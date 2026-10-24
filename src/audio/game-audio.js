@@ -13,6 +13,7 @@ import {
   rainLoop,
 } from './synth.js';
 import { recordedEngineLoop, uavEngineMix } from './engines.js';
+import { rocketIgnition, missileDive } from './missiles.js';
 
 // How loud each weapon is and how often the same class may start a new sound.
 const WEAPON_SOUND = {
@@ -183,6 +184,9 @@ export class GameAudio {
     add('atgm', () => whoosh(rate, 0.9));
     add('whistle', () => whistle(rate, 1.3));
     add('reload', () => clicks(rate));
+    add('rocketLaunch', () => rocketIgnition(rate));
+    add('ballisticLaunch', () => rocketIgnition(rate, true));
+    add('missileDive', () => missileDive(rate));
     const next = () => {
       const job = jobs.shift();
       if (!job) return;
@@ -287,7 +291,8 @@ export class GameAudio {
         return;
       }
       if (kind === 'rocket') {
-        if (this.throttle('rocket', 0.07)) this.sample('whoosh', where.distance, where.pan, 1.2);
+        if (this.throttle('rocket', 0.09))
+          this.sample('rocketLaunch', where.distance, where.pan, 0.85);
         return;
       }
       if (kind === 'atgm') {
@@ -354,7 +359,12 @@ export class GameAudio {
       return;
     }
     if (e.type === 'launch' && this.throttle('launch', 0.1))
-      this.sample('whoosh', where.distance, where.pan, 0.8);
+      this.sample(
+        e.key === 'ballistic' ? 'ballisticLaunch' : e.key === 'cruise' ? 'rocketLaunch' : 'whoosh',
+        where.distance,
+        where.pan,
+        e.key === 'ballistic' ? 0.95 : 0.8,
+      );
   }
   createEngines() {
     const c = this.context,
@@ -428,6 +438,21 @@ export class GameAudio {
   }
   // Incoming artillery shells whistle during the last second before impact.
   incoming(state) {
+    for (const u of state.units || []) {
+      if (
+        u.key !== 'ballistic' ||
+        u.hp <= 0 ||
+        u.delay > 0 ||
+        u.status === 'falling' ||
+        this.whistled.has(u.id)
+      )
+        continue;
+      const left = (u.total - u.travelled) / Math.max(1, u.speed || 90);
+      if (left > 1.5 || left < 0.2) continue;
+      this.whistled.add(u.id);
+      const where = this.locate({ x: u.tx, y: 2, z: u.tz }, 0, 0);
+      this.sample('missileDive', where.distance, where.pan, 0.5, { delay: 0, offset: 1.5 - left });
+    }
     for (const p of state.projectiles || []) {
       if (p.shooterKey !== 'howitzer' || this.whistled.has(p.id)) continue;
       const left = (p.flight ?? 0) - p.life;

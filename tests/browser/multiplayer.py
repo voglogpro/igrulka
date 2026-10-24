@@ -95,8 +95,8 @@ try:
             assert page.locator('#pause').is_disabled()
         assert first.evaluate('skyfront.network().side')==0
         assert second.evaluate('skyfront.network().side')==1
-        assert first.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).x')==-615
-        assert second.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).x')==615
+        assert first.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).x')==-1015
+        assert second.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).x')==1015
         print('Two isolated browsers joined one authoritative match with opposite perspectives',flush=True)
         for side,page in enumerate(pages):
             activate(page)

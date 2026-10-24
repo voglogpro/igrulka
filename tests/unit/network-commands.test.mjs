@@ -11,7 +11,7 @@ function fresh() {
   for (const f of s.sides) {
     f.credits = 100000;
     f.materials = 10000;
-    f.tech = Object.keys(game.TECH);
+    f.tech = [];
   }
   return s;
 }
@@ -30,14 +30,14 @@ function finiteTree(value) {
 
 test('unknown and inherited configuration keys cannot mutate resources or crash the command gateway', () => {
   const s = fresh();
-  const b = game.build(s, 0, 'barracks', -680, -10);
+  const b = game.build(s, 0, 'barracks', -1080, -10);
   assert.notEqual(typeof b, 'string', b);
   b.hp = b.maxHp;
   b.progress = 1;
   const before = [s.sides[0].credits, s.sides[0].materials, s.buildings.length];
   for (const key of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
     for (const [type, args] of [
-      ['build', { key, x: -450, z: 300 }],
+      ['build', { key, x: -850, z: 300 }],
       ['produce', { key }],
       ['research', { key }],
       ['launch', { key, aim: { x: 0, z: 0 }, count: 1 }],
@@ -73,23 +73,23 @@ test('malformed JSON shapes are rejected without exceptions or authority changes
 
 test('side 1 can command only its own units and objects with unchanged world coordinates and IDs', () => {
   const s = fresh();
-  const one = unit(s, 1, 'infantry', 500, 250);
-  const zero = unit(s, 0, 'infantry', -500, 250);
-  const enemyBarracks = game.build(s, 0, 'barracks', -680, -10);
+  const one = unit(s, 1, 'infantry', 900, 250);
+  const zero = unit(s, 0, 'infantry', -900, 250);
+  const enemyBarracks = game.build(s, 0, 'barracks', -1080, -10);
   assert.notEqual(typeof enemyBarracks, 'string', enemyBarracks);
   assert.equal(executeCommand(s, 1, 'formation', { value: 'spread' }), true);
   assert.equal(s.formations[1], 'spread');
   assert.equal(s.formations[0], 'line');
   assert.deepEqual(executeCommand(s, 1, 'group', { index: 1, ids: [one.id] }), [one.id]);
   assert.equal(
-    typeof executeCommand(s, 1, 'order', { ids: [zero.id], aim: { x: 400, z: 250, mode: 'move' } }),
+    typeof executeCommand(s, 1, 'order', { ids: [zero.id], aim: { x: 800, z: 250, mode: 'move' } }),
     'string',
   );
   assert.equal(
-    executeCommand(s, 1, 'order', { ids: [one.id], aim: { x: 450, z: 250, mode: 'move' } }),
+    executeCommand(s, 1, 'order', { ids: [one.id], aim: { x: 850, z: 250, mode: 'move' } }),
     1,
   );
-  assert.equal(one.order.x, 450);
+  assert.equal(one.order.x, 850);
   assert.equal(one.order.z, 250);
   assert.equal(
     executeCommand(s, 1, 'repair', { id: s.buildings[0].id }),
@@ -98,7 +98,7 @@ test('side 1 can command only its own units and objects with unchanged world coo
   for (const [type, args] of [
     ['recruit', { key: 'infantry', count: 1, siteId: enemyBarracks.id }],
     ['launch', { key: 'drone', count: 1, siteId: enemyBarracks.id, aim: { x: 0, z: 0 } }],
-    ['rally', { id: enemyBarracks.id, point: { x: 500, z: 250 } }],
+    ['rally', { id: enemyBarracks.id, point: { x: 900, z: 250 } }],
     ['rally-mode', { id: enemyBarracks.id, mode: 'guard' }],
     ['repeat', { id: enemyBarracks.id, key: 'infantry', enabled: true }],
   ])
@@ -111,7 +111,7 @@ test('a hidden infantry ID cannot be used as a forced attack target', () => {
   const patch = game.COVER_PATCHES.find((p) => p.x < -100 && p.x > -1300 && Math.abs(p.z) < 800);
   const hidden = unit(s, 0, 'infantry', patch.x, patch.z);
   hidden.camouflaged = true;
-  const attacker = unit(s, 1, 'infantry', 450, 300);
+  const attacker = unit(s, 1, 'infantry', 850, 300);
   assert.equal(game.groundVisible(s, 1, hidden), false);
   assert.equal(
     executeCommand(s, 1, 'order', {
@@ -135,19 +135,19 @@ test('projection hides concealed infantry, private effects and future enemy plan
   );
   const hidden = unit(s, 1, 'mog', patch.x, patch.z);
   hidden.camouflaged = true;
-  const visible = unit(s, 1, 'infantry', 500, 420);
+  const visible = unit(s, 1, 'infantry', 900, 420);
   // Friendly observers: one near the visible soldier, one near the drone below.
-  unit(s, 0, 'sniper', 470, 420);
-  unit(s, 0, 'sniper', 280, 20);
-  visible.path = [{ x: -500, z: 420 }];
-  visible.guard = { x: 510, z: 420 };
+  unit(s, 0, 'sniper', 870, 420);
+  unit(s, 0, 'sniper', 680, 20);
+  visible.path = [{ x: -900, z: 420 }];
+  visible.guard = { x: 910, z: 420 };
   visible.xp = 360;
-  const b = game.build(s, 1, 'barracks', 680, -10);
+  const b = game.build(s, 1, 'barracks', 1080, -10);
   assert.notEqual(typeof b, 'string', b);
   b.armyQueue = [{ key: 'sniper', progress: 0.5 }];
   b.recruitRepeat = { enabled: true, key: 'sniper' };
-  b.rally = { x: 300, z: 120 };
-  s.contacts[1].push({ x: -400, z: 300, unitId: 900, radius: 20, expires: 20, time: 0 });
+  b.rally = { x: 700, z: 120 };
+  s.contacts[1].push({ x: -800, z: 300, unitId: 900, radius: 20, expires: 20, time: 0 });
   s.contacts[0].push({
     x: patch.x + 4,
     z: patch.z + 5,
@@ -205,13 +205,13 @@ test('projection hides concealed infantry, private effects and future enemy plan
     id: s.nextId++,
     side: 1,
     key: 'drone',
-    x: 600,
+    x: 1000,
     y: 5,
     z: 0,
     hp: 30,
     delay: 5,
     launched: false,
-    tx: -600,
+    tx: -1000,
     tz: 0,
     route: [{ x: 0, z: 0 }],
   });
@@ -219,7 +219,7 @@ test('projection hides concealed infantry, private effects and future enemy plan
     id: s.nextId++,
     side: 1,
     key: 'drone',
-    x: 300,
+    x: 700,
     y: 30,
     z: 20,
     hp: 30,
@@ -230,7 +230,7 @@ test('projection hides concealed infantry, private effects and future enemy plan
     vy: 0,
     vz: 0,
     phase: 0,
-    tx: -600,
+    tx: -1000,
     tz: 0,
     route: [{ x: 0, z: 0 }],
     targetId: 1,
@@ -273,9 +273,9 @@ test('visible enemy death effects survive removal while concealed casualties sta
   );
   const hidden = unit(s, 1, 'infantry', patch.x, patch.z);
   hidden.camouflaged = true;
-  const visible = unit(s, 1, 'infantry', 500, 420);
-  const tank = unit(s, 0, 'leopard', -500, 420);
-  unit(s, 0, 'sniper', 470, 420);
+  const visible = unit(s, 1, 'infantry', 900, 420);
+  const tank = unit(s, 0, 'leopard', -900, 420);
+  unit(s, 0, 'sniper', 870, 420);
   assert.equal(game.groundVisible(s, 0, hidden), false);
   assert.equal(game.groundVisible(s, 0, visible), true);
   for (const u of [hidden, visible, tank]) damageGround(s, u, 100000);
@@ -300,15 +300,15 @@ test('visible enemy death effects survive removal while concealed casualties sta
 
 test('side 1 projection reverses ownership, private arrays and victory while preserving identity', () => {
   const s = fresh();
-  const own = unit(s, 1, 'infantry', 500, 300);
-  unit(s, 0, 'infantry', -500, 300);
+  const own = unit(s, 1, 'infantry', 900, 300);
+  unit(s, 0, 'infantry', -900, 300);
   s.sides[0].credits = 8888;
   s.sides[1].credits = 1234;
   s.groups[0][1] = [9];
   s.groups[1][2] = [own.id];
   s.formations = ['column', 'spread'];
-  s.contacts[0].push({ x: 500, z: 300, radius: 20, expires: 20, time: 0, unitId: own.id });
-  s.contacts[1].push({ x: -500, z: 300, radius: 20, expires: 20, time: 0 });
+  s.contacts[0].push({ x: 900, z: 300, radius: 20, expires: 20, time: 0, unitId: own.id });
+  s.contacts[1].push({ x: -900, z: 300, radius: 20, expires: 20, time: 0 });
   s.result = 'victory';
   s.events.push({ id: s.nextId++, type: 'result', result: 'victory' });
   const view = playerView(s, 1);
@@ -318,10 +318,10 @@ test('side 1 projection reverses ownership, private arrays and victory while pre
   assert.deepEqual(view.groups[1], {});
   assert.equal(view.formations[0], 'spread');
   assert.equal(view.formations[1], 'line');
-  assert.equal(view.contacts[0][0].x, -500);
+  assert.equal(view.contacts[0][0].x, -900);
   assert.deepEqual(view.contacts[1], []);
   assert.equal(view.groundUnits.find((u) => u.id === own.id).side, 0);
-  assert.equal(view.groundUnits.find((u) => u.id === own.id).x, 500);
+  assert.equal(view.groundUnits.find((u) => u.id === own.id).x, 900);
   assert.equal(view.buildings.find((b) => b.id === 2).side, 0);
   assert.equal(view.result, 'defeat');
   assert.equal(view.events[0].result, 'defeat');

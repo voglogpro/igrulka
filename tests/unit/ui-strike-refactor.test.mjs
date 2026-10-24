@@ -26,10 +26,17 @@ function fixture() {
       WEAPONS: {
         drone: { name: 'Drone', blast: 10, speed: 100 },
         ballistic: { name: 'Ballistic', blast: 50, speed: 100 },
-        heavy: { tech: 'heavy' },
+        heavy: { name: 'Heavy', blast: 25, speed: 80, tech: 'heavy' },
       },
       MAP: { width: 1728, depth: 1152 },
       COMBAT: { queueLimit: 12 },
+      BUILDINGS: { launcher: { name: 'Drone launcher' }, silo: { name: 'Missile silo' } },
+      launchSites: (s, side, key) =>
+        s.buildings.filter(
+          (b) => b.side === side && (key === 'ballistic' ? b.key === 'silo' : b.key === 'launcher'),
+        ),
+      availableLaunchStock: () => 2,
+      weaponStock: () => 10,
       queuedLaunches: () => 0,
       selectedLaunchSite: () => ({ id: 7 }),
       launchStatus: () => null,
@@ -65,6 +72,7 @@ function fixture() {
   return {
     controller,
     calls,
+    elements,
     setRevision: (value) => (revision = value),
     setStarted: (value) => (started = value),
     setReply: (value) => (reply = value),
@@ -72,15 +80,35 @@ function fixture() {
   };
 }
 
-test('strike model belongs to controller; locked weapons open research without arming', () => {
+test('changing weapon removes incompatible selected sites and shows local stock separately', () => {
+  const f = fixture();
+  f.setState({
+    buildings: [
+      { id: 7, key: 'launcher', side: 0, hp: 10, progress: 1 },
+      { id: 9, key: 'silo', side: 0, hp: 10, progress: 1 },
+    ],
+    sides: [{ inventory: { drone: 100, ballistic: 100 } }],
+  });
+  f.controller.model.launcherId = 7;
+  f.controller.armStrike('ballistic');
+  assert.equal(f.controller.model.launcherId, null);
+  const select = f.elements.get('#strike-site');
+  assert.match(select.innerHTML, /value="9"/);
+  assert.doesNotMatch(select.innerHTML, /value="7"/);
+  assert.equal(f.elements.get('#strike-stock').textContent, 'На площадке: 2 · всего 10');
+});
+
+test('strike model is local and all weapons arm without a technology prerequisite', () => {
   const f = fixture();
   f.controller.armStrike('heavy');
-  assert.deepEqual(f.calls, ['clear-target', 'clear-army', ['panel', 'research', true]]);
-  assert.equal(f.controller.model.aiming, false);
+  assert.ok(!f.calls.some((c) => Array.isArray(c) && c[0] === 'panel'));
+  assert.equal(f.controller.model.aiming, true);
+  assert.equal(f.controller.model.weapon, 'heavy');
+  assert.ok(f.calls.some((c) => c[0] === 'focus' && c[1] === 615));
   f.calls.length = 0;
   f.controller.armStrike('drone');
   assert.equal(f.controller.model.aiming, true);
-  assert.ok(f.calls.some((c) => c[0] === 'focus' && c[1] === 615));
+  assert.equal(f.controller.model.weapon, 'drone');
   const second = fixture();
   assert.equal(second.controller.model.aiming, false);
 });

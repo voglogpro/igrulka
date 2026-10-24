@@ -62,12 +62,12 @@ try:
         ids = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),s=w.state,next=E.createGame(2410);next.mode='multiplayer';next.rules.rear=false;
           for(const f of next.sides){f.credits=20000;f.materials=3000;f.rearAuto=false;}
           Object.assign(s,next);w.previousSimTime=s.time;
-          const house=E.build(s,0,'housing',-560,-80);house.progress=1;house.hp=house.maxHp-120;
-          w.controls.focus(-620,-45,240);w.controls.update(3);w.sync();return {house:house.id};}''')
+          const house=E.build(s,0,'housing',-960,-80);house.progress=1;house.hp=house.maxHp-120;
+          w.controls.focus(-1020,-45,240);w.controls.update(3);w.sync();return {house:house.id};}''')
         card = page.locator('[data-build="service"]')
         card.scroll_into_view_if_needed()
         card.click()
-        point = page.evaluate('''()=>{const w=skyfront.getWorld(),v=w.camera.position.clone().set(-680,0,-80).project(w.camera),r=w.renderer.domElement.getBoundingClientRect();return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}''')
+        point = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),error=E.canPlace(w.state,'service',-1080,-80);if(error)throw Error(error);const v=w.camera.position.clone().set(-1080,0,-80).project(w.camera),r=w.renderer.domElement.getBoundingClientRect();return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}''')
         page.mouse.click(point['x'], point['y'])
         page.wait_for_function('skyfront.getState().buildings.some(b=>b.key==="service")')
         ids['station'] = page.evaluate('skyfront.getState().buildings.find(b=>b.key==="service").id')
@@ -101,7 +101,7 @@ try:
         assert report['fog']['weather']['rain'] is False
         report['checks'].append('all four weather phases render; rain and lightning freeze on pause')
         print(report['checks'][-1], flush=True)
-        for panel in ['attack', 'army', 'research', 'economy', 'settings', 'help']:
+        for panel in ['attack', 'army', 'economy', 'settings', 'help']:
             page.evaluate('name=>skyfront.openPanel(name,true)', panel)
             bounds = page.locator('#panel').bounding_box()
             assert bounds['x'] >= 0 and bounds['x'] + bounds['width'] <= 1025, (panel, bounds)
@@ -114,12 +114,12 @@ try:
         report['checks'].append('redesigned panels fit 1024px without horizontal page overflow')
         page.set_viewport_size({'width': 1440, 'height': 900})
         report['tracers'] = page.evaluate('''()=>{const w=skyfront.getWorld(),E=skyfront.engine,s=E.createGame(819);s.mode='multiplayer';s.rules.rear=false;
-          for(const f of s.sides){f.credits=50000;f.materials=5000;f.tech=Object.keys(E.TECH);}
-          const b=E.build(s,0,'gun',-450,0);b.progress=1;b.hp=b.maxHp;
-          const m=E.makeGround(s,0,'mog',-420,50);m.setup=1;s.groundUnits.push(m);
-          const site=E.build(s,1,'launcher',-350,175);if(typeof site==='string')throw Error(site);site.progress=1;site.hp=site.maxHp;s.sides[1].inventory.heavy=1;E.launch(s,1,'heavy',{x:-650,z:10});
-          Object.assign(s.units[0],{route:null,startX:0,startZ:10,tx:-650,tz:10,total:650,travelled:300,speed:.001,hp:100000,maxHp:100000,delay:0});
-          E.advance(s,7);Object.assign(w.state,s);w.previousSimTime=s.time;w.controls.focus(-380,20,300);w.controls.update(3);w.updateDaylight();w.sync();
+          for(const f of s.sides){f.credits=50000;f.materials=5000;}
+          const b=E.build(s,0,'gun',-850,0);b.progress=1;b.hp=b.maxHp;
+          const m=E.makeGround(s,0,'mog',-820,50);m.setup=1;s.groundUnits.push(m);
+          const site=E.build(s,1,'launcher',-750,175);if(typeof site==='string')throw Error(site);site.progress=1;site.hp=site.maxHp;E.acceptLaunchDelivery(site,'heavy',1);E.launch(s,1,'heavy',{x:-1050,z:10});
+          Object.assign(s.units[0],{route:null,startX:-400,startZ:10,tx:-1050,tz:10,total:650,travelled:300,speed:.001,hp:100000,maxHp:100000,delay:0});
+          E.advance(s,7);Object.assign(w.state,s);w.previousSimTime=s.time;w.controls.focus(-780,20,300);w.controls.update(3);w.updateDaylight();w.sync();
           w.weatherFX.update(3,w.controls.target,s.weather);w.combatFX.emit(s,.1);w.combatFX.update(.1,w.battleTime,w.camera);w.post.render(w.scene,w.camera,w.battleTime);
           return {shots:s.stats.shots,...w.combatFX.diagnostics()};}''')
         assert report['tracers']['shots'] > 20 and report['tracers']['tracerHeads'] > 0, report['tracers']

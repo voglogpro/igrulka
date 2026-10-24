@@ -27,7 +27,7 @@ test('service fleet mirrors simulation coordinates, respects fog and caps each s
     vehicles: 16,
     repairing: 8,
     capacity: 16,
-    drawCalls: 4,
+    drawCalls: 5,
     disposed: false,
   });
   const matrix = new T.Matrix4();
@@ -57,6 +57,39 @@ test('service fleet mirrors simulation coordinates, respects fog and caps each s
   fleet.sync({ time: 5, serviceVehicles: [] });
   assert.ok(fleet.meshes.every((m) => m.count === 0));
   fleet.dispose();
+});
+
+test('ammo fleet uses the same bounded batches and follows current-frame field positions', () => {
+  const scene = new T.Scene(),
+    fleet = new ServiceFleet(scene, { collection: 'ammoVehicles', paint: '#74836c' });
+  const v = { id: 900, side: 0, x: -1000, z: 150, yaw: 0.2, status: 'outbound' };
+  fleet.sync({ time: 0, ammoVehicles: [v], serviceVehicles: [vehicle(1)] });
+  const body = new T.Matrix4(),
+    shadow = new T.Matrix4();
+  fleet.body.getMatrixAt(0, body);
+  fleet.shadows.mesh.getMatrixAt(0, shadow);
+  assert.equal(body.elements[12], v.x);
+  assert.equal(shadow.elements[12], v.x);
+  const storage = fleet.body.instanceMatrix.array;
+  v.x += 31;
+  v.z += 12;
+  v.status = 'unloading';
+  fleet.sync({ time: 1, ammoVehicles: [v] });
+  fleet.body.getMatrixAt(0, body);
+  fleet.shadows.mesh.getMatrixAt(0, shadow);
+  assert.equal(body.elements[12], v.x);
+  assert.equal(shadow.elements[12], v.x);
+  assert.equal(body.elements[14], v.z);
+  assert.equal(fleet.body.castShadow, false);
+  assert.equal(fleet.body.instanceMatrix.array, storage);
+  assert.equal(fleet.diagnostics().repairing, 1);
+  v.hp = 0;
+  fleet.sync({ time: 1.5, ammoVehicles: [v] });
+  assert.equal(fleet.body.count, 0, 'destroyed slots stay in logistics but have no live van mesh');
+  fleet.sync({ time: 2, ammoVehicles: [] });
+  assert.equal(fleet.shadows.mesh.count, 0);
+  fleet.dispose();
+  assert.equal(scene.children.length, 0);
 });
 
 test('service fleet retains shared buffers across snapshots and disposes every resource once', () => {

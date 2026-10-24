@@ -1,5 +1,8 @@
 import { economy } from './city/economy.js';
-import { updateResearch } from './research/research.js';
+import { updateArmyComposition } from './units/ground/composition.js';
+import { updateLaunchSupply } from './units/aviation/launch-supply.js';
+import { updateAmmoProduction } from './city/ammo-production.js';
+import { updateAmmoLogistics } from './city/ammo-logistics.js';
 import { event } from './shared/events.js';
 import { updateConstruction } from './city/update.js';
 import { updateGround } from './units/ground/index.js';
@@ -27,16 +30,18 @@ export function step(s, dt) {
       e = rates[owner];
     f.credits = Math.max(0, f.credits + e.net * dt);
     f.materials += e.materials * dt;
-    f.science += e.science * dt;
-    updateResearch(s, owner, e, dt);
   }
   updateFactoryPlans(s);
   updateConstruction(s, rates, dt);
+  updateLaunchSupply(s);
+  updateAmmoProduction(s);
+  updateAmmoLogistics(s, dt);
   updateServices(s, dt);
   updateOil(s, rates, dt);
   updateTraining(s, dt);
   updatePorts(s, dt);
   updateDefense(s);
+  updateArmyComposition(s);
   updateGround(s, rates, dt, { event, random });
   moveUnits(s, dt);
   fireDefenses(s, rates, dt);

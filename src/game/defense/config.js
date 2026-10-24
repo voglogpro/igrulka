@@ -31,7 +31,7 @@ export const FRONTLINE = Object.freeze({
   maxDuty: 24,
   calmSeconds: 6,
   cooldown: 12,
-  homeLineX: 110,
+  homeLineX: 420,
   territoryAdvance: 40,
   postGap: 80,
   edgeCoverage: 48,

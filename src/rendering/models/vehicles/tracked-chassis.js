@@ -79,21 +79,39 @@ export function buildTrackedVehicle(world, u, root, paint, accent, dynamic) {
 }
 
 const dummy = new T.Object3D();
+const trackSample = { y: 0, z: 0, angle: 0 };
+const drivePoses = new Map();
 function trackPoint(distance) {
   const radius = 1.05,
     arc = Math.PI * radius,
     perimeter = 18 + 2 * arc;
   let s = ((distance % perimeter) + perimeter) % perimeter;
-  if (s < 9) return { y: 2.3, z: -4.5 + s, angle: 0 };
+  if (s < 9) {
+    trackSample.y = 2.3;
+    trackSample.z = -4.5 + s;
+    trackSample.angle = 0;
+    return trackSample;
+  }
   s -= 9;
   if (s < arc) {
     const a = s / radius;
-    return { y: 1.25 + Math.cos(a) * radius, z: 4.5 + Math.sin(a) * radius, angle: a };
+    trackSample.y = 1.25 + Math.cos(a) * radius;
+    trackSample.z = 4.5 + Math.sin(a) * radius;
+    trackSample.angle = a;
+    return trackSample;
   }
   s -= arc;
-  if (s < 9) return { y: 0.2, z: 4.5 - s, angle: Math.PI };
+  if (s < 9) {
+    trackSample.y = 0.2;
+    trackSample.z = 4.5 - s;
+    trackSample.angle = Math.PI;
+    return trackSample;
+  }
   const a = (s - 9) / radius + Math.PI;
-  return { y: 1.25 + Math.cos(a) * radius, z: -4.5 + Math.sin(a) * radius, angle: a };
+  trackSample.y = 1.25 + Math.cos(a) * radius;
+  trackSample.z = -4.5 + Math.sin(a) * radius;
+  trackSample.angle = a;
+  return trackSample;
 }
 
 export function animateVehicleDrive(root, phase) {
@@ -101,6 +119,30 @@ export function animateVehicleDrive(root, phase) {
   if (!wheels) return;
   const spokes = root.getObjectByName('drive-spokes'),
     links = root.getObjectByName('track-links');
+  let cached;
+  if (root.userData.batchedVisual) {
+    root.userData.driveCacheKey ??= wheels.geometry.uuid;
+    const key = root.userData.driveCacheKey;
+    cached = drivePoses.get(key);
+    // A sub-frame angular step lets moving copies reuse a pose without coupling their clocks.
+    phase = Math.round(phase * 60) / 60;
+    if (cached?.phase === phase) {
+      wheels.instanceMatrix.array.set(cached.wheels);
+      spokes.instanceMatrix.array.set(cached.spokes);
+      links.instanceMatrix.array.set(cached.links);
+      for (const mesh of [wheels, spokes, links]) mesh.instanceMatrix.needsUpdate = true;
+      return;
+    }
+    if (!cached) {
+      if (drivePoses.size >= 32) drivePoses.delete(drivePoses.keys().next().value);
+      cached = {
+        wheels: new Float32Array(wheels.instanceMatrix.array.length),
+        spokes: new Float32Array(spokes.instanceMatrix.array.length),
+        links: new Float32Array(links.instanceMatrix.array.length),
+      };
+      drivePoses.set(key, cached);
+    }
+  }
   for (let side = 0; side < 2; side++) {
     const sign = side ? 1 : -1;
     for (let i = 0; i < 6; i++) {
@@ -127,4 +169,10 @@ export function animateVehicleDrive(root, phase) {
     }
   }
   for (const mesh of [wheels, spokes, links]) mesh.instanceMatrix.needsUpdate = true;
+  if (cached) {
+    cached.phase = phase;
+    cached.wheels.set(wheels.instanceMatrix.array);
+    cached.spokes.set(spokes.instanceMatrix.array);
+    cached.links.set(links.instanceMatrix.array);
+  }
 }

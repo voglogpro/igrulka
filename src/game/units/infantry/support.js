@@ -17,9 +17,6 @@ export function updateInfantrySupport(s, u, dt) {
       u.hp += amount;
       s.sides[u.side].credits -= amount * 0.3;
     }
-    if (base && u.key === 'operator' && (u.fpvReady || 0) < s.time) {
-      u.fpvAmmo = 3;
-    }
   }
   if (u.key === 'engineer' && !u.moving) {
     const v = s.groundUnits.find(

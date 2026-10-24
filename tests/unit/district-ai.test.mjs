@@ -11,7 +11,7 @@ function fresh() {
 }
 function soldiers(s, n) {
   for (let i = 0; i < n; i++) {
-    const u = E.makeGround(s, 1, 'infantry', 500, 200 + i * 4);
+    const u = E.makeGround(s, 1, 'infantry', E.HQ_X - 115, 200 + i * 4);
     u.holdFire = true;
     s.groundUnits.push(u);
   }

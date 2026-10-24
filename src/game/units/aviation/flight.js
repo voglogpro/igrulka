@@ -148,7 +148,9 @@ export function moveUnits(s, dt) {
       u.sourceId &&
       !s.buildings.some((b) => b.id === u.sourceId && b.hp > 0 && !b.demolished)
     ) {
-      s.sides[u.side].inventory[u.key]++;
+      // Locally reserved craft are lost with their destroyed rack; old global
+      // reservations keep their historical refund path during migration.
+      if (!u.localLaunch) s.sides[u.side].inventory[u.key]++;
       u.hp = 0;
       u.status = 'cancelled';
       continue;

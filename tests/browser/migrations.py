@@ -13,14 +13,14 @@ with sync_playwright() as p:
     old=page.evaluate('''()=>{const E=skyfront.engine,s=E.createGame(817);s.version=7;s.time=90;s.sides[0].credits=1700;const u=E.makeGround(s,0,'infantry',-480,-70);u.hp=55;u.maxHp=110;s.groundUnits.push(u);s.buildings.push({id:s.nextId++,side:0,key:'cannon',x:-450,z:0,hp:140,maxHp:280,progress:1,rotation:0,cooldown:0});delete s.groups;delete s.contacts;delete s.trenches;delete s.formations;return E.save(s);}''')
     page.evaluate('raw=>localStorage.setItem("skyfront-realtime-v3",raw)',old)
     page.reload(wait_until='load',timeout=120000);page.wait_for_function('Boolean(window.skyfront)',timeout=60000)
-    assert '8.8.0' in page.title();assert page.evaluate('skyfront.getState().version')==14
+    assert '8.9.0' in page.title();assert page.evaluate('skyfront.getState().version')==15
     assert page.evaluate('skyfront.getState().groundUnits.length')==5
     assert page.evaluate('skyfront.getState().sides[0].credits')==2000
     assert page.evaluate('skyfront.getState().sides[0].materials')==218
     assert page.evaluate('localStorage.getItem("skyfront-realtime-v3-before-infantry8")')==old
     page.locator('[data-action="start"]').click();page.keyboard.press('Space')
     gun=page.evaluate('skyfront.getState().buildings.find(b=>b.key==="gun").id')
-    page.evaluate('''id=>{const w=skyfront.getWorld();w.controls.focus(-450,0,120);w.controls.rotate(0,-100);w.controls.update(3);skyfront.select(id);w.sync();w.post.render(w.scene,w.camera,w.elapsed);}''',gun)
+    page.evaluate('''id=>{const w=skyfront.getWorld();w.controls.focus(-850,0,120);w.controls.rotate(0,-100);w.controls.update(3);skyfront.select(id);w.sync();w.post.render(w.scene,w.camera,w.elapsed);}''',gun)
     page.screenshot(path=str((ARTIFACTS/'infantry8-mog-close.png')),timeout=120000)
     page.locator('[data-redeploy]').click()
     packed=page.evaluate('''()=>{const w=skyfront.getWorld();w.sync();const u=w.state.groundUnits.find(u=>u.key==='mog');return {id:u.id,visible:w.groundModels.get(u.id).userData.fieldPosition.visible};}''')

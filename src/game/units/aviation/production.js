@@ -8,16 +8,15 @@ export function produce(s, owner, key, count = 1, factoryId = null) {
   const f = s.sides[owner],
     d = WEAPONS[key];
   count = clamp(Math.floor(count) || 1, 1, 6);
-  if (!d || (d.tech && !f.tech.includes(d.tech))) return 'Нужно исследование';
   const living = s.buildings.filter(
     (b) => b.side === owner && b.key === 'factory' && b.hp > 0 && !b.demolished,
   );
   if (factoryId != null && (!Number.isSafeInteger(factoryId) || factoryId <= 0))
-    return 'Выберите свой действующий сборочный завод';
+    return 'Выберите свою действующую базу дронов';
   const factories = living.filter(
     (b) => b.progress >= 1 && (factoryId == null || b.id === factoryId),
   );
-  if (!factories.length) return 'Сначала постройте сборочный завод';
+  if (!factories.length) return 'Сначала постройте базу дронов';
   if (f.credits < d.cost * count || f.materials < d.metal * count)
     return 'Не хватает денег или сплавов';
   if (!hasOil(s, owner, oilCost(key) * count)) return 'Не хватает нефти: постройте нефтевышки';

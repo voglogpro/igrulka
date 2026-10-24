@@ -1,5 +1,6 @@
 import * as T from '../../vendor/three/three.module.js';
 import { batchStatic } from './mesh-utils.js';
+import { ContactShadows } from './performance/contact-shadows.js';
 
 const PER_SIDE = 8;
 const CAPACITY = PER_SIDE * 2;
@@ -11,7 +12,7 @@ const groundLevel = () => 0;
 const visibleByDefault = () => true;
 
 // Build once; every van instance shares the resulting two batched geometries.
-function vanTemplate() {
+function vanTemplate(paint = '#bd793f') {
   const body = new T.Group(),
     lamps = new T.Group(),
     box = new T.BoxGeometry(1, 1, 1),
@@ -29,7 +30,7 @@ function vanTemplate() {
     body.add(mesh);
     return mesh;
   }
-  const orange = '#bd793f',
+  const orange = paint,
     dark = '#273438',
     trim = '#d4c8a6',
     glass = '#38535a';
@@ -78,23 +79,35 @@ function vanTemplate() {
 
 /** A bounded visual mirror of simulation vehicles. No paths, selection or gameplay state. */
 export class ServiceFleet {
-  constructor(scene, { height = groundLevel, visible = visibleByDefault } = {}) {
+  constructor(
+    scene,
+    {
+      height = groundLevel,
+      visible = visibleByDefault,
+      collection = 'serviceVehicles',
+      paint = '#bd793f',
+    } = {},
+  ) {
     this.height = height;
     this.visible = visible;
+    this.collection = collection;
+    this.shadowUnits = [];
+    this.shadowIds = new Set();
+    this.shadows = new ContactShadows(scene, CAPACITY);
     this.poses = new Float64Array(CAPACITY * 4);
     this.flags = new Uint8Array(CAPACITY);
     this.count = 0;
     this.repairing = 0;
     this.disposed = false;
     this.dummy = new T.Object3D();
-    const template = vanTemplate();
+    const template = vanTemplate(paint);
     this.body = new T.InstancedMesh(template.body.geometry, template.body.material, CAPACITY);
     this.lamps = new T.InstancedMesh(template.lamps.geometry, template.lamps.material, CAPACITY);
     const amber = new T.MeshBasicMaterial({ color: '#ffbd59', toneMapped: false });
     this.beacons = new T.InstancedMesh(new T.BoxGeometry(1.1, 0.32, 0.28), amber, CAPACITY);
     this.work = new T.InstancedMesh(new T.TorusGeometry(1.35, 0.09, 4, 16), amber, CAPACITY);
     this.meshes = [this.body, this.lamps, this.beacons, this.work];
-    this.body.castShadow = true;
+    this.body.castShadow = false;
     this.body.receiveShadow = true;
     for (const mesh of this.meshes) {
       mesh.count = 0;
@@ -111,7 +124,9 @@ export class ServiceFleet {
     let own = 0,
       enemy = 0,
       count = 0;
-    for (const vehicle of state.serviceVehicles || EMPTY) {
+    this.shadowIds.clear();
+    for (const vehicle of state[this.collection] || EMPTY) {
+      if (vehicle.hp != null && vehicle.hp <= 0) continue;
       if (vehicle.side !== 0 && vehicle.side !== 1) continue;
       if (!Number.isFinite(vehicle.x) || !Number.isFinite(vehicle.z)) continue;
       if ((vehicle.side === 0 ? own : enemy) >= PER_SIDE || !this.visible(state, vehicle)) continue;
@@ -120,16 +135,16 @@ export class ServiceFleet {
       const offset = count * 4,
         level = Math.max(0, this.height(vehicle.x, vehicle.z)),
         yaw = Number.isFinite(vehicle.yaw) ? vehicle.yaw : 0,
-        working = vehicle.state === 'repairing';
+        status = vehicle.state || vehicle.status,
+        working = ['repairing', 'unloading'].includes(status);
+      const shadow = (this.shadowUnits[count] ||= { key: 'supplytruck', hp: 1 });
+      Object.assign(shadow, { id: vehicle.id, x: vehicle.x, z: vehicle.z, yaw });
+      this.shadowIds.add(vehicle.id);
       this.poses[offset] = vehicle.x;
       this.poses[offset + 1] = level;
       this.poses[offset + 2] = vehicle.z;
       this.poses[offset + 3] = yaw;
-      this.flags[count] = working
-        ? 3
-        : vehicle.state === 'outbound' || vehicle.state === 'returning'
-          ? 1
-          : 0;
+      this.flags[count] = working ? 3 : status === 'outbound' || status === 'returning' ? 1 : 0;
       const d = this.dummy;
       d.position.set(vehicle.x, level + VAN_BASE, vehicle.z);
       d.rotation.set(0, yaw, 0);
@@ -140,6 +155,8 @@ export class ServiceFleet {
       count++;
     }
     this.count = count;
+    this.shadowUnits.length = count;
+    this.shadows.sync(this.shadowUnits, this.shadowIds);
     this.body.count = this.lamps.count = count;
     this.body.instanceMatrix.needsUpdate = true;
     this.lamps.instanceMatrix.needsUpdate = true;
@@ -184,7 +201,7 @@ export class ServiceFleet {
       vehicles: this.count,
       repairing: this.repairing,
       capacity: CAPACITY,
-      drawCalls: this.disposed || !this.count ? 0 : this.repairing ? 4 : 3,
+      drawCalls: this.disposed || !this.count ? 0 : this.repairing ? 5 : 4,
       disposed: this.disposed,
     };
   }
@@ -192,6 +209,7 @@ export class ServiceFleet {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.shadows.dispose();
     const materials = new Set();
     for (const mesh of this.meshes) {
       mesh.removeFromParent();

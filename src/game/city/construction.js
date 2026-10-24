@@ -11,13 +11,14 @@ import { ROAD_REQUIRED } from './rules.js';
 import { addRoad } from './roads.js';
 import { event } from '../shared/events.js';
 import { purchaseQuote, recordBuildingPurchase } from './pricing.js';
+import { initializeAmmunition } from '../units/ground/ammunition.js';
 // The oil field under a point, if a well placed there would tap it.
 export const oilFieldAt = (x, z) =>
   OIL_FIELDS.find((f) => Math.hypot(x - f.x, z - f.z) <= f.r * 0.7) || null;
 
 export function physicalPlacement(s, key, x, z) {
   const d = BUILDINGS[key];
-  if (!d || ![x, z].every(Number.isFinite)) return 'Некорректная постройка';
+  if (!d || d.retired || ![x, z].every(Number.isFinite)) return 'Некорректная постройка';
   if (Math.abs(x) > MAP.width / 2 - d.size || Math.abs(z) > MAP.depth / 2 - d.size)
     return 'За границей карты';
   const shore = seaDistance(x, z);
@@ -89,7 +90,6 @@ export function build(s, owner, key, x, z, rotation = null) {
   const d = quote && BUILDINGS[key],
     f = s.sides[owner];
   if (!d || !f) return 'Неизвестная постройка';
-  if (d.tech && !f.tech.includes(d.tech)) return 'Сначала проведите исследование';
   const p = placementPlan(s, owner, key, x, z);
   if (p.error) return p.error;
   const cost = quote.cost + (p.driveCost || 0);
@@ -110,6 +110,7 @@ export function build(s, owner, key, x, z, rotation = null) {
     cooldown: 0,
     queue: [],
   };
+  initializeAmmunition(b);
   s.buildings.push(b);
   if (p.near) {
     if (Math.hypot(p.near.x - p.end.x, p.near.z - p.end.z) > 2) {

@@ -1,5 +1,5 @@
 import { Vector3, MathUtils } from '../../vendor/three/three.module.js';
-import { FIELD } from '../game/map.js';
+import { FIELD, HQ_X } from '../game/map.js';
 export const CAMERA = {
   min: 100,
   max: 720,
@@ -14,7 +14,7 @@ export class FixedCamera {
   constructor(camera, canvas) {
     this.camera = camera;
     this.canvas = canvas;
-    this.target = new Vector3(-615, 0, 0);
+    this.target = new Vector3(-HQ_X, 0, 0);
     this.desired = this.target.clone();
     this.distance = CAMERA.home;
     this.zoomDistance = CAMERA.home;

@@ -75,7 +75,7 @@ export function updateDaylight() {
   if (
     moved ||
     this.lastShadowTime == null ||
-    Math.abs(this.state.time - this.lastShadowTime) >= 0.25
+    Math.abs(this.state.time - this.lastShadowTime) >= (this.shadowBudget?.interval ?? 0.25)
   ) {
     this.lastShadowTime = this.state.time;
     this.renderer.shadowMap.needsUpdate = true;

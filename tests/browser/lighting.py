@@ -19,7 +19,7 @@ with sync_playwright() as p:
         page.locator('[data-action="start"]').click();page.keyboard.press('Space')
         assert page.evaluate('skyfront.isPaused()')
     def setup(time):
-        page.evaluate('''time=>{const w=skyfront.getWorld();w.controls.focus(-500,0,300);w.controls.update(3);w.shadowFocus=w.controls.target.clone();w.state.time=time;w.lastDayUpdate=undefined;w.updateDaylight();}''',time)
+        page.evaluate('time=>{const w=skyfront.getWorld();w.controls.focus(-900,0,300);w.controls.update(3);w.shadowFocus=w.controls.target.clone();w.state.time=time;w.lastDayUpdate=undefined;w.updateDaylight();}',time)
     def pan():
         before=page.evaluate(sample);page.keyboard.down('w')
         page.wait_for_function('p=>Math.hypot(skyfront.getWorld().controls.target.x-p.x,skyfront.getWorld().controls.target.z-p.z)>45',arg=before)
@@ -31,7 +31,7 @@ with sync_playwright() as p:
         report['previousDirectionJumpDegrees']=math.degrees(2*math.asin(min(1,old_delta/2)))
         print('Reproduced old lighting direction jump while panning:',report['previousDirectionJumpDegrees'],flush=True)
     open_game('skyfront-infantry8.html')
-    assert '8.8.0' in page.title()
+    assert '8.9.0' in page.title()
     report['fixedPans']=[]
     for time in [0,700,1000]:
         setup(time);before,after=pan()
@@ -50,7 +50,7 @@ with sync_playwright() as p:
     assert delta(before,page.evaluate(sample))<1e-10
     print('Minimap jump keeps lighting stable',flush=True)
     report['rotationAndMinimapStable']=True
-    page.evaluate('skyfront.getWorld().focus(-500,0,300)')
+    page.evaluate('skyfront.getWorld().focus(-900,0,300)')
     page.wait_for_function('skyfront.getWorld().controls.target.distanceTo(skyfront.getWorld().controls.desired)<1')
     page.screenshot(path=str((ARTIFACTS/'lighting8-fixed.png')),timeout=120000)
     before=page.evaluate(sample);page.keyboard.press('Space')

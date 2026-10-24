@@ -1,5 +1,6 @@
 import { GROUND_UNITS, BUILDINGS, isInfantry } from '../../config.js';
 import { groundVisible, lineOfSight } from '../infantry/cover.js';
+import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
 
 export const ENGAGEMENT_CADENCE = 0.3;
 export const ENGAGEMENT_LOS_BUDGET = 8;
@@ -375,7 +376,7 @@ function rank(u, target, range, cache) {
 
 export function groundEngagement(s, u) {
   const config = GROUND_UNITS[u.key] || BUILDINGS[u.key],
-    range = config?.groundRange || 0,
+    range = (config?.groundRange || 0) * equipmentModifiers(u).range,
     minRange = config?.groundMinRange || 0,
     indirect = groundWeaponProfile(u.key).indirect;
   if (!range || u.holdFire || u.digging || u.order?.mode === 'retreat' || u.carrierId) {

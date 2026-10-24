@@ -27,7 +27,7 @@ function unit(s, side, key, x, z, auto = true) {
 }
 function army(s, side, count = 20) {
   return Array.from({ length: count }, (_, i) =>
-    unit(s, side, 'infantry', side ? 500 : -500, (i - count / 2) * 5),
+    unit(s, side, 'infantry', side ? 900 : -900, (i - count / 2) * 5),
   );
 }
 function ownDistricts(s, side) {
@@ -37,24 +37,24 @@ function ownDistricts(s, side) {
 
 test('two independent terrain lines stay still when troops move, and change only with public territorial control', () => {
   const s = fresh(),
-    u = unit(s, 0, 'infantry', -500, 0, false);
+    u = unit(s, 0, 'infantry', -900, 0, false);
   const initial = structuredClone(E.frontlineReport(s, 0));
   assert.equal(initial.lines.length, 2);
   assert.equal(initial.sectors.length, 2);
   assert.equal(initial.polyline.filter((p) => p.breakBefore).length, 1);
-  assert.equal(E.orderGround(s, 0, [u.id], { x: -700, z: 0 }), 1);
+  assert.equal(E.orderGround(s, 0, [u.id], { x: -1100, z: 0 }), 1);
   E.advance(s, 5);
   assert.deepEqual(E.frontlineReport(s, 0).polyline, initial.polyline);
-  const hidden = unit(s, 1, 'leopard', 700, 0, false);
+  const hidden = unit(s, 1, 'leopard', 1100, 0, false);
   E.advance(s, 1.1);
-  hidden.x = 900;
+  hidden.x = 1300;
   hidden.z = 100;
   E.advance(s, 1.1);
   assert.deepEqual(E.frontlineReport(s, 0).polyline, initial.polyline);
   ownDistricts(s, 0);
   E.advance(s, 1.1);
   const advanced = E.frontlineReport(s, 0);
-  assert.ok(advanced.lines.every((line) => line.points.every((p) => p.x > -100)));
+  assert.ok(advanced.lines.every((line) => line.points.every((p) => p.x > -E.FRONTLINE.homeLineX)));
   assert.ok(advanced.posts.every((p) => E.walkable(s, p.x, p.z, 12)));
   assert.ok(advanced.sectors.every((v) => v.enemy === 0 && v.knowledge === 'unknown'));
 });
@@ -115,8 +115,8 @@ test('a small force spreads to distant flank posts and explicitly reports incomp
 
 test('an explicit automatic recruit whose initial local guard failed leaves idle base, while a manual stop remains pinned', () => {
   const s = fresh(),
-    waiting = unit(s, 0, 'infantry', -500, 50),
-    stopped = unit(s, 0, 'infantry', -510, 60);
+    waiting = unit(s, 0, 'infantry', -900, 50),
+    stopped = unit(s, 0, 'infantry', -910, 60);
   waiting.guard = null;
   waiting.order = null;
   assert.equal(E.commandUnits(s, 0, [stopped.id], 'stop'), 1);
@@ -132,7 +132,7 @@ test('an explicit automatic recruit whose initial local guard failed leaves idle
   assert.equal(stopped.autoDefense, false);
   assert.equal(stopped.guard, null);
   assert.equal(stopped.order, null);
-  assert.equal(stopped.x, -510);
+  assert.equal(stopped.x, -910);
   assert.equal(stopped.z, 60);
 });
 
@@ -149,7 +149,7 @@ test('the shore endpoint touches actual water at the line x and a real coastal b
       );
       assert.ok(line.slots.every((p) => E.walkable(s, p.x, p.z, 12)));
       const start = { x: 500, z: shore.z - sign * 100 },
-        end = { x: -500, z: shore.z - sign * 100 };
+        end = { x: -900, z: shore.z - sign * 100 };
       const path = E.groundPath(s, start, end, 1);
       assert.ok(path.length > 0);
       let previous = start,
@@ -325,7 +325,7 @@ test('solo AI keeps its income and attack budget while only existing bot defende
   s.ai.nextArmy = 0;
   s.ai.nextBuild = s.ai.nextAttack = s.ai.nextResearch = 1e9;
   const troops = Array.from({ length: 10 }, (_, i) => {
-    const u = E.makeGround(s, 1, i < 3 ? 'machinegunner' : 'infantry', 500 + i * 6, 80);
+    const u = E.makeGround(s, 1, i < 3 ? 'machinegunner' : 'infantry', 900 + i * 6, 80);
     u.holdFire = true;
     s.groundUnits.push(u);
     return u;
@@ -347,7 +347,7 @@ test('both network perspectives reproduce corridor geometry and hide foreign cap
   army(s, 0, 14);
   army(s, 1, 14);
   E.advance(s, 5);
-  const visible = [unit(s, 0, 'infantry', -500, -300), unit(s, 1, 'infantry', -450, -300)];
+  const visible = [unit(s, 0, 'infantry', -900, -700), unit(s, 1, 'infantry', -850, -700)];
   for (const u of visible) {
     u.defensePost = { corridorId: 'north', slot: 0, row: 2 };
     u.defenseCapture = { districtId: 'north-depot', assignedAt: s.time };

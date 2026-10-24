@@ -1,5 +1,6 @@
 import { buildAPC } from './vehicles/apc.js';
 import { buildTankDestroyer } from './vehicles/tank-destroyer.js';
+import { buildBlenderVehicle } from './vehicles/blender-vehicles.js';
 import { buildTrackedVehicle, animateVehicleDrive } from './vehicles/tracked-chassis.js';
 import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
@@ -15,7 +16,7 @@ export function groundModel(world, u) {
     root.userData.groundId = u.id;
     return root;
   }
-  const signature = u.key + u.side;
+  const signature = u.key + ':' + u.side + ':' + (u.level || 0);
   if (!templates.has(signature)) {
     const root = new T.Group(),
       own = u.side === 0,
@@ -24,8 +25,10 @@ export function groundModel(world, u) {
       dynamic = new Set();
     const box = (p, x, y, z, w, h, d, c) => world.box(p, x, y, z, w, h, d, c),
       cyl = (p, x, y, z, r, h, c) => world.cyl(p, x, y, z, r, h, c);
-    if (u.key === 'mog') {
-      mogModel(world, u, root, root, false);
+    if (buildBlenderVehicle(world, u, root, paint, accent, dynamic)) {
+      // Blender parts retain the same shared geometry and named aiming hierarchy.
+    } else if (u.key === 'mog') {
+      mogModel(world, u, root, root);
       root.userData.turret.name = 'turret';
       root.userData.pitch.name = 'pitch';
       root.userData.turret.userData.backward = true;
@@ -42,6 +45,16 @@ export function groundModel(world, u) {
       buildTankDestroyer(world, root, paint, accent, dynamic);
     } else {
       buildTrackedVehicle(world, u, root, paint, accent, dynamic);
+    }
+    if (['gepard', 'shilka'].includes(u.key) && u.level > 0) {
+      const turret = root.getObjectByName('turret');
+      const optic = box(turret, -2.4, 2.3, 1, 1.2, 0.9, 1.8, '#354c45');
+      optic.name = 'equipment-optic';
+      box(turret, -2.4, 2.3, 2, 0.8, 0.5, 0.12, '#8cb7af');
+      if (u.level > 1) {
+        cyl(turret, 2.6, 2, -1, 0.12, 2.2, '#687d70');
+        box(turret, 2.6, 4.2, -1, 1.8, 0.5, 0.9, accent);
+      }
     }
     batchStatic(root, dynamic);
     if (HULL_SCALE[u.key]) root.scale.setScalar(HULL_SCALE[u.key]);

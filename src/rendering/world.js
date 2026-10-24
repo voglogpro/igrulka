@@ -40,6 +40,10 @@ import { TacticalView } from './tactical-overlays.js';
 import { EveningPost } from './effects/post-processing.js';
 import { RenderBudget, renderPixelRatio } from './performance/render-budget.js';
 import { GroundVisibility } from './performance/ground-visibility.js';
+import { RoadVisualCache } from './performance/road-visual-cache.js';
+import { VehicleBatch } from './performance/vehicle-batch.js';
+import { ContactShadows } from './performance/contact-shadows.js';
+import { ShadowBudget } from './performance/shadow-budget.js';
 import { DeploymentPreview } from './deployment-preview.js';
 import * as E from '../game/index.js';
 import { BUILDINGS, riverX } from '../game/index.js';
@@ -62,7 +66,9 @@ export class RTSWorld {
     this.shakeEnergy = 0;
     this.shakeStrength = 0.45;
     this.roadVisuals = new Map();
+    this.roadView = new RoadVisualCache();
     this.renderBudget = new RenderBudget();
+    this.shadowBudget = new ShadowBudget();
     this.groundVisibility = new GroundVisibility();
     this.keys = {};
     this.armySelection = [];
@@ -292,12 +298,21 @@ export class RTSWorld {
     });
     this.resizeObserver.observe(host);
     this.infantry = new InfantryBatch(this);
+    this.vehicleBatch = new VehicleBatch(this.scene);
+    this.roadBatch = new VehicleBatch(this.scene);
+    this.contactShadows = new ContactShadows(this.scene);
     this.combatFX = new CombatEffects(this);
     this.fogVeil = new FogVeil(this.scene);
     this.post.setVision(this.fogVeil);
     this.weatherFX = new WeatherFX(this.scene);
     this.traffic = new Traffic(this);
     this.serviceFleet = new ServiceFleet(this.scene, {
+      height: (x, z) => this.height(x, z),
+      visible: (s, v) => v.side === 0 || E.fogVisible(s, 0, v.x, v.z),
+    });
+    this.ammoFleet = new ServiceFleet(this.scene, {
+      collection: 'ammoVehicles',
+      paint: '#74836c',
       height: (x, z) => this.height(x, z),
       visible: (s, v) => v.side === 0 || E.fogVisible(s, 0, v.x, v.z),
     });
@@ -458,6 +473,7 @@ export class RTSWorld {
   sync(...args) {
     const result = syncForWorld.call(this, ...args);
     this.serviceFleet.sync(this.state);
+    this.ammoFleet.sync(this.state);
     return result;
   }
   aircraft(u) {
@@ -518,6 +534,9 @@ export class RTSWorld {
       buildings: this.models.size,
       units: this.unitModels.size,
       groundUnits: this.groundModels.size,
+      groundBatches: this.vehicleBatch.diagnostics(),
+      roadBatches: this.roadBatch.diagnostics(),
+      contactShadows: this.contactShadows.mesh.count,
       day: E.dayPhase(this.state.time),
       projectiles: this.state.projectiles.length,
       effects: this.combatFX.diagnostics().particles,
@@ -527,6 +546,7 @@ export class RTSWorld {
       weather: this.weatherFX.diagnostics(),
       traffic: this.traffic.diagnostics(),
       serviceFleet: this.serviceFleet.diagnostics(),
+      ammoFleet: this.ammoFleet.diagnostics(),
       ships: this.ships.diagnostics(),
       frontline: this.frontlineView.diagnostics(),
       fortifications: this.fortifications.diagnostics(),
@@ -540,7 +560,8 @@ export class RTSWorld {
       evening: true,
       grain: true,
       bloom: true,
-      shadows: 4096,
+      shadows: this.sun.shadow.mapSize.x,
+      shadowInterval: this.shadowBudget.interval,
       pixelRatio: this.renderer.getPixelRatio(),
       renderScale: this.renderBudget.scale,
       camera: this.controls.diagnostics(),
@@ -554,6 +575,12 @@ export class RTSWorld {
       wallDt = Math.max(0, (now - this.last) / 1000);
     this.last = now;
     if (document.hidden) return;
+    if (this.shadowBudget.observeFrame(wallDt)) {
+      this.sun.shadow.mapSize.setScalar(this.shadowBudget.mapSize);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     if (this.renderBudget.observe(wallDt)) this.resizeRender();
     this.elapsed += wallDt;
     this.callbacks.onFrame?.(wallDt);
@@ -593,6 +620,7 @@ export class RTSWorld {
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);
     this.traffic.update(this.state, this.visualDt, this.combatFX);
     this.serviceFleet.update(this.battleTime);
+    this.ammoFleet.update(this.battleTime);
     this.ships.update(
       this.state,
       this.battleTime,
@@ -604,6 +632,7 @@ export class RTSWorld {
       if (p) this.callbacks.onAimHover?.(p);
     }
     this.callbacks.onAmbient?.(wallDt);
+    this.shadowBudget.lastWasShadow = this.renderer.shadowMap.needsUpdate;
     this.renderInfo = this.post.render(this.scene, this.camera, this.battleTime);
   };
 }

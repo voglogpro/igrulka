@@ -13,11 +13,11 @@ with sync_playwright() as p:
     page.locator('[data-action="start"]').click();page.keyboard.press('Space')
     fixture=page.evaluate('''()=>{
       const E=skyfront.engine,w=skyfront.getWorld(),s=E.createGame(815);s.rules.rear=false;s.ai.nextBuild=s.ai.nextAttack=s.ai.nextResearch=s.ai.nextArmy=1e9;
-      for(const f of s.sides){f.credits=30000;f.materials=3000;f.science=3000;f.tech=Object.keys(E.TECH);}
-      for(const [key,x,z]of [['power',-670,-80],['housing',-615,-80],['barracks',-680,-10],['gun',-390,100],['sam',-450,120],['launcher',-400,-180]]){const b=E.build(s,0,key,x,z);if(typeof b==='string')throw Error(b);b.hp=b.maxHp;b.progress=1;}
+      for(const f of s.sides){f.credits=30000;f.materials=3000;}
+      for(const [key,x,z]of [['power',-1070,-80],['housing',-1015,-80],['barracks',-1080,-10],['gun',-790,100],['sam',-850,120],['launcher',-800,-180]]){const b=E.build(s,0,key,x,z);if(typeof b==='string')throw Error(b);b.hp=b.maxHp;b.progress=1;}
       const keys=['infantry','infantry','machinegunner','sniper','engineer','operator','assault','mog','apc','gepard','shilka','leopard'];
-      const units=keys.map((key,i)=>{const u=E.makeGround(s,0,key,-510+(i%6)*18,-100+Math.floor(i/6)*34);u.setup=1;s.groundUnits.push(u);return {id:u.id,key,x:u.x,z:u.z};});
-      Object.assign(w.state,s);w.previousSimTime=s.time;w.controls.focus(-465,-65,250);w.controls.update(3);w.sync();w.scene.updateMatrixWorld(true);w.post.render(w.scene,w.camera,w.elapsed);
+      const units=keys.map((key,i)=>{const u=E.makeGround(s,0,key,-910+(i%6)*18,-100+Math.floor(i/6)*34);u.setup=1;s.groundUnits.push(u);return {id:u.id,key,x:u.x,z:u.z};});
+      Object.assign(w.state,s);w.previousSimTime=s.time;w.controls.focus(-865,-65,250);w.controls.update(3);w.sync();w.scene.updateMatrixWorld(true);w.post.render(w.scene,w.camera,w.elapsed);
       return {units,barracks:s.buildings.find(b=>b.key==='barracks').id,gun:s.buildings.find(b=>b.key==='gun').id};
     }''')
     print('All infantry roles, MOG and vehicles render',flush=True)
@@ -31,7 +31,7 @@ with sync_playwright() as p:
     page.keyboard.press('Control+1');page.keyboard.press('Escape');assert not page.evaluate('skyfront.getOrder().armySelection');page.keyboard.press('1')
     assert page.evaluate('skyfront.getOrder().armySelection')==selection
     assert page.evaluate('skyfront.getWorld().buildKey') is None
-    target=pt(-450,-170);page.mouse.click(target['x'],target['y'],button='right');assert page.evaluate('skyfront.getState().groundUnits.filter(u=>u.path.length).length')>=2
+    target=pt(-850,-170);page.mouse.click(target['x'],target['y'],button='right');assert page.evaluate('skyfront.getState().groundUnits.filter(u=>u.path.length).length')>=2
     assert page.evaluate('skyfront.getOrder().armySelection')==selection
     page.locator('[data-troop="stop"]').click();page.locator('[data-troop="dig"]').click()
     assert page.evaluate('skyfront.getState().trenches.length')>=2
@@ -42,8 +42,8 @@ with sync_playwright() as p:
     page.screenshot(path=str((ARTIFACTS/'infantry8-soldiers.png')),timeout=120000)
     print('Real rectangle selection, saved keyboard group, movement, entrenching, camouflage and fire control passed',flush=True)
     apc=next(u for u in fixture['units'] if u['key']=='apc')
-    page.evaluate('''ids=>{const w=skyfront.getWorld(),s=w.state;for(const id of ids){const u=s.groundUnits.find(u=>u.id===id);u.x=-450;u.z=-40;u.digging=false;u.trenchId=null;}w.controls.focus(-450,-40,250);w.controls.update(3);w.sync();w.scene.updateMatrixWorld(true);}''',[selection[0],apc['id']])
-    page.evaluate('(id)=>skyfront.selectArmy([id])',selection[0]);page.locator('[data-troop="board"]').click();point=pt(-450,-40);page.mouse.click(point['x'],point['y'])
+    page.evaluate('ids=>{const w=skyfront.getWorld(),s=w.state;for(const id of ids){const u=s.groundUnits.find(u=>u.id===id);u.x=-850;u.z=-40;u.digging=false;u.trenchId=null;}w.controls.focus(-850,-40,250);w.controls.update(3);w.sync();w.scene.updateMatrixWorld(true);}',[selection[0],apc['id']])
+    page.evaluate('(id)=>skyfront.selectArmy([id])',selection[0]);page.locator('[data-troop="board"]').click();point=pt(-850,-40);page.mouse.click(point['x'],point['y'])
     page.evaluate('skyfront.engine.advance(skyfront.getWorld().state,1)')
     assert page.evaluate('(id)=>skyfront.getState().groundUnits.find(u=>u.id===id).carrierId',selection[0])==apc['id']
     page.wait_for_function('(id)=>skyfront.getOrder().armySelection.includes(id)',arg=apc['id'])
@@ -53,7 +53,7 @@ with sync_playwright() as p:
     operator=next(u for u in fixture['units'] if u['key']=='operator')
     page.evaluate('(id)=>skyfront.selectArmy([id])',operator['id']);page.locator('[data-troop="fpv"]').click()
     assert page.locator('#district-strip').is_hidden(), 'District cards must release the map during FPV targeting'
-    point=pt(-300,-100);page.mouse.move(point['x'],point['y']);page.mouse.click(point['x'],point['y'])
+    point=pt(-700,-100);page.mouse.move(point['x'],point['y']);page.mouse.click(point['x'],point['y'])
     if not page.evaluate('skyfront.getState().units.some(u=>u.subtype==="fpv")'):
         report['fpvDebug']=page.evaluate('''p=>({point:p,element:document.elementFromPoint(p.x,p.y)?.outerHTML,order:skyfront.getOrder(),notice:document.querySelector('#notice').textContent,operator:skyfront.getState().groundUnits.find(u=>u.key==='operator')})''',point)
         page.screenshot(path=str(ARTIFACTS/'infantry-fpv-failure.png'),timeout=120000)
@@ -64,18 +64,18 @@ with sync_playwright() as p:
     page.evaluate('(id)=>skyfront.select(id)',fixture['gun']);page.locator('[data-redeploy]').click()
     assert page.evaluate('skyfront.getState().buildings.find(b=>b.id==='+str(fixture['gun'])+').demolished')
     page.locator('[data-tab="military"]').click();assert page.locator('[data-build="cannon"]').count()==0
-    page.evaluate('''()=>{const w=skyfront.getWorld();w.focus(-450,-100,320);w.controls.update(3);w.scene.updateMatrixWorld(true);}''')
-    page.keyboard.press('b');page.locator('[data-recruit-count="5"]').click();page.locator('#panel [data-recruit="infantry"]').click()
+    page.evaluate('()=>{const w=skyfront.getWorld();w.focus(-850,-100,320);w.controls.update(3);w.scene.updateMatrixWorld(true);}')
+    page.keyboard.press('f');page.locator('[data-recruit-count="5"]').click();page.locator('#panel [data-recruit="infantry"]').click()
     assert page.locator('#panel').is_hidden()
     assert page.locator('#deployment-hud').is_visible()
-    point=pt(-400,-160)
+    point=pt(-800,-160)
     assert page.evaluate('p=>document.elementFromPoint(p.x,p.y)===skyfront.getWorld().renderer.domElement',point),point
     page.mouse.click(point['x'],point['y'])
     if not page.evaluate('skyfront.getState().buildings.find(b=>b.key==="barracks").armyQueue?.length'):
-        print(json.dumps(page.evaluate('''p=>({point:p,element:document.elementFromPoint(p.x,p.y)?.outerHTML,order:skyfront.getOrder(),notice:document.querySelector('#notice').textContent,plan:skyfront.engine.deploymentPlan(skyfront.getWorld().state,0,'infantry',{x:-400,z:-160},5)})''',point),ensure_ascii=True),flush=True)
+        print(json.dumps(page.evaluate("p=>({point:p,element:document.elementFromPoint(p.x,p.y)?.outerHTML,order:skyfront.getOrder(),notice:document.querySelector('#notice').textContent,plan:skyfront.engine.deploymentPlan(skyfront.getWorld().state,0,'infantry',{x:-800,z:-160},5)})",point),ensure_ascii=True),flush=True)
     assert page.evaluate('skyfront.getState().buildings.find(b=>b.key==="barracks").armyQueue.length')==5
-    page.keyboard.press('Escape');page.keyboard.press('b')
-    page.locator('#panel [data-rally="auto"]').click();point=pt(-400,-160);page.mouse.click(point['x'],point['y'])
+    page.keyboard.press('Escape');page.keyboard.press('f')
+    page.locator('#panel [data-rally="auto"]').click();point=pt(-800,-160);page.mouse.click(point['x'],point['y'])
     assert page.evaluate('Boolean(skyfront.getState().buildings.find(b=>b.key==="barracks").rally)')
     page.evaluate('skyfront.save()');before=page.evaluate('({units:skyfront.getState().groundUnits.length,trenches:skyfront.getState().trenches.length,group:skyfront.engine.getGroup(skyfront.getState(),0,1)})')
     page.reload(wait_until='load',timeout=120000);page.wait_for_function('Boolean(window.skyfront)',timeout=60000)

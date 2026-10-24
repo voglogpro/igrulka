@@ -9,13 +9,12 @@ function fresh() {
   for (const side of s.sides) {
     side.credits = 100000;
     side.materials = 10000;
-    side.tech = Object.keys(game.TECH);
   }
   return s;
 }
 
 function building(s, key = 'launcher') {
-  const b = game.build(s, 0, key, -350, 100);
+  const b = game.build(s, 0, key, -750, 100);
   assert.notEqual(typeof b, 'string', b);
   b.progress = 1;
   b.hp = b.maxHp;

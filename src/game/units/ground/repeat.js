@@ -1,4 +1,4 @@
-import { oilCost, hasOil, spendOil, oilEnabled } from '../../city/oil.js';
+import { oilCost, hasOil, oilEnabled } from '../../city/oil.js';
 import { GROUND_UNITS } from '../../config.js';
 import { GROUND_LIMIT } from './navigation.js';
 
@@ -31,7 +31,7 @@ export function recruitRepeatStatus(s, side, siteId) {
   if (plan?.enabled) {
     if (s.result) status = 'finished';
     else if (b.hp <= 0 || b.progress < 1 || b.demolished) status = 'site-unavailable';
-    else if (!d || (d.tech && !f.tech.includes(d.tech))) status = 'research';
+    else if (!d) status = 'research';
     else if (remaining === 0) status = 'target-met';
     else if (queued) status = 'queued';
     else if (alive + sideQueued >= GROUND_LIMIT) status = 'unit-limit';
@@ -61,7 +61,7 @@ export function recruitRepeatStatus(s, side, siteId) {
   };
 }
 
-export function setRecruitRepeat(s, side, siteId, key, enabled = true, options = null) {
+export function setRecruitRepeat(s, side, siteId, key, enabled = true) {
   const b = barracks(s, side, siteId);
   if (!b || b.hp <= 0 || b.demolished) return 'Выберите свои действующие казармы';
   if (s.result) return 'Кампания завершена';
@@ -70,46 +70,9 @@ export function setRecruitRepeat(s, side, siteId, key, enabled = true, options =
     b.recruitRepeat = null;
     return true;
   }
-  const d = typeof key === 'string' && Object.hasOwn(GROUND_UNITS, key) ? GROUND_UNITS[key] : null;
-  if (!d || d.civil || (d.tech && !s.sides[side].tech.includes(d.tech)))
-    return 'Нужно исследование';
-  const target = options?.target;
-  if (options != null && (!Number.isSafeInteger(target) || target < 1 || target > GROUND_LIMIT))
-    return 'Численность гарнизона: от 1 до 120';
-  b.recruitRepeat = {
-    enabled: true,
-    key,
-    ...(options == null
-      ? {}
-      : {
-          target,
-          reserves: { ...RECRUIT_REPEAT.reserves },
-          nextAt: s.time,
-        }),
-  };
-  return true;
+  return 'Выберите постоянный состав армии';
 }
 
-export function updateRecruitRepeat(s) {
-  for (const b of s.buildings) {
-    if (b.key !== 'barracks' || !b.recruitRepeat?.enabled) continue;
-    const plan = b.recruitRepeat;
-    if (plan.target != null) {
-      if (s.time < plan.nextAt) continue;
-      plan.nextAt = s.time + RECRUIT_REPEAT.interval;
-    }
-    if (recruitRepeatStatus(s, b.side, b.id)?.status !== 'ready') continue;
-    const d = GROUND_UNITS[b.recruitRepeat.key];
-    const f = s.sides[b.side];
-    f.credits -= d.cost;
-    f.materials -= d.metal;
-    spendOil(s, b.side, oilCost(b.recruitRepeat.key));
-    (b.armyQueue ||= []).push({
-      key: b.recruitRepeat.key,
-      progress: 0,
-      ...(plan.target == null
-        ? {}
-        : { stance: { mode: 'defend', post: 'auto' }, autoDefense: true }),
-    });
-  }
-}
+// Retired: composition is the only automatic purchaser. Paid queues remain untouched.
+
+export function updateRecruitRepeat() {}

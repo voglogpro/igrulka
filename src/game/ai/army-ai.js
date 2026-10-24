@@ -1,4 +1,4 @@
-import { recruit } from '../units/ground/recruitment.js';
+import { recruit, recruitmentFacility } from '../units/ground/recruitment.js';
 import { COVER_PATCHES } from '../units/infantry/cover.js';
 import { walkable } from '../units/ground/navigation.js';
 import { GROUND_UNITS, isInfantry } from '../config.js';
@@ -44,11 +44,20 @@ export function updateArmyAI(s, hooks) {
   const level = difficultyOf(s);
   if (s.time > level.armyFrom && (s.ai.nextArmy || 0) < s.time) {
     s.ai.nextArmy = s.time + level.armyEvery;
-    const ready = s.buildings.some(
-        (b) => b.side === 1 && b.key === 'barracks' && b.hp > 0 && b.progress >= 1,
+    const facilities = new Set(
+        s.buildings
+          .filter((b) => b.side === 1 && b.hp > 0 && b.progress >= 1 && !b.demolished)
+          .map((b) => b.key),
       ),
+      ready = facilities.has('barracks') || facilities.has('vehiclebase'),
       f = s.sides[1];
-    if (ready && f.credits > 700) {
+    const captureNeeded = facilities.has('barracks') && needsCaptureInfantry(s);
+    // New logistics infrastructure must not starve the small paid capture detail.
+    // The rest of the army retains its existing cash threshold.
+    if (
+      ready &&
+      (captureNeeded ? f.credits >= GROUND_UNITS.infantry.cost + 250 : f.credits > 700)
+    ) {
       const choices = [
         'infantry',
         'machinegunner',
@@ -57,25 +66,28 @@ export function updateArmyAI(s, hooks) {
         'sniper',
         'assault',
         'apc',
-        ...(f.tech.includes('mobileAA') ? ['gepard'] : []),
+        'gepard',
         'armoredcar',
-        ...(f.tech.includes('lightArmor') ? ['lighttank', 'ifv'] : []),
-        ...(f.tech.includes('armor') ? ['leopard', 'atgm', 'tankdestroyer'] : []),
-        ...(f.tech.includes('heavyArmor') ? ['heavytank'] : []),
-        ...(f.tech.includes('artillery') ? ['howitzer'] : []),
-        ...(f.tech.includes('rocketArtillery') ? ['mlrs'] : []),
-        ...(f.tech.includes('fpvTeams') ? ['operator'] : []),
-      ];
+        'lighttank',
+        'ifv',
+        'leopard',
+        'atgm',
+        'tankdestroyer',
+        'heavytank',
+        'howitzer',
+        'mlrs',
+        'operator',
+      ].filter((key) => facilities.has(recruitmentFacility(key)));
       const armorThreat = s.groundUnits.some(
         (u) => u.side === 0 && u.hp > 0 && u.key === 'leopard',
       );
       const antiArmor = s.groundUnits.filter(
         (u) => u.side === 1 && u.hp > 0 && ['atgm', 'tankdestroyer'].includes(u.key),
       ).length;
-      const key = needsCaptureInfantry(s)
+      const key = captureNeeded
         ? 'infantry'
-        : armorThreat && f.tech.includes('armor') && antiArmor < 2
-          ? antiArmor
+        : facilities.has('barracks') && armorThreat && antiArmor < 2
+          ? antiArmor && facilities.has('vehiclebase')
             ? 'tankdestroyer'
             : 'atgm'
           : choices[Math.floor(random(s) * choices.length)];
@@ -101,7 +113,7 @@ export function updateArmyAI(s, hooks) {
         if (u.guard) continue;
         if (u.delivery) continue;
         if (u.routeState) continue;
-        if (u.aiDefender && u.hp / u.maxHp > 0.35) {
+        if (u.aiDefender && u.hp / u.maxHp > 0.35 && !u.order && !u.path?.length) {
           const own = s.buildings.find((b) => b.side === 1 && b.key === 'hq');
           u.defensePoint ||= COVER_PATCHES.filter(
             (p) =>
@@ -113,7 +125,10 @@ export function updateArmyAI(s, hooks) {
           ).sort(
             (a, b) => Math.hypot(a.x - u.x, a.z - u.z) - Math.hypot(b.x - u.x, b.z - u.z),
           )[0] || { x: own.x - 100, z: 100 };
-          if (typeof guardGround(s, 1, [u.id], u.defensePoint) === 'number') u.autoDefense = true;
+          // If this local point has become inaccessible, the existing idle defender can
+          // use the bounded front planner instead of waiting here forever.
+          const assigned = guardGround(s, 1, [u.id], u.defensePoint);
+          if (typeof assigned === 'number' || (!u.order && !u.path?.length)) u.autoDefense = true;
           u.camouflaged = true;
           continue;
         }

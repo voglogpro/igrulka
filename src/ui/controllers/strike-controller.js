@@ -38,10 +38,10 @@ export function createStrikeController({
     refreshOrderPreview();
   }
   function updateSiteSelect(select) {
-    const sites = getState().buildings.filter(
-        (b) => b.side === 0 && b.key === 'launcher' && b.hp > 0 && !b.demolished,
-      ),
-      sig = sites.map((b) => b.id).join(',');
+    const sites = game.launchSites(getState(), 0, model.weapon),
+      sig = model.weapon + ':' + sites.map((b) => b.id).join(',');
+    if (model.launcherId != null && !sites.some((b) => b.id === model.launcherId))
+      model.launcherId = null;
     if (select.dataset.signature !== sig) {
       select.innerHTML =
         '<option value="auto">Автовыбор площадки</option>' +
@@ -50,30 +50,32 @@ export function createStrikeController({
     }
     for (const b of sites)
       select.querySelector(`[value="${b.id}"]`).textContent =
-        `#${b.id} · ${Math.round(b.x)}, ${Math.round(b.z)} · ${b.progress < 1 ? 'строится' : `в очереди ${game.queuedLaunches(getState(), b)}/${game.COMBAT.queueLimit}`}`;
+        `${game.BUILDINGS[b.key].name} #${b.id} · готово ${game.availableLaunchStock(b, model.weapon)} · очередь ${game.queuedLaunches(getState(), b)}/${game.COMBAT.queueLimit}`;
     select.value = model.launcherId == null ? 'auto' : String(model.launcherId);
   }
   function updateStrikeHUD() {
+    updateSiteSelect(query('#strike-site'));
     const d = game.WEAPONS[model.weapon],
-      site = game.selectedLaunchSite(getState(), 0, model.launcherId),
-      available = getState().sides[0].inventory[model.weapon],
+      site = game.selectedLaunchSite(getState(), 0, model.launcherId, model.weapon),
+      available = site ? game.availableLaunchStock(site, model.weapon) : 0,
       error = game.launchStatus(getState(), 0, model.weapon, attackAim(), model.launcherId);
     query('#strike-name').textContent = d.name;
-    query('#strike-stock').textContent = `На складе: ${available}`;
+    query('#strike-stock').textContent =
+      `На площадке: ${available} · всего ${game.weaponStock(getState(), 0, model.weapon)}`;
     for (const b of document.querySelectorAll('[data-salvo]'))
       b.classList.toggle('active', Number(b.dataset.salvo) === model.count);
-    updateSiteSelect(query('#strike-site'));
     const distance = site ? game.flightRoute(site, attackAim(), model.weapon).at(-1).d : 0;
     const quickSignature =
       model.weapon +
-      JSON.stringify(getState().sides[0].inventory) +
-      getState().sides[0].tech.join(',');
+      Object.keys(game.WEAPONS)
+        .map((key) => game.weaponStock(getState(), 0, key))
+        .join('/');
     if (query('#quick-weapons').dataset.signature !== quickSignature) {
       query('#quick-weapons').dataset.signature = quickSignature;
       query('#quick-weapons').innerHTML = Object.entries(game.WEAPONS)
         .map(
           ([key, w], i) =>
-            `<button data-weapon="${key}" class="${key === model.weapon ? 'active' : ''}" ${w.tech && !getState().sides[0].tech.includes(w.tech) ? 'disabled' : ''} title="${w.name} · ${['Z', 'X', 'C', 'V'][i]}">${['Лёгкие', 'Тяжёлые', 'Крылатые', 'Баллист.'][i]}<b>${getState().sides[0].inventory[key]}</b></button>`,
+            `<button data-weapon="${key}" class="${key === model.weapon ? 'active' : ''}" title="${w.name} · ${['Z', 'X', 'C', 'V'][i]}">${['Лёгкие', 'Тяжёлые', 'Крылатые', 'Баллист.'][i]}<b>${game.weaponStock(getState(), 0, key)}</b></button>`,
         )
         .join('');
     }
@@ -97,10 +99,6 @@ export function createStrikeController({
     interaction.clearArmySelection();
     const d = game.WEAPONS[key];
     if (!d) return;
-    if (d.tech && !getState().sides[0].tech.includes(d.tech)) {
-      interaction.openPanel('research', true);
-      return;
-    }
     const wasAiming = model.aiming;
     const tool = interaction.getBuildTool();
     if (tool) interaction.chooseBuild(tool);
@@ -116,8 +114,8 @@ export function createStrikeController({
       const enemy = home(1);
       getWorld().focus(enemy.x, enemy.z);
     }
-    refreshOrderPreview();
     updateStrikeHUD();
+    refreshOrderPreview();
   }
   async function chooseAimPoint(p, modifiers = {}) {
     if (!getStarted() || !model.aiming) return;
@@ -137,7 +135,7 @@ export function createStrikeController({
       return;
     }
     model.aimPoint = { x: p.x, z: p.z };
-    const site = game.selectedLaunchSite(getState(), 0, model.launcherId),
+    const site = game.selectedLaunchSite(getState(), 0, model.launcherId, model.weapon),
       result = await execute('launch', {
         key: model.weapon,
         aim: attackAim(),

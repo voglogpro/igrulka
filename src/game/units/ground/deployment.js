@@ -2,7 +2,7 @@ import { oilCost, hasOil } from '../../city/oil.js';
 import { GROUND_UNITS, FIELD } from '../../config.js';
 import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
 import { freeSpot } from '../vehicles/transport.js';
-import { recruit } from './recruitment.js';
+import { recruit, recruitmentFacility } from './recruitment.js';
 import { squadDestination, squadArrivalPoint } from './squads.js';
 
 export function deploymentPlan(s, side, key, point, count = 1, siteId = null) {
@@ -24,23 +24,28 @@ export function deploymentPlan(s, side, key, point, count = 1, siteId = null) {
   const fail = (reason) => ({ ...result, reason });
   if (s.result) return fail('Кампания завершена');
   if (![0, 1].includes(side)) return fail('Неизвестная сторона');
-  if (!d) return fail('Неизвестный тип отряда');
+  const facility = recruitmentFacility(key);
+  if (!d || !facility) return fail('Неизвестный тип отряда');
   if (!Number.isInteger(count) || count < 1 || count > 5)
     return fail('Отправляйте от 1 до 5 единиц за один приказ');
   if (!destination) return fail('Выберите точку отправки в пределах карты');
-  if (d.tech && !s.sides[side].tech.includes(d.tech)) return fail('Нужно исследование');
   if (siteId != null && (!Number.isSafeInteger(siteId) || siteId <= 0))
     return fail('Выберите свои казармы');
   const sites = s.buildings.filter(
     (b) =>
       b.side === side &&
-      b.key === 'barracks' &&
+      b.key === facility &&
       b.hp > 0 &&
       !b.demolished &&
       b.progress >= 1 &&
       (siteId == null || b.id === siteId),
   );
-  if (!sites.length) return fail('Сначала постройте свои казармы');
+  if (!sites.length)
+    return fail(
+      facility === 'barracks'
+        ? 'Сначала постройте свои казармы'
+        : 'Сначала постройте свой бронезавод',
+    );
   const queued = s.buildings
     .filter((b) => b.side === side && b.hp > 0)
     .reduce((n, b) => n + (b.armyQueue?.length || 0), 0);

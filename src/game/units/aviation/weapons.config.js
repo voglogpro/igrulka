@@ -23,7 +23,6 @@ export const WEAPONS = {
     damage: 230,
     blast: 40,
     altitude: 57,
-    tech: 'heavy',
   },
   cruise: {
     name: 'Крылатая ракета',
@@ -36,7 +35,6 @@ export const WEAPONS = {
     damage: 330,
     blast: 45,
     altitude: 35,
-    tech: 'cruise',
   },
   ballistic: {
     name: 'Баллистическая ракета',
@@ -49,6 +47,5 @@ export const WEAPONS = {
     damage: 620,
     blast: 75,
     altitude: 235,
-    tech: 'ballistic',
   },
 };

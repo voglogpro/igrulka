@@ -15,7 +15,7 @@ with sync_playwright() as p:
     page.wait_for_function('Boolean(window.skyfront)')
     page.locator('[data-action="start"]').click();page.keyboard.press('Space')
     assert page.evaluate('skyfront.isPaused()')
-    page.evaluate('''()=>{const w=skyfront.getWorld(),s=w.state,E=skyfront.engine;w.controls.focus(-450,0,300);w.controls.update(3);s.buildings.push({id:s.nextId++,side:0,key:'launcher',x:-400,z:100,hp:200,maxHp:200,progress:1,rotation:0});s.groundUnits.push(E.makeGround(s,0,'infantry',-450,0));w.sync();}''')
+    page.evaluate("()=>{const w=skyfront.getWorld(),s=w.state,E=skyfront.engine;w.controls.focus(-850,0,300);w.controls.update(3);s.buildings.push({id:s.nextId++,side:0,key:'launcher',x:-800,z:100,hp:200,maxHp:200,progress:1,rotation:0});s.groundUnits.push(E.makeGround(s,0,'infantry',-850,0));w.sync();}")
     def pan(key,axis,sign=1):
         before=page.evaluate('({x:skyfront.getWorld().controls.desired.x,z:skyfront.getWorld().controls.desired.z})')
         direction=page.evaluate('axis=>{const v=skyfront.getWorld().controls[axis];return {x:v.x,z:v.z}}',axis)

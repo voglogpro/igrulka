@@ -1,10 +1,12 @@
-import { VERSION } from './config.js';
+import { VERSION, HQ_X } from './config.js';
 import { campRoads } from './city/roads.js';
 import { log } from './shared/events.js';
 import { createDistricts } from './territory/state.js';
 import { DIFFICULTY, DEFAULT_DIFFICULTY } from './ai/difficulty.config.js';
 import { createWeather } from './weather.js';
 import { createFrontlineMemory } from './defense/frontline.js';
+import { createArmyComposition } from './units/ground/composition.js';
+import { createAmmoStock } from './units/ground/ammunition.js';
 export const newSide = () => ({
   credits: 3200,
   materials: 200,
@@ -13,6 +15,8 @@ export const newSide = () => ({
   research: null,
   researchQueue: [],
   purchases: { building: {} },
+  armyComposition: createArmyComposition(),
+  ammoStock: createAmmoStock(),
   inventory: { drone: 0, heavy: 0, cruise: 0, ballistic: 0 },
   spentAmmo: 0,
   rearAuto: true,
@@ -39,7 +43,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
         id: 1,
         side: 0,
         key: 'hq',
-        x: -615,
+        x: -HQ_X,
         z: 0,
         hp: 1100,
         maxHp: 1100,
@@ -51,7 +55,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
         id: 2,
         side: 1,
         key: 'hq',
-        x: 615,
+        x: HQ_X,
         z: 0,
         hp: 1100,
         maxHp: 1100,
@@ -62,11 +66,14 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
     ],
     roads: [],
     serviceVehicles: [],
+    ammoVehicles: [],
+    ammoLogisticsAt: 0,
     ships: [],
     frontlineMemory: createFrontlineMemory(),
     units: [],
     groundUnits: [],
     trenches: [],
+    groundScars: [],
     districts: createDistricts(),
     contacts: [[], []],
     groups: [{}, {}],
@@ -74,7 +81,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
     projectiles: [],
     events: [],
     log: [],
-    ai: { nextBuild: 7, nextAttack: 170, nextResearch: 65, roadPlan: 0 },
+    ai: { nextBuild: 7, nextAttack: 170, roadPlan: 0 },
     result: null,
     stats: {
       shots: 0,

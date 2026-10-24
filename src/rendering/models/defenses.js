@@ -41,6 +41,16 @@ export function defenseModel(w, b, content, root) {
   turret.position.y = 3;
   root.userData.turret = turret;
   content.add(turret);
+  const level = Math.max(0, Math.min(2, b.level || 0));
+  if (level > 0) {
+    w.box(turret, -3, 3, 3, 1.7, 1.4, 2, metal);
+    w.box(turret, -3, 3.2, 1.9, 1.2, 0.65, 0.15, '#89b5ad');
+  }
+  if (level > 1) {
+    w.cyl(turret, 3, 2, 3, 0.18, 5, steel);
+    w.box(turret, 3, 7, 3, 2.3, 0.7, 1.1, trim);
+    w.box(content, 0, 0.85, 8, 7, 0.4, 2, trim);
+  }
   if (sam) {
     w.box(turret, 0, 0, 0, 8, 2, 9, olive);
     w.cyl(turret, 0, 2, 0, 2.4, 1.4, steel);

@@ -1,4 +1,4 @@
-import { CORRIDORS } from '../map.js';
+import { CORRIDORS, DISTRICT_X } from '../map.js';
 
 // Fictional strategic sites in the land corridors; pairs are mirrored through the centre.
 export const DISTRICT_TYPES = {
@@ -6,10 +6,10 @@ export const DISTRICT_TYPES = {
   relay: { name: 'Узел связи', income: 1.25, materials: 0, science: 0.35, hp: 300 },
 };
 export const DISTRICTS = [
-  { id: 'north-depot', name: 'Север · склад', type: 'depot', x: -170, z: CORRIDORS[0] },
-  { id: 'north-relay', name: 'Север · связь', type: 'relay', x: 170, z: CORRIDORS[0] },
-  { id: 'south-relay', name: 'Юг · связь', type: 'relay', x: -170, z: CORRIDORS[1] },
-  { id: 'south-depot', name: 'Юг · склад', type: 'depot', x: 170, z: CORRIDORS[1] },
+  { id: 'north-depot', name: 'Север · склад', type: 'depot', x: -DISTRICT_X, z: CORRIDORS[0] },
+  { id: 'north-relay', name: 'Север · связь', type: 'relay', x: DISTRICT_X, z: CORRIDORS[0] },
+  { id: 'south-relay', name: 'Юг · связь', type: 'relay', x: -DISTRICT_X, z: CORRIDORS[1] },
+  { id: 'south-depot', name: 'Юг · склад', type: 'depot', x: DISTRICT_X, z: CORRIDORS[1] },
 ].map((d) => ({ ...DISTRICT_TYPES[d.type], ...d, radius: 64 }));
 export const DISTRICT_BY_ID = Object.fromEntries(DISTRICTS.map((d) => [d.id, d]));
 export const DISTRICT_RULES = {

@@ -135,7 +135,7 @@ export function terrain() {
   // The sea: one sheet over the whole basin; the terrain hides it everywhere on land.
   this.waterNormals = rippleTexture();
   this.waterNormals.repeat.set(14, 30);
-  const sea = new T.PlaneGeometry(1000, 2200, 1, 1);
+  const sea = new T.PlaneGeometry(E.SEA.halfX * 2 + 160, E.SEA.halfZ * 2 + 160, 1, 1);
   sea.rotateX(-Math.PI / 2);
   this.water = new T.Mesh(
     sea,

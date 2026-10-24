@@ -163,6 +163,16 @@ test('Escape cancels tools/selection before focus even in editable controls; rep
   assert.deepEqual(f.calls, []);
 });
 
+test('E opens the arsenal and F opens the army without a research shortcut', () => {
+  const f = keyboardFixture();
+  f.controller.bubble(key('KeyE'));
+  f.controller.bubble(key('KeyF'));
+  assert.deepEqual(f.calls, [
+    ['openPanel', 'attack'],
+    ['openPanel', 'army'],
+  ]);
+});
+
 test('browser lifecycle releases pointer on blur, suspends audio and saves only started hidden campaigns', () => {
   const document = hub(),
     window = hub(),

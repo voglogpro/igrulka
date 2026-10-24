@@ -1,11 +1,13 @@
 const paths = {
+  ammofactory: 'M3 21V8h18v13M6 21V12h5v9m3 0v-9h4v9M6 5h12M9 3v2m6-2v2',
+  silo: 'M3 21h18M5 21V9l3-5 3 5v12m2 0V9l3-5 3 5v12M5 12h6m2 0h6',
   service: 'M3 20V9l9-6 9 6v11M7 20v-8h10v8M10 15h4m-2-2v4',
   barracks: 'M3 21V8l9-5 9 5v13M7 21v-8h10v8M9 8h6M12 6v4',
+  vehiclebase: 'M2 21V9l6-4 6 4V4h7v17M5 21v-8h12v8M6 16h10M8 13v-3h7l3 3M7 19h2m4 0h2',
   housing: 'M4 21V8h7v13M11 21V3h9v18M7 11v1m0 3v1m8-10v2m3-2v2m-3 3v2m3-2v2m-3 3v2m3-2v2',
   industry: 'M3 21V10l6 4V8l6 4V3h4v18M3 21h19M7 17h2m4 0h2',
   power: 'M13 2 5 14h6l-1 8 9-13h-7Z',
   factory: 'M3 21V9l7 4V9l7 4V5h3v16ZM7 17h3m4 0h3',
-  lab: 'M9 3h6m-5 0v7l-6 9q-1 2 2 2h12q3 0 2-2l-6-9V3M8 14h8',
   launcher: 'M3 21h18M6 20v-6h12v6M5 13 15 3l4 4L9 17M8 10l4 4',
   road: 'M7 2 3 22M17 2l4 20M12 3v3m0 4v4m0 4v3',
   gun: 'M3 21h18M12 21v-9M7 13l8-8 4 4-8 8M15 5l4-4',
@@ -24,11 +26,13 @@ const paths = {
 export const icon = (key) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[key] || paths.launcher}"/></svg>`;
 export const short = {
+  ammofactory: 'Боеприпасы',
+  silo: 'Ракетная шахта',
   housing: 'Жильё',
   industry: 'Промышленность',
   power: 'Энергия',
-  factory: 'Завод',
-  lab: 'Лаборатория',
+  factory: 'База дронов',
+  vehiclebase: 'Бронезавод',
   launcher: 'Пусковая',
   gun: 'МОГ',
   sam: 'Ракетное ПВО',

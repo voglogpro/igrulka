@@ -1,4 +1,5 @@
 export const ROAD_REQUIRED = new Set([
+  'ammofactory',
   'service',
   'oilwell',
   'port',
@@ -9,5 +10,6 @@ export const ROAD_REQUIRED = new Set([
   'lab',
   'market',
   'barracks',
+  'vehiclebase',
   'training',
 ]);

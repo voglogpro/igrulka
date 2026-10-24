@@ -1,192 +1,156 @@
+// The old per-barracks repeat control is replaced by one explicit composition per side.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame } from '../../src/game/state.js';
-import { GROUND_UNITS } from '../../src/game/config.js';
-import {
-  setRecruitRepeat,
-  recruitRepeatStatus,
-  updateRecruitRepeat,
-  RECRUIT_REPEAT,
-} from '../../src/game/units/ground/repeat.js';
-import { restoreEconomy } from '../../src/game/persistence/economy.js';
+import * as E from '../../src/game/index.js';
+import { addRoad } from '../../src/game/city/roads.js';
 import { executeCommand } from '../../src/network/commands.js';
+import {
+  updateArmyComposition,
+  restoreArmyComposition,
+} from '../../src/game/units/ground/composition.js';
 
-function fresh(sites = 1) {
-  const s = createGame(117);
-  for (const f of s.sides) {
-    f.purchases = { building: {} };
-    f.researchQueue = [];
-    f.credits = 100000;
-    f.materials = 1000;
-    f.oil = 1000;
-  }
+function fresh(count = 1) {
+  const s = E.createGame(117);
+  s.mode = 'multiplayer';
+  s.rules.rear = false;
   const barracks = [];
-  for (let i = 0; i < sites; i++) {
-    const b = {
-      id: s.nextId++,
-      side: 0,
-      key: 'barracks',
-      hp: 200,
-      maxHp: 200,
-      progress: 1,
-      x: -650 - 60 * i,
-      z: -80,
-      armyQueue: [],
-    };
-    s.buildings.push(b);
-    barracks.push(b);
+  for (const side of [0, 1]) {
+    Object.assign(s.sides[side], { credits: 100000, materials: 1000, oil: 150 });
+    const hq = s.buildings.find((b) => b.side === side && b.key === 'hq');
+    for (let i = 0; i < count; i++) {
+      const b = {
+        id: s.nextId++,
+        key: 'barracks',
+        side,
+        hp: 360,
+        maxHp: 360,
+        progress: 1,
+        x: hq.x - 60 + i * 60,
+        z: -20,
+        armyQueue: [],
+        queue: [],
+      };
+      s.buildings.push(b);
+      barracks.push(b);
+      addRoad(s, side, hq.x, 0, b.x, b.z, { camp: true });
+    }
   }
-  return { s, barracks };
+  return { s, barracks: barracks.filter((b) => b.side === 0) };
 }
-const unit = (s, properties = {}) =>
-  s.groundUnits.push({ id: s.nextId++, side: 0, key: 'infantry', hp: 100, ...properties });
+const row = (s, side = 0) =>
+  E.armyCompositionStatus(s, side).types.find((v) => v.key === 'infantry');
 
-test('network garrison command preserves target, binds the owner and rejects malformed orders atomically', () => {
-  const {
-    s,
-    barracks: [b],
-  } = fresh();
-  const command = { id: b.id, key: 'infantry', enabled: true, target: 6 };
-  for (const target of [0, 121, 1.5, '6', Infinity]) {
-    const before = JSON.stringify(s);
-    assert.equal(typeof executeCommand(s, 0, 'repeat', { ...command, target }), 'string');
-    assert.equal(JSON.stringify(s), before);
+test('network army targets bind to the commanding owner and malformed commands are atomic', () => {
+  const { s } = fresh();
+  for (const side of [0, 1]) {
+    for (const args of [
+      { key: 'infantry', count: -1 },
+      { key: 'infantry', count: 121 },
+      { key: 'infantry', count: 1.5 },
+      { key: 'infantry', count: '6' },
+      { key: 'infantry', count: NaN },
+      { key: 'constructor', count: 6 },
+      { key: '__proto__', count: 6 },
+      { key: 'tradetruck', count: 6 },
+    ]) {
+      const before = E.save(s);
+      assert.equal(typeof executeCommand(s, side, 'army-target', args), 'string');
+      assert.equal(E.save(s), before);
+    }
+    assert.equal(
+      executeCommand(s, side, 'army-target', { key: 'infantry', count: side + 2, side: 1 - side }),
+      true,
+    );
+    assert.equal(row(s, side).target, side + 2);
   }
-  assert.equal(typeof executeCommand(s, 1, 'repeat', command), 'string');
-  assert.equal(executeCommand(s, 0, 'repeat', command), true);
-  assert.equal(b.recruitRepeat.target, 6);
-  updateRecruitRepeat(s);
-  assert.equal(b.armyQueue.length, 1);
-  assert.equal(executeCommand(s, 0, 'repeat', { ...command, enabled: false }), true);
-  assert.equal(b.recruitRepeat, null);
-  assert.equal(b.armyQueue.length, 1, 'disabling keeps the paid recruit');
+  assert.equal(row(s, 0).target, 2);
+  assert.equal(row(s, 1).target, 3);
 });
 
-test('target plans share the side/type target across barracks and cannot overshoot with queued recruits', () => {
+test('paid queues across several bases satisfy one shared side/type target without overshoot', () => {
   const { s, barracks } = fresh(3);
-  for (const b of barracks)
-    assert.equal(setRecruitRepeat(s, 0, b.id, 'infantry', true, { target: 2 }), true);
-  updateRecruitRepeat(s);
-  assert.deepEqual(
-    barracks.map((b) => b.armyQueue.length),
-    [1, 1, 0],
-  );
-  const status = recruitRepeatStatus(s, 0, barracks[2].id);
-  assert.equal(status.status, 'target-met');
-  assert.equal(status.queuedType, 2);
-  assert.equal(status.remaining, 0);
-  assert.deepEqual(barracks[0].armyQueue[0], {
-    key: 'infantry',
-    progress: 0,
-    stance: { mode: 'defend', post: 'auto' },
-    autoDefense: true,
-  });
-  assert.deepEqual(status.reserves, RECRUIT_REPEAT.reserves);
+  barracks[0].armyQueue.push({ key: 'infantry', progress: 0.2 });
+  barracks[1].armyQueue.push({ key: 'infantry', progress: 0.8 });
+  E.setArmyTarget(s, 0, 'infantry', 2);
+  const before = s.sides[0].credits;
+  updateArmyComposition(s);
+  assert.equal(row(s).queued, 2);
+  assert.equal(row(s).remaining, 0);
+  assert.equal(row(s).status, 'met');
+  assert.equal(barracks[2].armyQueue.length, 0);
+  assert.equal(s.sides[0].credits, before);
 });
 
-test('live non-downed troops satisfy target; casualties replenish only after four simulated seconds', () => {
+test('existing targets survive real casualty replacement; setting zero keeps the already paid queue', () => {
   const {
     s,
     barracks: [b],
   } = fresh();
-  setRecruitRepeat(s, 0, b.id, 'infantry', true, { target: 2 });
-  unit(s);
-  unit(s);
-  updateRecruitRepeat(s);
-  assert.equal(recruitRepeatStatus(s, 0, b.id).status, 'target-met');
-  s.groundUnits[0].downed = { t: 0 };
-  unit(s, { side: 1 });
-  unit(s, { hp: 0 });
-  unit(s, { key: 'sniper' });
-  s.time = 3.9;
-  updateRecruitRepeat(s);
-  assert.equal(b.armyQueue.length, 0);
-  s.time = 4;
-  updateRecruitRepeat(s);
-  assert.equal(b.armyQueue.length, 1);
-  assert.equal(recruitRepeatStatus(s, 0, b.id).present, 1);
-  b.armyQueue = [];
-  s.time = 4.1;
-  updateRecruitRepeat(s);
-  assert.equal(b.armyQueue.length, 0);
+  E.setArmyTarget(s, 0, 'infantry', 1);
+  E.advance(s, 6);
+  assert.equal(row(s).alive, 1);
+  const lost = s.groundUnits.find((u) => u.side === 0);
+  lost.hp = 0;
+  E.advance(s, 3);
+  assert.equal(row(s).alive + row(s).queued, 1);
+  E.setArmyTarget(s, 0, 'infantry', 0);
+  const paid = structuredClone(b.armyQueue);
+  E.step(s, 0);
+  assert.deepEqual(b.armyQueue, paid);
+  assert.equal(row(s).status, 'disabled');
 });
 
-test('automatic purchase preserves money, materials and enabled oil reserves; legacy remains unchanged', () => {
-  for (const resource of ['credits', 'materials', 'oil']) {
-    const {
-      s,
-      barracks: [b],
-    } = fresh();
-    const key = resource === 'oil' ? 'armoredcar' : 'infantry';
-    const d = GROUND_UNITS[key];
-    if (d.tech) s.sides[0].tech.push(d.tech);
-    assert.equal(setRecruitRepeat(s, 0, b.id, key, true, { target: 6 }), true);
-    const base = resource === 'credits' ? d.cost : resource === 'materials' ? d.metal : d.oil || 0;
-    s.sides[0][resource] = base + RECRUIT_REPEAT.reserves[resource] - 1;
-    assert.equal(recruitRepeatStatus(s, 0, b.id).status, 'reserve');
-    updateRecruitRepeat(s);
-    assert.equal(b.armyQueue.length, 0);
-    s.sides[0][resource]++;
-    s.time = 4;
-    updateRecruitRepeat(s);
-    assert.equal(b.armyQueue.length, 1);
-    assert.equal(s.sides[0][resource], RECRUIT_REPEAT.reserves[resource]);
+test('the side limit includes wounded, passengers and civilian ground vehicles just like ordinary recruitment', () => {
+  const {
+    s,
+    barracks: [b],
+  } = fresh();
+  for (let i = 0; i < E.GROUND_LIMIT; i++) {
+    const u = E.makeGround(s, 0, i === 0 ? 'tradetruck' : 'engineer', -1000, 200 + i);
+    if (i === 1) u.downed = { t: 0, revive: 0 };
+    if (i === 2) u.carrierId = 999;
+    s.groundUnits.push(u);
   }
-  const {
-    s,
-    barracks: [b],
-  } = fresh();
-  s.sides[0].credits = GROUND_UNITS.infantry.cost;
-  setRecruitRepeat(s, 0, b.id, 'infantry');
-  updateRecruitRepeat(s);
-  assert.equal(s.sides[0].credits, 0);
-  assert.deepEqual(b.recruitRepeat, { enabled: true, key: 'infantry' });
-  assert.deepEqual(b.armyQueue[0], { key: 'infantry', progress: 0 });
+  E.setArmyTarget(s, 0, 'infantry', 1);
+  const funds = s.sides[0].credits;
+  assert.equal(row(s).status, 'limit');
+  updateArmyComposition(s);
+  assert.equal(b.armyQueue.length, 0);
+  assert.equal(s.sides[0].credits, funds);
 });
 
-test('disabled oil, destroyed barracks, invalid target and save validation are bounded', () => {
+test('legacy explicitly chosen garrisons migrate by maximum per type while infinite repeats stay off', () => {
+  const {
+    s,
+    barracks: [a, b, c],
+  } = fresh(3);
+  a.recruitRepeat = { enabled: true, key: 'infantry', target: 6 };
+  b.recruitRepeat = { enabled: true, key: 'infantry', target: 12 };
+  c.recruitRepeat = { enabled: true, key: 'medic' };
+  restoreArmyComposition(s, 14);
+  assert.deepEqual(s.sides[0].armyComposition.targets, { infantry: 12 });
+  assert.deepEqual(s.sides[1].armyComposition.targets, {});
+  assert.ok(s.buildings.every((b) => b.recruitRepeat == null));
+});
+
+test('new composition imports preserve paid defense metadata and reject forged targets/cadence', () => {
   const {
     s,
     barracks: [b],
   } = fresh();
-  for (const target of [0, -1, 121, 1.5, Infinity, '12'])
-    assert.equal(typeof setRecruitRepeat(s, 0, b.id, 'infantry', true, { target }), 'string');
-  assert.equal(b.recruitRepeat, undefined);
-  setRecruitRepeat(s, 0, b.id, 'infantry', true, { target: 12 });
-  s.rules.oil = false;
-  s.sides[0].oil = 0;
-  updateRecruitRepeat(s);
-  assert.equal(b.armyQueue.length, 1);
-  const restored = structuredClone(s);
-  restoreEconomy(restored, 14);
-  assert.deepEqual(restored.buildings.at(-1).recruitRepeat, b.recruitRepeat);
+  E.setArmyTarget(s, 0, 'infantry', 6);
+  updateArmyComposition(s);
+  const restored = E.load(E.save(s));
+  assert.deepEqual(restored.sides[0].armyComposition, s.sides[0].armyComposition);
+  assert.deepEqual(restored.buildings.find((v) => v.id === b.id).armyQueue, b.armyQueue);
   for (const mutate of [
-    (p) => (p.target = 121),
-    (p) => (p.reserves.credits = 0),
-    (p) => (p.nextAt = Infinity),
-    (p) => (p.nextAt = s.time + 5),
+    (p) => (p.targets.infantry = 121),
+    (p) => (p.targets.leopard = 120),
+    (p) => (p.nextAt = s.time + 20),
+    (p) => (p.cursor = -1),
   ]) {
-    const invalid = structuredClone(s);
-    mutate(invalid.buildings.at(-1).recruitRepeat);
-    assert.throws(() => restoreEconomy(invalid, 14), /гарнизона/);
+    const raw = JSON.parse(E.save(s));
+    mutate(raw.sides[0].armyComposition);
+    assert.throws(() => E.load(JSON.stringify(raw)));
   }
-  b.hp = 0;
-  s.time = 10;
-  b.armyQueue = [];
-  updateRecruitRepeat(s);
-  assert.equal(b.armyQueue.length, 0);
-  assert.equal(recruitRepeatStatus(s, 0, b.id).status, 'site-unavailable');
-});
-
-test('an empty oil tank cannot block automatic infantry that consumes no oil', () => {
-  const {
-    s,
-    barracks: [b],
-  } = fresh();
-  s.sides[0].oil = 0;
-  setRecruitRepeat(s, 0, b.id, 'infantry', true, { target: 6 });
-  assert.equal(recruitRepeatStatus(s, 0, b.id).status, 'ready');
-  updateRecruitRepeat(s);
-  assert.equal(b.armyQueue.length, 1);
-  assert.equal(s.sides[0].oil, 0);
 });

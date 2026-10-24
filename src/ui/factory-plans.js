@@ -9,7 +9,7 @@ const labels = {
   queue: 'Выполняется оплаченная очередь',
   credits: 'Ожидание денег с учётом резерва',
   materials: 'Ожидание сплавов с учётом резерва',
-  locked: 'Нужно исследование вооружения',
+  locked: 'Вооружение недоступно',
   ruined: 'Завод разрушен',
   building: 'Завод строится',
   active: 'Готов к следующему заказу',
@@ -17,7 +17,7 @@ const labels = {
 };
 
 export function factoryPlansHTML() {
-  return `<details class="factory-automation"><summary>План боезапаса <span id="factory-plan-summary"></span></summary><div class="factory-plan-fields"><label>Завод<select id="factory-plan-site" aria-label="Завод для плана"></select></label><label>Выпуск<select id="factory-plan-key" aria-label="Вооружение для плана"></select></label><label>Держать на складе<input id="factory-plan-target" aria-label="Целевой запас" type="number" min="1" max="30" step="1" value="5"></label><label>Резерв денег<input id="factory-plan-credits" aria-label="Денежный резерв" type="number" min="0" max="10000" step="any" value="500"></label><label>Резерв сплавов<input id="factory-plan-materials" aria-label="Резерв сплавов" type="number" min="0" max="1000" step="any" value="20"></label></div><div class="factory-plan-actions"><button data-action="factory-plan-save" id="factory-plan-save">Включить план</button><button data-action="factory-plan-stop" id="factory-plan-stop">Остановить</button></div><p class="status-note" id="factory-plan-status"></p><p class="status-note">План учитывает общий склад и оплаченные заказы всех заводов. После покупки сохраняет заданный резерв. Остановка оставляет оплаченную очередь.</p></details>`;
+  return `<details class="factory-automation"><summary>План боезапаса <span id="factory-plan-summary"></span></summary><div class="factory-plan-fields"><label>База дронов<select id="factory-plan-site" aria-label="База дронов для плана"></select></label><label>Выпуск<select id="factory-plan-key" aria-label="Вооружение для плана"></select></label><label>Держать на складе<input id="factory-plan-target" aria-label="Целевой запас" type="number" min="1" max="30" step="1" value="5"></label><label>Резерв денег<input id="factory-plan-credits" aria-label="Денежный резерв" type="number" min="0" max="10000" step="any" value="500"></label><label>Резерв сплавов<input id="factory-plan-materials" aria-label="Резерв сплавов" type="number" min="0" max="1000" step="any" value="20"></label></div><div class="factory-plan-actions"><button data-action="factory-plan-save" id="factory-plan-save">Включить план</button><button data-action="factory-plan-stop" id="factory-plan-stop">Остановить</button></div><p class="status-note" id="factory-plan-status"></p><p class="status-note">План учитывает общий склад и оплаченные заказы всех баз дронов. После покупки сохраняет заданный резерв. Остановка оставляет оплаченную очередь.</p></details>`;
 }
 
 export function loadFactoryPlanFields(state) {
@@ -37,24 +37,20 @@ export function updateFactoryPlansPanel(state) {
   if (select.dataset.signature !== signature) {
     const previous = select.value;
     select.innerHTML = factories
-      .map((b) => `<option value="${b.id}">Завод #${b.id}</option>`)
+      .map((b) => `<option value="${b.id}">База дронов #${b.id}</option>`)
       .join('');
     if (factories.some((b) => String(b.id) === previous)) select.value = previous;
     select.dataset.signature = signature;
     if (select.value !== previous) select.dataset.loaded = '';
   }
-  const weapons = $('#factory-plan-key'),
-    tech = state.sides[0].tech;
-  if (weapons.dataset.signature !== tech.join(',')) {
+  const weapons = $('#factory-plan-key');
+  if (!weapons.dataset.signature) {
     const previous = weapons.value;
     weapons.innerHTML = Object.entries(E.WEAPONS)
-      .map(
-        ([key, d]) =>
-          `<option value="${key}" ${d.tech && !tech.includes(d.tech) ? 'disabled' : ''}>${d.name}</option>`,
-      )
+      .map(([key, d]) => `<option value="${key}">${d.name}</option>`)
       .join('');
     if (Object.hasOwn(E.WEAPONS, previous)) weapons.value = previous;
-    weapons.dataset.signature = tech.join(',');
+    weapons.dataset.signature = 'all-weapons';
   }
   if (select.dataset.loaded !== select.value) {
     loadFactoryPlanFields(state);

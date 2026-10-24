@@ -24,10 +24,10 @@ function unit(s, side, x, z) {
   return u;
 }
 
-test('protocol seven auto-defense validates either owner, complete ownership and boolean before mutating any selection', () => {
-  assert.equal(PROTOCOL_VERSION, 7);
+test('protocol eight auto-defense validates either owner, complete ownership and boolean before mutating any selection', () => {
+  assert.equal(PROTOCOL_VERSION, 8);
   const s = fresh(),
-    troops = [unit(s, 0, -450, -270), unit(s, 1, 450, -270)];
+    troops = [unit(s, 0, -850, -270), unit(s, 1, 850, -270)];
   for (const side of [0, 1]) {
     const own = troops[side],
       enemy = troops[1 - side],
@@ -63,7 +63,9 @@ test('protocol seven auto-defense validates either owner, complete ownership and
 
 test('either perspective retains its own observed memory, never the enemy memory or future unit plans', () => {
   const s = fresh(),
-    troops = [unit(s, 0, -150, E.CORRIDORS[0]), unit(s, 1, -100, E.CORRIDORS[0])];
+    troops = [unit(s, 0, -850, E.CORRIDORS[0]), unit(s, 1, -800, E.CORRIDORS[0])];
+  unit(s, 0, 400, E.CORRIDORS[0]);
+  unit(s, 1, 450, E.CORRIDORS[0]);
   for (const u of troops) {
     u.autoDefense = true;
     u.defenseReadyAt = 99;
@@ -175,7 +177,7 @@ test('enemy fortification and reserve events never disclose planning while own n
         z: -270,
         sectorId: 'north',
         level: 3,
-        futurePlan: { x: 750 },
+        futurePlan: { x: 1150 },
       });
   for (const side of [0, 1]) {
     const view = playerView(s, side);
