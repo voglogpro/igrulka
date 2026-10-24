@@ -71,6 +71,7 @@ export function ai(s) {
         ['launcher', s.time > 600 ? 2 : 1],
         ['factory', s.time > 580 ? 2 : 1],
         ['barracks', s.time > 240 ? 1 : 0],
+        ['training', s.time > 640 ? 1 : 0],
         ['market', s.time > 420 ? 1 : 0],
         ['lab', s.time > 700 ? 2 : 1],
         ['gun', Math.min(6, 3 + Math.floor(s.time / 240))],

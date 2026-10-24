@@ -68,6 +68,7 @@ export {
   passable,
   segmentDistance,
   snapRoadPoint,
+  ROAD_GRID,
   overlappingRoad,
   normalizeRoadOverlaps,
 } from './city/road-network.js';

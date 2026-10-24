@@ -1,3 +1,4 @@
+import { trainRecruit } from './training.js';
 import { fuelFactor } from '../../city/oil.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry, defenseStats, groundHeight } from '../../config.js';
 import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
@@ -297,6 +298,7 @@ export function updateGround(s, rates, dt, hooks) {
             u.squadSlot = q.squadSlot;
             u.squadGoal = q.destination ? { ...q.destination } : null;
           }
+          trainRecruit(s, u);
           s.groundUnits.push(u);
           event(s, 'recruited', { ...p, side: b.side, key: q.key, unitId: u.id });
           if (d.support) {

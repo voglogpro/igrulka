@@ -180,6 +180,46 @@ export function nearestRoad(s, side, x, z, { connected = false, includeDriveways
   }
   return best;
 }
+// City-builder snapping: streets meet at ends and junctions, run at 15° steps or parallel and
+// perpendicular to the street they start from, keep 8 m length steps, and new streets line up
+// on guides one or two blocks away from existing ones, so a regular grid is easy to draw.
+export const ROAD_GRID = { block: 60, angleStep: Math.PI / 12, lengthStep: 8, guide: 7 };
+
+function parallelGuide(roads, x, z) {
+  let best = null;
+  for (const r of roads) {
+    if (r.connectorTo) continue;
+    const dx = r.bx - r.ax,
+      dz = r.bz - r.az,
+      length = Math.hypot(dx, dz);
+    if (length < 20) continue;
+    const ux = dx / length,
+      uz = dz / length,
+      along = (x - r.ax) * ux + (z - r.az) * uz,
+      across = -(x - r.ax) * uz + (z - r.az) * ux;
+    if (along < -ROAD_GRID.block * 2 || along > length + ROAD_GRID.block * 2) continue;
+    for (const offset of [-2, -1, 1, 2].map((k) => k * ROAD_GRID.block)) {
+      const miss = Math.abs(across - offset);
+      if (miss > ROAD_GRID.guide || (best && miss >= best.miss)) continue;
+      // Line the start up with the ends of the street when it is close to them.
+      let t = along;
+      for (const end of [0, length]) if (Math.abs(t - end) < ROAD_GRID.guide) t = end;
+      best = {
+        miss,
+        x: r.ax + ux * t - uz * offset,
+        z: r.az + uz * t + ux * offset,
+        guide: {
+          ax: r.ax - uz * offset - ux * ROAD_GRID.block,
+          az: r.az + ux * offset - uz * ROAD_GRID.block,
+          bx: r.bx - uz * offset + ux * ROAD_GRID.block,
+          bz: r.bz + ux * offset + uz * ROAD_GRID.block,
+        },
+      };
+    }
+  }
+  return best;
+}
+
 export function snapRoadPoint(s, side, x, z, anchor = null, straight = false) {
   x = Math.round(x / 2) * 2;
   z = Math.round(z / 2) * 2;
@@ -194,7 +234,7 @@ export function snapRoadPoint(s, side, x, z, anchor = null, straight = false) {
       const d = Math.hypot(p.x - x, p.z - z);
       if (d < distance) {
         distance = d;
-        best = { x: p.x, z: p.z };
+        best = { x: p.x, z: p.z, kind: 'end' };
       }
     }
   if (distance < 13) return best;
@@ -202,20 +242,72 @@ export function snapRoadPoint(s, side, x, z, anchor = null, straight = false) {
     const p = projectPoint(x, z, r);
     if (p.distance < distance) {
       distance = p.distance;
-      best = { x: p.x, z: p.z };
+      best = { x: p.x, z: p.z, kind: 'junction' };
     }
   }
-  if (anchor && distance === 13) {
-    const dx = best.x - anchor.x,
-      dz = best.z - anchor.z,
+  if (distance < 13) return best;
+  if (anchor) {
+    const dx = x - anchor.x,
+      dz = z - anchor.z,
       length = Math.hypot(dx, dz),
-      angle = Math.atan2(dz, dx),
-      snapped = (Math.round(angle / (Math.PI / 4)) * Math.PI) / 4;
-    if (straight || Math.abs(angle - snapped) < 0.1) {
-      best = { x: anchor.x + Math.cos(snapped) * length, z: anchor.z + Math.sin(snapped) * length };
+      angle = Math.atan2(dz, dx);
+    // Directions to snap to: the 15° compass, plus along and across the street under the anchor.
+    const candidates = [];
+    for (let k = 0; k < 24; k++) candidates.push(k * ROAD_GRID.angleStep);
+    const base = roads.find(
+      (r) => !r.connectorTo && projectPoint(anchor.x, anchor.z, r).distance < 1,
+    );
+    if (base) {
+      const a = Math.atan2(base.bz - base.az, base.bx - base.ax);
+      for (let k = 0; k < 4; k++) candidates.push(a + (k * Math.PI) / 2);
     }
+    let snapped = null,
+      miss = Infinity;
+    for (const c of candidates) {
+      const d = Math.abs(Math.atan2(Math.sin(angle - c), Math.cos(angle - c)));
+      if (d < miss) {
+        miss = d;
+        snapped = c;
+      }
+    }
+    if (straight || miss < 0.09) {
+      const rounded = Math.max(
+        ROAD_GRID.lengthStep,
+        Math.round(length / ROAD_GRID.lengthStep) * ROAD_GRID.lengthStep,
+      );
+      best = {
+        x: anchor.x + Math.cos(snapped) * rounded,
+        z: anchor.z + Math.sin(snapped) * rounded,
+        kind: 'angle',
+      };
+    }
+    // A guide line one or two blocks from another street wins when the end lands on it.
+    const guide = parallelGuide(roads, best.x, best.z);
+    if (guide) {
+      const along = { x: best.x - anchor.x, z: best.z - anchor.z },
+        l = Math.hypot(along.x, along.z) || 1,
+        gx = guide.guide.bx - guide.guide.ax,
+        gz = guide.guide.bz - guide.guide.az,
+        cross = (along.x / l) * gz - (along.z / l) * gx;
+      // Stop where the drawn direction meets the guide, so the angle snap is kept.
+      if (best.kind === 'angle' && Math.abs(cross) > 1e-3 * Math.hypot(gx, gz)) {
+        const t =
+          ((guide.guide.ax - anchor.x) * gz - (guide.guide.az - anchor.z) * gx) /
+          ((along.x / l) * gz - (along.z / l) * gx);
+        if (t > 0 && Math.abs(t - l) < ROAD_GRID.guide * 2)
+          best = {
+            x: anchor.x + (along.x / l) * t,
+            z: anchor.z + (along.z / l) * t,
+            kind: 'guide',
+            guide: guide.guide,
+          };
+      } else if (best.kind !== 'angle')
+        best = { x: guide.x, z: guide.z, kind: 'guide', guide: guide.guide };
+    }
+    return best;
   }
-  return best;
+  const guide = parallelGuide(roads, x, z);
+  return guide ? { x: guide.x, z: guide.z, kind: 'guide', guide: guide.guide } : best;
 }
 
 // A driveway belongs to its building: it disappears with the ruin instead of needing its own

@@ -3,7 +3,7 @@ import { BUILDINGS } from '../../game/index.js';
 import { radarModel, defenseModel } from './defenses.js';
 import { detailBuilding, batchStatic } from '../mesh-utils.js';
 import { serviceStationModel } from './city/service-station.js';
-import { oilWellModel, oilTankModel, portModel } from './city/oil.js';
+import { oilWellModel, oilTankModel, portModel, trainingModel } from './city/oil.js';
 export function model(b) {
   const root = new T.Group();
   root.position.set(b.x, Math.max(0, this.height(b.x, b.z)), b.z);
@@ -40,6 +40,8 @@ export function model(b) {
     oilTankModel(this, content, accent);
   } else if (b.key === 'port') {
     portModel(this, content, accent);
+  } else if (b.key === 'training') {
+    trainingModel(this, content, accent);
   } else if (b.key === 'housing') {
     for (let i = 0; i < 3; i++) {
       const x = (i - 1) * 8,
@@ -158,7 +160,7 @@ export function model(b) {
     defenseModel(this, b, content, root);
   }
   // Warm porch lights are emissive geometry, avoiding a point light per structure.
-  if (!['gun', 'cannon', 'sam', 'oilwell', 'oiltank', 'port'].includes(b.key))
+  if (!['gun', 'cannon', 'sam', 'oilwell', 'oiltank', 'port', 'training'].includes(b.key))
     for (const x of [-size * 0.4, size * 0.4]) {
       this.cyl(content, x, 0.8, size * 0.43, 0.18, 7, '#485951');
       this.box(content, x, 7.5, size * 0.43, 1.7, 0.35, 1.7, '#ffcf8e', {

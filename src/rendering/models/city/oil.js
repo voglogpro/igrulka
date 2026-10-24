@@ -141,3 +141,42 @@ export function shipModel(w, root, accent) {
   w.cyl(root, 0, 11, -12.2, 0.95, 0.8, accent);
   w.cyl(root, 0, 2.25, 13, 0.12, 6, '#a9ada6');
 }
+
+// Training range: a firing line with sandbags and pop-up targets, an obstacle course of walls
+// and tyres, a watchtower and a small hut with a flag.
+export function trainingModel(w, content, accent) {
+  const sand = '#a89b74',
+    wood = '#6f5a42';
+  w.box(content, 0, 0.7, 0, 30, 0.2, 30, '#8a8a68');
+  // Firing line and sandbag bunker.
+  for (let i = 0; i < 6; i++) w.box(content, -12 + i * 4.8, 0.9, 8, 4.2, 1.2, 1.6, sand);
+  for (let i = 0; i < 5; i++) {
+    const x = -10 + i * 5;
+    w.box(content, x, 0.9, -12, 0.2, 2.2, 0.2, wood);
+    w.box(content, x, 2.4, -12, 1.4, 1.8, 0.12, i % 2 ? '#d8d4c4' : '#c45a3e');
+    w.box(content, x, 2.9, -11.93, 0.5, 0.5, 0.05, '#2b2b2b');
+  }
+  w.box(content, 0, 0.9, -14, 28, 3, 0.8, '#7c6f55');
+  // Obstacle course: low walls, a climbing frame and a row of tyres.
+  for (const z of [-4, 0]) w.box(content, -11, 0.9, z, 5, 1.4, 0.5, '#8f8a7c');
+  for (const x of [8, 11]) w.box(content, x, 0.9, -2, 0.3, 4, 0.3, wood);
+  w.box(content, 9.5, 4.6, -2, 3.6, 0.25, 0.25, wood);
+  for (let i = 0; i < 4; i++) w.cyl(content, 3 + i * 1.6, 0.9, 3, 0.7, 0.4, '#23282a');
+  // Watchtower and hut.
+  for (const [x, z] of [
+    [12, 10],
+    [14.5, 10],
+    [12, 12.5],
+    [14.5, 12.5],
+  ])
+    w.box(content, x, 0.9, z, 0.3, 7, 0.3, wood);
+  w.box(content, 13.25, 7.9, 11.25, 3.6, 0.3, 3.6, wood);
+  w.box(content, 13.25, 9.6, 11.25, 4, 0.3, 4, '#5a4c3a');
+  w.box(content, -12, 0.9, 11.5, 6, 3.5, 4.5, '#77806a');
+  w.box(content, -12, 4.4, 11.5, 6.6, 0.4, 5, '#4f5a4c');
+  w.cyl(content, -15.5, 0.9, 9, 0.12, 9, '#aeb7af');
+  w.box(content, -14.3, 8.2, 9, 2.4, 1.4, 0.1, accent, {
+    emissive: accent,
+    emissiveIntensity: 0.4,
+  });
+}

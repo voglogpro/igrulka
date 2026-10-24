@@ -5,6 +5,7 @@ export function setBuild(key) {
   this.buildKey = key;
   this.roadAnchor = null;
   this.disposeContents(this.ghost);
+  if (this.roadGuide) this.roadGuide.visible = false;
   this.coverage.visible = false;
   this.rotation = 0;
   if (!key) {
@@ -223,7 +224,32 @@ export function groundPoint(e) {
   return this.ray.ray.intersectPlane(this.plane, new T.Vector3());
 }
 
+// The parallel guide a road end has snapped to: a long faint strip on the ground.
+function showGuide(world, guide) {
+  if (!world.roadGuide) {
+    world.roadGuide = new T.Mesh(
+      world.boxGeo,
+      new T.MeshBasicMaterial({
+        color: '#f2d38a',
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+      }),
+    );
+    world.roadGuide.renderOrder = 3;
+    world.scene.add(world.roadGuide);
+  }
+  const g = world.roadGuide;
+  g.visible = !!guide;
+  if (!guide) return;
+  const length = Math.hypot(guide.bx - guide.ax, guide.bz - guide.az);
+  g.position.set((guide.ax + guide.bx) / 2, 0.9, (guide.az + guide.bz) / 2);
+  g.rotation.set(0, Math.atan2(guide.bx - guide.ax, guide.bz - guide.az), 0);
+  g.scale.set(1.2, 0.08, length);
+}
+
 export function updateGhost(e) {
+  if (this.roadGuide && this.buildKey !== 'road') this.roadGuide.visible = false;
   if (!this.buildKey) return;
   const p = this.groundPoint(e);
   if (!p) return;
@@ -233,9 +259,15 @@ export function updateGhost(e) {
     let start = this.roadAnchor;
     if (!start && this.down?.button === 0 && this.keys.MouseLeft && this.down.ground)
       start = E.snapRoadPoint(this.state, 0, this.down.ground.x, this.down.ground.z);
+    showGuide(this, point.guide || (!this.roadAnchor ? start?.guide : null));
     if (start) {
       const length = Math.hypot(point.x - start.x, point.z - start.z),
-        check = E.roadPreview(this.state, 0, start.x, start.z, point.x, point.z);
+        check = {
+          ...E.roadPreview(this.state, 0, start.x, start.z, point.x, point.z),
+          angle:
+            ((Math.atan2(point.x - start.x, -(point.z - start.z)) * 180) / Math.PI + 360) % 360,
+          snap: point.kind || null,
+        };
       this.ghost.position.set((point.x + start.x) / 2, 0.95, (point.z + start.z) / 2);
       this.ghost.rotation.y = Math.atan2(point.x - start.x, point.z - start.z);
       this.ghost.children[0].scale.set(10, 0.16, Math.max(1, length));

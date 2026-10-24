@@ -367,3 +367,26 @@ test('a driveway is never hit on its own and disappears together with its ruined
   assert.equal(drive().removed, true);
   assert.equal(E.demolish(s, t.factory.id), true);
 });
+
+test('road drawing snaps like a city builder: compass and street angles, length steps, parallel guides', () => {
+  const s = fresh();
+  funds(s);
+  assert.equal(typeof E.buildRoad(s, 0, -700, 200, -500, 200), 'object');
+  const block = E.ROAD_GRID.block;
+  // A start near the line one block away lands exactly on it, lined up with the street end.
+  const start = E.snapRoadPoint(s, 0, -697, 200 + block + 4);
+  assert.equal(start.kind, 'guide');
+  assert.deepEqual([start.x, start.z], [-700, 200 + block]);
+  // Drawn almost straight: the end keeps the street direction and an 8 m length step.
+  const end = E.snapRoadPoint(s, 0, -583, 200 + block + 3, start);
+  assert.ok(Math.abs(end.z - start.z) < 1e-9);
+  assert.equal(Math.abs(end.x - start.x) % E.ROAD_GRID.lengthStep, 0);
+  // Across from the street end the drawing snaps perpendicular.
+  const across = E.snapRoadPoint(s, 0, -498, 330, { x: -500, z: 200 });
+  assert.ok(Math.abs(across.x + 500) < 1e-9);
+  // Shift forces the nearest grid direction even far from it.
+  const forced = E.snapRoadPoint(s, 0, -600, 330, { x: -700, z: 330 }, true);
+  assert.ok(
+    Math.abs(forced.z - 330) < 1e-9 || Math.abs(forced.x + 700) < 1e-9 || forced.kind === 'angle',
+  );
+});

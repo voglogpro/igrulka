@@ -13,6 +13,7 @@ import { updateFactoryPlans } from './units/aviation/factory-plans.js';
 import { updateWeather } from './weather.js';
 import { updateServices } from './city/service.js';
 import { updateOil } from './city/oil.js';
+import { updateTraining } from './units/ground/training.js';
 import { updatePorts } from './city/ports.js';
 import { updateDefense } from './defense/coordinator.js';
 export function step(s, dt) {
@@ -47,6 +48,7 @@ export function step(s, dt) {
   updateConstruction(s, rates, dt);
   updateServices(s, dt);
   updateOil(s, rates, dt);
+  updateTraining(s, dt);
   updatePorts(s, dt);
   updateDefense(s);
   updateGround(s, rates, dt, { event, random });

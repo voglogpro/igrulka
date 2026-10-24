@@ -517,7 +517,7 @@ function buildList() {
       : tab === 'oil'
         ? ['oilwell', 'oiltank', 'port']
         : tab === 'army'
-          ? ['barracks']
+          ? ['barracks', 'training']
           : ['factory', 'launcher', 'gun', 'sam', 'radar'];
   $('#build-list').innerHTML =
     keys
@@ -625,8 +625,17 @@ function previewRoad(p) {
     $('#tool-note').textContent = 'Выберите начало улицы';
     return;
   }
+  const snap =
+    p.snap === 'guide'
+      ? ' · параллельно улице'
+      : p.snap === 'angle'
+        ? ' · угол ' + Math.round(p.angle) + '°'
+        : p.snap === 'junction' || p.snap === 'end'
+          ? ' · примыкание'
+          : '';
   $('#tool-note').textContent =
-    p.error || `Длина ${Math.round(p.length)} · стоимость ${p.cost} ₡ · ЛКМ — продолжить улицу`;
+    p.error ||
+    `Длина ${Math.round(p.length)} м${snap} · стоимость ${p.cost} ₡ · ЛКМ — продолжить улицу · Shift — строго по сетке`;
   $('#tool-note').classList.toggle('warning', !!p.error);
 }
 function previewBuilding(plan) {

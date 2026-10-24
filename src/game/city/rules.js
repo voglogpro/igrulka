@@ -9,4 +9,5 @@ export const ROAD_REQUIRED = new Set([
   'lab',
   'market',
   'barracks',
+  'training',
 ]);

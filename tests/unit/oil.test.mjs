@@ -143,3 +143,19 @@ test('old campaigns gain the starting oil stock and an empty fleet; corrupt valu
   ];
   assert.throws(() => E.load(E.save(fleet)), /флот/);
 });
+
+test('a connected training range sends trained recruits and drills resting soldiers to rank two', () => {
+  const s = fresh();
+  ready(s, 0, 'barracks', -680, -10);
+  const range = ready(s, 0, 'training', -550, -10);
+  assert.equal(E.recruit(s, 0, 'infantry'), true);
+  E.advance(s, 40);
+  const recruit = s.groundUnits.find((u) => u.side === 0 && u.key === 'infantry');
+  assert.ok(recruit, 'the recruit leaves the barracks');
+  assert.ok(E.veteranRank(recruit) >= 1);
+  const idle = E.makeGround(s, 0, 'infantry', range.x + 20, range.z + 40);
+  s.groundUnits.push(idle);
+  E.advance(s, 200);
+  assert.equal(E.veteranRank(idle), 2, 'drill stops at the second rank');
+  assert.equal(idle.xp, E.BUILDINGS.training.training.maxXp);
+});
