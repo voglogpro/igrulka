@@ -1,6 +1,6 @@
 import { setArmyContextVisible } from './army-controls.js';
 import { updateArmyRecruitment } from './army-recruitment.js';
-import { updateDeploymentHUD, renderSquadRoster } from './deployment.js';
+import { updateDeploymentHUD, renderSquadRoster, toggleSquadRoster } from './deployment.js';
 import {
   factoryPlanRequest,
   loadFactoryPlanFields,
@@ -272,7 +272,7 @@ function leaveNetwork(message) {
 }
 function ambientAudio() {
   if (!world) return;
-  audio.update?.(state, world.camera, paused || !started, world.controls.target);
+  audio.update?.(state, world.camera, paused || !started, network?.side ?? 0);
 }
 function toast(text, danger = false) {
   clearTimeout(toastTimer);
@@ -1276,6 +1276,11 @@ document.addEventListener('click', async (ev) => {
       .filter((u) => u.side === 0 && u.hp > 0 && u.key === d.armyRole)
       .map((u) => u.id);
     selectArmy(ids, ev.shiftKey);
+    if (ev.detail === 2) focusUnits(ids);
+  }
+  if (d.action === 'roster-toggle') {
+    toggleSquadRoster();
+    renderGroups();
   }
   if (d.squad) {
     const ids = d.squad.startsWith('role-')
@@ -1284,6 +1289,7 @@ document.addEventListener('click', async (ev) => {
           .map((u) => u.id)
       : E.squadRoster(state, 0).find((g) => g.id === Number(d.squad))?.ids || [];
     if (ids.length) selectArmy(ids, ev.shiftKey);
+    if (ids.length && ev.detail === 2) focusUnits(ids);
   }
   if (d.deployCount) {
     recruitCount = Number(d.deployCount);
@@ -1300,6 +1306,7 @@ document.addEventListener('click', async (ev) => {
     const ids = E.getGroup(state, 0, Number(d.group));
     if (ids.length) selectArmy(ids, ev.shiftKey);
     else toast('Выделите бойцов и нажмите Ctrl+' + d.group);
+    if (ids.length && ev.detail === 2) focusUnits(ids);
   }
   if (d.recruitCount) {
     recruitCount = Number(d.recruitCount);

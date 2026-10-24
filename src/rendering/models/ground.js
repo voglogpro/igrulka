@@ -80,7 +80,12 @@ export function animateGround(model, u, time, dt = 0) {
       (1 - Math.exp(-12 * dt));
   }
   const pitch = model.userData.pitch;
-  if (pitch)
+  if (pitch && u.key === 'howitzer') {
+    // A howitzer lobs its shells: elevation grows with range instead of pointing at the target.
+    const range = Math.hypot((u.targetX ?? u.x) - u.x, (u.targetZ ?? u.z) - u.z),
+      desired = Number.isFinite(u.targetX) ? 0.22 + Math.min(1, range / 560) * 0.62 : 0.05;
+    pitch.rotation.x += (-desired - pitch.rotation.x) * (1 - Math.exp(-3 * dt));
+  } else if (pitch)
     pitch.rotation.x =
       (turret?.userData.backward ? 1 : -1) *
       Math.atan2(
@@ -89,7 +94,9 @@ export function animateGround(model, u, time, dt = 0) {
       );
   if (model.userData.recoil) {
     const age = Math.max(0, time - (u.lastFire ?? -100));
-    model.userData.recoil.position.z = age < 0.32 ? -Math.sin((Math.PI * age) / 0.32) * 0.65 : 0;
+    const heavy = u.key === 'howitzer' ? 1.6 : 0.65,
+      span = u.key === 'howitzer' ? 0.9 : 0.32;
+    model.userData.recoil.position.z = age < span ? -Math.sin((Math.PI * age) / span) * heavy : 0;
   }
   if (u.moving && dt > 0) {
     model.userData.drivePhase = (model.userData.drivePhase || 0) + dt * 8;

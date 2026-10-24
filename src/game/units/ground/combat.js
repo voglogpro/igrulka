@@ -56,8 +56,9 @@ export function impactGround(s, p, event = emit) {
       : p.kind === 'shell'
         ? 'cannon'
         : 'rifle';
-  const splash = profile === 'cannon';
-  const radius = splash ? 14 : profile === 'antiArmor' ? 3 : 4.5;
+  const artillery = profile === 'artillery';
+  const splash = profile === 'cannon' || artillery;
+  const radius = artillery ? 24 : splash ? 14 : profile === 'antiArmor' ? 3 : 4.5;
   const from = {
     x: p.originX ?? p.px ?? p.x ?? p.tx,
     z: p.originZ ?? p.pz ?? p.z ?? p.tz,
@@ -71,7 +72,8 @@ export function impactGround(s, p, event = emit) {
       const dist = Math.hypot(u.x - p.tx, u.z - p.tz);
       const hitRadius = GROUND_UNITS[u.key].size * 0.55 + 0.8;
       if (dist >= Math.max(radius + 7, hitRadius)) continue;
-      if (!lineOfSight(s, from, u)) continue;
+      // Shells falling from above are blocked only by walls between the burst and the soldier.
+      if (!lineOfSight(s, artillery ? { x: p.tx, z: p.tz, id: p.source } : from, u)) continue;
       if (dist < radius + 7 && isInfantry(u.key)) recordThreat(s, u, from);
       if (dist < radius + 7 && isInfantry(u.key))
         u.suppression = clamp(
@@ -115,7 +117,7 @@ export function impactGround(s, p, event = emit) {
         Math.max(0, Math.abs(p.tx - b.x) - half),
         Math.max(0, Math.abs(p.tz - b.z) - half),
       );
-      if (distance > radius || !lineOfSight(s, from, b)) continue;
+      if (distance > radius || (!artillery && !lineOfSight(s, from, b))) continue;
       const amount =
         p.damage *
         groundDamageMultiplier(p.shooterKey, b, p.kind) *
@@ -133,7 +135,7 @@ export function impactGround(s, p, event = emit) {
     x: p.tx,
     y: 2,
     z: p.tz,
-    key: p.kind === 'shell' ? 'tank' : 'infantry',
+    key: artillery ? 'artillery' : p.kind === 'shell' ? 'tank' : 'infantry',
     radius: radius,
     side: p.side,
   });

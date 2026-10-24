@@ -33,6 +33,7 @@
 | Поиск пути и мосты                                        | `src/game/units/ground/navigation.js`              |
 | Внешний вид Leopard                                       | `src/rendering/models/vehicles/leopard.js`         |
 | Внешний вид БТР                                           | `src/rendering/models/vehicles/apc.js`             |
+| Башня и ствол самоходной гаубицы                          | `src/rendering/models/vehicles/howitzer.js`        |
 | Пушки и радары Шилки/Gepard                               | `src/rendering/models/vehicles/anti-air.js`        |
 | Гусеницы и общий корпус                                   | `src/rendering/models/vehicles/tracked-chassis.js` |
 | Выбор шаблона, клонирование и анимация машин              | `src/rendering/models/ground.js`                   |
@@ -95,7 +96,7 @@
 - `src/ui/app.js` — текущая сессия, обработчики действий и связь интерфейса с правилами.
 - `src/ui/layout.js`, `panels.js`, `inspector.js` — оболочка, меню и карточка выбранного объекта.
 - `src/ui/icons.js`, `format.js`, `style.css`, `fonts.css` — оформление и форматирование.
-- `src/audio/game-audio.js` — процедурный звук и пространственная громкость.
+- `src/audio/game-audio.js` — маршрутизация звука: расстояние от камеры, задержка, реверберация, эхо, моторы и сирена. `src/audio/synth.js` — синтез выстрелов, взрывов, свиста, моторов и импульсного отклика.
 
 ## Новые механики армии
 

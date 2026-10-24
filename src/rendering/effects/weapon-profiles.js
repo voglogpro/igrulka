@@ -50,6 +50,19 @@ export const WEAPON_FX = {
     blast: true,
     reach: 8.5,
   },
+  artillery: {
+    flash: 6.5,
+    jet: 13,
+    petals: 2,
+    casing: 0,
+    smoke: 3,
+    every: 1,
+    light: 55,
+    lightEvery: 1,
+    brake: true,
+    blast: true,
+    reach: 14,
+  },
   atgm: {
     flash: 2.4,
     jet: 3,
@@ -77,6 +90,7 @@ export const WEAPON_FX = {
 
 const AIR_GUNS = { gepard: 'autocannon', shilka: 'shilka', mog: 'hmg', gun: 'hmg' };
 const GROUND_GUNS = {
+  howitzer: 'artillery',
   leopard: 'tank',
   tankdestroyer: 'tank',
   atgm: 'atgm',

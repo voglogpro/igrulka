@@ -120,20 +120,24 @@ export function tickUnit(s, u, dt, rates, hooks) {
   )
     return;
   let aim = target;
-  if (aim && (!lineOfSight(s, u, aim) || Math.hypot(aim.x - u.x, aim.z - u.z) > d.groundRange))
-    aim = null;
-  const blind = !aim,
-    shot = groundWeaponProfile(u.key);
+  const shot = groundWeaponProfile(u.key),
+    minRange = d.groundMinRange || 0,
+    reach = (p) => {
+      const range = Math.hypot(p.x - u.x, p.z - u.z);
+      return range <= d.groundRange && range >= minRange;
+    };
+  // Indirect fire lobs shells over buildings, so only direct weapons need a clear line.
+  if (aim && ((!shot.indirect && !lineOfSight(s, u, aim)) || !reach(aim))) aim = null;
+  const blind = !aim;
   if (!aim && shot.canBlind)
     aim = s.contacts?.[u.side]?.find(
-      (c) =>
-        c.expires > s.time &&
-        Math.hypot(c.x - u.x, c.z - u.z) < d.groundRange &&
-        lineOfSight(s, u, c),
+      (c) => c.expires > s.time && reach(c) && (shot.indirect || lineOfSight(s, u, c)),
     );
   if (!aim) return;
+  const distanceSpread = shot.indirect ? 1 + Math.hypot(aim.x - u.x, aim.z - u.z) / 220 : 1;
   const spread =
       (blind ? 18 : shot.spread) *
+      distanceSpread *
       (u.moving ? 2 : 1) *
       (1 + u.suppression * 2) *
       (1 + Math.pow(u.heat || 0, 2) * 2) *
@@ -149,7 +153,16 @@ export function tickUnit(s, u, dt, rates, hooks) {
   if (f.credits < cost) return;
   f.credits -= cost;
   f.spentAmmo += cost;
-  u.groundCooldown = d.groundCooldown * (1 + u.suppression);
+  // Automatic weapons fire in bursts; the pause keeps the configured average rate of fire.
+  let cooldown = d.groundCooldown;
+  if (d.groundBurst > 1) {
+    if (!(u.burstLeft > 0)) u.burstLeft = d.groundBurst;
+    u.burstLeft--;
+    cooldown = u.burstLeft
+      ? d.groundBurstGap
+      : d.groundCooldown * d.groundBurst - d.groundBurstGap * (d.groundBurst - 1);
+  }
+  u.groundCooldown = cooldown * (1 + u.suppression);
   u.groundAmmo--;
   if (d.heatPerShot) u.heat = Math.min(1.5, (u.heat || 0) + d.heatPerShot);
   u.targetX = tx;
@@ -167,7 +180,8 @@ export function tickUnit(s, u, dt, rates, hooks) {
     targetId: blind ? null : aim.id,
     domain: 'ground',
     kind: tank ? 'shell' : 'bullet',
-    tracer: tank || u.key === 'machinegunner' || u.groundAmmo % 3 === 0,
+    tracer: tank || u.groundAmmo % (['machinegunner', 'apc', 'mog'].includes(u.key) ? 2 : 4) === 0,
+    ...(shot.indirect ? { arc: Math.min(150, length * 0.33), originY: 6 } : {}),
     x: u.x,
     y: foot ? 2.6 : 4,
     z: u.z,
@@ -189,6 +203,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
   event(s, 'shot', {
     side: u.side,
     key: tank ? 'cannon' : 'gun',
+    shooter: u.key,
     buildingId: u.id,
     x: u.x,
     y: foot ? 2.6 : 4,

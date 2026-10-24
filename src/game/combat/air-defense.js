@@ -219,6 +219,7 @@ export function fireDefenses(s, rates, dt) {
       z: b.z,
       side: b.side,
       key: missile ? 'sam' : fast ? 'gun' : 'cannon',
+      shooter: b.key,
       buildingId: b.id,
       mx,
       my,

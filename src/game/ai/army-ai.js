@@ -25,7 +25,7 @@ export function updateArmyAI(s, hooks) {
         'assault',
         'apc',
         ...(f.tech.includes('mobileAA') ? ['gepard'] : []),
-        ...(f.tech.includes('armor') ? ['leopard', 'atgm', 'tankdestroyer'] : []),
+        ...(f.tech.includes('armor') ? ['leopard', 'atgm', 'tankdestroyer', 'howitzer'] : []),
         ...(f.tech.includes('fpvTeams') ? ['operator'] : []),
       ];
       const armorThreat = s.groundUnits.some(

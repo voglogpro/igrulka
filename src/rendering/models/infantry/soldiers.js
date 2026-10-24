@@ -8,50 +8,125 @@ const temp = new T.Object3D(),
   frustum = new T.Frustum(),
   viewProjection = new T.Matrix4(),
   bounds = new T.Sphere(new T.Vector3(), 12);
+// Centre-based helper: the shared world.box places boxes by their base.
+function part(w, root, x, y, z, sx, sy, sz, color, rx = 0, ry = 0, rz = 0) {
+  const mesh = w.box(root, x, y - sy / 2, z, sx, sy, sz, color);
+  mesh.rotation.set(rx, ry, rz);
+  return mesh;
+}
+// Baked into the role geometry, so a private low-poly sphere is enough.
+const SPHERE = new T.IcosahedronGeometry(1, 1);
+function ball(w, root, x, y, z, sx, sy, sz, color) {
+  const mesh = new T.Mesh(SPHERE, w.mat(color));
+  mesh.position.set(x, y, z);
+  mesh.scale.set(sx, sy, sz);
+  root.add(mesh);
+  return mesh;
+}
+// Weapon held at the right shoulder and pointing forward (+z).
+function weapon(w, root, key, dark) {
+  const x = 0.2,
+    y = 2.02,
+    metal = '#1f2b26',
+    furniture = '#3a3f33';
+  if (key === 'machinegunner') {
+    part(w, root, x, y - 0.02, -0.02, 0.14, 0.24, 0.55, furniture);
+    part(w, root, x, y, 0.55, 0.2, 0.26, 0.75, metal);
+    part(w, root, x, y + 0.02, 1.45, 0.08, 0.08, 1.25, metal);
+    part(w, root, x, y + 0.03, 1.15, 0.15, 0.15, 0.55, '#2b3a33');
+    part(w, root, x - 0.16, y - 0.2, 0.5, 0.3, 0.3, 0.32, '#4b5a3c');
+    // Folded bipod and a belt hanging into the ammo box.
+    part(w, root, x - 0.05, y - 0.12, 1.85, 0.04, 0.04, 0.5, metal, 0.4);
+    part(w, root, x + 0.05, y - 0.12, 1.85, 0.04, 0.04, 0.5, metal, 0.4);
+    part(w, root, x - 0.1, y - 0.05, 0.62, 0.06, 0.05, 0.25, '#b39a54');
+    return;
+  }
+  if (key === 'sniper') {
+    part(w, root, x, y - 0.03, -0.05, 0.13, 0.26, 0.55, furniture);
+    part(w, root, x, y, 0.5, 0.14, 0.2, 0.7, '#3b4434');
+    part(w, root, x, y + 0.02, 1.55, 0.06, 0.06, 1.5, metal);
+    const scope = w.cyl(root, x, y + 0.18, 0.5, 0.07, 0.6, '#151d1a');
+    scope.rotation.x = Math.PI / 2;
+    scope.position.set(x, y + 0.2, 0.5);
+    part(w, root, x, y + 0.2, 0.86, 0.13, 0.13, 0.06, '#5c8d8a');
+    return;
+  }
+  const short = key === 'assault' || key === 'operator' || key === 'engineer';
+  part(w, root, x, y - 0.03, -0.02, 0.12, 0.22, 0.45, furniture);
+  part(w, root, x, y, 0.42, 0.14, 0.2, 0.5, metal);
+  part(w, root, x, y + 0.01, short ? 0.85 : 0.92, 0.12, 0.14, short ? 0.38 : 0.52, '#2c3a31');
+  part(w, root, x, y + 0.02, short ? 1.18 : 1.36, 0.05, 0.05, short ? 0.3 : 0.4, metal);
+  part(w, root, x, y - 0.22, 0.5, 0.1, 0.32, 0.15, dark, 0.25);
+  if (key === 'assault') part(w, root, x, y + 0.16, 0.45, 0.09, 0.09, 0.2, '#6f9a8d');
+}
 function bodyGeometry(w, key, side) {
   const root = new T.Group(),
     paint = side === 0 ? '#75836b' : '#8f7966',
+    rig = side === 0 ? '#56654c' : '#6c5e4b',
     skin = '#b6a085',
-    dark = '#263c32',
-    d = GROUND_UNITS[key];
-  w.box(root, 0, 1.2, 0, 0.95, 1.18, 0.65, paint);
-  w.box(root, 0, 1.65, -0.5, 0.8, 0.8, 0.48, '#4c5a44');
-  w.box(root, 0, 1.45, 0.39, 0.85, 0.65, 0.2, '#526348');
-  w.cyl(root, 0, 2.4, 0, 0.3, 0.4, skin);
-  w.cyl(root, 0, 2.76, 0, 0.44, 0.25, paint);
-  w.box(root, -0.52, 1.35, 0, 0.32, 0.95, 0.42, paint);
-  w.box(root, 0.52, 1.7, 0.2, 0.32, 0.42, 0.8, paint);
-  w.box(
-    root,
-    0.6,
-    1.78,
-    0.95,
-    key === 'machinegunner' ? 0.22 : 0.14,
-    0.17,
-    key === 'sniper' ? 2.8 : 1.7,
-    dark,
-  );
-  w.box(root, 0.58, 1.55, 0.45, 0.22, 0.5, 0.35, dark);
+    dark = '#263c32';
+  // Belt, torso and plate carrier with magazine pouches.
+  part(w, root, 0, 1.38, 0, 0.88, 0.28, 0.56, '#3d4536');
+  part(w, root, 0, 1.88, 0, 0.9, 0.82, 0.54, paint);
+  part(w, root, 0, 1.9, 0.2, 0.84, 0.7, 0.2, rig);
+  part(w, root, 0, 1.92, -0.2, 0.82, 0.66, 0.16, rig);
+  for (const px of [-0.26, 0, 0.26]) part(w, root, px, 1.66, 0.34, 0.2, 0.26, 0.1, '#4a5641');
+  part(w, root, -0.38, 1.43, 0.12, 0.16, 0.22, 0.2, '#4a5641');
+  // Shoulders and arms in a firing grip: right hand on the grip, left on the handguard.
+  for (const sx of [-1, 1]) ball(w, root, sx * 0.5, 2.18, 0.02, 0.2, 0.17, 0.2, paint);
+  part(w, root, 0.48, 2.0, 0.2, 0.2, 0.2, 0.5, paint, 0.55);
+  part(w, root, 0.33, 1.92, 0.42, 0.17, 0.17, 0.42, paint, -0.1, -0.35);
+  part(w, root, -0.47, 2.02, 0.28, 0.2, 0.2, 0.55, paint, 0.35, 0.35);
+  part(w, root, -0.2, 1.96, 0.72, 0.17, 0.17, 0.55, paint, -0.05, 0.75);
+  ball(w, root, 0.22, 1.93, 0.55, 0.1, 0.1, 0.1, skin);
+  ball(w, root, 0.12, 1.98, 0.98, 0.1, 0.1, 0.1, skin);
+  // Neck, face and helmet with a brim and goggles strap.
+  part(w, root, 0, 2.38, 0, 0.22, 0.16, 0.22, skin);
+  ball(w, root, 0, 2.58, 0.03, 0.24, 0.27, 0.25, skin);
+  part(w, root, 0, 2.62, 0.25, 0.3, 0.07, 0.04, '#1d2422');
   if (key === 'sniper') {
-    w.box(root, 0.59, 2, 0.65, 0.16, 0.16, 0.5, '#384e43');
-    w.box(root, 0, 2.4, -0.2, 1.2, 0.5, 0.9, '#657752');
+    // Ghillie hood and shaggy shoulders break up the silhouette.
+    ball(w, root, 0, 2.7, -0.03, 0.36, 0.3, 0.38, '#5f6e45');
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      part(
+        w,
+        root,
+        Math.cos(a) * 0.42,
+        2.1 + (i % 3) * 0.12,
+        Math.sin(a) * 0.3,
+        0.22,
+        0.28,
+        0.14,
+        i % 2 ? '#6b7a4e' : '#56633d',
+        0.3,
+        a,
+        0.4,
+      );
+    }
+  } else {
+    ball(w, root, 0, 2.74, 0, 0.33, 0.24, 0.35, paint);
+    part(w, root, 0, 2.66, 0, 0.66, 0.05, 0.7, rig);
+    if (key === 'assault' || key === 'operator')
+      part(w, root, 0, 2.78, 0.3, 0.42, 0.1, 0.06, '#32514f');
   }
+  // Backpack; heavier for support roles.
+  const pack = key === 'machinegunner' || key === 'mog' || key === 'engineer' ? 0.85 : 0.6;
+  part(w, root, 0, 1.95, -0.43, 0.68, pack, 0.32, '#4c5a44');
+  part(w, root, 0, 2.2 + pack / 2, -0.43, 0.6, 0.14, 0.3, '#3d4a37');
+  if (key !== 'atgm') weapon(w, root, key, dark);
   if (key === 'engineer') {
-    w.box(root, -0.65, 1.4, -0.3, 0.15, 1.5, 0.2, '#b5ac89');
-    w.box(root, -0.65, 2.5, -0.3, 0.5, 0.55, 0.16, '#4d5548');
+    part(w, root, -0.3, 2.15, -0.62, 0.12, 1.2, 0.1, '#7d6b4a', 0.2);
+    part(w, root, -0.3, 2.85, -0.75, 0.38, 0.42, 0.06, '#59605a', 0.2);
   }
   if (key === 'operator') {
-    w.box(root, 0, 1.5, 0.75, 0.9, 0.18, 0.6, '#273e3b');
-    w.box(root, 0.3, 1.7, 0.8, 0.04, 0.7, 0.04, '#a3b5a0');
-    w.box(root, 0, 2.48, 0.33, 0.68, 0.28, 0.2, '#253a3a');
+    part(w, root, -0.05, 1.62, 0.62, 0.7, 0.12, 0.42, '#263b38');
+    part(w, root, 0.25, 1.95, 0.7, 0.03, 0.62, 0.03, '#a3b5a0');
+    part(w, root, -0.32, 2.75, -0.5, 0.03, 0.9, 0.03, '#9bab98');
   }
-  if (key === 'assault') {
-    w.box(root, 0, 2.4, 0.32, 0.65, 0.28, 0.22, '#364b43');
-    w.box(root, 0, 1.3, 0.65, 0.4, 0.7, 0.14, '#78816b');
-  }
-  if (key === 'mog') {
-    w.box(root, 0, 1.3, 0.4, 0.9, 0.7, 0.2, '#485d47');
-  }
+  if (key === 'assault')
+    for (const gx of [-0.3, 0.3]) ball(w, root, gx, 1.48, 0.36, 0.09, 0.11, 0.09, '#3e4a37');
+  if (key === 'mog') part(w, root, -0.45, 1.3, 0.35, 0.35, 0.3, 0.45, '#485d47');
   if (key === 'atgm') buildInfantryAT(w, root, paint);
   root.updateMatrixWorld(true);
   let count = 0;
@@ -168,7 +243,9 @@ export class InfantryBatch {
           wx = u.x + x * c + z * s,
           wz = u.z + z * c - x * s,
           index = pool.count++,
-          height = crouch ? 0.67 : 1;
+          // Firing from a halt: drop to a half-kneel and lean into the weapon.
+          aiming = !u.moving && time - (u.lastFire ?? -100) < 1.6,
+          height = crouch ? 0.67 : aiming ? 0.86 : 1;
         const stride = u.moving ? Math.sin(time * 12 + m * 1.7) : 0;
         const recoil = Math.exp(-Math.max(0, time - (u.lastFire ?? -100)) * 22) * 0.06;
         temp.position.set(
@@ -176,7 +253,7 @@ export class InfantryBatch {
           (u.y || 1) + Math.abs(stride) * 0.055,
           wz - Math.cos(angle) * recoil,
         );
-        temp.rotation.set(u.moving ? 0.065 : 0, angle, stride * 0.018);
+        temp.rotation.set(u.moving ? 0.065 : aiming ? 0.09 : 0, angle, stride * 0.018);
         temp.scale.set(1, height, 1);
         temp.updateMatrix();
         pool.body.setMatrixAt(index, temp.matrix);

@@ -8,6 +8,12 @@ import { WEAPON_FX, weaponClass } from './weapon-profiles.js';
 const DETAIL_DISTANCE = 720;
 const WRECK_LIFE = 14;
 const SPARK_COLOR = [5, 2.4, 0.6];
+// Tracer compositions differ by army, as in real conflicts: red-orange for us, green for them.
+const TRACER = [
+  [6.5, 1.5, 0.35],
+  [1.1, 5.5, 1.3],
+];
+const tracerColor = (p) => TRACER[p.side === 1 ? 1 : 0];
 
 export class CombatEffects {
   constructor(world) {
@@ -23,6 +29,7 @@ export class CombatEffects {
     this.rounds = new Map();
     this.airRounds = new Map();
     this.trails = new Map();
+    this.groundTracers = new Map();
     this.wrecks = [];
     this.eye = new T.Vector3();
     this.lights = Array.from({ length: 3 }, () => {
@@ -250,7 +257,7 @@ export class CombatEffects {
       });
   }
   muzzle(e, shooter) {
-    const fx = WEAPON_FX[weaponClass(e, shooter?.key)] || WEAPON_FX.rifle,
+    const fx = WEAPON_FX[weaponClass(e, shooter?.key ?? e.shooter)] || WEAPON_FX.rifle,
       dx0 = e.tx - (e.mx ?? e.x),
       dy0 = e.ty - (e.my ?? e.y),
       dz0 = e.tz - (e.mz ?? e.z),
@@ -428,13 +435,15 @@ export class CombatEffects {
         e.z,
         e.key === 'fpv'
           ? 0.55
-          : e.key === 'tank'
-            ? 0.8
-            : e.key === 'ballistic'
-              ? 2.6
-              : e.key === 'heavy'
-                ? 1.7
-                : 1.2,
+          : e.key === 'artillery'
+            ? 1.5
+            : e.key === 'tank'
+              ? 0.8
+              : e.key === 'ballistic'
+                ? 2.6
+                : e.key === 'heavy'
+                  ? 1.7
+                  : 1.2,
       );
     if (e.type === 'destroy')
       for (let i = 0; i < 18; i++)
@@ -629,13 +638,17 @@ export class CombatEffects {
         this.airRounds.set(p.id, { x: p.x, y: p.y, z: p.z, kind: p.kind });
       }
       if (p.kind === 'bullet' && !p.tracer) continue;
-      const tail = Math.min(p.life, 0.07),
+      if (p.domain === 'ground' && p.kind === 'bullet') {
+        seen.add(p.id);
+        this.groundTracers.set(p.id, p);
+      }
+      const tail = Math.min(p.life, p.kind === 'bullet' ? 0.09 : 0.07),
         color =
           p.kind === 'interceptor'
             ? [1.6, 2.6, 4]
             : p.kind === 'shell'
               ? [4, 1.7, 0.4]
-              : [5, 3.8, 1.5];
+              : tracerColor(p).map((v) => v * 0.8);
       for (let i = 0; i < 3 && segment < this.traceCapacity; i++, segment++)
         for (let end = 0; end < 2; end++) {
           const t = tail * (1 - (i + end) / 3),
@@ -663,6 +676,35 @@ export class CombatEffects {
       if (round.kind === 'shell') this.airburst(round.x, round.y, round.z, 1);
       else if (round.kind === 'interceptor') this.airburst(round.x, round.y, round.z, 1.6);
     }
+    // Some tracers skip off the ground and tumble away, glowing, as they do in real firefights.
+    vanished = 0;
+    for (const [id, p] of this.groundTracers) {
+      if (seen.has(id)) continue;
+      this.groundTracers.delete(id);
+      if (++vanished > 24 || Math.random() > 0.4) continue;
+      const speed = Math.hypot(p.vx, p.vz) || 1,
+        turn = (Math.random() - 0.5) * 1.6,
+        dx = p.vx / speed,
+        dz = p.vz / speed,
+        rx = dx * Math.cos(turn) - dz * Math.sin(turn),
+        rz = dx * Math.sin(turn) + dz * Math.cos(turn),
+        hop = 60 + Math.random() * 90;
+      this.sparks.spawn({
+        x: p.tx ?? p.x,
+        y: this.floor(p.tx ?? p.x, p.tz ?? p.z) + 0.6,
+        z: p.tz ?? p.z,
+        vx: rx * hop,
+        vy: 25 + Math.random() * 60,
+        vz: rz * hop,
+        gravity: 30,
+        drag: 0.4,
+        life: 0.45 + Math.random() * 0.45,
+        length: 2.5,
+        width: 0.3,
+        stretch: 0.03,
+        color: tracerColor(p),
+      });
+    }
   }
   // Glowing heads for every tracer and interceptor, aligned with the flight direction.
   drawTracerStreaks() {
@@ -673,9 +715,9 @@ export class CombatEffects {
       if (!speed || p.life <= 0) continue;
       const interceptor = p.kind === 'interceptor',
         shell = p.kind === 'shell',
-        length = Math.min(interceptor ? 9 : shell ? 14 : 11, speed * 0.04, speed * p.life),
-        width = interceptor ? 1.1 : shell ? 0.62 : 0.36,
-        color = interceptor ? [5, 3.4, 1.4] : shell ? [5, 2.1, 0.45] : [5.5, 3.6, 1.3];
+        length = Math.min(interceptor ? 9 : shell ? 14 : 16, speed * 0.055, speed * p.life),
+        width = interceptor ? 1.1 : shell ? 0.62 : 0.28,
+        color = interceptor ? [5, 3.4, 1.4] : shell ? [5, 2.1, 0.45] : tracerColor(p);
       this.streaks.add(
         p.x,
         p.y,

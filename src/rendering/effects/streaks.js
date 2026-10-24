@@ -5,7 +5,7 @@ import * as T from '../../../vendor/three/three.module.js';
 const streakVertex = `attribute vec3 aTint;attribute float aOpacity;varying vec2 vUv;varying vec3 vTint;varying float vAlpha;
 void main(){vUv=uv;vTint=aTint;vAlpha=aOpacity;gl_Position=projectionMatrix*viewMatrix*instanceMatrix*vec4(position,1.0);}`;
 const streakFragment = `varying vec2 vUv;varying vec3 vTint;varying float vAlpha;
-void main(){float across=abs(vUv.y-.5)*2.;float core=exp(-across*across*9.);float halo=(1.-across*across)*.35;
+void main(){float across=abs(vUv.y-.5)*2.;float core=exp(-across*across*9.);float halo=(1.-across*across)*.22;
  float along=smoothstep(0.,.75,vUv.x)*(1.-smoothstep(.93,1.,vUv.x));float alpha=(core+halo)*along*vAlpha;
  if(alpha<.004)discard;gl_FragColor=vec4(vTint*(.55+core*.9),alpha);
  #include <colorspace_fragment>

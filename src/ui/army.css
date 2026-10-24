@@ -291,40 +291,68 @@
 }
 #groups-bar {
   display: block;
-  max-width: min(660px, calc(100% - 590px));
-  max-height: 100px;
-  padding: 8px;
+  width: max-content;
+  max-width: min(380px, calc(100% - 590px));
+  padding: 6px 8px;
 }
-.squad-cards {
+#groups-bar .roster-head {
   display: flex;
-  gap: 5px;
-  overflow-x: auto;
-  margin-top: 6px;
-  max-width: 100%;
-  padding-bottom: 3px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #8eae98;
 }
-#groups-bar .squad-cards button {
-  min-width: 120px;
-  flex: 0 0 150px;
-  overflow: hidden;
-  padding: 7px 9px;
-  text-align: left;
+#groups-bar .roster-head b {
+  color: #e4eee0;
+  font-weight: 600;
 }
-.squad-cards b {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
+#groups-bar .roster-head button {
+  min-width: 20px;
+  padding: 1px 5px;
   font-size: 10px;
-  font-weight: 500;
+}
+#groups-bar .roster-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  margin-top: 5px;
+  max-height: 46px;
+  overflow-y: auto;
+}
+#groups-bar .roster-row > small {
+  margin: 0 3px 0 0;
+  font-size: 8px;
+  color: #8eae98;
+}
+#groups-bar .roster-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 10px;
+  line-height: 1.2;
   white-space: nowrap;
 }
-#groups-bar .squad-cards small {
-  overflow: hidden;
-  text-overflow: ellipsis;
+#groups-bar .roster-chip b {
+  font-weight: 600;
+  color: #e9f2e4;
+}
+#groups-bar .roster-chip i {
+  font-style: normal;
   font-size: 9px;
-  white-space: nowrap;
+  color: #c9b98d;
 }
-.squad-cards button.active {
+#groups-bar .roster-chip.wave {
+  border-style: dashed;
+}
+#groups-bar .roster-chip.group span {
+  color: #a6d6b0;
+}
+#groups-bar .roster-chip.active {
   background: #b5d1a723;
   border-color: #b5d1a788;
 }

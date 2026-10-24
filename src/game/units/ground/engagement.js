@@ -46,6 +46,18 @@ const profiles = {
     stationary: false,
     suppressionLimit: Infinity,
   },
+  artillery: {
+    id: 'artillery',
+    kind: 'shell',
+    speed: 140,
+    cost: 3,
+    spread: 9,
+    canBlind: true,
+    stationary: true,
+    suppressionLimit: Infinity,
+    // Indirect fire: needs a spotted target, not a clear line from the gun.
+    indirect: true,
+  },
   antiArmor: {
     id: 'antiArmor',
     kind: 'shell',
@@ -131,6 +143,7 @@ export function groundDamageMultiplier(shooterKey, target, kind = 'bullet') {
     sniper: { infantry: 1, light: 0.08, heavy: 0.01, building: 0.45 },
     cannon: { infantry: 1, light: 1.1, heavy: 1, building: 1 },
     antiArmor: { infantry: 0.045, light: 1.1, heavy: 1.25, building: 0.18 },
+    artillery: { infantry: 1, light: 0.75, heavy: 0.4, building: 1.3 },
   };
   return values[profile][armor];
 }
@@ -244,9 +257,10 @@ function clearLine(s, cache, u, target) {
   return value;
 }
 
-function inRange(u, target, range) {
+function inRange(u, target, range, minRange = 0) {
   return (
     target &&
+    (target.x - u.x) ** 2 + (target.z - u.z) ** 2 >= minRange * minRange &&
     target.side !== u.side &&
     target.hp > 0 &&
     !target.carrierId &&
@@ -262,7 +276,20 @@ function rank(u, target, range, cache) {
   const armor = groundArmorClass(target);
   const profile = groundWeaponProfile(u.key).id;
   let priority;
-  if (profile === 'antiArmor')
+  if (profile === 'artillery') {
+    priority = armor === 'heavy' ? 95 : armor === 'light' ? 115 : armor === 'infantry' ? 110 : 105;
+    // Shells are area weapons: prefer targets standing among other enemies.
+    const cell = cache?.buckets?.get(
+      `${Math.floor(target.x / ENGAGEMENT_CELL)},${Math.floor(target.z / ENGAGEMENT_CELL)}`,
+    );
+    for (const other of cell || [])
+      if (
+        other !== target &&
+        other.side === target.side &&
+        (other.x - target.x) ** 2 + (other.z - target.z) ** 2 < 400
+      )
+        priority += 12;
+  } else if (profile === 'antiArmor')
     priority = armor === 'heavy' ? 300 : armor === 'light' ? 260 : armor === 'infantry' ? 20 : 10;
   else if (profile === 'cannon')
     priority =
@@ -300,7 +327,10 @@ function rank(u, target, range, cache) {
 }
 
 export function groundEngagement(s, u) {
-  const range = (GROUND_UNITS[u.key] || BUILDINGS[u.key])?.groundRange || 0;
+  const config = GROUND_UNITS[u.key] || BUILDINGS[u.key],
+    range = config?.groundRange || 0,
+    minRange = config?.groundMinRange || 0,
+    indirect = groundWeaponProfile(u.key).indirect;
   if (!range || u.holdFire || u.digging || u.order?.mode === 'retreat' || u.carrierId) {
     u.enemyId = null;
     u.nextThink = 0;
@@ -309,9 +339,9 @@ export function groundEngagement(s, u) {
   const cache = prepareGroundEngagement(s);
   let target = cache.ids.get(u.enemyId);
   const valid =
-    inRange(u, target, range) &&
+    inRange(u, target, range, minRange) &&
     visible(s, cache, u.side, target) &&
-    clearLine(s, cache, u, target);
+    (indirect || clearLine(s, cache, u, target));
   if (!valid) target = null;
   if ((u.nextThink || 0) <= s.time) {
     cache.metrics.searches++;
@@ -328,7 +358,8 @@ export function groundEngagement(s, u) {
         x++
       )
         for (const t of cache.buckets.get(`${x},${z}`) || [])
-          if (inRange(u, t, range)) candidates.push({ unit: t, score: rank(u, t, range, cache) });
+          if (inRange(u, t, range, minRange))
+            candidates.push({ unit: t, score: rank(u, t, range, cache) });
     cache.metrics.candidates += candidates.length;
     candidates.sort((a, b) => b.score - a.score || a.unit.id - b.unit.id);
     const head = candidates.slice(0, 2);
@@ -338,7 +369,11 @@ export function groundEngagement(s, u) {
     const offset = (Math.floor(s.time / ENGAGEMENT_CADENCE) % batches) * width;
     for (const entry of [...head, ...tail.slice(offset, offset + width)]) {
       const candidate = entry.unit;
-      if (!visible(s, cache, u.side, candidate) || !clearLine(s, cache, u, candidate)) continue;
+      if (
+        !visible(s, cache, u.side, candidate) ||
+        (!indirect && !clearLine(s, cache, u, candidate))
+      )
+        continue;
       if (!target || rank(u, candidate, range, cache) > rank(u, target, range, cache))
         target = candidate;
       break;

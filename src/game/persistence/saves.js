@@ -333,7 +333,15 @@ export function load(raw) {
       )
     )
       throw Error('Повреждены пассажиры');
-    for (const k of ['groundAmmo', 'groundReload', 'suppression', 'fpvAmmo', 'fpvReady', 'setup'])
+    for (const k of [
+      'groundAmmo',
+      'groundReload',
+      'suppression',
+      'fpvAmmo',
+      'fpvReady',
+      'setup',
+      'burstLeft',
+    ])
       if (u[k] != null && (!Number.isFinite(u[k]) || u[k] < 0))
         throw Error('Повреждено состояние бойца');
   }
