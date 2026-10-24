@@ -1,4 +1,4 @@
-import { passable, dirtyNetwork, projectPoint } from '../city/road-network.js';
+import { passable, dirtyNetwork, projectPoint, removeDriveways } from '../city/road-network.js';
 import { event } from '../shared/events.js';
 import { clamp } from '../shared/math.js';
 import { BUILDINGS, GROUND_UNITS } from '../config.js';
@@ -26,6 +26,7 @@ export function damageBuilding(s, b, amount) {
   if (b.hp <= 0 || b.demolished) return;
   b.hp = Math.max(0, b.hp - amount);
   if (b.hp === 0) {
+    removeDriveways(s, b.id);
     dirtyNetwork(s);
     event(s, 'destroy', { x: b.x, z: b.z, side: b.side, key: b.key, buildingId: b.id });
     s.sides[b.side].losses++;
@@ -49,8 +50,9 @@ export function applyBlast(s, x, z, damage, radius) {
     const amount = at(Math.max(0, Math.hypot(u.x - x, u.z - z) - GROUND_UNITS[u.key].size));
     if (amount) damageGround(s, u, amount, event, 'blast');
   }
+  // Driveways are not damaged on their own; they share the fate of their building.
   for (const r of s.roads)
-    if (!r.removed && r.hp > 0) {
+    if (!r.removed && r.hp > 0 && !r.connectorTo) {
       const amount = at(Math.max(0, projectPoint(x, z, r).distance - 5));
       if (amount) damageRoad(s, r, amount);
     }

@@ -5,6 +5,7 @@ import { passable, overlappingRoad } from '../city/road-network.js';
 import { economy } from '../city/economy.js';
 import { buildRoad } from '../city/roads.js';
 import { research } from '../research/research.js';
+import { difficultyOf } from './difficulty.config.js';
 import { random } from '../shared/random.js';
 import { produce } from '../units/aviation/production.js';
 import { knownTargets } from '../visibility.js';
@@ -114,7 +115,7 @@ export function ai(s) {
     }
   }
   if (s.time >= s.ai.nextResearch) {
-    s.ai.nextResearch = s.time + 13;
+    s.ai.nextResearch = s.time + difficultyOf(s).researchEvery;
     for (const key of [
       'autocannon',
       'heavy',
@@ -125,13 +126,19 @@ export function ai(s) {
       'mobileAA',
       'fpvTeams',
       'abm',
+      'lightArmor',
       'armor',
+      'bodyArmor',
       'propulsion',
       'cooling',
       'airframes',
       'magazines',
       'ballistic',
       'payload',
+      'composite',
+      'artillery',
+      'heavyArmor',
+      'rocketArtillery',
     ])
       if (!f.tech.includes(key)) {
         research(s, 1, key);
@@ -154,7 +161,8 @@ export function ai(s) {
     }
   }
   if (s.time >= s.ai.nextAttack) {
-    s.ai.nextAttack = s.time + 28 + random(s) * 18;
+    s.ai.nextAttack =
+      s.time + difficultyOf(s).attackEvery + random(s) * difficultyOf(s).attackJitter;
     let targets = knownTargets(s, 1).filter((b) => b.key !== 'road');
     if (random(s) < 0.28) {
       const roads = knownTargets(s, 1).filter((r) => r.key === 'road' && passable(r));

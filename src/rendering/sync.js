@@ -55,7 +55,37 @@ export function sync() {
         m.collapseAt = m.wasAlive ? this.battleTime : -100;
         m.scaffold.visible = false;
         const rubble = new T.Group();
-        for (let i = 0; i < 14; i++) {
+        // Broken wall stubs and charred beams stand out of the rubble pile.
+        const size = BUILDINGS[b.key]?.size || 28;
+        for (let i = 0; i < 4; i++) {
+          const a = i * 1.57 + 0.4,
+            r = size * 0.32,
+            wall = this.box(
+              rubble,
+              Math.cos(a) * r,
+              0,
+              Math.sin(a) * r,
+              i % 2 ? 1.2 : size * 0.35,
+              3 + (i % 3) * 2.5,
+              i % 2 ? size * 0.3 : 1.2,
+              i % 2 ? '#5d5a50' : '#6c6a60',
+            );
+          wall.rotation.z = (i % 2 ? 1 : -1) * 0.12;
+        }
+        for (let i = 0; i < 5; i++) {
+          const beam = this.box(
+            rubble,
+            (i - 2) * 2.4,
+            1.5,
+            (i % 2) * 3 - 1.5,
+            0.5,
+            0.5,
+            size * 0.45,
+            '#2b2622',
+          );
+          beam.rotation.set(0.4 + i * 0.2, i * 0.9, 0.3);
+        }
+        for (let i = 0; i < 22; i++) {
           const a = i * 2.399,
             r = 3 + (i % 4) * 3,
             cube = this.box(
@@ -86,10 +116,14 @@ export function sync() {
         m.root.add(rubble);
         this.renderer.shadowMap.needsUpdate = true;
       }
-      const t = Math.min(1, (this.battleTime - m.collapseAt) / 0.7);
+      // Collapse: the structure sags, tilts and sinks into its own dust over a second and a half.
+      const t = Math.min(1, (this.battleTime - m.collapseAt) / 1.5),
+        fall = t * t;
       m.content.visible = t < 1;
-      m.content.scale.y = Math.max(0.03, 1 - t);
-      m.content.rotation.z = t * 0.13;
+      m.content.scale.y = Math.max(0.03, 1 - fall);
+      m.content.position.y = -fall * 3;
+      m.content.rotation.z = fall * 0.22;
+      m.content.rotation.x = fall * 0.08;
       continue;
     }
     m.wasAlive = true;
@@ -275,7 +309,10 @@ export function sync() {
         const vehicle = this.groundModels.get(e.buildingId);
         if (vehicle && !vehicle.userData.recoil) vehicle.userData.kick = 1;
       }
-      if (['impact', 'crash'].includes(e.type) || (e.type === 'intercept' && e.mode === 'burst'))
+      if (
+        ['impact', 'crash', 'destroy'].includes(e.type) ||
+        (e.type === 'intercept' && e.mode === 'burst')
+      )
         this.addShake(e.x, e.z, e.key === 'ballistic' ? 2.5 : 1);
       this.callbacks.onEvent?.(e);
     }

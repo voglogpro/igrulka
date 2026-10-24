@@ -46,6 +46,27 @@ const profiles = {
     stationary: false,
     suppressionLimit: Infinity,
   },
+  autocannon: {
+    id: 'autocannon',
+    kind: 'bullet',
+    speed: 240,
+    cost: 0.12,
+    spread: 2.6,
+    canBlind: true,
+    stationary: false,
+    suppressionLimit: Infinity,
+  },
+  rocket: {
+    id: 'rocket',
+    kind: 'shell',
+    speed: 125,
+    cost: 2.5,
+    spread: 12,
+    canBlind: true,
+    stationary: true,
+    suppressionLimit: Infinity,
+    indirect: true,
+  },
   artillery: {
     id: 'artillery',
     kind: 'shell',
@@ -144,6 +165,8 @@ export function groundDamageMultiplier(shooterKey, target, kind = 'bullet') {
     cannon: { infantry: 1, light: 1.1, heavy: 1, building: 1 },
     antiArmor: { infantry: 0.045, light: 1.1, heavy: 1.25, building: 0.18 },
     artillery: { infantry: 1, light: 0.75, heavy: 0.4, building: 1.3 },
+    autocannon: { infantry: 1, light: 0.85, heavy: 0.1, building: 0.7 },
+    rocket: { infantry: 1, light: 0.8, heavy: 0.35, building: 1.2 },
   };
   return values[profile][armor];
 }
@@ -276,7 +299,7 @@ function rank(u, target, range, cache) {
   const armor = groundArmorClass(target);
   const profile = groundWeaponProfile(u.key).id;
   let priority;
-  if (profile === 'artillery') {
+  if (profile === 'artillery' || profile === 'rocket') {
     priority = armor === 'heavy' ? 95 : armor === 'light' ? 115 : armor === 'infantry' ? 110 : 105;
     // Shells are area weapons: prefer targets standing among other enemies.
     const cell = cache?.buckets?.get(
@@ -291,6 +314,17 @@ function rank(u, target, range, cache) {
         priority += 12;
   } else if (profile === 'antiArmor')
     priority = armor === 'heavy' ? 300 : armor === 'light' ? 260 : armor === 'infantry' ? 20 : 10;
+  else if (profile === 'autocannon')
+    priority =
+      armor === 'light'
+        ? 140
+        : armor === 'infantry'
+          ? target.key === 'atgm'
+            ? 150
+            : 125
+          : armor === 'heavy'
+            ? 15
+            : 40;
   else if (profile === 'cannon')
     priority =
       armor === 'heavy'

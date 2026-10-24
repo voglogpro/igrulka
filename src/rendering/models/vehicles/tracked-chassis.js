@@ -3,6 +3,7 @@ import { batchStatic } from '../../mesh-utils.js';
 import { buildLeopardTurret } from './leopard.js';
 import { buildAntiAirTurret } from './anti-air.js';
 import { buildHowitzerTurret } from './howitzer.js';
+import { buildLightTurret, addHeavyArmor } from './light-vehicles.js';
 import { armor, hatch } from './geometry.js';
 export function buildTrackedVehicle(world, u, root, paint, accent, dynamic) {
   const box = (...args) => world.box(...args),
@@ -61,7 +62,12 @@ export function buildTrackedVehicle(world, u, root, paint, accent, dynamic) {
   root.add(turret);
   dynamic.add(turret);
   if (u.key === 'leopard') buildLeopardTurret(world, turret, paint, dynamic);
-  else if (u.key === 'howitzer') buildHowitzerTurret(world, turret, paint, dynamic);
+  else if (u.key === 'heavytank') {
+    buildLeopardTurret(world, turret, paint, dynamic);
+    addHeavyArmor(world, turret);
+  } else if (u.key === 'howitzer') buildHowitzerTurret(world, turret, paint, dynamic);
+  else if (u.key === 'lighttank' || u.key === 'ifv')
+    buildLightTurret(world, turret, paint, dynamic, u.key === 'ifv');
   else buildAntiAirTurret(world, u, turret, paint, dynamic);
   for (const x of [-3, 3]) {
     box(root, x, 2.5, 5.4, 0.6, 0.4, 0.25, '#ffddaa');

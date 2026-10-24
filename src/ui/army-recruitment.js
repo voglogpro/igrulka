@@ -6,7 +6,11 @@ export const ARMY_CATEGORIES = {
     name: 'Пехота',
     keys: ['infantry', 'machinegunner', 'sniper', 'assault', 'atgm', 'engineer', 'operator'],
   },
-  vehicles: { name: 'Техника', keys: ['apc', 'leopard', 'tankdestroyer', 'howitzer'] },
+  vehicles: {
+    name: 'Техника',
+    keys: ['armoredcar', 'apc', 'lighttank', 'ifv', 'leopard', 'heavytank', 'tankdestroyer'],
+  },
+  artillery: { name: 'Артиллерия', keys: ['howitzer', 'mlrs'] },
   defense: { name: 'ПВО', keys: ['mog', 'shilka', 'gepard'] },
 };
 

@@ -217,3 +217,17 @@ export function snapRoadPoint(s, side, x, z, anchor = null, straight = false) {
   }
   return best;
 }
+
+// A driveway belongs to its building: it disappears with the ruin instead of needing its own
+// demolition or repair.
+export function removeDriveways(s, buildingId) {
+  let changed = false;
+  for (const drive of s.roads)
+    if (drive.connectorTo === buildingId && !drive.removed) {
+      drive.removed = true;
+      drive.hp = 0;
+      changed = true;
+    }
+  if (changed) dirtyNetwork(s);
+  return changed;
+}

@@ -13,6 +13,7 @@ export {
   damageDistricts,
 } from './territory/districts.js';
 export { createGame } from './state.js';
+export { DIFFICULTY, DEFAULT_DIFFICULTY, difficultyOf } from './ai/difficulty.config.js';
 export { supplyFactor, economy, buildingOutput } from './city/economy.js';
 export { placementPlan, canPlace, build, demolish, repair } from './city/construction.js';
 export { roadPreview, buildRoad } from './city/roads.js';

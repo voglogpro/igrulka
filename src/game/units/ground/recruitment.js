@@ -31,6 +31,9 @@ export function makeGround(s, side, key, x, z) {
       s.groundUnits.filter((u) => u.side === side && u.aiDefender).length < 3,
   };
   if (d.infantry && d.range) u.groundAmmo = defenseStats(s.sides[side], u).magazine;
+  // Composite armour only reinforces machines built after the research.
+  if (!d.infantry && s.sides[side]?.tech.includes('composite'))
+    u.hp = u.maxHp = Math.round(d.hp * 1.25);
   return u;
 }
 

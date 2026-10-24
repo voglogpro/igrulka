@@ -5,6 +5,7 @@ import {
   ROAD_REACH,
   segmentDistance,
   dirtyNetwork,
+  removeDriveways,
 } from './road-network.js';
 import { ROAD_REQUIRED } from './rules.js';
 import { addRoad } from './roads.js';
@@ -108,11 +109,7 @@ export function demolish(s, id, owner = 0) {
   } else {
     b.hp = 0;
     b.demolished = true;
-    for (const drive of s.roads)
-      if (drive.connectorTo === b.id) {
-        drive.removed = true;
-        drive.hp = 0;
-      }
+    removeDriveways(s, b.id);
   }
   dirtyNetwork(s);
   event(s, 'cleared', {

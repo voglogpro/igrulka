@@ -1,4 +1,5 @@
 import { VERSION, MAP, BUILDINGS, GROUND_UNITS, TECH, WEAPONS } from '../config.js';
+import { DIFFICULTY, DEFAULT_DIFFICULTY } from '../ai/difficulty.config.js';
 import { ROAD_HP, normalizeRoadOverlaps } from '../city/road-network.js';
 import { campRoads } from '../city/roads.js';
 import { log } from '../shared/events.js';
@@ -344,6 +345,22 @@ export function load(raw) {
     ])
       if (u[k] != null && (!Number.isFinite(u[k]) || u[k] < 0))
         throw Error('Повреждено состояние бойца');
+  }
+  // Campaigns from before difficulty levels keep the previous bot strength.
+  s.difficulty ??= DEFAULT_DIFFICULTY;
+  if (!Object.hasOwn(DIFFICULTY, s.difficulty)) throw Error('Повреждена сложность');
+  // Driveways follow their building: older campaigns could hold damaged or orphaned ones.
+  for (const r of s.roads) {
+    if (!r.connectorTo || r.removed) continue;
+    const owner = s.buildings.find((b) => b.id === r.connectorTo);
+    if (!owner || owner.hp <= 0 || owner.demolished) {
+      r.removed = true;
+      r.hp = 0;
+    } else {
+      r.hp = r.maxHp;
+      r.blocked = false;
+      r.repairing = false;
+    }
   }
   restoreDistricts(s);
   s.version = VERSION;

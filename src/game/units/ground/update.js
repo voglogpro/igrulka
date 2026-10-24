@@ -21,6 +21,8 @@ import {
   canGroundFire,
   groundAimPoint,
 } from './engagement.js';
+// Belt-fed and vehicle guns show every second round as a tracer, rifles every fourth.
+const AUTOMATIC = new Set(['machinegunner', 'apc', 'mog', 'armoredcar', 'lighttank', 'ifv']);
 export function tickUnit(s, u, dt, rates, hooks) {
   const { event, random } = hooks,
     d = GROUND_UNITS[u.key] || BUILDINGS[u.key],
@@ -180,7 +182,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
     targetId: blind ? null : aim.id,
     domain: 'ground',
     kind: tank ? 'shell' : 'bullet',
-    tracer: tank || u.groundAmmo % (['machinegunner', 'apc', 'mog'].includes(u.key) ? 2 : 4) === 0,
+    tracer: tank || u.groundAmmo % (AUTOMATIC.has(u.key) ? 2 : 4) === 0,
     ...(shot.indirect ? { arc: Math.min(150, length * 0.33), originY: 6 } : {}),
     x: u.x,
     y: foot ? 2.6 : 4,

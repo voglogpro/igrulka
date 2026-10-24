@@ -34,6 +34,8 @@
 | Внешний вид Leopard                                       | `src/rendering/models/vehicles/leopard.js`         |
 | Внешний вид БТР                                           | `src/rendering/models/vehicles/apc.js`             |
 | Башня и ствол самоходной гаубицы                          | `src/rendering/models/vehicles/howitzer.js`        |
+| Бронеавтомобиль, лёгкая башня, тяжёлый танк, РСЗО         | `src/rendering/models/vehicles/light-vehicles.js`  |
+| Сложность бота: бонус дохода и темп                       | `src/game/ai/difficulty.config.js`                 |
 | Пушки и радары Шилки/Gepard                               | `src/rendering/models/vehicles/anti-air.js`        |
 | Гусеницы и общий корпус                                   | `src/rendering/models/vehicles/tracked-chassis.js` |
 | Выбор шаблона, клонирование и анимация машин              | `src/rendering/models/ground.js`                   |
@@ -93,6 +95,7 @@
 - `src/rendering/effects/combat-effects.js` — пулы дыма, вспышек, осколков и трассеров; дульные эффекты, разрывы в воздухе, след ЗУР, горящие обломки.
 - `src/rendering/effects/weapon-profiles.js` — внешний вид выстрела каждого класса оружия; `streaks.js` — росчерки трассеров и искр; `casings.js` — гильзы; `particles.js` — пакет дыма и свечения.
 - `src/rendering/effects/post-processing.js` — свечение, тональная обработка и зерно.
+- `src/ui/tech-tree.js` — дерево исследований: колонки веток, уровни, линии зависимостей.
 - `src/ui/app.js` — текущая сессия, обработчики действий и связь интерфейса с правилами.
 - `src/ui/layout.js`, `panels.js`, `inspector.js` — оболочка, меню и карточка выбранного объекта.
 - `src/ui/icons.js`, `format.js`, `style.css`, `fonts.css` — оформление и форматирование.

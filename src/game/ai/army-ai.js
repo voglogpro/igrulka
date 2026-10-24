@@ -6,11 +6,13 @@ import { orderGround, commandUnits } from '../units/ground/orders.js';
 import { unloadGround, boardGround } from '../units/vehicles/transport.js';
 import { launchFPV } from '../units/infantry/fpv.js';
 import { updateDistrictAI } from './district-ai.js';
+import { difficultyOf } from './difficulty.config.js';
 export function updateArmyAI(s, hooks) {
   if (s.mode === 'multiplayer') return;
   const { random } = hooks;
-  if (s.time > 230 && (s.ai.nextArmy || 0) < s.time) {
-    s.ai.nextArmy = s.time + 17;
+  const level = difficultyOf(s);
+  if (s.time > level.armyFrom && (s.ai.nextArmy || 0) < s.time) {
+    s.ai.nextArmy = s.time + level.armyEvery;
     const ready = s.buildings.some(
         (b) => b.side === 1 && b.key === 'barracks' && b.hp > 0 && b.progress >= 1,
       ),
@@ -25,7 +27,12 @@ export function updateArmyAI(s, hooks) {
         'assault',
         'apc',
         ...(f.tech.includes('mobileAA') ? ['gepard'] : []),
-        ...(f.tech.includes('armor') ? ['leopard', 'atgm', 'tankdestroyer', 'howitzer'] : []),
+        'armoredcar',
+        ...(f.tech.includes('lightArmor') ? ['lighttank', 'ifv'] : []),
+        ...(f.tech.includes('armor') ? ['leopard', 'atgm', 'tankdestroyer'] : []),
+        ...(f.tech.includes('heavyArmor') ? ['heavytank'] : []),
+        ...(f.tech.includes('artillery') ? ['howitzer'] : []),
+        ...(f.tech.includes('rocketArtillery') ? ['mlrs'] : []),
         ...(f.tech.includes('fpvTeams') ? ['operator'] : []),
       ];
       const armorThreat = s.groundUnits.some(
@@ -69,7 +76,7 @@ export function updateArmyAI(s, hooks) {
           }
           continue;
         }
-        if (u.key === 'apc') {
+        if (GROUND_UNITS[u.key].capacity) {
           const passengers = s.groundUnits.filter((p) => p.carrierId === u.id);
           if (
             passengers.length &&

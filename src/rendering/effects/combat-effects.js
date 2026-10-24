@@ -411,9 +411,64 @@ export class CombatEffects {
     if (fx.light && round % (fx.lightEvery || 1) === 0)
       this.light(x, y + 1, z, fx.light, 18 + fx.light * 2, 0.07, false);
   }
-  wreck(x, z) {
-    if (this.wrecks.length < 24)
-      this.wrecks.push({ x, z, until: this.clock + WRECK_LIFE, next: 0 });
+  wreck(x, z, size = 1, life = WRECK_LIFE) {
+    if (this.wrecks.length < 40)
+      this.wrecks.push({ x, z, size, life, until: this.clock + life, next: 0 });
+  }
+  // A destroyed building: blast, rolling dust wave, flying debris and fires that burn for a while.
+  collapse(x, z, key) {
+    const big = ['industry', 'power', 'factory', 'hq', 'lab'].includes(key),
+      spread = big ? 14 : 10;
+    this.explode(x, 3, z, big ? 1.5 : 1.15);
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2,
+        speed = 9 + Math.random() * 12;
+      this.puff(
+        x + Math.cos(a) * spread * 0.5,
+        2,
+        z + Math.sin(a) * spread * 0.5,
+        3.5,
+        5 + Math.random() * 2,
+        {
+          vx: Math.cos(a) * speed,
+          vy: 1.5 + Math.random() * 3,
+          vz: Math.sin(a) * speed,
+          drag: 0.9,
+          growth: 3,
+          opacity: 0.4,
+          color: [0.42, 0.39, 0.33],
+        },
+      );
+    }
+    for (let i = 0; i < 14; i++)
+      this.puff(
+        x + (Math.random() - 0.5) * spread,
+        6 + Math.random() * 10,
+        z + (Math.random() - 0.5) * spread,
+        4,
+        6,
+        {
+          vy: 5 + Math.random() * 5,
+          growth: 3.5,
+          opacity: 0.32,
+          color: [0.33, 0.31, 0.27],
+        },
+      );
+    for (let i = 0; i < (big ? 16 : 10); i++)
+      this.fragment(
+        x + (Math.random() - 0.5) * spread,
+        6,
+        z + (Math.random() - 0.5) * spread,
+        0.8 + Math.random() * 1.8,
+      );
+    const fires = big ? 4 : 2;
+    for (let i = 0; i < fires; i++)
+      this.wreck(
+        x + (Math.random() - 0.5) * spread * 1.2,
+        z + (Math.random() - 0.5) * spread * 1.2,
+        big ? 1.9 : 1.5,
+        28 + Math.random() * 20,
+      );
   }
   handle(e, shooter = null) {
     if (e.type === 'intercept') {
@@ -437,21 +492,17 @@ export class CombatEffects {
           ? 0.55
           : e.key === 'artillery'
             ? 1.5
-            : e.key === 'tank'
-              ? 0.8
-              : e.key === 'ballistic'
-                ? 2.6
-                : e.key === 'heavy'
-                  ? 1.7
-                  : 1.2,
+            : e.key === 'rocket'
+              ? 1.05
+              : e.key === 'tank'
+                ? 0.8
+                : e.key === 'ballistic'
+                  ? 2.6
+                  : e.key === 'heavy'
+                    ? 1.7
+                    : 1.2,
       );
-    if (e.type === 'destroy')
-      for (let i = 0; i < 18; i++)
-        this.puff(e.x + (Math.random() - 0.5) * 20, 2, e.z + (Math.random() - 0.5) * 20, 3, 3, {
-          vy: 8,
-          color: [0.39, 0.36, 0.31],
-          opacity: 0.38,
-        });
+    if (e.type === 'destroy') this.collapse(e.x, e.z, e.key);
     if (e.type === 'cleared')
       for (let i = 0; i < 7; i++)
         this.puff(e.x, 1, e.z, 2, 1.1, { color: [0.42, 0.39, 0.32], opacity: 0.25 });
@@ -547,7 +598,8 @@ export class CombatEffects {
     }
     // Interceptors leave a continuous white motor trail with a flickering exhaust.
     for (const p of state.projectiles) {
-      if (p.kind !== 'interceptor') continue;
+      // Interceptors and MLRS rockets burn a motor all the way and leave the same trail.
+      if (p.kind !== 'interceptor' && p.shooterKey !== 'mlrs') continue;
       const speed = Math.hypot(p.vx, p.vy, p.vz) || 1,
         nx = p.x - (p.vx / speed) * 2,
         ny = p.y - (p.vy / speed) * 2,
@@ -594,23 +646,31 @@ export class CombatEffects {
     this.wrecks = this.wrecks.filter((w) => w.until > this.clock);
     for (const w of this.wrecks) {
       if (w.next > this.clock) continue;
-      const left = (w.until - this.clock) / WRECK_LIFE;
-      w.next = this.clock + 0.12 + (1 - left) * 0.25;
-      this.puff(w.x + (Math.random() - 0.5) * 3, 3, w.z + (Math.random() - 0.5) * 3, 1.6, 4, {
-        vx: 1.5,
-        vy: 6 + left * 4,
-        vz: 0.8,
-        growth: 2.4,
-        opacity: 0.2 + left * 0.18,
-        color: [0.08, 0.085, 0.09],
-      });
+      const left = (w.until - this.clock) / (w.life || WRECK_LIFE),
+        size = w.size || 1;
+      w.next = this.clock + (0.12 + (1 - left) * 0.25) / Math.sqrt(size);
+      this.puff(
+        w.x + (Math.random() - 0.5) * 3 * size,
+        3,
+        w.z + (Math.random() - 0.5) * 3 * size,
+        1.6 * size,
+        4 + size * 2,
+        {
+          vx: 1.5,
+          vy: (6 + left * 4) * Math.sqrt(size),
+          vz: 0.8,
+          growth: 2.4 * size,
+          opacity: 0.2 + left * 0.18,
+          color: [0.08, 0.085, 0.09],
+        },
+      );
       if (Math.random() < left + 0.2)
         this.glow.spawn(
           w.x + (Math.random() - 0.5) * 3,
           2 + Math.random() * 2,
           w.z + (Math.random() - 0.5) * 3,
           {
-            size: 1.4 + left * 1.6,
+            size: (1.4 + left * 1.6) * size,
             life: 0.25,
             vy: 3,
             opacity: 0.6,

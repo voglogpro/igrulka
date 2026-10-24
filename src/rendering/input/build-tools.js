@@ -122,7 +122,12 @@ export async function pointerUp(e) {
     chosen = E.targetById(this.state, this.selected);
   if (clicked) {
     if (chosen?.ground && chosen.side === 0) {
-      if (E.isInfantry(chosen.key) && clicked.key === 'apc' && clicked.side === 0 && !e.shiftKey) {
+      if (
+        E.isInfantry(chosen.key) &&
+        E.GROUND_UNITS[clicked.key]?.capacity &&
+        clicked.side === 0 &&
+        !e.shiftKey
+      ) {
         this.callbacks.onGroundOrder?.({ x: clicked.x, z: clicked.z, boardId: clicked.id });
         return;
       }
@@ -185,7 +190,7 @@ export function groundCommandAt(e) {
   const target = pickTarget.call(this);
   const canBoard =
     target?.side === 0 &&
-    target.key === 'apc' &&
+    E.GROUND_UNITS[target.key]?.capacity &&
     !e.shiftKey &&
     this.armySelection.some((id) => {
       const unit = E.targetById(this.state, id);

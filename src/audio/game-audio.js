@@ -27,6 +27,10 @@ const WEAPON_SOUND = {
 const AIR_GUNS = { gepard: 'autocannon', shilka: 'shilka', mog: 'hmg', gun: 'hmg' };
 const GROUND_GUNS = {
   leopard: 'tank',
+  heavytank: 'tank',
+  lighttank: 'autocannon',
+  ifv: 'autocannon',
+  armoredcar: 'hmg',
   tankdestroyer: 'tank',
   howitzer: 'artillery',
   machinegunner: 'mg',
@@ -35,11 +39,25 @@ const GROUND_GUNS = {
   gun: 'hmg',
   sniper: 'sniper',
 };
-const VEHICLES = new Set(['leopard', 'gepard', 'shilka', 'apc', 'tankdestroyer', 'howitzer']);
+const VEHICLES = new Set([
+  'leopard',
+  'gepard',
+  'shilka',
+  'apc',
+  'tankdestroyer',
+  'howitzer',
+  'armoredcar',
+  'lighttank',
+  'ifv',
+  'heavytank',
+  'mlrs',
+]);
+const WHEELED = new Set(['apc', 'armoredcar', 'mlrs']);
 const SPEED_OF_SOUND = 343;
 
 export function soundClass(e) {
   if (e.key === 'sam') return 'sam';
+  if (e.shooter === 'mlrs') return 'rocket';
   if (e.key === 'cannon' && e.shooter === 'atgm') return 'atgm';
   if (e.ground) return GROUND_GUNS[e.shooter] || (e.key === 'cannon' ? 'tank' : 'rifle');
   return AIR_GUNS[e.shooter] || (e.key === 'cannon' ? 'autocannon' : 'rifle');
@@ -250,6 +268,10 @@ export class GameAudio {
         if (this.throttle('sam', 0.12)) this.sample('whoosh', where.distance, where.pan, 1.1);
         return;
       }
+      if (kind === 'rocket') {
+        if (this.throttle('rocket', 0.07)) this.sample('whoosh', where.distance, where.pan, 1.2);
+        return;
+      }
       if (kind === 'atgm') {
         if (this.throttle('atgm', 0.1)) {
           this.sample('rifle', where.distance, where.pan, 0.6, { rate: 0.6 });
@@ -440,7 +462,7 @@ export class GameAudio {
             fpv = u.subtype === 'fpv';
           gain =
             kind === 'diesel'
-              ? 0.32 * mix.dry * (u.key === 'leopard' || u.key === 'howitzer' ? 1.2 : 1)
+              ? 0.32 * mix.dry * (['leopard', 'howitzer', 'heavytank'].includes(u.key) ? 1.25 : 1)
               : kind === 'rotor'
                 ? 0.1 * mix.dry
                 : kind === 'moped'
@@ -448,7 +470,7 @@ export class GameAudio {
                   : 0.3 * mix.dry;
           voice.source.playbackRate.setTargetAtTime(
             kind === 'diesel'
-              ? u.key === 'apc'
+              ? WHEELED.has(u.key)
                 ? 1.15
                 : 0.9
               : kind === 'rotor'

@@ -49,6 +49,11 @@ const SHORT = {
   leopard: 'Танк',
   tankdestroyer: 'ПТ-САУ',
   howitzer: 'САУ',
+  armoredcar: 'Броневик',
+  lighttank: 'Лёгк. танк',
+  ifv: 'БМП',
+  heavytank: 'Тяж. танк',
+  mlrs: 'РСЗО',
   shilka: 'Шилка',
   gepard: 'Gepard',
 };

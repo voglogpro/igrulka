@@ -75,6 +75,17 @@ export const WEAPON_FX = {
     backblast: true,
     reach: 1.6,
   },
+  rocketLaunch: {
+    flash: 2.8,
+    jet: 7,
+    petals: 0,
+    casing: 0,
+    smoke: 2,
+    every: 1,
+    light: 22,
+    lightEvery: 2,
+    backblast: true,
+  },
   sam: {
     flash: 3.4,
     jet: 5,
@@ -91,6 +102,11 @@ export const WEAPON_FX = {
 const AIR_GUNS = { gepard: 'autocannon', shilka: 'shilka', mog: 'hmg', gun: 'hmg' };
 const GROUND_GUNS = {
   howitzer: 'artillery',
+  mlrs: 'rocketLaunch',
+  heavytank: 'tank',
+  lighttank: 'autocannon',
+  ifv: 'autocannon',
+  armoredcar: 'hmg',
   leopard: 'tank',
   tankdestroyer: 'tank',
   atgm: 'atgm',

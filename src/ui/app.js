@@ -1,5 +1,6 @@
 import { setArmyContextVisible } from './army-controls.js';
 import { updateArmyRecruitment } from './army-recruitment.js';
+import { updateTechTree } from './tech-tree.js';
 import { updateDeploymentHUD, renderSquadRoster, toggleSquadRoster } from './deployment.js';
 import {
   factoryPlanRequest,
@@ -162,11 +163,27 @@ const districtHUD = new DistrictHUD({
 networkStatus.id = 'network-status';
 networkStatus.hidden = true;
 $('#game').append(networkStatus);
-$('#welcome').insertAdjacentHTML(
-  'beforeend',
-  '<button class="welcome-new" data-action="network">Сетевая дуэль</button>',
-);
+// Start screen: game mode and bot difficulty. A running campaign keeps its own difficulty;
+// the choice then applies to "new game".
+let chosenDifficulty = E.DIFFICULTY[settings.difficulty] ? settings.difficulty : 'normal';
+function renderWelcomeSetup() {
+  const current = E.difficultyOf(state);
+  $('#welcome-setup').innerHTML =
+    `<div class="welcome-modes"><button class="active" data-welcome-mode="solo"><b>Одиночная игра</b><small>против бота</small></button><button data-action="network"><b>Сетевая дуэль</b><small>два игрока</small></button></div>` +
+    `<span class="welcome-label">${resumed ? 'Сложность новой игры' : 'Сложность бота'}</span><div class="difficulty-picker">${Object.entries(
+      E.DIFFICULTY,
+    )
+      .map(
+        ([key, d]) =>
+          `<button data-difficulty="${key}" class="${key === chosenDifficulty ? 'active' : ''}" title="${d.description}">${d.name}<small>${d.bonus > 1 ? '+' + Math.round((d.bonus - 1) * 100) + '%' : '0%'}</small></button>`,
+      )
+      .join(
+        '',
+      )}</div><p class="small-muted">${E.DIFFICULTY[chosenDifficulty].description}${resumed ? `<br>Текущая кампания: ${current.name}.` : ''}<br>Одинаковый старт, реальное время.</p>`;
+}
+renderWelcomeSetup();
 document.querySelector('.topline > span:last-child').id = 'opponent-rule';
+renderOpponentRule();
 renderGroups();
 async function execute(type, args) {
   const epoch = campaignEpoch,
@@ -256,7 +273,7 @@ function leaveNetwork(message) {
   $('#result').hidden = true;
   $('#welcome').hidden = started;
   $('#pause').disabled = false;
-  $('#opponent-rule').innerHTML = 'ЭКОНОМИКА БОТА +25% <i>УЛЬТРА</i>';
+  renderOpponentRule();
   $('#paused').innerHTML = 'ПАУЗА <small>пробел — продолжить</small>';
   networkStatus.hidden = true;
   world.previousSimTime = state.time;
@@ -326,8 +343,17 @@ function pause(value) {
   $('#phase').textContent = value ? 'ПАУЗА' : 'В РЕАЛЬНОМ ВРЕМЕНИ';
   acc = 0;
 }
+function renderOpponentRule() {
+  const d =
+    !started && !resumed && !network ? E.DIFFICULTY[chosenDifficulty] : E.difficultyOf(state);
+  $('#opponent-rule').innerHTML =
+    `БОТ: ${d.name.toUpperCase()} <i>${d.bonus > 1 ? 'ДОХОД +' + Math.round((d.bonus - 1) * 100) + '%' : 'БЕЗ БОНУСА'}</i>`;
+}
 function begin() {
+  // A fresh, untouched campaign takes the difficulty chosen on the start screen.
+  if (!resumed && !network && state.time === 0) state.difficulty = chosenDifficulty;
   started = true;
+  renderOpponentRule();
   $('#welcome').hidden = true;
   audio.unlock();
   pause(false);
@@ -901,7 +927,8 @@ async function troopTarget(p) {
     result = await execute('fpv', { ids: [...armySelection], point: p });
   else if (troopMode === 'board') {
     const vehicle = state.groundUnits.filter(
-      (u) => u.side === 0 && u.key === 'apc' && Math.hypot(u.x - p.x, u.z - p.z) < 18,
+      (u) =>
+        u.side === 0 && E.GROUND_UNITS[u.key]?.capacity && Math.hypot(u.x - p.x, u.z - p.z) < 18,
     )[0];
     result = vehicle
       ? await execute('board', { ids: [...armySelection], id: vehicle.id })
@@ -1089,6 +1116,7 @@ function openPanel(name, force = false) {
 function renderPanel() {
   if (!panel) return;
   $('#panel').classList.toggle('army-panel', panel === 'army');
+  $('#panel').classList.toggle('tree-panel', panel === 'research');
   $('#panel').innerHTML = panelHTML({
     panel,
     weapon,
@@ -1173,19 +1201,7 @@ function updateLivePanel() {
   if (panel === 'army') {
     updateArmyRecruitment({ state, recruitCount });
   }
-  if (panel === 'research') {
-    const active = f.research;
-    $('#research-progress').textContent = active
-      ? `${E.TECH[active.key].name} · ${Math.floor(active.progress * 100)}%`
-      : 'Один проект за раз. Нужна работающая лаборатория.';
-    for (const [key, d] of Object.entries(E.TECH)) {
-      const btn = $(`[data-research="${key}"]`),
-        done = f.tech.includes(key),
-        locked = d.requires && !f.tech.includes(d.requires);
-      btn.disabled = done || !!locked || !!active;
-      $(`[data-tech="${key}"]`).textContent = done ? '✓' : locked ? '◇' : '→';
-    }
-  }
+  if (panel === 'research') updateTechTree(state, $('#panel'));
   if (panel === 'economy') {
     const e = E.economy(state, 0);
     $('#economy-values').innerHTML = [
@@ -1266,6 +1282,13 @@ document.addEventListener('click', async (ev) => {
     const b = E.targetById(state, selected);
     if (d.panel === 'attack' && b?.side === 0 && b.key === 'launcher') launcherId = b.id;
     openPanel(d.panel);
+  }
+  if (d.difficulty && E.DIFFICULTY[d.difficulty]) {
+    chosenDifficulty = d.difficulty;
+    settings.difficulty = chosenDifficulty;
+    saveSettings();
+    renderWelcomeSetup();
+    renderOpponentRule();
   }
   if (d.armyCategory) {
     armyCategory = d.armyCategory;
@@ -1512,7 +1535,7 @@ document.addEventListener('click', async (ev) => {
     b.dataset.action = 'new';
     b.textContent = 'Подтвердить новую игру';
   }
-  if (a === 'new') replaceCampaign(E.createGame());
+  if (a === 'new') replaceCampaign(E.createGame(undefined, { difficulty: chosenDifficulty }));
 });
 document.addEventListener('input', (ev) => {
   if (ev.target.id === 'shake') {
@@ -1678,7 +1701,7 @@ window.addEventListener(
     const command = {
       KeyH: 'dig',
       KeyK: 'camo',
-      KeyF: 'fire',
+      KeyY: 'fire',
       KeyT: 'retreat',
       KeyU: 'unload',
       KeyM: 'attackmove',
@@ -1720,7 +1743,10 @@ window.addEventListener('keydown', (e) => {
   const quick = { KeyZ: 'drone', KeyX: 'heavy', KeyC: 'cruise', KeyV: 'ballistic' }[e.code];
   if (quick && started) armStrike(quick);
   if (e.code === 'KeyB' && started) openPanel('army');
-  if (e.code === 'KeyE') openPanel('attack');
+  // E — research tree, F — army recruitment, N — arsenal and raids.
+  if (e.code === 'KeyE') openPanel('research');
+  if (e.code === 'KeyF' && started) openPanel('army');
+  if (e.code === 'KeyN') openPanel('attack');
   const key = {
     KeyG: 'road',
     Digit1: 'housing',

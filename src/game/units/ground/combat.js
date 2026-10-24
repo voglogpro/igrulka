@@ -3,6 +3,7 @@ import { isInfantry, GROUND_UNITS, BUILDINGS } from '../../config.js';
 import { coverInfo, groundVisible, lineOfSight } from '../infantry/cover.js';
 import { freeSpot } from '../vehicles/transport.js';
 import { clamp } from '../../shared/math.js';
+import { removeDriveways } from '../../city/road-network.js';
 import { gainGroundExperience } from './veterancy.js';
 import { damageDistricts } from '../../territory/districts.js';
 import { cancelTransportDelivery } from '../vehicles/transport.js';
@@ -13,7 +14,12 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
   if (u.hp <= 0 || u.carrierId || !Number.isFinite(amount) || amount <= 0) return;
   const c = isInfantry(u.key) ? coverInfo(s, u, from) : { cover: 0 };
   const cover = kind === 'blast' && c.kind === 'Стена' ? 0 : c.cover;
-  const hp = Math.max(0, u.hp - amount * (1 - cover * (kind === 'blast' ? 0.4 : 1)));
+  // Body armour stops part of small-arms fire, not blast or shell fragments.
+  const vest =
+    kind === 'bullet' && isInfantry(u.key) && s.sides[u.side]?.tech.includes('bodyArmor')
+      ? 0.85
+      : 1;
+  const hp = Math.max(0, u.hp - amount * vest * (1 - cover * (kind === 'blast' ? 0.4 : 1)));
   // Visibility must be captured while the victim is alive; corpses are removed before snapshots.
   const visibleTo =
     hp === 0 && s.mode === 'multiplayer'
@@ -56,9 +62,18 @@ export function impactGround(s, p, event = emit) {
       : p.kind === 'shell'
         ? 'cannon'
         : 'rifle';
-  const artillery = profile === 'artillery';
+  const artillery = profile === 'artillery' || profile === 'rocket';
   const splash = profile === 'cannon' || artillery;
-  const radius = artillery ? 24 : splash ? 14 : profile === 'antiArmor' ? 3 : 4.5;
+  const radius =
+    profile === 'artillery'
+      ? 24
+      : profile === 'rocket'
+        ? 15
+        : splash
+          ? 14
+          : profile === 'antiArmor'
+            ? 3
+            : 4.5;
   const from = {
     x: p.originX ?? p.px ?? p.x ?? p.tx,
     z: p.originZ ?? p.pz ?? p.z ?? p.tz,
@@ -126,6 +141,7 @@ export function impactGround(s, p, event = emit) {
       b.hp = Math.max(0, b.hp - amount);
       if (before > b.hp) gainGroundExperience(s, p.source, (before - b.hp) * 0.25, b.hp <= 0);
       if (!b.hp) {
+        removeDriveways(s, b.id);
         s.networkRevision++;
         s.sides[b.side].losses++;
         event(s, 'destroy', { x: b.x, z: b.z, side: b.side, key: b.key, buildingId: b.id });
@@ -135,7 +151,14 @@ export function impactGround(s, p, event = emit) {
     x: p.tx,
     y: 2,
     z: p.tz,
-    key: artillery ? 'artillery' : p.kind === 'shell' ? 'tank' : 'infantry',
+    key:
+      profile === 'rocket'
+        ? 'rocket'
+        : artillery
+          ? 'artillery'
+          : p.kind === 'shell'
+            ? 'tank'
+            : 'infantry',
     radius: radius,
     side: p.side,
   });

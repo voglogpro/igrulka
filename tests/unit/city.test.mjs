@@ -140,7 +140,9 @@ test('road disruption also slows factory work, while the same saved queue resume
   s = E.load(E.save(s));
   const factory = s.buildings.find((b) => b.id === t.factory.id);
   assert.ok(Math.abs(factory.queue[0].progress - 0.2) < 1e-8);
-  assert.equal(E.repair(s, t.factory.roadLink), true);
+  // A driveway shares its building's fate, so it needs no separate repair.
+  assert.ok(E.passable(s.roads.find((r) => r.id === t.factory.roadLink)));
+  assert.equal(E.repair(s, t.factory.roadLink), 'Ремонт не требуется');
   E.advance(s, 20);
   assert.equal(s.sides[0].inventory.drone, 1);
 });
@@ -342,4 +344,17 @@ test('complete research chain and all four weapons participate in a live defende
   assert.ok(s.stats.impacts > 0);
   assert.ok(s.sides.every((f) => Number.isFinite(f.credits) && f.credits >= 0 && f.materials >= 0));
   assert.equal(E.load(E.save(s)).stats.shots, s.stats.shots);
+});
+
+test('a driveway is never hit on its own and disappears together with its ruined building', () => {
+  const s = fresh();
+  funds(s);
+  const t = town(s),
+    drive = () => s.roads.find((r) => r.id === t.factory.roadLink);
+  const before = drive().hp;
+  E.applyBlast(s, drive().ax, drive().az, 30, 12);
+  assert.equal(drive().hp, before);
+  E.damageBuilding(s, t.factory, 1e6);
+  assert.equal(drive().removed, true);
+  assert.equal(E.demolish(s, t.factory.id), true);
 });

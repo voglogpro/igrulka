@@ -2,6 +2,7 @@ import { ROAD_REQUIRED } from './rules.js';
 import { buildingConnected } from './road-network.js';
 import { BUILDINGS, GROUND_UNITS } from '../config.js';
 import { districtIncome } from '../territory/districts.js';
+import { difficultyOf } from '../ai/difficulty.config.js';
 export function supplyFactor(s, b) {
   return ROAD_REQUIRED.has(b.key) && !buildingConnected(s, b, BUILDINGS[b.key].size) ? 0.2 : 1;
 }
@@ -49,7 +50,7 @@ export function economy(s, owner) {
   income += districts.income;
   materials += districts.materials;
   science += districts.science;
-  const bonus = owner === 1 && s.mode !== 'multiplayer' ? 1.25 : 1;
+  const bonus = owner === 1 && s.mode !== 'multiplayer' ? difficultyOf(s).bonus : 1;
   return {
     gross: income * bonus,
     upkeep,

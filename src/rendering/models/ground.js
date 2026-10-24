@@ -3,8 +3,11 @@ import { buildTankDestroyer } from './vehicles/tank-destroyer.js';
 import { buildTrackedVehicle, animateVehicleDrive } from './vehicles/tracked-chassis.js';
 import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
-import { isInfantry } from '../../game/config.js';
+import { isInfantry, GROUND_UNITS } from '../../game/config.js';
 import { mogModel } from './infantry/mog.js';
+import { buildArmoredCar, buildMLRS } from './vehicles/light-vehicles.js';
+// Shared hulls are rescaled to tell the weight classes apart at a glance.
+const HULL_SCALE = { lighttank: 0.8, ifv: 0.9, heavytank: 1.14 };
 const templates = new Map();
 export function groundModel(world, u) {
   if (isInfantry(u.key) && u.key !== 'mog') {
@@ -29,12 +32,17 @@ export function groundModel(world, u) {
       dynamic.add(root.userData.turret);
     } else if (u.key === 'apc') {
       buildAPC(world, root, paint, dynamic);
+    } else if (u.key === 'armoredcar') {
+      buildArmoredCar(world, root, paint, accent, dynamic);
+    } else if (u.key === 'mlrs') {
+      buildMLRS(world, root, paint, accent, dynamic);
     } else if (u.key === 'tankdestroyer') {
       buildTankDestroyer(world, root, paint, accent, dynamic);
     } else {
       buildTrackedVehicle(world, u, root, paint, accent, dynamic);
     }
     batchStatic(root, dynamic);
+    if (HULL_SCALE[u.key]) root.scale.setScalar(HULL_SCALE[u.key]);
     root.traverse((o) => {
       if (o.geometry) world.sharedGeometries.add(o.geometry);
       if (o.material) world.sharedMaterials.add(o.material);
@@ -80,10 +88,11 @@ export function animateGround(model, u, time, dt = 0) {
       (1 - Math.exp(-12 * dt));
   }
   const pitch = model.userData.pitch;
-  if (pitch && u.key === 'howitzer') {
+  if (pitch && (u.key === 'howitzer' || u.key === 'mlrs')) {
     // A howitzer lobs its shells: elevation grows with range instead of pointing at the target.
     const range = Math.hypot((u.targetX ?? u.x) - u.x, (u.targetZ ?? u.z) - u.z),
-      desired = Number.isFinite(u.targetX) ? 0.22 + Math.min(1, range / 560) * 0.62 : 0.05;
+      reach = GROUND_UNITS[u.key].groundRange,
+      desired = Number.isFinite(u.targetX) ? 0.22 + Math.min(1, range / reach) * 0.62 : 0.05;
     pitch.rotation.x += (-desired - pitch.rotation.x) * (1 - Math.exp(-3 * dt));
   } else if (pitch)
     pitch.rotation.x =

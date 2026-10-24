@@ -2,6 +2,7 @@ import { VERSION } from './config.js';
 import { campRoads } from './city/roads.js';
 import { log } from './shared/events.js';
 import { createDistricts } from './territory/state.js';
+import { DIFFICULTY, DEFAULT_DIFFICULTY } from './ai/difficulty.config.js';
 export const newSide = () => ({
   credits: 3200,
   materials: 200,
@@ -14,9 +15,10 @@ export const newSide = () => ({
   losses: 0,
 });
 
-export function createGame(seed = Date.now() >>> 0) {
+export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFICULTY } = {}) {
   const s = {
     version: VERSION,
+    difficulty: DIFFICULTY[difficulty] ? difficulty : DEFAULT_DIFFICULTY,
     time: 0,
     seed,
     rng: seed || 1,
