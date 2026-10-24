@@ -52,6 +52,7 @@ const VEHICLES = new Set([
   'ifv',
   'heavytank',
   'mlrs',
+  'supplytruck',
 ]);
 const WHEELED = new Set(['apc', 'armoredcar', 'mlrs']);
 const SPEED_OF_SOUND = 343;

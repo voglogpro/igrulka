@@ -34,6 +34,7 @@ const groundFields = [
   'targetZ',
   'groundAmmo',
   'groundReload',
+  'downed',
 ];
 const buildingFields = [
   'id',

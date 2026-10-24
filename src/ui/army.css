@@ -574,3 +574,15 @@
   padding: 6px 9px;
   font-size: 10px;
 }
+.rear-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 6px 0;
+  font-size: 9px;
+  color: #a9c2ae;
+  cursor: pointer;
+}
+.rear-toggle input {
+  margin: 0;
+}

@@ -1,4 +1,4 @@
-import { isInfantry } from '../units/ground/types.js';
+import { isInfantry, GROUND_UNITS } from '../units/ground/types.js';
 import { guardGround } from '../units/ground/guard.js';
 import { event } from '../shared/events.js';
 import { DISTRICT_BY_ID, DISTRICT_RULES as R } from './districts.config.js';
@@ -95,6 +95,8 @@ export function updateDistricts(s, dt) {
       present[u.side]++;
       if (
         isInfantry(u.key) &&
+        !u.downed &&
+        !GROUND_UNITS[u.key].support &&
         (u.suppression || 0) < R.suppressionLimit &&
         u.order?.mode !== 'retreat'
       )

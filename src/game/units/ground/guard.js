@@ -117,7 +117,7 @@ function assignPost(s, u, p, snapToCover = false) {
 export function guardGround(s, side, ids, point) {
   if (s.result) return 'Кампания завершена';
   const units = (s.groundUnits || []).filter(
-    (u) => u.side === side && u.hp > 0 && !u.carrierId && ids.includes(u.id),
+    (u) => u.side === side && u.hp > 0 && !u.carrierId && !u.downed && ids.includes(u.id),
   );
   if (!units.length) return 'Выберите доступные наземные отряды';
   let assigned = 0;

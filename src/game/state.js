@@ -12,6 +12,7 @@ export const newSide = () => ({
   research: null,
   inventory: { drone: 0, heavy: 0, cruise: 0, ballistic: 0 },
   spentAmmo: 0,
+  rearAuto: true,
   kills: 0,
   losses: 0,
 });
@@ -23,6 +24,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
     time: 0,
     seed,
     weather: createWeather(seed),
+    rules: { rear: true },
     rng: seed || 1,
     nextId: 3,
     networkRevision: 0,

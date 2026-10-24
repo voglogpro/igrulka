@@ -10,6 +10,7 @@ import { cancelTransportDelivery } from '../vehicles/transport.js';
 import { clearGroundRoute } from './route-queue.js';
 import { groundDamageMultiplier, groundWeaponProfile } from './engagement.js';
 import { recordThreat } from './tactics.js';
+import { tryDown } from './rear.js';
 export function damageGround(s, u, amount, event = emit, kind = 'bullet', from = null) {
   if (u.hp <= 0 || u.carrierId || !Number.isFinite(amount) || amount <= 0) return;
   const c = isInfantry(u.key) ? coverInfo(s, u, from) : { cover: 0 };
@@ -25,6 +26,11 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
     hp === 0 && s.mode === 'multiplayer'
       ? [0, 1].filter((side) => groundVisible(s, side, u))
       : undefined;
+  // Soldiers who would die are sometimes only wounded and can be revived by a medic.
+  if (hp === 0 && kind !== 'bleed' && tryDown(s, u, kind)) {
+    if (from) recordThreat(s, u, from);
+    return;
+  }
   u.hp = hp;
   if (from) recordThreat(s, u, from);
   if (!u.hp) {

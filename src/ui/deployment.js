@@ -54,6 +54,8 @@ const SHORT = {
   ifv: 'БМП',
   heavytank: 'Тяж. танк',
   mlrs: 'РСЗО',
+  medic: 'Санитар',
+  supplytruck: 'Снабжение',
   shilka: 'Шилка',
   gepard: 'Gepard',
 };

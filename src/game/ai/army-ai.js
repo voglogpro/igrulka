@@ -52,7 +52,14 @@ export function updateArmyAI(s, hooks) {
     updateDistrictAI(s);
     const hq = s.buildings.find((b) => b.side === 0 && b.key === 'hq' && b.hp > 0);
     for (const u of s.groundUnits)
-      if (u.side === 1 && !u.carrierId && !u.boardingId && hq) {
+      if (
+        u.side === 1 &&
+        !u.carrierId &&
+        !u.boardingId &&
+        hq &&
+        !GROUND_UNITS[u.key].support &&
+        !u.downed
+      ) {
         if (u.guard) continue;
         if (u.delivery) continue;
         if (u.routeState) continue;

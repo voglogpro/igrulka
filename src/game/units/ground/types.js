@@ -13,6 +13,7 @@ export const GROUND_UNITS = {
   apc: VEHICLE_TYPES.apc,
   mog: INFANTRY_TYPES.mog,
   atgm: INFANTRY_TYPES.atgm,
+  medic: INFANTRY_TYPES.medic,
   tankdestroyer: VEHICLE_TYPES.tankdestroyer,
   howitzer: VEHICLE_TYPES.howitzer,
   armoredcar: VEHICLE_TYPES.armoredcar,
@@ -20,5 +21,6 @@ export const GROUND_UNITS = {
   ifv: VEHICLE_TYPES.ifv,
   heavytank: VEHICLE_TYPES.heavytank,
   mlrs: VEHICLE_TYPES.mlrs,
+  supplytruck: VEHICLE_TYPES.supplytruck,
 };
 export const isInfantry = (key) => !!GROUND_UNITS[key]?.infantry;

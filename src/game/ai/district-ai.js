@@ -1,4 +1,4 @@
-import { isInfantry } from '../config.js';
+import { isInfantry, GROUND_UNITS } from '../config.js';
 import {
   DISTRICTS,
   captureDistrict,
@@ -28,6 +28,8 @@ export function updateDistrictAI(s) {
       u.side === 1 &&
       u.hp / u.maxHp > 0.55 &&
       isInfantry(u.key) &&
+      !GROUND_UNITS[u.key].support &&
+      !u.downed &&
       u.key !== 'atgm' &&
       !u.aiDefender &&
       !u.carrierId &&

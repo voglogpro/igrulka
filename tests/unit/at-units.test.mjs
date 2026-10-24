@@ -10,6 +10,7 @@ import { RTSWorld } from '../../src/rendering/world.js';
 function fresh() {
   const s = E.createGame(832);
   s.mode = 'multiplayer';
+  s.rules.rear = false;
   for (const f of s.sides) {
     f.credits = 1e6;
     f.materials = 1e6;

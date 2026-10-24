@@ -5,7 +5,7 @@ import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
 import { isInfantry, GROUND_UNITS } from '../../game/config.js';
 import { mogModel } from './infantry/mog.js';
-import { buildArmoredCar, buildMLRS } from './vehicles/light-vehicles.js';
+import { buildArmoredCar, buildMLRS, buildSupplyTruck } from './vehicles/light-vehicles.js';
 // Shared hulls are rescaled to tell the weight classes apart at a glance.
 const HULL_SCALE = { lighttank: 0.8, ifv: 0.9, heavytank: 1.14 };
 const templates = new Map();
@@ -36,6 +36,8 @@ export function groundModel(world, u) {
       buildArmoredCar(world, root, paint, accent, dynamic);
     } else if (u.key === 'mlrs') {
       buildMLRS(world, root, paint, accent, dynamic);
+    } else if (u.key === 'supplytruck') {
+      buildSupplyTruck(world, root, paint, accent);
     } else if (u.key === 'tankdestroyer') {
       buildTankDestroyer(world, root, paint, accent, dynamic);
     } else {

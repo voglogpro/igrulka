@@ -12,6 +12,7 @@ export const ARMY_CATEGORIES = {
     keys: ['armoredcar', 'apc', 'lighttank', 'ifv', 'leopard', 'heavytank', 'tankdestroyer'],
   },
   artillery: { name: 'Артиллерия', keys: ['howitzer', 'mlrs'] },
+  rear: { name: 'Тыл', keys: ['medic', 'supplytruck'] },
   defense: { name: 'ПВО', keys: ['mog', 'shilka', 'gepard'] },
 };
 
@@ -39,7 +40,7 @@ export function recruitmentHTML({
     })
     .join(
       '',
-    )}</div><div id="army-queue" class="status-note"></div>${autoRecruitmentHTML(state, armyAutomation)}<details class="army-roster"><summary id="army-roster-label">На поле</summary><div id="army-list"></div></details><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-rally="auto" title="Назначить точку сбора новых бойцов">Точка сбора ↗</button><button data-action="army-all">Выбрать армию</button></div><p class="army-panel-hint">Рамка — выбрать · ПКМ — приказ · L — линия обороны</p>`;
+    )}</div><label class="rear-toggle" title="Санитары поднимают раненых, грузовики чинят технику и пополняют боезапас. Всё делается само, пока в армии есть кого лечить и чинить."><input type="checkbox" id="rear-auto"> Тыловая служба: авто · санитары и грузовики</label><div id="army-queue" class="status-note"></div>${autoRecruitmentHTML(state, armyAutomation)}<details class="army-roster"><summary id="army-roster-label">На поле</summary><div id="army-list"></div></details><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-rally="auto" title="Назначить точку сбора новых бойцов">Точка сбора ↗</button><button data-action="army-all">Выбрать армию</button></div><p class="army-panel-hint">Рамка — выбрать · ПКМ — приказ · L — линия обороны</p>`;
 }
 
 function autoRecruitmentHTML(state, choice = { siteId: null, key: 'infantry' }) {
@@ -62,6 +63,9 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
   const ready = sites.filter((b) => b.progress >= 1);
   const units = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0);
   const queue = sites.reduce((n, b) => n + (b.armyQueue?.length || 0), 0);
+  const rearToggle = $('#rear-auto');
+  if (rearToggle && document.activeElement !== rearToggle)
+    rearToggle.checked = faction.rearAuto !== false;
   $('#army-capacity').textContent = `${units.length + queue} / ${E.GROUND_LIMIT}`;
   $('#army-queue').textContent =
     sites

@@ -1652,6 +1652,14 @@ document.addEventListener('change', async (ev) => {
     else persist();
   }
   if (ev.target.id === 'deployment-key') beginDeployment(ev.target.value);
+  if (ev.target.id === 'rear-auto') {
+    const result = await execute('rear-auto', { enabled: ev.target.checked });
+    if (typeof result === 'string') toast(result, true);
+    else {
+      persist();
+      toast(ev.target.checked ? 'Тыловая служба включена' : 'Тыловая служба выключена');
+    }
+  }
   if (ev.target.id === 'recruit-post') {
     recruitPost = ev.target.value;
     settings.recruitPost = recruitPost;

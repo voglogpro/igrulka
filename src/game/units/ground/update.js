@@ -16,6 +16,8 @@ import { squadArrivalPoint } from './squads.js';
 import { updateGroundTactics } from './tactics.js';
 import { applyStance, updateStance } from './stance.js';
 import { weatherSpread, weatherSpeed } from '../../weather.js';
+import { tickDowned, updateRear, autoRear } from './rear.js';
+import { damageGround } from './combat.js';
 import {
   prepareGroundEngagement,
   groundEngagement,
@@ -31,6 +33,10 @@ export function tickUnit(s, u, dt, rates, hooks) {
     foot = isInfantry(u.key),
     mobile = !!GROUND_UNITS[u.key];
   if (u.hp <= 0 || u.progress < 1) return;
+  if (u.downed) {
+    if (tickDowned(s, u, dt)) damageGround(s, u, 1e9, event, 'bleed');
+    return;
+  }
   const index = prepareGroundEngagement(s).ids;
   if (u.carrierId) {
     const v = index.get(u.carrierId);
@@ -258,7 +264,9 @@ export function updateGround(s, rates, dt, hooks) {
           }
           s.groundUnits.push(u);
           event(s, 'recruited', { ...p, side: b.side, key: q.key, unitId: u.id });
-          if (q.stance) {
+          if (d.support) {
+            // Rear service units look after themselves; no rally point or stance applies.
+          } else if (q.stance) {
             applyStance(s, b.side, [u.id], q.stance);
           } else if (Object.hasOwn(q, 'destination')) {
             const arrival = squadArrivalPoint(q);
@@ -288,6 +296,11 @@ export function updateGround(s, rates, dt, hooks) {
         }
       }
     }
+  if ((s.rearNext || 0) <= s.time) {
+    s.rearNext = s.time + 6;
+    autoRear(s);
+  }
+  updateRear(s, dt);
   prepareGroundEngagement(s);
   for (const u of s.groundUnits) tickUnit(s, u, dt, rates, hooks);
   for (const b of s.buildings)

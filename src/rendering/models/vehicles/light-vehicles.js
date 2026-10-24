@@ -152,3 +152,47 @@ export function buildMLRS(world, root, paint, accent, dynamic) {
   batchStatic(pitch);
   batchStatic(turret, new Set([pitch]));
 }
+
+// Covered supply truck: cab, cargo box with a red cross, small crane and spare wheel.
+export function buildSupplyTruck(world, root, paint, accent) {
+  const box = (...args) => world.box(...args);
+  box(root, 0, 1.2, 0, 4.4, 0.8, 12.2, '#2e3a32');
+  armor(world, root, 0, 1.9, 4.4, 4.6, 2.5, 3.3, paint, 0.9, 0.6);
+  for (const x of [-1.1, 1.1]) {
+    const glass = box(root, x, 3.5, 5.8, 1.6, 0.7, 0.1, '#1f3d43');
+    glass.rotation.x = -0.4;
+  }
+  box(root, 0, 2.2, 6.1, 3.6, 0.4, 0.15, accent);
+  for (const x of [-1.7, 1.7]) box(root, x, 2.6, 6.1, 0.5, 0.3, 0.1, '#e6d9a3');
+  // Cargo box with a tarpaulin roof.
+  box(root, 0, 2, -1.6, 4.5, 2.6, 7.4, '#6d7a5e');
+  box(root, 0, 4.5, -1.6, 4.2, 0.35, 7, '#556247');
+  for (const sign of [-1, 1]) {
+    box(root, sign * 2.27, 3, -1.6, 0.06, 1.3, 1.9, '#e8e9e0');
+    box(root, sign * 2.31, 3.5, -1.6, 0.04, 0.3, 1.1, '#b8352f');
+    box(root, sign * 2.31, 3.1, -1.6, 0.04, 1.1, 0.3, '#b8352f');
+  }
+  // Crane arm and spare wheel at the back.
+  box(root, 0, 4.8, -4.6, 0.5, 2.6, 0.5, '#3d4a3a');
+  const arm = box(root, 0, 7, -3.2, 0.35, 0.35, 3.2, '#3d4a3a');
+  arm.rotation.x = 0.35;
+  const spare = new T.Mesh(world.cylGeo, world.mat('#252f2a'));
+  spare.rotation.x = Math.PI / 2;
+  spare.scale.set(1.1, 0.5, 1.1);
+  spare.position.set(0, 2.2, -5.4);
+  root.add(spare);
+  wheels(
+    world,
+    root,
+    [
+      [-2.3, 4.3],
+      [2.3, 4.3],
+      [-2.3, -1.2],
+      [2.3, -1.2],
+      [-2.3, -3.8],
+      [2.3, -3.8],
+    ],
+    1.15,
+    paint,
+  );
+}

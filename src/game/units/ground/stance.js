@@ -53,7 +53,7 @@ export function applyStance(s, side, ids, stance) {
   if (s.result) return 'Кампания завершена';
   if (!validStance(stance) || !stance) return 'Неизвестный режим';
   const units = (s.groundUnits || []).filter(
-    (u) => u.side === side && u.hp > 0 && !u.carrierId && ids.includes(u.id),
+    (u) => u.side === side && u.hp > 0 && !u.carrierId && !u.downed && ids.includes(u.id),
   );
   if (!units.length) return 'Выберите доступные наземные отряды';
   if (stance.mode === 'attack') {

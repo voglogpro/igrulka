@@ -8,6 +8,7 @@ const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 function fresh() {
   const s = game.createGame(39);
   s.mode = 'multiplayer';
+  s.rules.rear = false;
   for (const side of s.sides) {
     side.credits = 1e6;
     side.materials = 1e6;

@@ -13,7 +13,7 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
   )
     return 'Выберите точку в пределах карты';
   const units = (s.groundUnits || []).filter(
-    (u) => u.side === side && u.hp > 0 && !u.carrierId && ids.includes(u.id),
+    (u) => u.side === side && u.hp > 0 && !u.carrierId && !u.downed && ids.includes(u.id),
   );
   const destinations = groundFormationDestinations(s, side, units, aim);
   let count = 0;
@@ -80,7 +80,9 @@ export const getGroup = (s, side, index) =>
   );
 
 export function commandUnits(s, side, ids, command) {
-  const units = s.groundUnits.filter((u) => u.side === side && u.hp > 0 && ids.includes(u.id)),
+  const units = s.groundUnits.filter(
+      (u) => u.side === side && u.hp > 0 && !u.downed && ids.includes(u.id),
+    ),
     fireState = !units.every((u) => u.holdFire),
     camoState = !units.filter((u) => isInfantry(u.key) && !u.carrierId).every((u) => u.camouflaged);
   let changed = 0;

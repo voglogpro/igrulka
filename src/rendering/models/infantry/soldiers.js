@@ -117,7 +117,22 @@ function bodyGeometry(w, key, side) {
   const pack = key === 'machinegunner' || key === 'mog' || key === 'engineer' ? 0.85 : 0.6;
   part(w, root, 0, 1.95, -0.43, 0.68, pack, 0.32, '#4c5a44');
   part(w, root, 0, 2.2 + pack / 2, -0.43, 0.6, 0.14, 0.3, '#3d4a37');
-  if (key !== 'atgm') weapon(w, root, key, dark);
+  if (key !== 'atgm' && key !== 'medic') weapon(w, root, key, dark);
+  if (key === 'medic') {
+    // White helmet and armband with red crosses, a medical bag and a stretcher roll.
+    const white = '#e6e8e0',
+      red = '#b8352f';
+    ball(w, root, 0, 2.74, 0, 0.34, 0.25, 0.36, white);
+    part(w, root, 0, 2.86, 0.3, 0.24, 0.2, 0.04, red);
+    part(w, root, 0, 2.86, 0.31, 0.08, 0.08, 0.04, white);
+    part(w, root, -0.5, 2.05, 0.05, 0.1, 0.34, 0.34, white);
+    part(w, root, -0.56, 2.05, 0.05, 0.04, 0.2, 0.06, red);
+    part(w, root, 0, 1.95, -0.62, 0.62, 0.7, 0.3, white);
+    part(w, root, 0, 1.95, -0.79, 0.32, 0.1, 0.04, red);
+    part(w, root, 0, 1.95, -0.79, 0.1, 0.32, 0.04, red);
+    part(w, root, 0.42, 1.55, 0.3, 0.42, 0.34, 0.5, '#d8dcd0');
+    part(w, root, 0.42, 1.55, 0.56, 0.2, 0.08, 0.04, red);
+  }
   if (key === 'engineer') {
     part(w, root, -0.3, 2.15, -0.62, 0.12, 1.2, 0.1, '#7d6b4a', 0.2);
     part(w, root, -0.3, 2.85, -0.75, 0.38, 0.42, 0.06, '#59605a', 0.2);
@@ -266,6 +281,32 @@ export class InfantryBatch {
           // Firing from a halt: drop to a half-kneel and lean into the weapon.
           aiming = !u.moving && time - (u.lastFire ?? -100) < 1.6,
           height = crouch ? 0.67 : aiming ? 0.86 : 1;
+        if (u.downed) {
+          // A wounded soldier lies on the ground until a medic arrives; the body twitches slowly.
+          const fall = Math.min(1, u.downed.t / CORPSE_FALL),
+            t = 1 - (1 - fall) * (1 - fall),
+            breath = Math.sin(time * 2.2 + u.id) * 0.02,
+            side = (u.id % 2 ? 1 : -1) * 0.25;
+          temp.position.set(wx, 0.55 + breath, wz);
+          temp.rotation.set((-Math.PI / 2) * t + side * t, angle + u.id * 0.3, 0.15 * t, 'YXZ');
+          temp.scale.set(1, 1, 1);
+          temp.updateMatrix();
+          pool.body.setMatrixAt(index, temp.matrix);
+          pool.body.userData.unitIds[index] = u.id;
+          for (let leg = 0; leg < 2; leg++) {
+            temp.position.set(
+              wx + (leg ? 0.3 : -0.3) * c,
+              0.35,
+              wz - (leg ? 0.3 : -0.3) * s - 0.6 * t,
+            );
+            temp.rotation.set((-Math.PI / 2) * t, angle, (leg ? 1 : -1) * 0.2 * t, 'YXZ');
+            temp.scale.set(0.31, 1.22, 0.37);
+            temp.updateMatrix();
+            pool.legs.setMatrixAt(index * 2 + leg, temp.matrix);
+            pool.legs.userData.unitIds[index * 2 + leg] = u.id;
+          }
+          continue;
+        }
         const stride = u.moving ? Math.sin(time * 12 + m * 1.7) : 0;
         const recoil = Math.exp(-Math.max(0, time - (u.lastFire ?? -100)) * 22) * 0.06;
         temp.position.set(

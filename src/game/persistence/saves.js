@@ -232,6 +232,17 @@ export function load(raw) {
     if (u.guardTargetId != null && (!Number.isSafeInteger(u.guardTargetId) || u.guardTargetId <= 0))
       throw Error('Повреждена цель гарнизона');
     if (u.stance != null && !validStance(u.stance)) throw Error('Повреждён режим отряда');
+    if (
+      u.downed != null &&
+      (typeof u.downed !== 'object' ||
+        !Number.isFinite(u.downed.t) ||
+        !Number.isFinite(u.downed.revive) ||
+        u.downed.t < 0 ||
+        u.downed.revive < 0)
+    )
+      throw Error('Повреждено состояние раненого');
+    for (const key of ['supplyAt', 'supportAt'])
+      if (u[key] != null && !Number.isFinite(u[key])) throw Error('Повреждена тыловая задача');
     for (const key of ['threatX', 'threatZ', 'threatAt', 'coverCheckAt', 'coverSince'])
       if (u[key] != null && !Number.isFinite(u[key])) throw Error('Повреждена реакция на огонь');
     if (
@@ -371,6 +382,12 @@ export function load(raw) {
   }
   s.weather ??= createWeather(s.seed);
   if (!validWeather(s.weather)) throw Error('Повреждена погода');
+  s.rules ??= { rear: true };
+  if (typeof s.rules !== 'object' || typeof s.rules.rear !== 'boolean')
+    throw Error('Повреждены правила');
+  for (const f of s.sides) f.rearAuto ??= true;
+  if (s.sides.some((f) => typeof f.rearAuto !== 'boolean'))
+    throw Error('Повреждена тыловая служба');
   restoreDistricts(s);
   s.version = VERSION;
   s.events = [];
