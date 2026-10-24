@@ -6,9 +6,9 @@ import { dayPhase } from './clock.js';
 // A phase of one kind ramps in, holds, ramps out, and a clear spell follows before the next one.
 export const WEATHER = {
   clear: { name: 'Ясно', visibility: 1, spread: 1, speed: 1 },
-  rain: { name: 'Дождь', visibility: 0.78, spread: 1.3, speed: 0.93 },
-  fog: { name: 'Туман', visibility: 0.5, spread: 1.15, speed: 1 },
-  storm: { name: 'Гроза', visibility: 0.62, spread: 1.5, speed: 0.88 },
+  rain: { name: 'Дождь', visibility: 0.86, spread: 1.3, speed: 0.93 },
+  fog: { name: 'Туман', visibility: 0.74, spread: 1.15, speed: 1 },
+  storm: { name: 'Гроза', visibility: 0.76, spread: 1.5, speed: 0.88 },
 };
 const WEIGHTS = [
   ['rain', 0.42],

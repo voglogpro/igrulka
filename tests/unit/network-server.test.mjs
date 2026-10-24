@@ -293,11 +293,11 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
   assert.equal((await rapid.closed()).code, 1008);
 });
 
-test('old protocols are explicitly refused and protocol three creates and joins a real room', async (t) => {
+test('old protocols are explicitly refused and protocol five creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 4);
+  assert.equal(PROTOCOL_VERSION, 5);
   const host = await connect();
-  host.send({ type: 'create', protocol: 1, name: 'Old host' });
+  host.send({ type: 'create', protocol: 4, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
   assert.equal(server.rooms.size, 0);
   host.send({ type: 'create', protocol: PROTOCOL_VERSION, name: 'Current host' });

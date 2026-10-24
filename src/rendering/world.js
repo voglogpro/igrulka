@@ -27,6 +27,7 @@ import { InfantryBatch } from './models/infantry/soldiers.js';
 import { CombatEffects } from './effects/combat-effects.js';
 import { FogVeil } from './fog-veil.js';
 import { Traffic } from './traffic.js';
+import { ServiceFleet } from './service-fleet.js';
 import { WeatherFX } from './effects/weather-fx.js';
 import { disposeTree } from './mesh-utils.js';
 import { aircraftModel } from './models/aircraft.js';
@@ -291,6 +292,10 @@ export class RTSWorld {
     this.fogVeil = new FogVeil(this.scene);
     this.weatherFX = new WeatherFX(this.scene);
     this.traffic = new Traffic(this);
+    this.serviceFleet = new ServiceFleet(this.scene, {
+      height: (x, z) => this.height(x, z),
+      visible: (s, v) => v.side === 0 || E.fogVisible(s, 0, v.x, v.z),
+    });
     this.tactical = new TacticalView(this);
     this.deploymentPreview = new DeploymentPreview(this.scene);
     this.sync();
@@ -436,7 +441,9 @@ export class RTSWorld {
     root.clear();
   }
   sync(...args) {
-    return syncForWorld.call(this, ...args);
+    const result = syncForWorld.call(this, ...args);
+    this.serviceFleet.sync(this.state);
+    return result;
   }
   aircraft(u) {
     return aircraftModel(this, u);
@@ -501,6 +508,7 @@ export class RTSWorld {
       fogOfWar: true,
       weather: this.weatherFX.diagnostics(),
       traffic: this.traffic.diagnostics(),
+      serviceFleet: this.serviceFleet.diagnostics(),
       detectedEnemies: this.state.units.filter(
         (u) => u.side === 1 && E.unitVisible(this.state, 0, u),
       ).length,
@@ -550,18 +558,17 @@ export class RTSWorld {
     this.updateDaylight();
     this.sync();
     this.fogVeil.update(this.state, wallDt);
-    const wx = this.state.weather,
-      rainy = wx && (wx.kind === 'rain' || wx.kind === 'storm') ? wx.amount : 0;
-    this.weatherFX.update(wallDt, this.elapsed, this.controls.target, rainy);
+    this.weatherFX.update(this.visualDt, this.controls.target, this.state.weather);
     this.combatFX.emit(this.state, this.visualDt, (u) => E.unitVisible(this.state, 0, u));
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);
     this.traffic.update(this.state, this.visualDt, this.combatFX);
+    this.serviceFleet.update(this.battleTime);
     if (this.buildKey && this.lastPointer) this.updateGhost(this.lastPointer);
     if (this.aiming && this.lastPointer && !this.controls.rotating) {
       const p = this.groundPoint(this.lastPointer);
       if (p) this.callbacks.onAimHover?.(p);
     }
     this.callbacks.onAmbient?.(wallDt);
-    this.renderInfo = this.post.render(this.scene, this.camera, this.elapsed);
+    this.renderInfo = this.post.render(this.scene, this.camera, this.battleTime);
   };
 }

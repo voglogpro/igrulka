@@ -586,3 +586,311 @@
 .rear-toggle input {
   margin: 0;
 }
+
+/* Selected troops share the same command grammar as construction and research. */
+#game #army-controls {
+  min-height: 112px;
+  padding: 10px 30px 8px 0;
+  gap: 14px;
+  border-top: 0;
+}
+#game .army-summary {
+  width: 168px;
+  min-width: 140px;
+  padding-right: 13px;
+  border-right: 1px solid var(--line);
+}
+#game .army-name b {
+  font-family: 'Manrope', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+#game .army-name small {
+  color: #b1c2b8;
+  margin-top: 6px;
+  font-size: 10px;
+}
+#game .army-summary > small {
+  color: var(--muted);
+  font-size: 9px;
+}
+#game .army-summary .health {
+  height: 4px;
+  border-radius: 0;
+  background: #82958e25;
+}
+#game .army-summary .health i {
+  background: #9bb7a7;
+}
+#game .stance-row {
+  margin-bottom: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#game .stance-label {
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+#game .stance-switch {
+  border-color: #82958e50;
+  border-radius: 2px;
+  background: #101a1c;
+}
+#game .stance-switch button {
+  padding: 7px 12px;
+  font-size: 10px;
+  color: #bacbc1;
+  background: transparent;
+}
+#game .stance-switch button + button {
+  border-color: #82958e40;
+}
+#game .stance-switch button.active {
+  box-shadow: inset 0 -2px var(--accent);
+}
+#game .stance-switch :is([data-stance='attack'], [data-recruit-mode='attack']).active {
+  background: #b5835e25;
+  color: #edc2a4;
+}
+#game .stance-switch :is([data-stance='defend'], [data-recruit-mode='defend']).active {
+  background: #799eac25;
+  color: #bcd7dd;
+}
+#game .stance-switch [data-recruit-mode='point'].active {
+  background: #9bb7a725;
+  color: #d4e0d6;
+}
+#game .stance-note {
+  color: var(--muted);
+}
+#game .army-primary-orders {
+  gap: 5px;
+}
+#game .army-primary-orders button {
+  min-height: 30px;
+  padding: 6px 9px;
+  font-size: 10px;
+  border-color: #82958e45;
+  background: #a3b9ae08;
+  border-radius: 2px;
+  color: #c7d4cc;
+}
+#game .army-primary-orders button:hover:not(:disabled) {
+  border-color: #b4c5b780;
+}
+#game .army-primary-orders button.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: #e2b7798c;
+}
+#game .army-primary-orders button.held {
+  color: #efc2a3;
+  border-color: #bd98778c;
+}
+#game .order-sep {
+  background: var(--line);
+  margin: 3px 2px;
+}
+#game .army-tools {
+  margin-top: 8px;
+  gap: 9px;
+  color: var(--muted);
+}
+#game .army-tools button {
+  padding: 4px;
+  border-radius: 2px;
+}
+#game .army-mouse-hint {
+  color: #92a79c;
+}
+#game .army-details summary {
+  color: #c1cec6;
+}
+#game .army-details > div {
+  background: #172124;
+  border-color: #82958e60;
+  border-radius: 2px;
+  bottom: 32px;
+}
+#game .army-details p {
+  color: var(--muted);
+}
+#game #panel.army-panel {
+  width: 342px;
+  max-height: min(500px, calc(100% - 280px));
+}
+#game .army-category-tabs {
+  gap: 4px;
+  border-color: var(--line);
+}
+#game .army-category-tabs button {
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  min-height: 32px;
+}
+#game .army-category-tabs button.active {
+  border-color: #82958e60;
+  background: #9bbdb014;
+  color: #e4ece5;
+}
+#game .army-panel .army-recruit button {
+  padding: 10px;
+  border: 1px solid #82958e45;
+  border-radius: 2px;
+  background: linear-gradient(130deg, #9bbdb00b, transparent), #1c2729;
+  min-height: 82px;
+}
+#game .army-panel .army-recruit button:hover:not(:disabled) {
+  border-color: #e2b77990;
+  background-color: #2b3330;
+}
+#game .army-panel .army-recruit b {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text);
+}
+#game .army-panel .army-recruit small {
+  font-size: 9px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin: 6px 0;
+}
+#game .army-panel .army-recruit span {
+  font-size: 9px;
+  color: #d6c39d;
+}
+#game
+  :is(
+    .recruit-mode > span,
+    .rear-toggle,
+    .army-panel-hint,
+    .army-roster summary,
+    .barracks-rally-mode
+  ) {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+#game .army-roster,
+#game .army-automation {
+  border-color: var(--line);
+}
+#game .army-role {
+  border: 1px solid #82958e25;
+  border-radius: 2px;
+  color: #b7c7be;
+  min-height: 30px;
+}
+#game .army-role b {
+  color: var(--text);
+}
+#game #repeat-toggle {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  min-height: 30px;
+  color: #c6d4ca;
+}
+#game #groups-bar {
+  top: 116px;
+  left: 12px;
+  padding: 8px;
+  max-width: min(380px, calc(100% - 590px));
+}
+#game #groups-bar .roster-head {
+  color: var(--muted);
+  font-size: 9px;
+}
+#game #groups-bar .roster-row {
+  gap: 4px;
+  max-height: 54px;
+}
+#game #groups-bar .roster-row > small {
+  color: var(--muted);
+}
+#game #groups-bar .roster-chip {
+  min-height: 25px;
+  align-items: center;
+  padding: 4px 7px;
+  border-color: #82958e3b;
+  border-radius: 2px;
+  background: #1c2729;
+}
+#game #groups-bar .roster-chip b {
+  color: #e0e9e2;
+}
+#game #groups-bar .roster-chip i {
+  color: var(--accent);
+}
+#game #groups-bar .roster-chip.group span {
+  color: #a6c4b5;
+}
+#game #groups-bar .roster-chip.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+#game #deployment-hud {
+  width: 278px;
+  bottom: 165px;
+  right: 12px;
+  padding: 13px;
+}
+#game .deployment-top span {
+  color: var(--accent);
+  font-size: 10px;
+}
+#game #deployment-note {
+  color: #c2d1c7;
+  font-size: 11px;
+}
+#game #deployment-hud small {
+  color: var(--muted);
+  font-size: 9px;
+}
+#game .deployment-count span {
+  color: #c5d4ca;
+}
+@media (max-width: 1100px) {
+  #game #army-controls {
+    gap: 10px;
+  }
+  #game .army-summary {
+    width: 145px;
+    min-width: 130px;
+    padding-right: 10px;
+  }
+  #game .army-primary-orders button {
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+  #game .army-tools {
+    gap: 7px;
+  }
+  #game .army-mouse-hint {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  #game .army-summary {
+    width: 112px;
+    min-width: 100px;
+  }
+  #game .army-name b {
+    font-size: 12px;
+  }
+  #game .stance-switch button {
+    padding: 6px 8px;
+  }
+  #game #panel.army-panel {
+    width: 310px;
+  }
+  #game #groups-bar {
+    max-width: calc(100% - 24px);
+  }
+  #game #army-controls {
+    align-items: flex-start;
+  }
+}

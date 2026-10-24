@@ -1,6 +1,6 @@
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -84,6 +84,11 @@ export function executeCommand(s, side, type, a = {}) {
         return 'Казармы вам не принадлежат';
       if (a.stance != null && !E.validStance(a.stance)) return invalid;
       return E.recruit(s, side, a.key, a.siteId ?? null, a.count, a.stance ?? null);
+    case 'service-enabled':
+      if (!validId(a.id) || typeof a.enabled !== 'boolean') return invalid;
+      if (!s.buildings.some((b) => b.id === a.id && b.side === side && b.key === 'service'))
+        return '????????? ??????? ??? ?? ???????????';
+      return E.setServiceEnabled(s, side, a.id, a.enabled);
     case 'rear-auto':
       if (typeof a.enabled !== 'boolean') return invalid;
       s.sides[side].rearAuto = a.enabled;

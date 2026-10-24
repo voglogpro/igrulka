@@ -56,6 +56,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
       },
     ],
     roads: [],
+    serviceVehicles: [],
     units: [],
     groundUnits: [],
     trenches: [],

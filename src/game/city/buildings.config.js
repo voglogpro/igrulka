@@ -1,5 +1,30 @@
 // Fictional game values. Change balance here, not in rendering code.
 export const BUILDINGS = {
+  service: {
+    height: 11,
+    name: 'Городская ремонтная служба',
+    tag: 'Ремонт дорог и города',
+    cost: 600,
+    metal: 32,
+    time: 24,
+    hp: 340,
+    size: 26,
+    power: 4,
+    upkeep: 0.6,
+    jobs: 3,
+    service: {
+      vehicles: 2,
+      sideLimit: 8,
+      speed: 32,
+      buildingRepair: 12,
+      roadRepair: 16,
+      creditsPerHp: 0.3,
+      materialsPerHp: 0.025,
+      cadence: 0.75,
+    },
+    description:
+      'Две дорожные бригады сами едут к повреждённым своим зданиям и улицам. Нужна связанная дорога; оплата деньгами и сплавами только за выполненный ремонт. Руины не восстанавливает. Потеря станции лишает её бригад.',
+  },
   housing: {
     height: 34,
     name: 'Жилой квартал',

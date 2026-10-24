@@ -63,21 +63,24 @@
 
 ## Город, бот и сохранения
 
-| Задача                                               | Где менять                              |
-| ---------------------------------------------------- | --------------------------------------- |
-| Постройки и их исходные характеристики               | `src/game/city/buildings.config.js`     |
-| Размещение, подъезд, снос и ремонт                   | `src/game/city/construction.js`         |
-| Постройка дорог и стартовые улицы                    | `src/game/city/roads.js`                |
-| Связность, пересечения, снабжение и запрет наложений | `src/game/city/road-network.js`         |
-| Доход, затраты, энергия и бонус бота                 | `src/game/city/economy.js`              |
-| Строительство и выпуск завода за тик                 | `src/game/city/update.js`               |
-| Дерево технологий                                    | `src/game/research/tech-tree.config.js` |
-| Применение исследований                              | `src/game/research/research.js`         |
-| Строительство города и налёты бота                   | `src/game/ai/city-ai.js`                |
-| Пехота, укрытия и транспорт бота                     | `src/game/ai/army-ai.js`                |
-| Новая кампания                                       | `src/game/state.js`                     |
-| Главный шаг симуляции                                | `src/game/simulation.js`                |
-| Сериализация, миграции и проверка входящих данных    | `src/game/persistence/saves.js`         |
+| Задача                                                    | Где менять                              |
+| --------------------------------------------------------- | --------------------------------------- |
+| Постройки и их исходные характеристики                    | `src/game/city/buildings.config.js`     |
+| Размещение, подъезд, снос и ремонт                        | `src/game/city/construction.js`         |
+| Постройка дорог и стартовые улицы                         | `src/game/city/roads.js`                |
+| Связность, пересечения, снабжение и запрет наложений      | `src/game/city/road-network.js`         |
+| Доход, затраты, энергия и бонус бота                      | `src/game/city/economy.js`              |
+| Строительство и выпуск завода за тик                      | `src/game/city/update.js`               |
+| Городские ремонтные бригады, оплата и выключатель станции | `src/game/city/service.js`              |
+| Дорожные маршруты бригад, перекрёстки и кэш графа         | `src/game/city/service-roads.js`        |
+| Дерево технологий                                         | `src/game/research/tech-tree.config.js` |
+| Применение исследований                                   | `src/game/research/research.js`         |
+| Строительство города и налёты бота                        | `src/game/ai/city-ai.js`                |
+| Пехота, укрытия и транспорт бота                          | `src/game/ai/army-ai.js`                |
+| Новая кампания                                            | `src/game/state.js`                     |
+| Главный шаг симуляции                                     | `src/game/simulation.js`                |
+| Сериализация, миграции и проверка входящих данных         | `src/game/persistence/saves.js`         |
+| Импорт и проверка станций и ремонтных машин               | `src/game/persistence/services.js`      |
 
 ## Отрисовка, интерфейс, звук
 
@@ -93,6 +96,9 @@
 - `src/rendering/terrain/` — земля, река, лес, мосты, улицы и окопы.
 - `src/rendering/tactical-overlays.js`, `minimap.js` — маршрут, кольца и миникарта.
 - `src/rendering/effects/combat-effects.js` — пулы дыма, вспышек, осколков и трассеров; дульные эффекты, разрывы в воздухе, след ЗУР, горящие обломки.
+- `src/rendering/effects/projectile-trail.js` — точки следа на той же баллистической дуге, что использует симуляция; не задаёт урон или физику полёта.
+- `src/rendering/effects/weather-style.js` — плотность дождя, наземного тумана и дымки, направление ветра и детерминированные семена частиц; `weather-fx.js` рядом — пакетные погодные эффекты.
+- `src/rendering/service-fleet.js` — пакетные модели ремонтных машин по `state.serviceVehicles`; `src/rendering/models/city/service-station.js` — внешний вид станции. Правила ремонта находятся в `game/city/service.js`.
 - `src/rendering/effects/weapon-profiles.js` — внешний вид выстрела каждого класса оружия; `streaks.js` — росчерки трассеров и искр; `casings.js` — гильзы; `particles.js` — пакет дыма и свечения.
 - `src/rendering/effects/post-processing.js` — свечение, тональная обработка и зерно.
 - `src/ui/tech-tree.js` — дерево исследований: колонки веток, уровни, линии зависимостей.

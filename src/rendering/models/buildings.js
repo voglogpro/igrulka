@@ -2,6 +2,7 @@ import * as T from '../../../vendor/three/three.module.js';
 import { BUILDINGS } from '../../game/index.js';
 import { radarModel, defenseModel } from './defenses.js';
 import { detailBuilding, batchStatic } from '../mesh-utils.js';
+import { serviceStationModel } from './city/service-station.js';
 export function model(b) {
   const root = new T.Group();
   root.position.set(b.x, Math.max(0, this.height(b.x, b.z)), b.z);
@@ -30,7 +31,9 @@ export function model(b) {
   });
   const windowMat = this.facadeMat;
   this.sharedMaterials.add(windowMat);
-  if (b.key === 'housing') {
+  if (b.key === 'service') {
+    serviceStationModel(this, content, accent);
+  } else if (b.key === 'housing') {
     for (let i = 0; i < 3; i++) {
       const x = (i - 1) * 8,
         z = i % 2 ? 5 : -3,

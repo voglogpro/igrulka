@@ -514,7 +514,7 @@ function updateHUD() {
 function buildList() {
   const keys =
     tab === 'city'
-      ? ['road', 'housing', 'industry', 'power', 'lab', 'market']
+      ? ['road', 'housing', 'industry', 'power', 'lab', 'market', 'service']
       : tab === 'army'
         ? ['barracks']
         : ['factory', 'launcher', 'gun', 'sam', 'radar'];
@@ -1532,6 +1532,18 @@ document.addEventListener('click', async (ev) => {
     else {
       persist();
       updateLivePanel();
+    }
+  }
+  if (d.serviceEnabled) {
+    const epoch = campaignEpoch,
+      revision = interactionRevision,
+      enabled = d.enabled === 'true';
+    const result = await execute('service-enabled', { id: Number(d.serviceEnabled), enabled });
+    if (epoch !== campaignEpoch) return;
+    if (typeof result === 'string') toast(result, true);
+    else {
+      persist();
+      if (revision === interactionRevision) renderInspector();
     }
   }
   if (d.repair) {

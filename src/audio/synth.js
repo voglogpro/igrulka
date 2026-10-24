@@ -46,7 +46,17 @@ export function gunshot(sampleRate, p) {
     tail2 += tailA * (tail1 - tail2);
     const tail = tail2 * p.tail * 6 * Math.exp(-t / p.tailDecay) * (1 - Math.exp(-t / 0.012));
     const action = p.action && t > 0.03 && t < 0.034 ? white * p.action : 0;
-    data[i] = attack * (crack + body + thump) + tail + action;
+    // A delayed, low-mid pressure reflection adds weight without obscuring the crack.
+    const reflectionTime = t - 0.055;
+    const reflection =
+      reflectionTime > 0
+        ? tail2 *
+          p.tail *
+          2.1 *
+          Math.exp(-reflectionTime / (p.tailDecay * 1.3)) *
+          (1 - Math.exp(-reflectionTime / 0.025))
+        : 0;
+    data[i] = attack * (crack + body + thump) + tail + reflection + action;
   }
   return finish(data, p.drive ?? 1.6);
 }
@@ -180,13 +190,15 @@ export const GUNS = {
 
 // Explosion: blast front, a deep falling boom, then crackling debris.
 export function explosion(sampleRate, size) {
-  const length = 1.8 + size * 0.9,
+  const length = 2.1 + size * 1.05,
     data = new Float32Array(Math.ceil(sampleRate * length)),
     a = onePole(220 + 160 / size, sampleRate),
-    b = onePole(1800, sampleRate);
+    b = onePole(1800, sampleRate),
+    rubbleA = onePole(95, sampleRate);
   let low1 = 0,
     low2 = 0,
     mid = 0,
+    rubble = 0,
     phase = 0;
   for (let i = 0; i < data.length; i++) {
     const t = i / sampleRate,
@@ -194,7 +206,8 @@ export function explosion(sampleRate, size) {
     low1 += a * (white - low1);
     low2 += a * (low1 - low2);
     mid += b * (white - mid);
-    const frequency = 18 + 42 * Math.exp(-t / (0.08 * size));
+    rubble += rubbleA * (white - rubble);
+    const frequency = 26 + 38 * Math.exp(-t / (0.08 * size));
     phase += (2 * Math.PI * frequency) / sampleRate;
     const boom =
       low2 * 5 * Math.exp(-t / (0.35 * size)) + Math.sin(phase) * 1.2 * Math.exp(-t / (0.3 * size));
@@ -203,7 +216,17 @@ export function explosion(sampleRate, size) {
       t > 0.15 && Math.random() < 0.0009 * size
         ? (Math.random() - 0.5) * 1.5 * Math.exp(-t / length)
         : 0;
-    data[i] = Math.min(1, t / 0.002) * (boom + front) + debris;
+    // Pressure rolls back from the valley after the blast front. Modulation creates
+    // moving masses of air rather than a flat noise tail; all layers share one voice.
+    const wake = Math.max(0, t - 0.17 * size);
+    const roll =
+      rubble *
+      4.5 *
+      (1 - Math.exp(-wake / 0.12)) *
+      Math.exp(-wake / (0.7 * size)) *
+      (0.65 + 0.22 * Math.sin(t * 17) + 0.13 * Math.sin(t * 31));
+    const pressure = Math.sin(phase * 1.93) * 0.22 * Math.exp(-t / (0.42 * size));
+    data[i] = Math.min(1, t / 0.002) * (boom + front + pressure) + roll + debris;
   }
   return finish(data, 2.1);
 }
@@ -306,7 +329,7 @@ export function jetLoop(sampleRate) {
 }
 
 // Outdoor impulse response: a few early reflections and a long darkening tail.
-export function impulseResponse(sampleRate, seconds = 2.6) {
+export function impulseResponse(sampleRate, seconds = 3.1) {
   const length = Math.ceil(sampleRate * seconds),
     channels = [new Float32Array(length), new Float32Array(length)];
   for (const data of channels) {
@@ -315,13 +338,15 @@ export function impulseResponse(sampleRate, seconds = 2.6) {
       const t = i / sampleRate,
         cutoff = 5000 * Math.exp(-t * 1.6) + 250;
       low += onePole(cutoff, sampleRate) * (Math.random() * 2 - 1 - low);
-      data[i] = low * Math.exp(-t * 2.4) * 1.6;
+      data[i] = low * Math.exp(-t * 2.1) * 1.45;
     }
     for (const [time, gain] of [
       [0.045, 0.5],
       [0.11, 0.35],
       [0.19, 0.25],
       [0.31, 0.18],
+      [0.53, 0.11],
+      [0.79, 0.06],
     ]) {
       const at = Math.floor((time + Math.random() * 0.015) * sampleRate);
       for (let i = 0; i < 40; i++) data[at + i] += (Math.random() - 0.5) * gain;
@@ -358,10 +383,11 @@ export function mopedLoop(sampleRate) {
     const t = i / sampleRate,
       cycle = (t * firing) % 1;
     rasp += a * (Math.random() * 2 - 1 - rasp);
-    const pulse = Math.exp(-cycle * 6) - 0.25,
+    const pressure = Math.sin(2 * Math.PI * 52 * t) * 0.19 + Math.sin(2 * Math.PI * 53 * t) * 0.11,
+      pulse = Math.exp(-cycle * 6) - 0.25,
       prop = Math.sin(2 * Math.PI * firing * 2 * t) * 0.25;
     data[i] =
-      (pulse + prop + rasp * 0.5 * Math.exp(-cycle * 3)) *
+      (pulse + pressure + prop + rasp * 0.5 * Math.exp(-cycle * 3)) *
       (0.85 + 0.15 * Math.sin(2 * Math.PI * 7 * t));
   }
   return finish(data, 1.4);

@@ -16,6 +16,7 @@ export { createGame } from './state.js';
 export { WEATHER, forecast, weatherSpread } from './weather.js';
 export { TRADE, tradeReport } from './units/ground/trade.js';
 export { COMMUTE_INCOME } from './city/economy.js';
+export { setServiceEnabled, serviceStatus } from './city/service.js';
 export { visionOf, fogVisible, GRID as VISION_GRID } from './vision-grid.js';
 export { DIFFICULTY, DEFAULT_DIFFICULTY, difficultyOf } from './ai/difficulty.config.js';
 export { supplyFactor, economy, buildingOutput } from './city/economy.js';

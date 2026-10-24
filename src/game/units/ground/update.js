@@ -163,6 +163,10 @@ export function tickUnit(s, u, dt, rates, hooks) {
     tank = shot.kind === 'shell',
     speed = shot.speed,
     length = Math.hypot(tx - u.x, tz - u.z) || 1,
+    flight = length / speed,
+    originY = shot.indirect ? 6 : foot ? 2.6 : 4,
+    gravity = 18,
+    arc = shot.indirect ? Math.min(150, length * 0.33) : 0,
     cost = shot.cost,
     f = s.sides[u.side];
   if (f.credits < cost) return;
@@ -196,15 +200,18 @@ export function tickUnit(s, u, dt, rates, hooks) {
     domain: 'ground',
     kind: tank ? 'shell' : 'bullet',
     tracer: tank || u.groundAmmo % (AUTOMATIC.has(u.key) ? 2 : 4) === 0,
-    ...(shot.indirect ? { arc: Math.min(150, length * 0.33), originY: 6 } : {}),
+    originY,
+    ...(arc ? { arc } : { gravity }),
     x: u.x,
-    y: foot ? 2.6 : 4,
+    y: originY,
     z: u.z,
     px: u.x,
-    py: foot ? 2.6 : 4,
+    py: originY,
     pz: u.z,
     vx: ((tx - u.x) / length) * speed,
-    vy: 0,
+    vy: arc
+      ? (4 * arc + 2 - originY) / flight
+      : (2 - originY + 0.5 * gravity * flight * flight) / flight,
     vz: ((tz - u.z) / length) * speed,
     speed,
     damage: d.groundDamage,
@@ -212,7 +219,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
     maxLife: 2,
     tx,
     tz,
-    flight: length / speed,
+    flight,
     suppression: d.suppression || 0.06,
   });
   event(s, 'shot', {

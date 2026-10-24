@@ -102,8 +102,23 @@ export class GameAudio {
       this.compressor.ratio.value = 5;
       this.compressor.attack.value = 0.002;
       this.compressor.release.value = 0.3;
-      this.master.connect(this.compressor);
-      this.compressor.connect(c.destination);
+      // Remove inaudible subsonic energy before dynamics; preserve the audible boom.
+      const subsonic = c.createBiquadFilter();
+      subsonic.type = 'highpass';
+      subsonic.frequency.value = 22;
+      subsonic.Q.value = 0.5;
+      const ceiling = c.createWaveShaper(),
+        curve = new Float32Array(4097);
+      for (let i = 0; i < curve.length; i++) {
+        const x = (i / (curve.length - 1)) * 2 - 1,
+          a = Math.abs(x);
+        curve[i] = Math.sign(x) * (a <= 0.7 ? a : 0.7 + 0.25 * Math.tanh((a - 0.7) / 0.25));
+      }
+      ceiling.curve = curve;
+      this.master.connect(subsonic);
+      subsonic.connect(this.compressor);
+      this.compressor.connect(ceiling);
+      ceiling.connect(c.destination);
       this.dry = c.createGain();
       this.dry.connect(this.master);
       // Shared outdoor reverb and a slap-back echo from the valley sides.
@@ -185,7 +200,7 @@ export class GameAudio {
   }
   // Interface blips stay synthetic and centred; they are not part of the battlefield.
   tone(freq, end, length, gain = 0.1, type = 'sine') {
-    if (!this.context || !this.enabled || this.voices > 40) return;
+    if (!this.context || !this.enabled || this.voices >= 40) return;
     const c = this.context,
       t = c.currentTime,
       o = c.createOscillator(),
@@ -210,7 +225,7 @@ export class GameAudio {
   // One positioned battlefield sound: buffer → distance filter → dry/pan + reverb + echo sends.
   sample(name, distance, pan, loudness, options = {}) {
     const list = this.buffers?.[name];
-    if (!list || !this.enabled || this.voices > 44) return;
+    if (!list || !this.enabled || this.voices >= 44) return;
     const mix = distanceMix(distance, loudness);
     if (mix.dry < 0.012 && !options.force) return;
     const c = this.context,
@@ -372,9 +387,9 @@ export class GameAudio {
     siren.buffer = this.buffers.siren;
     siren.loop = true;
     sirenTone.type = 'lowpass';
-    sirenTone.frequency.value = 2600;
+    sirenTone.frequency.value = 2100;
     sirenLevel.gain.value = 0;
-    sirenWet.gain.value = 1.4;
+    sirenWet.gain.value = 1.15;
     siren.connect(sirenTone);
     sirenTone.connect(sirenLevel);
     sirenLevel.connect(this.dry);
@@ -447,7 +462,7 @@ export class GameAudio {
         : null;
       this.siren.on = !!city;
       this.siren.level.gain.setTargetAtTime(
-        this.enabled && city ? 0.16 * Math.max(0.4, Math.min(1, near.dry * 4)) : 0,
+        this.enabled && city ? 0.11 * Math.max(0.4, Math.min(1, near.dry * 4)) : 0,
         t,
         city ? 1.2 : 2.5,
       );

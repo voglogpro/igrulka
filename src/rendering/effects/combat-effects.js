@@ -3,6 +3,7 @@ import { ParticleBatch } from './particles.js';
 import { StreakBatch, StreakParticles } from './streaks.js';
 import { CasingPool } from './casings.js';
 import { WEAPON_FX, weaponClass } from './weapon-profiles.js';
+import { projectileTrailPoint } from './projectile-trail.js';
 
 // Beyond this camera distance shots keep only their flash; nearby combat gets the full detail.
 const DETAIL_DISTANCE = 720;
@@ -13,6 +14,13 @@ const TRACER = [
   [6.5, 1.5, 0.35],
   [1.1, 5.5, 1.3],
 ];
+const TRACER_TAIL = TRACER.map((color) => color.map((value) => value * 0.8));
+const INTERCEPTOR_TAIL = [1.6, 2.6, 4];
+const SHELL_TAIL = [4, 1.7, 0.4];
+const INTERCEPTOR_HEAD = [5, 3.4, 1.4];
+const SHELL_HEAD = [5, 2.1, 0.45];
+const WARM_CORE = [14, 9, 4.5];
+const GREEN_CORE = [7, 14, 7];
 const tracerColor = (p) => TRACER[p.side === 1 ? 1 : 0];
 
 export class CombatEffects {
@@ -21,7 +29,7 @@ export class CombatEffects {
     this.smoke = new ParticleBatch(world.scene, 1280, 0);
     this.glow = new ParticleBatch(world.scene, 1280, 1);
     this.rings = new ParticleBatch(world.scene, 64, 2);
-    this.streaks = new StreakBatch(world.scene, 2048);
+    this.streaks = new StreakBatch(world.scene, 4096);
     this.sparks = new StreakParticles(900);
     this.casings = new CasingPool(world.scene, 320);
     this.clock = 0;
@@ -32,6 +40,8 @@ export class CombatEffects {
     this.groundTracers = new Map();
     this.wrecks = [];
     this.eye = new T.Vector3();
+    this.trailHead = { x: 0, y: 0, z: 0 };
+    this.trailTail = { x: 0, y: 0, z: 0 };
     this.lights = Array.from({ length: 3 }, () => {
       const light = new T.PointLight('#ffc18a', 0, 120, 2);
       light.userData.life = 0;
@@ -70,7 +80,7 @@ export class CombatEffects {
       new T.LineBasicMaterial({
         vertexColors: true,
         transparent: true,
-        opacity: 0.95,
+        opacity: 0.5,
         blending: T.AdditiveBlending,
         toneMapped: false,
         depthWrite: false,
@@ -705,17 +715,18 @@ export class CombatEffects {
       const tail = Math.min(p.life, p.kind === 'bullet' ? 0.09 : 0.07),
         color =
           p.kind === 'interceptor'
-            ? [1.6, 2.6, 4]
+            ? INTERCEPTOR_TAIL
             : p.kind === 'shell'
-              ? [4, 1.7, 0.4]
-              : tracerColor(p).map((v) => v * 0.8);
+              ? SHELL_TAIL
+              : TRACER_TAIL[p.side === 1 ? 1 : 0];
       for (let i = 0; i < 3 && segment < this.traceCapacity; i++, segment++)
         for (let end = 0; end < 2; end++) {
           const t = tail * (1 - (i + end) / 3),
             offset = segment * 6 + end * 3;
-          this.tracePositions[offset] = p.x - p.vx * t;
-          this.tracePositions[offset + 1] = p.y - p.vy * t - 0.5 * (p.gravity || 0) * t * t;
-          this.tracePositions[offset + 2] = p.z - p.vz * t;
+          const point = projectileTrailPoint(p, t, this.trailHead);
+          this.tracePositions[offset] = point.x;
+          this.tracePositions[offset + 1] = point.y;
+          this.tracePositions[offset + 2] = point.z;
           const intensity = 0.2 + (0.8 * (i + end)) / 3;
           this.traceColors[offset] = color[0] * intensity;
           this.traceColors[offset + 1] = color[1] * intensity;
@@ -766,30 +777,54 @@ export class CombatEffects {
       });
     }
   }
-  // Glowing heads for every tracer and interceptor, aligned with the flight direction.
+  // Layered hot cores and coloured bloom follow the actual curved trajectory in one fixed batch.
   drawTracerStreaks() {
     let heads = 0;
     for (const p of this.tracerProjectiles || []) {
+      if (heads >= this.traceCapacity / 3) break;
       if (p.kind === 'bullet' && !p.tracer) continue;
       const speed = Math.hypot(p.vx, p.vy, p.vz);
       if (!speed || p.life <= 0) continue;
       const interceptor = p.kind === 'interceptor',
         shell = p.kind === 'shell',
-        length = Math.min(interceptor ? 9 : shell ? 14 : 16, speed * 0.055, speed * p.life),
-        width = interceptor ? 1.1 : shell ? 0.62 : 0.28,
-        color = interceptor ? [5, 3.4, 1.4] : shell ? [5, 2.1, 0.45] : tracerColor(p);
-      this.streaks.add(
-        p.x,
-        p.y,
-        p.z,
-        p.vx / speed,
-        p.vy / speed,
-        p.vz / speed,
-        length,
-        width,
-        color,
-        0.9,
-      );
+        tail = Math.min(p.life, 0.095, (interceptor ? 12 : shell ? 18 : 19) / speed),
+        width = interceptor ? 1.5 : shell ? 0.9 : 0.6,
+        color = interceptor ? INTERCEPTOR_HEAD : shell ? SHELL_HEAD : tracerColor(p),
+        core = p.side === 1 && !shell && !interceptor ? GREEN_CORE : WARM_CORE;
+      for (let i = 0; i < 3; i++) {
+        const a = projectileTrailPoint(p, (tail * i) / 3, this.trailHead),
+          b = projectileTrailPoint(p, (tail * (i + 1)) / 3, this.trailTail),
+          dx = a.x - b.x,
+          dy = a.y - b.y,
+          dz = a.z - b.z,
+          length = Math.hypot(dx, dy, dz);
+        if (length < 1e-5) continue;
+        const fade = 1 - i * 0.25;
+        this.streaks.add(
+          a.x,
+          a.y,
+          a.z,
+          dx / length,
+          dy / length,
+          dz / length,
+          length,
+          width,
+          color,
+          0.65 * fade,
+        );
+        this.streaks.add(
+          a.x,
+          a.y,
+          a.z,
+          dx / length,
+          dy / length,
+          dz / length,
+          length,
+          width * 0.24,
+          core,
+          0.95 * fade,
+        );
+      }
       heads++;
     }
     this.tracerHeads = heads;

@@ -41,24 +41,34 @@ export function renderInspector(context) {
       );
     $('#rally-mode').value = E.defaultRallyMode(state, b);
   }
+  const serviceReport = b.key === 'service' ? E.serviceStatus(state, b.side, b.id) : null;
   const supply = ruin
     ? 'Разберите, чтобы освободить участок'
     : b.key === 'road'
       ? E.passable(b)
         ? 'Проезд открыт'
         : 'Проезд перекрыт'
-      : E.ROAD_REQUIRED.has(b.key)
-        ? E.supplyFactor(state, b) === 1
-          ? 'Снабжение 100%'
-          : 'Снабжение 20% · нет пути'
-        : 'Автономная позиция';
+      : b.key === 'service'
+        ? serviceReport.status === 'road'
+          ? 'Нет подъездной дороги'
+          : serviceReport.status === 'disabled'
+            ? 'Служба отключена'
+            : 'Подъезд открыт'
+        : E.ROAD_REQUIRED.has(b.key)
+          ? E.supplyFactor(state, b) === 1
+            ? 'Снабжение 100%'
+            : 'Снабжение 20% · нет пути'
+          : 'Автономная позиция';
   $('#inspect-health').style.width = Math.max(0, b.hp / b.maxHp) * 100 + '%';
   $('#inspect-hp').textContent = Math.ceil(b.hp) + ' / ' + b.maxHp;
   $('#inspect-status').textContent =
     b.progress < 1 && !ruin ? 'Строится ' + Math.floor(b.progress * 100) + '%' : supply;
   $('#inspect-status').classList.toggle(
     'warning',
-    ruin || supply.includes('20%') || supply.includes('перекрыт'),
+    ruin ||
+      supply.includes('20%') ||
+      supply.includes('перекрыт') ||
+      serviceReport?.status === 'road',
   );
   const button = $('#repair-button');
   button.disabled =
@@ -73,8 +83,41 @@ export function renderInspector(context) {
       ? 'Ремонт…'
       : 'Ремонт ' + Math.ceil((b.maxHp - b.hp) * 0.55) + ' ₡';
   const o = E.buildingOutput(state, b);
-  if (o && $('#building-detail'))
+  if (o && $('#building-detail') && b.key !== 'service')
     $('#building-detail').innerHTML =
       `<div class="status-note">Выпуск ${Math.round(o.factor * 100)}% · дорога ${Math.round(o.road * 100)}% · мощность ${Math.round(o.power * 100)}%<br>${o.income ? rate(o.income) + ' ₡/мин · ' : ''}${o.materials ? rate(o.materials) + ' спл./мин · ' : ''}${o.science ? rate(o.science) + ' науки/мин · ' : ''}содержание ${Math.round(o.upkeep * 60)} ₡/мин</div>`;
+  if (b.key === 'service' && b.side === 0 && !ruin) {
+    if (!$('#service-detail'))
+      $('#building-detail').insertAdjacentHTML(
+        'afterend',
+        '<section id="service-detail" aria-label="Городская ремонтная служба"><span class="eyebrow">ГОРОДСКОЙ РЕМОНТ</span><p class="small-muted">Две бригады чинят здания и дороги. Оплата деньгами и сплавами по мере работы.</p><div class="stat"><span>Машины / в работе</span><b id="service-fleet"></b></div><p id="service-status" class="status-note" role="status"></p><button id="service-toggle" data-service-enabled="' +
+          b.id +
+          '" class="service-toggle"></button></section>',
+      );
+    const report = serviceReport;
+    const messages = {
+      building: 'Развёртывание службы',
+      disabled: 'Служба отключена',
+      road: 'Нет подъездной дороги',
+      credits: 'Ремонт ждёт пополнения бюджета',
+      materials: 'Для ремонта нужны сплавы',
+      active: report.repairing
+        ? `Ремонтируют: ${report.repairing}`
+        : 'Бригады следуют к повреждениям',
+      idle: 'Бригады готовы к выезду',
+      blocked: 'Проезд к повреждениям перекрыт',
+    };
+    $('#service-fleet').textContent = `${report.vehicles} / ${report.busy}`;
+    $('#service-status').textContent = messages[report.status] || 'Служба готова';
+    $('#service-status').classList.toggle(
+      'warning',
+      ['road', 'credits', 'materials', 'blocked'].includes(report.status),
+    );
+    const toggle = $('#service-toggle');
+    toggle.dataset.enabled = String(!report.enabled);
+    toggle.setAttribute('aria-pressed', String(report.enabled));
+    toggle.textContent = report.enabled ? 'Отключить службу' : 'Включить службу';
+    toggle.disabled = b.progress < 1;
+  }
   if (!ruin) renderDefenseDetail(state, b);
 }

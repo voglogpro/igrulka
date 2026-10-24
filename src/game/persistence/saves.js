@@ -9,6 +9,7 @@ import { validStance } from '../units/ground/stance.js';
 import { RALLY_MODES } from '../units/ground/recruitment.js';
 import { isFactoryPlan } from '../units/aviation/factory-plans.js';
 import { validateSquadMetadata } from './squads.js';
+import { restoreServices } from './services.js';
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
   const copy = structuredClone(s);
@@ -19,7 +20,7 @@ export function save(s) {
 export function load(raw) {
   const s = JSON.parse(raw);
   if (
-    ![3, 4, 5, 6, 7, 8, 9, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, 9, 10, VERSION].includes(s.version) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
@@ -167,7 +168,9 @@ export function load(raw) {
       !['x', 'y', 'z', 'vx', 'vy', 'vz', 'speed', 'life', 'maxLife'].every((k) =>
         Number.isFinite(p[k]),
       ) ||
-      ['originX', 'originZ'].some((key) => p[key] != null && !Number.isFinite(p[key]))
+      ['originX', 'originY', 'originZ'].some((key) => p[key] != null && !Number.isFinite(p[key])) ||
+      (p.gravity != null && (!Number.isFinite(p.gravity) || p.gravity < 0 || p.gravity > 100)) ||
+      (p.arc != null && (!Number.isFinite(p.arc) || p.arc < 0))
     )
       throw Error('Повреждены снаряды');
   s.groundUnits ||= [];
@@ -399,6 +402,7 @@ export function load(raw) {
   if (s.sides.some((f) => typeof f.rearAuto !== 'boolean'))
     throw Error('Повреждена тыловая служба');
   restoreDistricts(s);
+  restoreServices(s);
   s.version = VERSION;
   s.events = [];
   s.stats = {

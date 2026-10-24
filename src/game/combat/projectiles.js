@@ -33,6 +33,9 @@ export function moveProjectiles(s, dt) {
         const k = Math.min(1, p.life / p.flight);
         p.y = (p.originY ?? 6) * (1 - k) + 2 * k + 4 * p.arc * k * (1 - k);
         p.vy = (4 * p.arc * (1 - 2 * k) + 2 - (p.originY ?? 6)) / p.flight;
+      } else if (p.gravity != null) {
+        p.y += p.vy * travel - 0.5 * p.gravity * travel * travel;
+        p.vy -= p.gravity * travel;
       }
       if (p.life >= p.flight) {
         p.x = p.tx;
