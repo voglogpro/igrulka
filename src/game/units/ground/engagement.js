@@ -89,6 +89,16 @@ const profiles = {
     stationary: true,
     suppressionLimit: 0.8,
   },
+  antiTankRifle: {
+    id: 'antiTankRifle',
+    kind: 'bullet',
+    speed: 360,
+    cost: 0.35,
+    spread: 1.5,
+    canBlind: false,
+    stationary: true,
+    suppressionLimit: 0.8,
+  },
 };
 
 export function groundWeaponProfile(key) {
@@ -164,6 +174,7 @@ export function groundDamageMultiplier(shooterKey, target, kind = 'bullet') {
     sniper: { infantry: 1, light: 0.08, heavy: 0.01, building: 0.45 },
     cannon: { infantry: 1, light: 1.1, heavy: 1, building: 1 },
     antiArmor: { infantry: 0.045, light: 1.1, heavy: 1.25, building: 0.18 },
+    antiTankRifle: { infantry: 0.22, light: 1.05, heavy: 0.5, building: 0.12 },
     artillery: { infantry: 0.9, light: 0.6, heavy: 0.3, building: 1.1 },
     autocannon: { infantry: 1, light: 0.85, heavy: 0.1, building: 0.7 },
     rocket: { infantry: 0.85, light: 0.6, heavy: 0.25, building: 1 },
@@ -314,7 +325,7 @@ function rank(u, target, range, cache) {
         (other.x - target.x) ** 2 + (other.z - target.z) ** 2 < 400
       )
         priority += 12;
-  } else if (profile === 'antiArmor')
+  } else if (profile === 'antiArmor' || profile === 'antiTankRifle')
     priority = armor === 'heavy' ? 300 : armor === 'light' ? 260 : armor === 'infantry' ? 20 : 10;
   else if (profile === 'autocannon')
     priority =

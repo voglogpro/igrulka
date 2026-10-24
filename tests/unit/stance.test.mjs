@@ -29,7 +29,8 @@ function fresh() {
 test('recruits with a defend stance walk to a bridge, hold the post and dig in', () => {
   const s = fresh();
   assert.equal(E.recruit(s, 0, 'infantry', null, 3, { mode: 'defend', post: 'south' }), true);
-  E.advance(s, 120);
+  // The widened 8.8 map adds a longer physical march after disconnected barracks training.
+  E.advance(s, 165);
   const troops = s.groundUnits.filter((u) => u.side === 0);
   assert.equal(troops.length, 3);
   assert.ok(troops.every((u) => u.stance?.post === 'south' && u.guard));

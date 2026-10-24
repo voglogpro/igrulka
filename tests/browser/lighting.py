@@ -31,7 +31,7 @@ with sync_playwright() as p:
         report['previousDirectionJumpDegrees']=math.degrees(2*math.asin(min(1,old_delta/2)))
         print('Reproduced old lighting direction jump while panning:',report['previousDirectionJumpDegrees'],flush=True)
     open_game('skyfront-infantry8.html')
-    assert '8.7.0' in page.title()
+    assert '8.8.0' in page.title()
     report['fixedPans']=[]
     for time in [0,700,1000]:
         setup(time);before,after=pan()

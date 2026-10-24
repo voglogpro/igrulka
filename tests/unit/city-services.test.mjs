@@ -46,10 +46,12 @@ test('the station requires an actual street, pays normal construction and upkeep
   const s = fresh(),
     before = s.sides[0].credits;
   assert.match(E.canPlace(s, 'service', -300, 250), /улицей/);
+  const quote = E.purchaseQuote(s, 0, 'building', 'service');
+  const plan = E.placementPlan(s, 0, 'service', -680, -80);
   const b = E.build(s, 0, 'service', -680, -80);
   assert.equal(typeof b, 'object');
-  assert.ok(before - s.sides[0].credits >= E.BUILDINGS.service.cost);
-  assert.equal(s.sides[0].materials, 3000 - E.BUILDINGS.service.metal);
+  assert.equal(before - s.sides[0].credits, quote.cost + plan.driveCost);
+  assert.equal(s.sides[0].materials, 3000 - quote.metal);
   E.advance(s, 1);
   assert.equal(s.serviceVehicles.length, 0);
   E.advance(s, E.BUILDINGS.service.time);
@@ -279,6 +281,7 @@ test('fleet limits are configured, shared per owner and independent between mult
   for (const side of [0, 1]) {
     const first = build(s, side, 'service', side ? 680 : -680, -80);
     for (let i = 0; i < 4; i++) s.buildings.push({ ...first, id: s.nextId++ });
+    s.sides[side].purchases.building.service = 5;
   }
   E.advance(s, 0.1);
   for (const side of [0, 1]) {

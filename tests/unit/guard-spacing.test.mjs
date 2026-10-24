@@ -37,12 +37,23 @@ function produce(key, count, setup = () => ({ x: -500, z: -40 })) {
   const b = barracks(s);
   const rally = setup(s);
   assert.equal(game.setRally(s, 0, b.id, rally), true);
-  assert.equal(game.setRallyMode(s, 0, b.id, 'guard'), true);
+  // Explicit manual guards remain local; the 8.8 default guard now volunteers for the corridors.
+  assert.equal(game.setRallyMode(s, 0, b.id, 'wait'), true);
   assert.equal(game.setRecruitRepeat(s, 0, b.id, key), true);
-  while (s.groundUnits.length < count && s.time < 2000) game.step(s, 0.05);
+  const pinned = new Set();
+  while (s.groundUnits.length < count && s.time < 2000) {
+    game.step(s, 0.05);
+    for (const u of s.groundUnits)
+      if (!pinned.has(u.id)) {
+        assert.equal(game.guardGround(s, 0, [u.id], rally), 1);
+        assert.equal(u.autoDefense, false);
+        pinned.add(u.id);
+      }
+  }
   assert.equal(s.groundUnits.length, count);
   assert.equal(game.setRecruitRepeat(s, 0, b.id, key, false), true);
-  game.advance(s, 90);
+  // Even the last recruit must physically cross the expanded map to its corner post.
+  game.advance(s, 150);
   assert.equal(b.armyQueue.length, 0);
   assert.equal(s.groundUnits.length, count);
   return { s, b, rally, units: s.groundUnits };
@@ -76,7 +87,7 @@ function separated({ s, rally, units }) {
     }
 }
 
-test('twenty actual auto-recruited soldiers reserve distinct posts at one rally', () => {
+test('twenty actual auto-recruited soldiers obey manual guard with distinct posts at one rally', () => {
   const result = produce('infantry', 20);
   separated(result);
   assert.deepEqual(
@@ -102,7 +113,7 @@ test('twenty actual auto-recruited soldiers reserve distinct posts at one rally'
   assert.ok(result.units.slice(1).every((u) => u.guard));
 });
 
-test('ten actual auto-recruited APCs reserve space for their larger footprints', () => {
+test('ten actual auto-recruited APCs reserve larger footprints under manual guard', () => {
   separated(produce('apc', 10));
 });
 

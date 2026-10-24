@@ -4,7 +4,8 @@ import { demolish, repair, canPlace, build } from '../city/construction.js';
 import { passable, overlappingRoad } from '../city/road-network.js';
 import { economy } from '../city/economy.js';
 import { buildRoad } from '../city/roads.js';
-import { research } from '../research/research.js';
+import { research, researchProjects, researchStatus } from '../research/research.js';
+import { purchaseQuote } from '../city/pricing.js';
 import { difficultyOf } from './difficulty.config.js';
 import { random } from '../shared/random.js';
 import { produce } from '../units/aviation/production.js';
@@ -122,6 +123,8 @@ export function ai(s) {
   }
   if (s.time >= s.ai.nextResearch) {
     s.ai.nextResearch = s.time + difficultyOf(s).researchEvery;
+    const running = new Set(researchProjects(s, side).map((project) => project.key));
+    let available = Math.max(0, researchStatus(s, side).slots - running.size);
     for (const key of [
       'autocannon',
       'heavy',
@@ -146,15 +149,17 @@ export function ai(s) {
       'heavyArmor',
       'rocketArtillery',
     ])
-      if (!f.tech.includes(key)) {
-        research(s, 1, key);
-        break;
+      if (available > 0 && !f.tech.includes(key) && !running.has(key)) {
+        if (research(s, side, key) === true) {
+          running.add(key);
+          available--;
+        }
       }
   }
   if (ready('factory').length && ready('launcher').length) {
     const queued = ready('factory').reduce((n, b) => n + (b.queue?.length || 0), 0),
       stock = Object.values(f.inventory).reduce((a, b) => a + b, 0),
-      reserve = BUILDINGS[s.ai.plannedBuild]?.cost || 150;
+      reserve = purchaseQuote(s, side, 'building', s.ai.plannedBuild)?.cost ?? 150;
     if (queued < 3 && stock < 7 && f.credits > reserve + 90 && f.materials > 30) {
       let key =
         f.tech.includes('cruise') && random(s) > 0.5

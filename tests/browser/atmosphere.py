@@ -42,15 +42,21 @@ try:
           const resolves=[];const read=amount=>{post.setAtmosphere({kind:'fog',amount},.2);post.render(scene,camera,0);resolves.push(post.target.resolveDepthBuffer);ctx.drawImage(w.renderer.domElement,0,0);return samples.map(([x,y])=>Array.from(ctx.getImageData(Math.round(x),Math.round(y),1,1).data).slice(0,3));};
           const clear=read(0),fog=read(1),again=read(0);
           const delta=(a,b)=>Math.max(...a.map((v,i)=>Math.abs(v-b[i])));
-          const result={clear,fog,resolves,groundDelta:delta(clear[0],fog[0]),roofDelta:delta(clear[1],fog[1]),skyDelta:delta(clear[2],fog[2]),repeatDelta:Math.max(...clear.map((v,i)=>delta(v,again[i]))),depthSize:[post.target.depthTexture.image.width,post.target.depthTexture.image.height]};
+          const texture=new T.DataTexture(new Uint8Array([16,32,36,100]),1,1,T.RGBAFormat);texture.needsUpdate=true;
+          post.setVision({texture,origin:new T.Vector2(-1600,-1600),extent:new T.Vector2(3200,3200),active:true});
+          const veiled=read(0);post.uniforms.visionActive.value=0;const revealed=read(0);
+          const result={clear,fog,resolves:resolves.slice(0,3),groundDelta:delta(clear[0],fog[0]),roofDelta:delta(clear[1],fog[1]),skyDelta:delta(clear[2],fog[2]),repeatDelta:Math.max(...clear.map((v,i)=>delta(v,again[i]))),depthSize:[post.target.depthTexture.image.width,post.target.depthTexture.image.height],visionGround:delta(clear[0],veiled[0]),visionRoof:delta(clear[1],veiled[1]),visionSky:delta(clear[2],veiled[2]),revealDelta:Math.max(...clear.map((v,i)=>delta(v,revealed[i])))};
+          texture.dispose();
           post.target.dispose();post.bloom.dispose();post.material.dispose();post.bloomMaterial.dispose();post.scene.children[0].geometry.dispose();geo.dispose();box.dispose();material.dispose();
           return result;
         }''')
         assert report['depthFog']['groundDelta'] >= 5, report['depthFog']
-        assert report['depthFog']['roofDelta'] == 0 and report['depthFog']['skyDelta'] == 0, report['depthFog']
+        assert 0 < report['depthFog']['roofDelta'] < report['depthFog']['groundDelta'] and report['depthFog']['skyDelta'] == 0, report['depthFog']
+        assert report['depthFog']['visionGround'] >= 5 and report['depthFog']['visionRoof'] >= 5, report['depthFog']
+        assert report['depthFog']['visionSky'] == 0 and report['depthFog']['revealDelta'] == 0, report['depthFog']
         assert report['depthFog']['repeatDelta'] == 0, report['depthFog']
         assert report['depthFog']['resolves'] == [False, True, False], report['depthFog']
-        report['checks'].append('GPU depth fog affects low ground; roof and sky stay pixel-identical')
+        report['checks'].append('GPU fog fades ground and roofs smoothly; vision veils both heights, reveals both and leaves sky unchanged')
         print(report['checks'][-1], flush=True)
 
         ids = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),s=w.state,next=E.createGame(2410);next.mode='multiplayer';next.rules.rear=false;
@@ -111,7 +117,7 @@ try:
           for(const f of s.sides){f.credits=50000;f.materials=5000;f.tech=Object.keys(E.TECH);}
           const b=E.build(s,0,'gun',-450,0);b.progress=1;b.hp=b.maxHp;
           const m=E.makeGround(s,0,'mog',-420,50);m.setup=1;s.groundUnits.push(m);
-          const site=E.build(s,1,'launcher',-265,175);site.progress=1;site.hp=site.maxHp;s.sides[1].inventory.heavy=1;E.launch(s,1,'heavy',{x:-650,z:10});
+          const site=E.build(s,1,'launcher',-350,175);if(typeof site==='string')throw Error(site);site.progress=1;site.hp=site.maxHp;s.sides[1].inventory.heavy=1;E.launch(s,1,'heavy',{x:-650,z:10});
           Object.assign(s.units[0],{route:null,startX:0,startZ:10,tx:-650,tz:10,total:650,travelled:300,speed:.001,hp:100000,maxHp:100000,delay:0});
           E.advance(s,7);Object.assign(w.state,s);w.previousSimTime=s.time;w.controls.focus(-380,20,300);w.controls.update(3);w.updateDaylight();w.sync();
           w.weatherFX.update(3,w.controls.target,s.weather);w.combatFX.emit(s,.1);w.combatFX.update(.1,w.battleTime,w.camera);w.post.render(w.scene,w.camera,w.battleTime);

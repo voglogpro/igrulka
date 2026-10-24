@@ -1,4 +1,5 @@
 import * as E from '../game/index.js';
+import { frontlineSegments } from './defense/frontline-segments.js';
 import { MAP } from '../game/index.js';
 
 // The land, the sea, hills and woods never change: paint them once per minimap size.
@@ -99,16 +100,10 @@ export function updateMinimap(canvas) {
   }
   const frontline = this.frontlineView;
   if (frontline?.enabled && frontline.report) {
-    const points = frontline.report.polyline;
     ctx.lineWidth = 1.3;
-    for (let i = 0; i < points.length - 1; i++) {
-      const a = points[i],
-        b = points[i + 1];
+    for (const { a, b, sector } of frontlineSegments(frontline.report)) {
       const known = a.knowledge === 'observed' && b.knowledge === 'observed';
-      const pressure = Math.max(
-        frontline.report.sectors[i].pressure,
-        frontline.report.sectors[i + 1].pressure,
-      );
+      const pressure = sector.pressure;
       ctx.strokeStyle = pressure >= 1.15 ? '#efa565' : known ? '#75d8b8' : '#91a4a9aa';
       ctx.setLineDash(known ? [] : [2, 3]);
       ctx.beginPath();

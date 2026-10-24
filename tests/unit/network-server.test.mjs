@@ -308,9 +308,9 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
   assert.equal((await rapid.closed()).code, 1008);
 });
 
-test('old protocols are explicitly refused and protocol six creates and joins a real room', async (t) => {
+test('old protocols are explicitly refused and protocol seven creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 6);
+  assert.equal(PROTOCOL_VERSION, 7);
   const host = await connect();
   host.send({ type: 'create', protocol: 5, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
@@ -334,10 +334,18 @@ test('WebSocket auto-defense belongs to each owner and snapshots preserve only o
   await startPair(pair);
   const { a, b, room } = pair;
   const peers = [a, b];
-  const defenders = [
-    ground(pair, 0, 'infantry', { x: -450, z: 380 }),
-    ground(pair, 1, 'infantry', { x: 450, z: 380 }),
-  ];
+  for (const d of room.state.districts)
+    d.owner = E.DISTRICTS.find((v) => v.id === d.id).x < 0 ? 0 : 1;
+  room.state.networkRevision++;
+  const defenders = [0, 1].map((side) => {
+    const corridorId = side ? 'south' : 'north';
+    const point = E.frontlineReport(room.state, side).posts.find(
+      (p) => p.corridorId === corridorId && p.slot === 2,
+    );
+    const u = ground(pair, side, 'infantry', point);
+    u.defensePost = { corridorId, slot: 2, row: 0 };
+    return u;
+  });
   const observed = [
     ground(pair, 0, 'infantry', { x: -450, z: -270 }),
     ground(pair, 1, 'infantry', { x: -400, z: -270 }),
@@ -372,7 +380,7 @@ test('WebSocket auto-defense belongs to each owner and snapshots preserve only o
     assert.deepEqual(view.frontlineMemory[1], { nextThink: 0, seen: [] });
     assert.equal(E.fortificationStatus(view.trenches.find((v) => v.id === own.trenchId)).level, 1);
     assert.equal(
-      view.trenches.some((v) => v.side === 1 && v.z === 380),
+      view.trenches.some((v) => v.id === defenders[1 - side].trenchId),
       false,
     );
     assert.deepEqual(

@@ -1,11 +1,11 @@
 import * as T from '../../vendor/three/three.module.js';
 import { GRID, visionOf } from '../game/vision-grid.js';
 
-// A single translucent plane over the playable valley. One texel per vision cell; bilinear
-// filtering softens the edge of every observed circle, and cells fade in and out over time.
+// One texel per observation cell. The post pass projects this mask onto the depth of
+// every visible surface, so roofs and hills cannot poke through a horizontal overlay.
 const DARK = 100;
 export class FogVeil {
-  constructor(scene) {
+  constructor() {
     this.size = GRID.cols * GRID.rows;
     this.data = new Uint8Array(this.size * 4);
     this.alpha = new Float32Array(this.size).fill(DARK);
@@ -20,24 +20,9 @@ export class FogVeil {
       this.data[i * 4 + 3] = DARK;
     }
     this.texture.needsUpdate = true;
-    this.mesh = new T.Mesh(
-      new T.PlaneGeometry(GRID.cols * GRID.cell, GRID.rows * GRID.cell),
-      new T.MeshBasicMaterial({
-        map: this.texture,
-        transparent: true,
-        depthWrite: false,
-        toneMapped: false,
-      }),
-    );
-    this.mesh.rotation.x = -Math.PI / 2;
-    this.mesh.position.set(
-      GRID.ox + (GRID.cols * GRID.cell) / 2,
-      7,
-      GRID.oz + (GRID.rows * GRID.cell) / 2,
-    );
-    this.mesh.renderOrder = 6;
-    this.mesh.frustumCulled = false;
-    scene.add(this.mesh);
+    this.origin = new T.Vector2(GRID.ox, GRID.oz);
+    this.extent = new T.Vector2(GRID.cols * GRID.cell, GRID.rows * GRID.cell);
+    this.active = true;
   }
   update(state, dt) {
     const vision = visionOf(state, 0),
@@ -57,6 +42,6 @@ export class FogVeil {
       this.data[i * 4 + 3] = Math.round(this.alpha[i]);
     }
     if (changed) this.texture.needsUpdate = true;
-    this.mesh.visible = !vision.radar || fading;
+    this.active = !vision.radar || fading;
   }
 }

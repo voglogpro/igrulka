@@ -10,6 +10,7 @@ import {
 import { ROAD_REQUIRED } from './rules.js';
 import { addRoad } from './roads.js';
 import { event } from '../shared/events.js';
+import { purchaseQuote, recordBuildingPurchase } from './pricing.js';
 // The oil field under a point, if a well placed there would tap it.
 export const oilFieldAt = (x, z) =>
   OIL_FIELDS.find((f) => Math.hypot(x - f.x, z - f.z) <= f.r * 0.7) || null;
@@ -84,16 +85,18 @@ export function canPlace(s, key, x, z, owner = 0) {
 
 export function build(s, owner, key, x, z, rotation = null) {
   if (s.result) return 'Кампания завершена';
-  const d = BUILDINGS[key],
+  const quote = purchaseQuote(s, owner, 'building', key);
+  const d = quote && BUILDINGS[key],
     f = s.sides[owner];
   if (!d || !f) return 'Неизвестная постройка';
   if (d.tech && !f.tech.includes(d.tech)) return 'Сначала проведите исследование';
   const p = placementPlan(s, owner, key, x, z);
   if (p.error) return p.error;
-  const cost = d.cost + (p.driveCost || 0);
-  if (f.credits < cost || f.materials < d.metal) return 'Не хватает денег или сплавов';
+  const cost = quote.cost + (p.driveCost || 0);
+  if (f.credits < cost || f.materials < quote.metal) return 'Не хватает денег или сплавов';
   f.credits -= cost;
-  f.materials -= d.metal;
+  f.materials -= quote.metal;
+  recordBuildingPurchase(s, owner, key);
   const b = {
     id: s.nextId++,
     side: owner,

@@ -1,5 +1,27 @@
 // Fictional game values. Change balance here, not in rendering code.
 export const INFANTRY_TYPES = {
+  atrifle: {
+    infantry: true,
+    members: 2,
+    name: 'Противотанковые стрелки',
+    cost: 85,
+    metal: 5,
+    time: 9,
+    hp: 66,
+    speed: 15,
+    size: 3,
+    upkeep: 0.045,
+    range: 0,
+    groundRange: 235,
+    groundDamage: 75,
+    groundCooldown: 0.7,
+    groundMagazine: 1,
+    groundReload: 7.5,
+    groundWeapon: 'antiTankRifle',
+    suppression: 0.08,
+    sight: 245,
+    role: 'Два стрелка с тяжёлой противотанковой винтовкой. Доступны сразу. Дальний одиночный выстрел и долгая перезарядка; лёгкую броню останавливают группой, против тяжёлых танков нужны FPV или ПТРК.',
+  },
   atgm: {
     infantry: true,
     members: 2,

@@ -4,6 +4,8 @@ import { invalidateFrontline } from './cache.js';
 export function clearAutoDefense(u) {
   u.autoDefense = false;
   u.defenseTask = null;
+  u.defensePost = null;
+  u.defenseCapture = null;
 }
 
 export function setAutoDefense(s, side, ids, enabled) {
@@ -24,6 +26,10 @@ export function setAutoDefense(s, side, ids, enabled) {
       (!enabled || !s.groundUnits.some((p) => p.carrierId === u.id || p.boardingId === u.id))
     ) {
       u.autoDefense = enabled;
+      if (!enabled) {
+        u.defensePost = null;
+        u.defenseCapture = null;
+      }
       if (!enabled && u.defenseTask) u.defenseTask.until = s.time;
       changed++;
     }

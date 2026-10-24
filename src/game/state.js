@@ -11,6 +11,8 @@ export const newSide = () => ({
   science: 0,
   tech: [],
   research: null,
+  researchQueue: [],
+  purchases: { building: {} },
   inventory: { drone: 0, heavy: 0, cruise: 0, ballistic: 0 },
   spentAmmo: 0,
   rearAuto: true,

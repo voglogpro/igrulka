@@ -44,6 +44,16 @@ function weapon(w, root, key, dark) {
     part(w, root, x - 0.1, y - 0.05, 0.62, 0.06, 0.05, 0.25, '#b39a54');
     return;
   }
+  if (key === 'atrifle') {
+    part(w, root, x, y - 0.02, -0.12, 0.18, 0.3, 0.85, furniture);
+    part(w, root, x, y, 0.62, 0.23, 0.23, 1.05, metal);
+    part(w, root, x, y + 0.01, 1.7, 0.09, 0.09, 1.35, metal);
+    part(w, root, x, y + 0.01, 2.4, 0.19, 0.16, 0.25, '#33433d');
+    part(w, root, x, y + 0.2, 0.7, 0.12, 0.1, 0.55, '#18251f');
+    for (const sign of [-1, 1])
+      part(w, root, x + sign * 0.17, y - 0.22, 1.42, 0.045, 0.45, 0.055, metal, 0, 0, sign * 0.35);
+    return;
+  }
   if (key === 'sniper') {
     part(w, root, x, y - 0.03, -0.05, 0.13, 0.26, 0.55, furniture);
     part(w, root, x, y, 0.5, 0.14, 0.2, 0.7, '#3b4434');

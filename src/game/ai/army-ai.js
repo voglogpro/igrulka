@@ -5,9 +5,39 @@ import { GROUND_UNITS, isInfantry } from '../config.js';
 import { orderGround, commandUnits } from '../units/ground/orders.js';
 import { unloadGround, boardGround } from '../units/vehicles/transport.js';
 import { launchFPV } from '../units/infantry/fpv.js';
-import { updateDistrictAI } from './district-ai.js';
+import { updateDistrictAI, AI_DISTRICT_GARRISON_LIMIT } from './district-ai.js';
 import { difficultyOf } from './difficulty.config.js';
 import { guardGround } from '../units/ground/guard.js';
+
+export function needsCaptureInfantry(s) {
+  if (!s.districts?.some((d) => d.owner !== 1)) return false;
+  const eligible = (key) => isInfantry(key) && !GROUND_UNITS[key].support && key !== 'atgm';
+  const present = s.groundUnits.filter(
+    (u) =>
+      u.side === 1 &&
+      u.hp > 0 &&
+      !u.downed &&
+      !u.aiDefender &&
+      !u.carrierId &&
+      !u.boardingId &&
+      eligible(u.key) &&
+      (!u.guard || u.aiDistrict),
+  ).length;
+  // These three classes may become the separate headquarters defense detail on spawn.
+  // Do not promise them to district capture before that assignment actually happens.
+  const queued = s.buildings
+    .filter((b) => b.side === 1 && b.hp > 0 && !b.demolished)
+    .reduce(
+      (count, b) =>
+        count +
+        (b.armyQueue || []).filter(
+          (q) => eligible(q.key) && !['mog', 'sniper', 'machinegunner'].includes(q.key),
+        ).length,
+      0,
+    );
+  return present + queued < AI_DISTRICT_GARRISON_LIMIT;
+}
+
 export function updateArmyAI(s, hooks) {
   if (s.mode === 'multiplayer') return;
   const { random } = hooks;
@@ -42,8 +72,9 @@ export function updateArmyAI(s, hooks) {
       const antiArmor = s.groundUnits.filter(
         (u) => u.side === 1 && u.hp > 0 && ['atgm', 'tankdestroyer'].includes(u.key),
       ).length;
-      const key =
-        armorThreat && f.tech.includes('armor') && antiArmor < 2
+      const key = needsCaptureInfantry(s)
+        ? 'infantry'
+        : armorThreat && f.tech.includes('armor') && antiArmor < 2
           ? antiArmor
             ? 'tankdestroyer'
             : 'atgm'

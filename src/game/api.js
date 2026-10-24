@@ -30,7 +30,8 @@ export { supplyFactor, economy, buildingOutput } from './city/economy.js';
 export { placementPlan, canPlace, build, demolish, repair } from './city/construction.js';
 export { roadPreview, buildRoad } from './city/roads.js';
 export { targetById, targetName } from './targets.js';
-export { research } from './research/research.js';
+export { research, researchProjects, researchStatus } from './research/research.js';
+export { purchaseQuote } from './city/pricing.js';
 export { produce } from './units/aviation/production.js';
 export {
   setFactoryPlan,

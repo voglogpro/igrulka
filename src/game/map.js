@@ -1,14 +1,32 @@
-export const VERSION = 13;
+export const VERSION = 14;
 // A wide valley split by an inland sea. Two narrow land corridors at the northern and southern
 // ends are the only ground routes between the cities; drones and missiles cross the water.
-export const MAP = { width: 3200, depth: 2400, riverWidth: 44 };
+export const MAP = { width: 3200, depth: 3200, riverWidth: 44 };
 // The playable field inside the map edge: orders, routes and saved points must stay inside it.
 export const FIELD = { x: MAP.width / 2 - 16, z: MAP.depth / 2 - 16 };
 export const inField = (x, z, margin = 0) =>
   Math.abs(x) <= FIELD.x - margin && Math.abs(z) <= FIELD.z - margin;
-export const SEA = { halfX: 200, halfZ: 820, round: 120 };
+export const SEA = { halfX: 200, halfZ: 1120, round: 120 };
 // Ground routes around the sea: the centre line of each corridor.
 export const CORRIDORS = [-(SEA.halfZ + MAP.depth / 2) / 2, (SEA.halfZ + MAP.depth / 2) / 2];
+// Keep city centres unchanged while stretching the sea and the two land corridors.
+// This same map transform preserves old wells and campaign positions on import.
+export function expandLegacyZ(z) {
+  const value = Math.abs(z),
+    anchors = [
+      [0, 0],
+      [400, 400],
+      [820, 1120],
+      [1010, 1360],
+      [1184, 1584],
+    ];
+  for (let i = 1; i < anchors.length; i++) {
+    const [a, x] = anchors[i - 1],
+      [b, y] = anchors[i];
+    if (value <= b) return Math.sign(z) * (x + ((value - a) / (b - a)) * (y - x));
+  }
+  return Math.sign(z) * (1584 + value - 1184);
+}
 export const HQ_X = 615;
 // The neutral trading island in the middle of the sea. In the rules it is open water: armies
 // cannot walk or build there, but merchant ships of both cities tie up at its quays.
@@ -23,8 +41,8 @@ export const OIL_FIELDS = [
   [-1080, 760],
   [-90, -1010],
 ].flatMap(([x, z], i) => [
-  { id: i * 2 + 1, x, z, r: 22 },
-  { id: i * 2 + 2, x: -x, z: -z, r: 22 },
+  { id: i * 2 + 1, x, z: expandLegacyZ(z), r: 22 },
+  { id: i * 2 + 2, x: -x, z: -expandLegacyZ(z), r: 22 },
 ]);
 
 // Gentle meander of the sea's long axis.

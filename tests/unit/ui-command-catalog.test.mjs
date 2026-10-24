@@ -1,8 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
-import { researchAvailability, researchUnlocks, techTreeHTML } from '../../src/ui/tech-tree.js';
-import { ARMY_CATEGORIES, recruitmentHTML } from '../../src/ui/army-recruitment.js';
+import {
+  researchAvailability,
+  researchGraph,
+  researchUnlocks,
+  techTreeHTML,
+} from '../../src/ui/tech-tree.js';
+import {
+  ARMY_CATEGORIES,
+  recruitmentHTML,
+  refreshRecruitmentChoices,
+} from '../../src/ui/army-recruitment.js';
 import { UNIT_PROFILES, unitIllustration } from '../../src/ui/unit-profiles.js';
 
 function laboratory(state) {
@@ -43,13 +52,24 @@ test('technology catalogue preserves command hooks and includes building unlocks
     assert.ok(html.includes(`data-research-reason="${key}"`), key);
   }
   assert.ok(researchUnlocks('missileDefense').includes(E.BUILDINGS.sam.name));
-  assert.equal((html.match(/data-research-filter=/g) || []).length, 6);
-  assert.equal((html.match(/class="tree-links"/g) || []).length, 5);
+  assert.equal((html.match(/data-research-filter=/g) || []).length, 4);
+  assert.equal((html.match(/class="tree-links"/g) || []).length, 4);
+  for (const category of ['defense', 'army', 'city', 'aviation']) {
+    const graph = researchGraph(category);
+    for (const [parent, child] of graph.edges) assert.equal(E.TECH[child].requires, parent);
+  }
+  assert.ok(
+    researchGraph('army').edges.some(
+      ([parent, child]) => parent === 'autocannon' && child === 'mobileAA',
+    ),
+  );
 });
 
 test('every recruitable role has distinct local art and keeps recruitment and automation hooks', () => {
   const state = E.createGame(862),
     illustrations = new Set();
+  state.sides[0].tech = Object.keys(E.TECH);
+  state.buildings.push({ id: 902, key: 'barracks', side: 0, progress: 1, hp: 200 });
   for (const [category, { keys }] of Object.entries(ARMY_CATEGORIES)) {
     const html = recruitmentHTML({ state, armyCategory: category });
     for (const key of keys) {
@@ -66,6 +86,7 @@ test('every recruitable role has distinct local art and keeps recruitment and au
       'rear-auto',
       'repeat-site',
       'repeat-key',
+      'repeat-target',
       'repeat-toggle',
       'army-capacity',
       'army-queue',
@@ -73,4 +94,58 @@ test('every recruitable role has distinct local art and keeps recruitment and au
     ])
       assert.ok(html.includes(`id="${id}"`), id);
   }
+});
+
+test('open recruitment updates on facility completion and research without replacing focused inputs', (t) => {
+  const state = E.createGame(888);
+  state.sides[0].tech = [];
+  const barracks = { id: 902, key: 'barracks', side: 0, progress: 0.5, hp: 200 };
+  state.buildings.push(barracks);
+  const grid = { dataset: { recruitCategory: 'vehicles' }, innerHTML: '' };
+  const site = { dataset: {}, value: '902', innerHTML: '' };
+  const type = { dataset: {}, value: 'armoredcar', innerHTML: '' };
+  const target = { value: '24' };
+  const elements = new Map([
+    ['.army-recruit', grid],
+    ['#repeat-site', site],
+    ['#repeat-key', type],
+    ['#repeat-target', target],
+  ]);
+  const document = {
+    activeElement: target,
+    querySelector: (selector) => elements.get(selector) || null,
+  };
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: document });
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, 'document', original);
+    else delete globalThis.document;
+  });
+  refreshRecruitmentChoices(state);
+  assert.match(grid.innerHTML, /recruit-empty/);
+  barracks.progress = 1;
+  refreshRecruitmentChoices(state);
+  assert.match(grid.innerHTML, /data-recruit="armoredcar"/);
+  assert.doesNotMatch(grid.innerHTML, /data-recruit="leopard"/);
+  state.sides[0].tech.push('armor');
+  refreshRecruitmentChoices(state);
+  assert.match(grid.innerHTML, /data-recruit="leopard"/);
+  assert.match(type.innerHTML, /value="leopard"/);
+  assert.equal(type.value, 'armoredcar');
+  const before = type.innerHTML;
+  document.activeElement = type;
+  state.sides[0].tech.push('heavyArmor');
+  refreshRecruitmentChoices(state);
+  assert.match(grid.innerHTML, /data-recruit="heavytank"/);
+  assert.equal(type.innerHTML, before, 'native selector is left intact while focused');
+  document.activeElement = target;
+  refreshRecruitmentChoices(state);
+  assert.match(type.innerHTML, /value="heavytank"/);
+  assert.equal(type.value, 'armoredcar');
+  assert.equal(target.value, '24');
+  assert.equal(site.value, '902');
+  barracks.hp = 0;
+  refreshRecruitmentChoices(state);
+  assert.match(grid.innerHTML, /recruit-empty/);
+  assert.doesNotMatch(grid.innerHTML, /data-recruit=/);
 });

@@ -1,7 +1,7 @@
-import { GROUND_UNITS, isInfantry, riverX, FIELD } from '../config.js';
+import { GROUND_UNITS, isInfantry } from '../config.js';
 import { groundVisible } from '../units/infantry/cover.js';
-import { DISTRICTS } from '../territory/districts.config.js';
-import { FRONTLINE as C, FRONT_SECTORS, sectorAt } from './config.js';
+import { corridorGeometry } from './geometry.js';
+import { FRONTLINE as C } from './config.js';
 import { frontlineRevision } from './cache.js';
 
 const reports = new WeakMap();
@@ -12,7 +12,8 @@ export function forgetObservedFrontlineTarget(s, id, sides) {
   }
   reports.delete(s);
 }
-export const createFrontlineMemory = () => [0, 1].map(() => ({ nextThink: 0, seen: [] }));
+export const createFrontlineMemory = () =>
+  [0, 1].map(() => ({ nextThink: 0, nextReinforce: 0, seen: [] }));
 export const military = (u) =>
   u.hp > 0 &&
   !u.carrierId &&
@@ -52,11 +53,13 @@ export function observedFrontline(s, side, previous = []) {
   };
 }
 
-function edge(anchors, direction) {
-  const front = anchors.sort((a, b) => direction * (b.x - a.x)).slice(0, 3);
-  const weight = front.reduce((n, v) => n + v.weight, 0);
-  return weight > 0 ? front.reduce((n, v) => n + v.x * v.weight, 0) / weight : null;
-}
+const corridorContains = (line, point) => {
+  const low = Math.min(...line.points.map((p) => p.z)),
+    high = Math.max(...line.points.map((p) => p.z));
+  return (
+    point.z >= low - C.postGap && point.z <= high + C.postGap && Math.abs(point.x - line.x) < 500
+  );
+};
 
 export function calculateFrontline(
   s,
@@ -66,107 +69,144 @@ export function calculateFrontline(
   direction = side === 0 ? 1 : -1,
 ) {
   const own = s.groundUnits.filter((u) => u.side === side && military(u));
-  const sectors = FRONT_SECTORS.map((config) => {
-    const allies = own.filter((u) => sectorAt(u.z).id === config.id);
-    const defending = own.filter((u) => u.guard && sectorAt(u.guard.z).id === config.id);
-    const enemies = memory.filter((u) => sectorAt(u.z).id === config.id);
+  const lines = corridorGeometry(s, side, direction);
+  const posts = [];
+  const sectors = lines.map((line) => {
+    const enemies = memory.filter((v) => corridorContains(line, v));
     const contacts = (s.contacts?.[side] || []).filter(
-      (c) =>
-        c.expires > s.time &&
-        !visible.has(c.unitId) &&
-        !memory.some((v) => v.id === c.unitId) &&
-        sectorAt(c.z).id === config.id,
+      (v) =>
+        v.expires > s.time &&
+        corridorContains(line, v) &&
+        !visible.has(v.unitId) &&
+        !memory.some((m) => m.id === v.unitId),
     );
-    const friendly = allies.reduce((n, u) => n + defenseStrength(u), 0);
-    const enemy = enemies.reduce(
-      (n, u) => n + u.strength * Math.max(0, 1 - (s.time - u.time) / C.memorySeconds),
-      0,
+    const decay = (v) => Math.max(0, 1 - (s.time - v.time) / C.memorySeconds);
+    const enemy = enemies.reduce((sum, v) => sum + v.strength * decay(v), 0);
+    const assigned = own.filter(
+      (u) =>
+        u.guard &&
+        (u.defensePost?.corridorId === line.id ||
+          (!u.defensePost && corridorContains(line, u.guard))),
     );
-    const defenders = defending.length;
-    const defensiveStrength = defending.reduce((n, u) => n + defenseStrength(u), 0);
-    const contactsStrength = contacts.reduce(
-      (n, c) => n + C.contactStrength * Math.max(0, Math.min(1, (c.expires - s.time) / 7)),
-      0,
-    );
-    const observed = enemies.some((u) => visible.has(u.id));
-    const ownAnchors = allies.map((u) => ({ x: u.x, weight: defenseStrength(u) }));
-    const enemyAnchors = enemies.map((u) => ({
-      x: u.x,
-      weight: u.strength * Math.max(0, 1 - (s.time - u.time) / C.memorySeconds),
-    }));
-    let ownedDistricts = 0;
-    for (const d of DISTRICTS) {
-      if (sectorAt(d.z).id !== config.id) continue;
-      const status = s.districts?.find((v) => v.id === d.id);
-      if (status?.hp <= 0 || ![0, 1].includes(status?.owner)) continue;
-      (status.owner === side ? ownAnchors : enemyAnchors).push({ x: d.x, weight: 2.5 });
-      ownedDistricts++;
-    }
-    const ownEdge = edge(ownAnchors, direction),
-      enemyEdge = edge(enemyAnchors, -direction);
-    const known = ownEdge !== null || enemyEdge !== null || contacts.length > 0;
-    let x =
-      ownEdge !== null && enemyEdge !== null
-        ? (ownEdge + enemyEdge) / 2
-        : ownEdge !== null
-          ? ownEdge + direction * 55
-          : enemyEdge !== null
-            ? enemyEdge - direction * 55
-            : contacts.length
-              ? contacts.reduce((n, c) => n + c.x, 0) / contacts.length - direction * 45
-              : riverX(config.z);
-    x = Math.max(-(FIELD.x - 100), Math.min(FIELD.x - 100, x));
+    const observed = enemies.some((v) => visible.has(v.id));
+    const known = observed || enemies.length > 0 || contacts.length > 0;
+    const knowledge = observed ? 'observed' : known ? 'estimated' : 'unknown';
     const confidence = observed
-      ? Math.min(1, 0.65 + (friendly > 0 ? 0.25 : 0))
+      ? 0.9
       : enemies.length
-        ? Math.min(
-            0.65,
-            Math.max(...enemies.map((v) => 1 - (s.time - v.time) / C.memorySeconds)) * 0.65,
-          )
-        : known
-          ? ownedDistricts
-            ? 0.4
-            : 0.3
+        ? Math.max(...enemies.map(decay)) * 0.65
+        : contacts.length
+          ? 0.3
           : 0;
-    const pressure = (enemy + contactsStrength) / (defensiveStrength + 1);
+    const contactStrength = (c) =>
+      C.contactStrength * Math.max(0, Math.min(1, (c.expires - s.time) / 7));
+    const strength = assigned.reduce((sum, u) => sum + defenseStrength(u), 0);
+    const pressure =
+      (enemy + contacts.reduce((sum, c) => sum + contactStrength(c), 0)) / (strength + 1);
+    const primary = line.slots.map((slot) => {
+      const occupants = assigned.filter(
+        (u) =>
+          !u.defenseCapture &&
+          !u.defenseTask &&
+          ((u.defensePost?.slot === slot.slot && u.defensePost.row === 0) ||
+            (!u.autoDefense &&
+              u.guard &&
+              Math.hypot(u.guard.x - slot.x, u.guard.z - slot.z) <= 12)),
+      );
+      const defenders = own.filter(
+        (u) =>
+          u.guard && Math.abs(u.z - slot.z) <= C.postGap * 0.65 && Math.abs(u.x - slot.x) <= 100,
+      );
+      const nearby = enemies.filter((v) => Math.abs(v.z - slot.z) <= C.postGap * 0.8);
+      const localEnemy = nearby.reduce((sum, v) => sum + v.strength * decay(v), 0);
+      const localContacts = contacts
+        .filter((c) => Math.abs(c.z - slot.z) <= C.postGap)
+        .reduce((sum, c) => sum + contactStrength(c), 0);
+      const localStrength = defenders.reduce((sum, u) => sum + defenseStrength(u), 0);
+      return {
+        ...slot,
+        occupied: occupants.filter(
+          (u) => !u.path?.length && Math.hypot(u.x - slot.x, u.z - slot.z) <= 20,
+        ).length,
+        reserved: occupants.length,
+        pressure: (localEnemy + localContacts) / (localStrength + 1),
+        enemy: localEnemy,
+        armor: nearby.reduce((sum, v) => sum + (v.strength >= 2.5 ? v.strength * decay(v) : 0), 0),
+        knowledge,
+        confidence,
+      };
+    });
+    posts.push(...primary);
+    const occupied = primary.filter((p) => p.occupied > 0);
+    const zs = occupied.map((p) => Math.abs(p.z)).sort((a, b) => a - b);
+    const shore = Math.min(...line.points.map((p) => Math.abs(p.z))),
+      edge = Math.max(...line.points.map((p) => Math.abs(p.z)));
+    const gaps = zs.length
+      ? [zs[0] - shore, edge - zs.at(-1), ...zs.slice(1).map((z, i) => z - zs[i])]
+      : [edge - shore];
+    const maxGap = Math.max(...gaps);
+    const coverage = {
+      required: primary.length,
+      occupied: occupied.length,
+      reserved: primary.filter((p) => p.reserved > 0).length,
+      arrived: primary.filter((p) => p.occupied > 0).length,
+      maxGap,
+      weak: occupied.length < primary.length || maxGap > C.postGap + 1e-6,
+    };
     return {
-      ...config,
-      x,
+      id: line.id,
+      label: line.id === 'north' ? 'Северный коридор' : 'Южный коридор',
+      x: line.x,
+      z: line.z,
       confidence,
-      knowledge: observed ? 'observed' : known ? 'estimated' : 'unknown',
-      friendly,
+      knowledge,
+      friendly: strength,
       enemy,
       contacts: contacts.length,
       threat: Math.min(100, pressure * 25),
       pressure,
-      defenders,
-      reserves: defending.filter((u) => u.autoDefense && !u.defenseTask).length,
-      reinforcing: defending.filter((u) => u.defenseTask && !u.defenseTask.returning).length,
+      defenders: assigned.length,
+      reserves: assigned.filter(
+        (u) => u.autoDefense && !u.defenseTask && !u.defenseCapture && u.defensePost?.row > 0,
+      ).length,
+      reinforcing: assigned.filter((u) => u.defenseTask && !u.defenseTask.returning).length,
+      coverage,
     };
   });
-  // Unobserved spans follow neighbouring estimates, never a hidden enemy's exact coordinates.
-  for (let i = 0; i < sectors.length; i++)
-    if (sectors[i].knowledge === 'unknown') {
-      const neighbours = sectors.filter((v, j) => j !== i && v.knowledge !== 'unknown');
-      if (neighbours.length)
-        sectors[i].x =
-          neighbours.reduce((n, v) => n + v.x / (1 + Math.abs(v.z - sectors[i].z)), 0) /
-          neighbours.reduce((n, v) => n + 1 / (1 + Math.abs(v.z - sectors[i].z)), 0);
-    }
   return {
     updatedAt: s.time,
     sectors,
-    polyline: sectors.map(({ id, x, z, confidence, knowledge }) => ({
-      sectorId: id,
-      x,
-      z,
-      confidence,
-      knowledge,
+    posts,
+    lines: lines.map((line, i) => ({
+      id: line.id,
+      points: line.points.map((p) => ({
+        ...p,
+        sectorId: line.id,
+        confidence: sectors[i].confidence,
+        knowledge: sectors[i].knowledge,
+      })),
     })),
+    polyline: lines.flatMap((line, i) =>
+      line.points.map((p, j) => ({
+        ...p,
+        sectorId: line.id,
+        breakBefore: i > 0 && j === 0,
+        confidence: sectors[i].confidence,
+        knowledge: sectors[i].knowledge,
+      })),
+    ),
     counts: {
       defenders: own.filter((u) => u.guard).length,
-      reserves: own.filter((u) => u.guard && u.autoDefense && !u.defenseTask).length,
+      reserves: own.filter(
+        (u) =>
+          u.guard &&
+          u.autoDefense &&
+          !u.defenseTask &&
+          !u.defenseCapture &&
+          (!u.defensePost || u.defensePost.row > 0),
+      ).length,
       reinforcing: own.filter((u) => u.defenseTask && !u.defenseTask.returning).length,
+      capturing: own.filter((u) => u.autoDefense && u.defenseCapture).length,
       fortified: (s.trenches || []).filter((t) => t.side === side && t.progress >= 1).length,
     },
   };

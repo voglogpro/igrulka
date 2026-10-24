@@ -20,7 +20,7 @@ export const FRONTLINE = Object.freeze({
   memorySeconds: 45,
   maxSeen: 120,
   contactStrength: 0.65,
-  maxReinforcing: 3,
+  maxReinforcing: 6,
   maxNewAssignments: 2,
   reserveShare: 1 / 3,
   donorMinimum: 2,
@@ -31,15 +31,25 @@ export const FRONTLINE = Object.freeze({
   maxDuty: 24,
   calmSeconds: 6,
   cooldown: 12,
+  homeLineX: 110,
+  territoryAdvance: 40,
+  postGap: 80,
+  edgeCoverage: 48,
+  shoreClearance: 94,
+  edgeMargin: 8,
+  supportOffset: 48,
+  rowSpacing: 28,
+  maxRows: 20,
+  maxPathAttempts: 6,
+  captureLimit: 3,
+  capturePerSite: 2,
+  reinforcementCadence: 3,
 });
 
-// Sectors run along the front from north to south: the two land corridors, the two shores and the
-// sea front between the cities. The ids predate the sea map and stay for saves and the network.
+// Only the two connected land corridors form the ground front.
+// Older coastal tasks are cleared by the state-14 migration before validation.
 export const FRONT_SECTORS = Object.freeze([
   { id: 'north', label: 'Северный коридор', z: CORRIDORS[0] },
-  { id: 'north-rear', label: 'Северный берег', z: -480 },
-  { id: 'center', label: 'Морской фронт', z: 0 },
-  { id: 'south-rear', label: 'Южный берег', z: 480 },
   { id: 'south', label: 'Южный коридор', z: CORRIDORS[1] },
 ]);
 

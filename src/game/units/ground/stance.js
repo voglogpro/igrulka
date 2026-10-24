@@ -3,6 +3,7 @@ import { BRIDGES, walkable } from './navigation.js';
 import { orderGround } from './orders.js';
 import { guardGround } from './guard.js';
 import { prepareDefensivePosition } from '../../defense/fortifications.js';
+import { updateDefenseFormation } from '../../defense/formation.js';
 
 // A stance is a standing order that outlives a single click: new units take it when they leave
 // the barracks. "attack" advances on the enemy headquarters with combat stops, "defend" holds
@@ -48,7 +49,7 @@ export function stanceLabel(stance) {
   if (!stance) return 'Приказ вручную';
   return stance.mode === 'attack'
     ? 'Атака'
-    : `Оборона · ${POST_NAMES[stance.post] || 'мост по загрузке'}`;
+    : `Оборона · ${POST_NAMES[stance.post] || 'Распределённый рубеж'}`;
 }
 
 export function applyStance(s, side, ids, stance) {
@@ -81,11 +82,17 @@ export function applyStance(s, side, ids, stance) {
   let assigned = 0;
   for (const u of units)
     if (u.guard && u.guard !== previous.get(u.id)) {
-      u.stance = { mode: 'defend', post };
+      u.stance = { mode: 'defend', post: stance.post === 'auto' || !stance.post ? 'auto' : post };
       u.autoDefense = !stance.post || stance.post === 'auto';
       u.entrenched = false;
       assigned++;
     }
+  if (assigned && (!stance.post || stance.post === 'auto'))
+    updateDefenseFormation(
+      s,
+      side,
+      s.groundUnits.filter((u) => u.side === side && u.hp > 0),
+    );
   return assigned || 'Нет свободного доступного места для поста';
 }
 

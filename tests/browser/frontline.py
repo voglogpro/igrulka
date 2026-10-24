@@ -29,7 +29,12 @@ with sync_playwright() as p:
       const ids=s.groundUnits.filter(u=>u.side===0).map(u=>u.id);
       skyfront.selectArmy(ids);return ids;
     }''')
-    page.wait_for_function('skyfront.getWorld().frontlineView.report?.sectors.length===5')
+    assert not page.evaluate('skyfront.getWorld().frontlineView.enabled')
+    page.keyboard.press('Escape')
+    page.locator('.frontline-summary').click()
+    page.wait_for_function('skyfront.getWorld().frontlineView.report?.sectors.length===2')
+    assert page.evaluate('skyfront.getWorld().frontlineView.segments') == 24
+    page.evaluate('ids=>skyfront.selectArmy(ids)', ids)
     page.wait_for_function('document.querySelector("#army-controls [data-action=auto-defense]")&&!document.querySelector("#army-controls [data-action=auto-defense]").disabled')
     page.locator('[data-action="auto-defense"]').click()
     page.wait_for_function('skyfront.getState().groundUnits.filter(u=>u.side===0).every(u=>u.autoDefense)')
@@ -39,19 +44,21 @@ with sync_playwright() as p:
     assert 'Защита позиции' in page.locator('#army-detail-text').inner_text()
     page.locator('.army-details summary').click()
     page.keyboard.press('Escape')
-    page.locator('.frontline-summary').click()
-    assert page.locator('[data-front-sector]').count() == 5
+    page.locator('.frontline-open').click()
+    assert page.locator('[data-front-sector]').count() == 2
     for selector in ['#frontline-hud', '.frontline-detail']:
         box = page.locator(selector).bounding_box()
         assert box and box['x'] >= 0 and box['y'] >= 0 and box['x']+box['width']<=1024 and box['y']+box['height']<=768, (selector,box)
-    page.locator('#frontline-hud input').uncheck()
+    assert page.evaluate('''()=>{const r=document.querySelector('.frontline-detail').getBoundingClientRect();return Boolean(document.elementFromPoint(r.right-12,r.bottom-12)?.closest('#frontline-hud'));}'''), 'construction dock must not cover the open front report'
+    page.locator('.frontline-summary').click()
     assert not page.evaluate('skyfront.getWorld().frontlineView.solid.visible')
-    page.locator('#frontline-hud input').check()
+    page.locator('.frontline-summary').click()
     assert page.evaluate('skyfront.getWorld().frontlineView.solid.visible')
-    page.screenshot(path=str(ARTIFACTS/'frontline86-positions-close.png'),timeout=120000)
+    page.locator('.frontline-open').click()
+    page.screenshot(path=str(ARTIFACTS/'frontline88-positions-close.png'),timeout=120000)
     page.locator('[data-front-sector="north"]').click()
     page.evaluate('skyfront.getWorld().controls.update(3)')
-    page.screenshot(path=str(ARTIFACTS/'frontline86-fortifications.png'),timeout=120000)
+    page.screenshot(path=str(ARTIFACTS/'frontline88-fortifications.png'),timeout=120000)
     report['rendering'] = page.evaluate('''()=>({fortifications:skyfront.getWorld().fortifications.diagnostics(),frontline:skyfront.getWorld().frontlineView.diagnostics(),calls:skyfront.getWorld().renderer.info.render.calls})''')
     assert report['rendering']['fortifications']['stages'] == [8,5,2], report
     page.evaluate('ids=>skyfront.selectArmy(ids)', ids)
@@ -64,22 +71,47 @@ with sync_playwright() as p:
       const lab=E.build(s,0,'lab',-680,-10);
       if(typeof lab==='string')throw Error(lab);
       lab.progress=1;lab.hp=lab.maxHp;s.sides[0].science=2000;
+      const second=E.build(s,0,'lab',-560,-80);
+      if(typeof second==='string')throw Error(second);second.progress=1;second.hp=second.maxHp;
       const site=E.build(s,0,'launcher',-540,160);
       if(typeof site==='string')throw Error(site);
       site.progress=1;site.hp=site.maxHp;
       s.sides[0].inventory.drone=4;s.sides[0].inventory.heavy=2;
       skyfront.getWorld().sync();skyfront.openPanel('research',true);
     }''')
-    page.locator('[data-research="lightArmor"]').click()
+    page.locator('[data-research-filter="army"]').click()
+    page.locator('[data-research-branch="army"] [data-research="lightArmor"]').click()
     page.wait_for_function('skyfront.getState().sides[0].research?.key==="lightArmor"')
+    page.locator('[data-research-filter="defense"]').click()
+    page.locator('[data-research-branch="defense"] [data-research="autocannon"]').click()
+    page.wait_for_function('skyfront.engine.researchProjects(skyfront.getState(),0).length===2')
     page.locator('[data-research-filter="aviation"]').click()
     assert page.locator('[data-research-branch="army"]').is_hidden()
     assert page.locator('[data-research-branch="aviation"]').is_visible()
     box=page.locator('#panel').bounding_box()
     assert box and box['x']>=0 and box['x']+box['width']<=1024 and box['y']+box['height']<=768,box
-    page.screenshot(path=str(ARTIFACTS/'research86-live.png'),timeout=120000)
+    assert box['width']>=1000 and box['height']>=740, box
+    assert page.locator('[data-research-filter]').count()==4
+    page.wait_for_timeout(350)
+    page.screenshot(path=str(ARTIFACTS/'research88-live.png'),timeout=120000)
+    print('Two independent front overlays and fullscreen four-branch parallel research passed',flush=True)
+    page.keyboard.press('Escape')
+    garrison = page.evaluate('''()=>{const E=skyfront.engine,s=skyfront.getWorld().state,b=E.build(s,0,'barracks',-680,-80);if(typeof b==='string')throw Error(b);b.progress=1;b.hp=b.maxHp;skyfront.openPanel('army',true);return b.id;}''')
+    page.wait_for_function('document.querySelector("[data-recruit=atrifle]")')
+    assert page.locator('[data-recruit="heavytank"]').count()==0
+    page.locator('#repeat-site').select_option(str(garrison))
+    page.locator('#repeat-target').select_option('6')
+    page.locator('#repeat-key').select_option('infantry')
+    page.locator('#repeat-toggle').click()
+    page.wait_for_function('id=>skyfront.getState().buildings.find(b=>b.id===id).recruitRepeat?.target===6',arg=garrison)
+    report['garrison'] = page.evaluate('''id=>{const E=skyfront.engine,s=skyfront.getWorld().state,b=s.buildings.find(b=>b.id===id);E.advance(s,.1);const queued=b.armyQueue?.length||0;b.armyQueue=[];const own=s.groundUnits.filter(u=>u.side===0&&u.key==='infantry');for(let i=0;i<own.length;i++)own[i].hp=i<6?own[i].maxHp:0;E.advance(s,4.1);const satisfied=b.armyQueue.length;own[0].hp=0;E.advance(s,4.1);const replaced=b.armyQueue.length;return {queued,satisfied,replaced,target:b.recruitRepeat.target,credits:s.sides[0].credits};}''',garrison)
+    # The fixture already has eight live infantry: no excess production until a real casualty.
+    assert report['garrison']['queued']==0 and report['garrison']['satisfied']==0 and report['garrison']['replaced']==1,report['garrison']
+    page.locator('#repeat-toggle').click()
+    page.wait_for_function('id=>!skyfront.getState().buildings.find(b=>b.id===id).recruitRepeat',arg=garrison)
     page.keyboard.press('Escape')
     page.evaluate('''()=>{skyfront.getWorld().state.sides[0].tech=Object.keys(skyfront.engine.TECH);skyfront.armStrike('drone');const w=skyfront.getWorld();w.focus(500,100,300);w.controls.update(3);w.scene.updateMatrixWorld(true);}''')
+    print('Real UI target garrison toggle, unlocked roles and paid casualty replacement passed',flush=True)
     def point(x,z):
         return page.evaluate('''p=>{const w=skyfront.getWorld(),v=w.camera.position.clone().set(p.x,0,p.z).project(w.camera),r=w.renderer.domElement.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}''',{'x':x,'z':z})
     page.locator('[data-action="route"]').click()
@@ -89,7 +121,7 @@ with sync_playwright() as p:
     page.locator('[data-action="route"]').click()
     target=point(510,130)
     page.mouse.move(target['x'],target['y'])
-    page.screenshot(path=str(ARTIFACTS/'strike86-live-route.png'),timeout=120000)
+    page.screenshot(path=str(ARTIFACTS/'strike88-live-route.png'),timeout=120000)
     page.mouse.click(target['x'],target['y'])
     page.wait_for_function('skyfront.getState().sides[0].inventory.drone===3')
     page.locator('#quick-weapons [data-weapon="heavy"]').click()
@@ -101,5 +133,5 @@ with sync_playwright() as p:
     report['researchAndStrike']='actual research, branch filter, route point, click launch, quick heavy switch, right-click cancellation'
     assert not report['errors'] and not report['consoleErrors'], report
     browser.close()
-(ARTIFACTS/'frontline86-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
+(ARTIFACTS/'frontline88-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
 print(json.dumps(report,ensure_ascii=False),flush=True)

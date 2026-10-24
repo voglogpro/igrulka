@@ -6,6 +6,7 @@ import { applyBlast } from '../../combat/damage.js';
 import { clamp } from '../../shared/math.js';
 import { pointOnRoute } from './routes.js';
 import { fogVisible } from '../../vision-grid.js';
+import { guidedFPVPosition } from './guided-fpv.js';
 export function damageAircraft(s, u, damage, attacker) {
   if (u.hp <= 0) return false;
   u.hp -= damage;
@@ -70,7 +71,7 @@ export function routePoint(origin, target, key, t, phase = 0, landing = false) {
   };
 }
 
-function basePosition(u, travelled) {
+export function basePosition(u, travelled) {
   const pos = routePoint(
     { x: u.startX, z: u.startZ },
     { x: u.tx, z: u.tz },
@@ -166,9 +167,17 @@ export function moveUnits(s, dt) {
         sourceId: u.sourceId,
       });
     }
-    u.travelled += (u.speed || WEAPONS[u.key].speed) * (u.hp / u.maxHp < 0.4 ? 0.85 : 1) * dt;
-    const pos = basePosition(u, u.travelled);
-    evade(s, u, pos, basePosition(u, Math.max(0, u.travelled - 2)), dt);
+    let pos = guidedFPVPosition(s, u, dt);
+    if (!pos) {
+      u.travelled += (u.speed || WEAPONS[u.key].speed) * (u.hp / u.maxHp < 0.4 ? 0.85 : 1) * dt;
+      pos = basePosition(u, u.travelled);
+      evade(s, u, pos, basePosition(u, Math.max(0, u.travelled - 2)), dt);
+    }
+    if (u.flightHeightOffset) {
+      pos.y += u.flightHeightOffset;
+      u.flightHeightOffset *= Math.exp(-1.5 * dt);
+      if (Math.abs(u.flightHeightOffset) < 0.001) u.flightHeightOffset = 0;
+    }
     u.vx = (pos.x - u.x) / dt;
     u.vy = (pos.y - u.y) / dt;
     u.vz = (pos.z - u.z) / dt;

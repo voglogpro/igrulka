@@ -1,5 +1,5 @@
-import { economy, supplyFactor } from './city/economy.js';
-import { TECH } from './config.js';
+import { economy } from './city/economy.js';
+import { updateResearch } from './research/research.js';
 import { event } from './shared/events.js';
 import { updateConstruction } from './city/update.js';
 import { updateGround } from './units/ground/index.js';
@@ -28,21 +28,7 @@ export function step(s, dt) {
     f.credits = Math.max(0, f.credits + e.net * dt);
     f.materials += e.materials * dt;
     f.science += e.science * dt;
-    if (f.research) {
-      const labs = s.buildings.filter(
-        (b) => b.side === owner && b.key === 'lab' && b.hp > 0 && b.progress >= 1,
-      );
-      if (labs.length)
-        f.research.progress +=
-          (dt * e.productivity * Math.max(...labs.map((b) => supplyFactor(s, b)))) /
-          TECH[f.research.key].time;
-      if (f.research.progress >= 1) {
-        const key = f.research.key;
-        f.tech.push(key);
-        f.research = null;
-        event(s, 'research', { side: owner, key });
-      }
-    }
+    updateResearch(s, owner, e, dt);
   }
   updateFactoryPlans(s);
   updateConstruction(s, rates, dt);

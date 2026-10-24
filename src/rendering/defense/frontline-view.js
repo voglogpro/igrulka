@@ -1,4 +1,5 @@
 import * as T from '../../../vendor/three/three.module.js';
+import { frontlineSegments } from './frontline-segments.js';
 
 const SEGMENTS = 64;
 const colour = (sector) =>
@@ -47,12 +48,13 @@ function line(scene, dashed) {
 export class FrontlineView {
   constructor(scene, height = () => 0) {
     this.height = height;
-    this.enabled = true;
+    this.enabled = false;
     this.solid = line(scene, false);
     this.estimated = line(scene, true);
     this.report = null;
     this.previous = null;
     this.segments = 0;
+    this.setVisible(false);
   }
   setVisible(value) {
     this.enabled = !!value;
@@ -63,19 +65,14 @@ export class FrontlineView {
     if (this.previous === report) return;
     this.previous = report;
     const counts = [0, 0],
-      meshes = [this.solid, this.estimated],
-      points = report?.polyline || [];
+      meshes = [this.solid, this.estimated];
     let distance = 0;
-    for (let index = 0; index < points.length - 1; index++) {
-      const a = points[index],
-        b = points[index + 1],
-        sector = report.sectors[index],
-        other = report.sectors[index + 1];
+    for (const { a, b, sector } of frontlineSegments(report)) {
       const uncertain = a.knowledge !== 'observed' || b.knowledge !== 'observed',
         pool = uncertain ? 1 : 0;
       const mesh = meshes[pool],
         attributes = mesh.geometry.attributes;
-      const tint = colour(sector.pressure > other.pressure ? sector : other);
+      const tint = colour(sector);
       for (let step = 0; step < 12 && counts[pool] < SEGMENTS; step++) {
         const slot = counts[pool]++;
         for (let end = 0; end < 2; end++) {

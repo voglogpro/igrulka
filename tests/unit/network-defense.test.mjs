@@ -24,8 +24,8 @@ function unit(s, side, x, z) {
   return u;
 }
 
-test('protocol six auto-defense validates either owner, complete ownership and boolean before mutating any selection', () => {
-  assert.equal(PROTOCOL_VERSION, 6);
+test('protocol seven auto-defense validates either owner, complete ownership and boolean before mutating any selection', () => {
+  assert.equal(PROTOCOL_VERSION, 7);
   const s = fresh(),
     troops = [unit(s, 0, -450, -270), unit(s, 1, 450, -270)];
   for (const side of [0, 1]) {
@@ -63,7 +63,7 @@ test('protocol six auto-defense validates either owner, complete ownership and b
 
 test('either perspective retains its own observed memory, never the enemy memory or future unit plans', () => {
   const s = fresh(),
-    troops = [unit(s, 0, -450, -270), unit(s, 1, -400, -270)];
+    troops = [unit(s, 0, -150, E.CORRIDORS[0]), unit(s, 1, -100, E.CORRIDORS[0])];
   for (const u of troops) {
     u.autoDefense = true;
     u.defenseReadyAt = 99;
@@ -78,6 +78,9 @@ test('either perspective retains its own observed memory, never the enemy memory
   }
   E.step(s, 0.05);
   assert.ok(s.frontlineMemory.every((v) => v.seen.length > 0));
+  s.frontlineMemory.forEach((memory, side) => {
+    memory.nextReinforce = s.time + 2 + side;
+  });
   for (const memory of s.frontlineMemory) {
     memory.privateDefensePlan = ['secret'];
     memory.seen[0].futurePlan = 'hidden';
@@ -101,6 +104,7 @@ test('either perspective retains its own observed memory, never the enemy memory
     ])
       assert.equal(Object.hasOwn(enemy, key), false, key);
     const memory = view.frontlineMemory[0];
+    assert.equal(memory.nextReinforce, s.frontlineMemory[side].nextReinforce);
     assert.deepEqual(
       memory.seen,
       s.frontlineMemory[side].seen.map(({ id, x, z, strength, time }) => ({
@@ -186,8 +190,14 @@ test('enemy fortification and reserve events never disclose planning while own n
 
 test('real server-side stepping upgrades the own fortification, and a gateway stop cancels auto without a deferred reassignment', () => {
   for (const side of [0, 1]) {
-    const s = fresh(),
-      u = unit(s, side, side ? 450 : -450, 380);
+    const s = fresh();
+    for (const d of s.districts)
+      if (Math.sign(E.DISTRICTS.find((v) => v.id === d.id).x) === (side ? 1 : -1)) d.owner = side;
+    const point = E.frontlineReport(s, side).posts.find(
+      (p) => p.corridorId === 'north' && p.slot === 2,
+    );
+    const u = unit(s, side, point.x, point.z);
+    u.defensePost = { corridorId: 'north', slot: 2, row: 0 };
     assert.equal(executeCommand(s, side, 'auto-defense', { ids: [u.id], enabled: true }), 1);
     E.advance(s, 45);
     const view = playerView(s, side),

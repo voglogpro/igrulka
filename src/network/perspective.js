@@ -151,6 +151,7 @@ export function playerView(authority, side) {
     return owner === side && memory
       ? {
           nextThink: memory.nextThink,
+          nextReinforce: memory.nextReinforce,
           seen: memory.seen.map((v) => publicFields(v, ['id', 'x', 'z', 'strength', 'time'])),
         }
       : { nextThink: 0, seen: [] };
@@ -235,6 +236,7 @@ export function playerView(authority, side) {
     science: 0,
     tech: [],
     research: null,
+    researchQueue: [],
     inventory: Object.fromEntries(Object.keys(opposingSide.inventory || {}).map((key) => [key, 0])),
     spentAmmo: 0,
     kills: opposingSide.kills,

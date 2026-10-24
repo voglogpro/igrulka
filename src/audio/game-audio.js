@@ -6,13 +6,13 @@ import {
   whistle,
   clicks,
   dieselLoop,
-  rotorLoop,
   jetLoop,
   impulseResponse,
   sirenLoop,
   mopedLoop,
   rainLoop,
 } from './synth.js';
+import { recordedEngineLoop, uavEngineMix } from './engines.js';
 
 // How loud each weapon is and how often the same class may start a new sound.
 const WEAPON_SOUND = {
@@ -162,9 +162,9 @@ export class GameAudio {
     const rate = this.context.sampleRate,
       out = {
         diesel: this.buffer(dieselLoop(rate)),
-        rotor: this.buffer(rotorLoop(rate)),
+        rotor: this.buffer(recordedEngineLoop(rate, 'rotor')),
         jet: this.buffer(jetLoop(rate)),
-        moped: this.buffer(mopedLoop(rate)),
+        moped: this.buffer(recordedEngineLoop(rate, 'prop', mopedLoop(rate))),
         siren: this.buffer(sirenLoop(rate)),
         rain: this.buffer(rainLoop(rate)),
       },
@@ -375,10 +375,10 @@ export class GameAudio {
         filter.type = 'lowpass';
         filter.frequency.value = kind === 'diesel' ? 500 : 2200;
         // Strike drones are heard across the valley: part of their sound feeds the reverb.
-        if (kind === 'moped') {
+        if (kind === 'moped' || kind === 'rotor') {
           const send = c.createGain();
-          send.gain.value = 0.35;
-          level.connect(send);
+          send.gain.value = kind === 'moped' ? 0.2 : 0.16;
+          pan.connect(send);
           send.connect(this.reverbIn);
         }
         level.gain.value = 0;
@@ -515,35 +515,20 @@ export class GameAudio {
           active++;
           const { u, d } = item,
             mix = distanceMix(d, 1),
-            heavy = u.key === 'heavy',
-            fpv = u.subtype === 'fpv';
+            uav = kind === 'rotor' || kind === 'moped' ? uavEngineMix(u, d, this.listener) : null;
           gain =
             kind === 'diesel'
               ? 0.32 * mix.dry * (['leopard', 'howitzer', 'heavytank'].includes(u.key) ? 1.25 : 1)
-              : kind === 'rotor'
-                ? 0.1 * mix.dry
-                : kind === 'moped'
-                  ? 0.24 * Math.min(1, mix.dry * 1.6) * (heavy ? 1.25 : 1)
-                  : 0.3 * mix.dry;
+              : uav
+                ? uav.gain
+                : 0.3 * mix.dry;
           voice.source.playbackRate.setTargetAtTime(
-            kind === 'diesel'
-              ? WHEELED.has(u.key)
-                ? 1.15
-                : 0.9
-              : kind === 'rotor'
-                ? fpv
-                  ? 1.5
-                  : 1
-                : kind === 'moped'
-                  ? heavy
-                    ? 0.82
-                    : 1.04
-                  : 1,
+            kind === 'diesel' ? (WHEELED.has(u.key) ? 1.15 : 0.9) : uav ? uav.rate : 1,
             t,
             0.2,
           );
           voice.filter.frequency.setTargetAtTime(
-            Math.min(kind === 'diesel' ? 600 : 3000, mix.cutoff),
+            uav ? uav.cutoff : Math.min(kind === 'diesel' ? 600 : 3000, mix.cutoff),
             t,
             0.15,
           );

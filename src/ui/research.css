@@ -1,19 +1,21 @@
-/* Technology workspace: one scroll area and a legible left-to-right dependency map. */
+/* Fullscreen research workspace: fixed controls, one pannable dependency canvas. */
 #game #panel.tree-panel {
-  left: auto;
-  right: 12px;
-  top: 116px;
-  width: min(1040px, calc(100% - 24px));
-  max-height: calc(100% - 270px);
-  padding: 16px 18px 12px;
+  inset: 10px;
+  width: auto;
+  height: auto;
+  max-height: none;
+  z-index: 50;
+  padding: 18px 22px 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: min(640px, calc(100% - 270px));
-  background: #141e20fa;
+  background: #141e20fc;
+  border-color: #82958e60;
+  box-shadow: 0 12px 80px #0009;
 }
 #panel.tree-panel > .panel-head {
-  margin-bottom: 10px;
+  flex: none;
+  margin-bottom: 12px;
 }
 .research-console {
   display: flex;
@@ -24,61 +26,52 @@
 }
 #game .research-overview {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 12px;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+  flex: none;
 }
 #game .research-overview h2 {
   font:
-    600 23px/1.2 'Manrope',
+    600 25px/1.2 'Manrope',
     sans-serif;
   letter-spacing: -0.6px;
-  margin: 0 0 5px;
+  margin: 0 0 7px;
 }
 .research-overview p {
   color: var(--muted);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.5;
   margin: 0;
 }
 .research-budget {
-  flex-shrink: 0;
   text-align: right;
+  flex: none;
 }
 .research-budget b {
   display: block;
   font:
-    600 24px/1.1 'Manrope',
+    600 25px/1.2 'Manrope',
     sans-serif;
   color: var(--accent);
 }
 .research-budget span {
-  display: block;
   font-size: 9px;
   color: var(--muted);
-  margin-top: 5px;
+}
+.research-projects {
+  display: flex;
+  gap: 16px;
+  padding: 10px 12px;
+  background: #25333270;
+  border: 1px solid #82958e30;
+  flex: none;
+  min-height: 52px;
 }
 .research-active {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: #24333380;
-  border: 1px solid #82958e32;
-  position: relative;
-  overflow: hidden;
-  border-radius: 3px;
-}
-.research-active-mark {
-  color: #a8c1b4;
-  width: 25px;
-  height: 25px;
-  flex-shrink: 0;
-}
-.research-active-mark svg {
-  width: 100%;
-  height: 100%;
+  min-width: 190px;
+  align-self: center;
 }
 .research-active b {
   display: block;
@@ -87,152 +80,142 @@
 }
 #research-progress {
   display: block;
-  margin-top: 4px;
   color: var(--muted);
   font-size: 10px;
-  line-height: 1.4;
+  margin-top: 5px;
 }
-.research-active-track {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #82958e20;
+#research-project-list {
+  display: flex;
+  gap: 8px;
+  overflow: auto;
+  min-width: 0;
+  scrollbar-width: thin;
 }
-.research-active-track i {
-  display: block;
-  height: 100%;
-  background: var(--accent);
+.research-project-chip {
+  flex: 0 0 190px;
+  display: grid;
+  gap: 4px;
+  padding: 5px 9px;
+  background: #121d1f;
+  border-left: 2px solid var(--accent);
+}
+.research-project-chip b {
+  font-size: 10px;
+  font-weight: 500;
+}
+.research-project-chip span {
+  font-size: 9px;
+  color: var(--muted);
+}
+.research-project-chip progress {
+  width: 100%;
+  height: 3px;
+  accent-color: var(--accent);
+}
+.research-project-chip.paused {
+  border-color: #82958e;
+  opacity: 0.75;
 }
 .research-filters {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
+  flex: none;
   padding: 12px 0;
+  align-items: center;
 }
 #game .research-filters button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 7px;
-  min-height: 33px;
-  border: 1px solid #82958e30;
-  border-radius: 3px;
-  padding: 6px 11px;
-  color: #aebfb5;
+  gap: 8px;
+  padding: 9px 14px;
   font-size: 11px;
+  border: 1px solid #82958e35;
+  border-radius: 3px;
 }
 .research-filters svg {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
 }
 .research-filters small {
-  color: #8fa399;
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 10px;
 }
 #game .research-filters button[aria-pressed='true'] {
-  border-color: #e2b77980;
-  background: #e2b77913;
   color: var(--accent);
+  background: #e2b77912;
+  border-color: #e2b77980;
+}
+.research-pan-hint {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 10px;
 }
 .tree-scroll {
   flex: 1;
-  max-height: none;
   min-height: 0;
   overflow: auto;
+  padding: 24px;
+  border: 1px solid #82958e2c;
+  background: #101a1d;
   scrollbar-color: #536d61 #121b1d;
   scrollbar-width: thin;
-  padding: 0 3px 7px;
-  border-top: 1px solid var(--line);
+  cursor: grab;
+  touch-action: pan-x pan-y;
+}
+.tree-scroll.panning {
+  cursor: grabbing;
+  user-select: none;
 }
 .tree-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.tree-branch-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 12px 0;
-}
-#game .tree-branch h3 {
-  margin: 0;
-  font-size: 11px;
-  letter-spacing: 0.8px;
-  color: #d5dfd8;
-}
-.tree-branch-heading > span {
-  font-size: 9px;
-  color: #8fa399;
-}
-.tree-lanes {
-  display: flex;
-  gap: 24px;
-  position: relative;
   width: max-content;
   min-width: 100%;
-  padding-bottom: 4px;
-  align-items: flex-start;
 }
-.tree-tier {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 182px;
-  flex: 0 0 182px;
-}
-.tree-tier-label {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #839a8d;
-  padding-bottom: 1px;
+.tree-lanes {
+  position: relative;
 }
 #game #panel .tree-node {
   --progress: 0;
+  position: absolute;
+  width: 238px;
+  height: 210px;
   display: flex;
   flex-direction: column;
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  min-height: 164px;
   gap: 8px;
-  border: 1px solid #82958e42;
-  border-radius: 4px;
-  background: #1b292b;
-  padding: 11px;
+  border: 1px solid #82958e50;
+  border-radius: 5px;
+  padding: 13px;
   text-align: left;
+  background: #1b292b;
   opacity: 1;
+  z-index: 1;
   overflow: hidden;
   cursor: pointer;
 }
 .tree-node-top {
   display: flex;
+  gap: 8px;
   align-items: flex-start;
-  gap: 7px;
 }
-.tree-node-top > i {
-  font-style: normal;
-  font-size: 14px;
-  color: #83998e;
-  line-height: 1.2;
-}
-.tree-node-top > b {
-  font-size: 11px;
-  line-height: 1.4;
+.tree-node-top b {
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1.4;
+}
+.tree-node-top i {
+  font-size: 15px;
+  font-style: normal;
+  color: #a9bbb0;
 }
 .tree-node em {
-  font-style: normal;
   font-size: 10px;
+  font-style: normal;
   color: #b4c4ba;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .tree-opens {
-  font-size: 9px;
   color: #d3bb90;
-  line-height: 1.45;
+  font-size: 10px;
+  line-height: 1.4;
 }
 .tree-cross {
   color: #9bb7be;
@@ -240,104 +223,93 @@
 }
 .tree-cost {
   color: #9eb4a8;
-  font-size: 9px;
+  font-size: 10px;
   margin-top: auto;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-.tree-cost i {
-  font-style: normal;
-  opacity: 0.5;
-  margin: 0 2px;
 }
 .tree-reason {
-  border-top: 1px solid #82958e24;
-  padding-top: 7px;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.4;
-  color: #8fa69a;
-  min-height: 21px;
+  padding-top: 7px;
+  border-top: 1px solid #82958e30;
+  color: #a9beb2;
 }
 #game #panel .tree-node.ready {
-  border-color: #e2b7798c;
-  background: #2b3029;
+  border-color: #e2b779a0;
+  background: #29312a;
   box-shadow: inset 0 2px #e2b779;
 }
-.tree-node.ready .tree-node-top > i,
 .tree-node.ready .tree-reason {
   color: var(--accent);
 }
 #game #panel .tree-node.ready:hover {
-  background: #373b2d;
+  background: #353c2e;
   border-color: #f2ca92;
 }
 #game #panel .tree-node.running {
-  border-color: #d2ae72;
   background: #302f24;
-}
-.tree-node.running .tree-reason {
-  color: var(--accent);
+  border-color: #d2ae72;
 }
 #game #panel .tree-node.done {
-  border-color: #8aaa9860;
   background: #1d302b;
+  border-color: #8aaa9870;
 }
-.tree-node.done .tree-node-top > i,
 .tree-node.done .tree-reason {
   color: #a3c6ae;
 }
 #game #panel .tree-node.locked {
-  border-style: dashed;
   background: #172225;
-}
-.tree-node.locked .tree-node-top {
-  color: #a6b7ae;
+  border-style: dashed;
 }
 #game #panel .tree-node:disabled {
   cursor: default;
 }
+#game #panel .tree-node.tree-gateway {
+  border-color: #789ca0;
+}
 .tree-bar {
   position: absolute;
+  bottom: 0;
   left: 0;
   right: 0;
-  bottom: 0;
-  height: 2px;
+  height: 3px;
   background: #82958e16;
 }
 .tree-bar > span {
   display: block;
-  width: calc(var(--progress) * 100%);
   height: 100%;
+  width: calc(var(--progress) * 100%);
   background: #b6c791;
 }
 .tree-links {
   position: absolute;
-  left: 0;
-  top: 0;
-  pointer-events: none;
+  inset: 0;
   overflow: visible;
+  pointer-events: none;
 }
 .tree-links path {
-  stroke: #6a817466;
+  stroke: #6a817490;
   stroke-width: 1.5;
   fill: none;
 }
 .tree-links path.lit {
   stroke: #c8b384;
 }
+.tree-links circle {
+  fill: #9cae9d;
+}
 .research-legend {
   display: flex;
   gap: 16px;
   align-items: center;
-  padding-top: 9px;
-  border-top: 1px solid var(--line);
-  color: #8fa69a;
-  font-size: 9px;
+  padding-top: 10px;
+  color: var(--muted);
+  font-size: 10px;
+  flex: none;
 }
 .research-legend span {
   display: flex;
-  align-items: center;
   gap: 5px;
+  align-items: center;
 }
 .research-legend span:last-child {
   margin-left: auto;
@@ -345,8 +317,8 @@
 .research-legend i {
   width: 5px;
   height: 5px;
-  border-radius: 50%;
   background: #8daa9a;
+  border-radius: 50%;
 }
 .research-legend i.ready {
   background: var(--accent);
@@ -354,75 +326,68 @@
 .research-legend i.running {
   background: #dfaa61;
 }
-@media (max-height: 740px) {
+@media (max-width: 800px) {
+  .research-pan-hint {
+    display: none;
+  }
   #game #panel.tree-panel {
-    top: 112px;
-    max-height: calc(100% - 255px);
     padding: 12px;
   }
   #game .research-overview h2 {
-    font-size: 20px;
-  }
-  .research-overview p {
-    font-size: 10px;
-  }
-  .research-active {
-    padding: 8px 10px;
-  }
-  .research-filters {
-    padding: 9px 0;
-  }
-  .tree-scroll {
-    max-height: none;
-    min-height: 0;
-  }
-}
-@media (max-width: 800px) {
-  #game .research-overview h2 {
-    font-size: 20px;
-  }
-  .research-budget b {
     font-size: 21px;
-  }
-  #game .research-filters button {
-    padding: 6px 8px;
-    gap: 5px;
-  }
-  .research-filters svg {
-    display: none;
-  }
-  .tree-tier {
-    width: 172px;
-    flex-basis: 172px;
   }
 }
 @media (max-width: 550px) {
   #game #panel.tree-panel {
-    top: 111px;
-    right: 7px;
-    width: calc(100% - 14px);
-    padding: 12px;
-  }
-  .research-overview p {
-    max-width: 210px;
+    inset: 5px;
   }
   .research-budget {
     display: none;
   }
+  .research-overview p {
+    font-size: 10px;
+  }
+  #game .research-filters button {
+    padding: 9px 8px;
+    gap: 4px;
+    flex: 1;
+    justify-content: center;
+  }
+  .research-filters svg,
   .research-filters small {
     display: none;
   }
-  .tree-branch-heading > span {
-    display: none;
+  .research-projects {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .research-active {
+    align-self: stretch;
+  }
+  .tree-scroll {
+    padding: 15px;
   }
   .research-legend {
-    gap: 10px;
+    font-size: 9px;
+    gap: 8px;
   }
 }
-.research-overview,
-.research-active,
-.research-filters,
-.research-legend,
-#panel.tree-panel > .panel-head {
-  flex-shrink: 0;
+@media (max-height: 600px) {
+  #game .research-overview h2 {
+    font-size: 18px;
+    margin-bottom: 3px;
+  }
+  .research-overview {
+    margin-bottom: 8px !important;
+  }
+  .research-projects {
+    padding: 6px 10px;
+    min-height: 40px;
+  }
+  .research-filters {
+    padding: 8px 0;
+  }
+  #game #panel.tree-panel {
+    padding: 10px 14px;
+  }
 }

@@ -4,6 +4,7 @@ import { GROUND_UNITS, BUILDINGS, isInfantry, defenseStats, groundHeight } from 
 import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
 import { lineOfSight, recordFire } from '../infantry/cover.js';
 import { updateInfantrySupport } from '../infantry/support.js';
+import { updateAutomaticFPV } from '../infantry/fpv.js';
 import { buildingConnected } from '../../city/road-network.js';
 import { freeSpot } from '../vehicles/transport.js';
 import { updateTransportDeliveries } from '../vehicles/transport-orders.js';
@@ -293,6 +294,7 @@ export function updateGround(s, rates, dt, hooks) {
         if (p) {
           b.armyQueue.shift();
           const u = makeGround(s, b.side, q.key, p.x, p.z);
+          if (q.autoDefense) u.autoDefense = true;
           if (q.squadId != null) {
             u.squadId = q.squadId;
             u.squadSlot = q.squadSlot;
@@ -326,8 +328,10 @@ export function updateGround(s, rates, dt, hooks) {
             if (rallyMode === 'attack') applyStance(s, b.side, [u.id], { mode: 'attack' });
             else if (rallyMode === 'defend')
               applyStance(s, b.side, [u.id], { mode: 'defend', post: 'auto' });
-            else if (rallyMode === 'guard') guardGround(s, b.side, [u.id], b.rally || p);
-            else if (rallyMode === 'attackmove' && b.rally)
+            else if (rallyMode === 'guard') {
+              guardGround(s, b.side, [u.id], b.rally || p);
+              u.autoDefense = true;
+            } else if (rallyMode === 'attackmove' && b.rally)
               orderGround(s, b.side, [u.id], { ...b.rally, mode: 'attackmove' });
           }
         }
@@ -341,6 +345,7 @@ export function updateGround(s, rates, dt, hooks) {
   updateTrade(s);
   prepareGroundEngagement(s);
   for (const u of s.groundUnits) tickUnit(s, u, dt, rates, hooks);
+  updateAutomaticFPV(s);
   for (const b of s.buildings)
     if (b.key === 'gun' && b.hp > 0 && b.progress >= 1) tickUnit(s, b, dt, rates, hooks);
   updateGroundRoutes(s);

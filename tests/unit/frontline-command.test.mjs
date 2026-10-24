@@ -4,12 +4,11 @@ import * as E from '../../src/game/index.js';
 import { damageGround } from '../../src/game/units/ground/combat.js';
 import { observedFrontline } from '../../src/game/defense/frontline.js';
 import { updateArmyAI } from '../../src/game/ai/army-ai.js';
+import { corridorGeometry, defensePostPoint } from '../../src/game/defense/geometry.js';
 
 // The corridor sectors of the sea map (formerly the bridges at z = ±270).
 const NORTH = E.FRONT_SECTORS.find((v) => v.id === 'north').z,
-  SOUTH = E.FRONT_SECTORS.find((v) => v.id === 'south').z,
-  // The neighbouring sector a reserve can be drawn from: the northern shore.
-  SHORE = E.FRONT_SECTORS.find((v) => v.id === 'north-rear').z;
+  SOUTH = E.FRONT_SECTORS.find((v) => v.id === 'south').z;
 function fresh() {
   const s = E.createGame(862);
   s.mode = 'multiplayer';
@@ -34,44 +33,48 @@ function unit(s, side, key, x, z, reserve = false) {
 }
 function battle(side = 0) {
   const s = fresh(),
-    sign = side ? -1 : 1;
-  const defenders = [],
+    direction = side === 0 ? 1 : -1;
+  for (const line of corridorGeometry(s, side))
+    s.districts.find((d) => d.id === line.districtId).owner = side;
+  const lines = corridorGeometry(s, side),
+    defenders = [];
+  for (const row of [0, 2, 4])
+    for (const line of lines)
+      for (const slot of line.slots) {
+        if (defenders.length >= 28) break;
+        const reference = { corridorId: line.id, slot: slot.slot, row };
+        const p = defensePostPoint(lines, reference, direction);
+        const u = unit(s, side, 'infantry', p.x, p.z, true);
+        u.defensePost = reference;
+        defenders.push(u);
+      }
+  const p = lines[0].slots[2],
     enemies = [];
-  for (const z of [NORTH, SHORE])
-    for (let i = 0; i < 6; i++) {
-      const u = unit(s, side, i === 0 ? 'apc' : 'infantry', sign * (-450 + i * 11), z, true);
-      defenders.push(u);
-    }
-  for (let i = 0; i < 6; i++)
-    enemies.push(unit(s, 1 - side, 'leopard', sign * (-330 + i * 8), NORTH));
+  for (let i = 0; i < 5; i++)
+    enemies.push(unit(s, 1 - side, 'leopard', p.x + direction * (65 + i * 8), p.z + i * 3));
   return { s, defenders, enemies };
 }
 
-test('frontline is a dynamic evidence estimate, not the river, and districts change control without inventing enemy troops', () => {
+test('terrain lines do not follow moving troops; only public territory anchors advance the corridor', () => {
   const s = fresh(),
     u = unit(s, 0, 'infantry', -400, 0);
   E.step(s, 0.05);
-  const first = E.frontlineReport(s, 0).sectors.find((v) => v.id === 'center');
-  assert.equal(first.knowledge, 'estimated');
-  assert.equal(first.enemy, 0);
-  assert.ok(first.x < -250);
+  const first = structuredClone(E.frontlineReport(s, 0).polyline);
   assert.equal(E.orderGround(s, 0, [u.id], { x: -250, z: 0 }), 1);
   E.advance(s, 8);
-  const second = E.frontlineReport(s, 0).sectors.find((v) => v.id === 'center');
-  assert.ok(second.x > first.x + 70);
-  const raw = s.districts.find((d) => d.id === 'north-relay');
-  raw.owner = 0;
+  assert.deepEqual(E.frontlineReport(s, 0).polyline, first);
+  s.districts.find((d) => d.id === 'north-depot').owner = 0;
   E.advance(s, 1.1);
   const north = E.frontlineReport(s, 0).sectors.find((v) => v.id === 'north');
-  assert.equal(north.knowledge, 'estimated');
   assert.equal(north.enemy, 0);
-  assert.ok(north.x > 100);
-  assert.equal(E.frontlineReport(s, 0).polyline.length, 5);
+  assert.ok(north.x > -100);
+  assert.equal(E.frontlineReport(s, 0).lines.length, 2);
+  assert.equal(E.frontlineReport(s, 0).polyline.filter((p) => p.breakBefore).length, 1);
 });
 
 test('hidden enemies cannot move the estimated line, create threat or trigger reserves', () => {
   const s = fresh();
-  unit(s, 0, 'infantry', -600, NORTH, true);
+  unit(s, 0, 'infantry', -600, NORTH, false);
   const hidden = unit(s, 1, 'leopard', 650, SOUTH);
   E.step(s, 0.05);
   assert.equal(s.frontlineMemory[0].seen.length, 0);
@@ -135,33 +138,31 @@ test('observed casualties disappear from memory immediately; unseen movement sta
   assert.equal(s.frontlineMemory[0].seen.length, 0);
 });
 
-test('a real breakthrough receives a bounded reserve that walks there and leaves the donor line manned', () => {
+test('an observed breakthrough receives staged rear reserves while every primary line post remains assigned', () => {
   const { s, defenders } = battle();
+  const primary = defenders
+    .filter((u) => u.defensePost.row === 0)
+    .map((u) => ({ id: u.id, guard: { ...u.guard } }));
   const initial = new Map(defenders.map((u) => [u.id, { x: u.x, z: u.z }]));
   E.step(s, 0.05);
-  let assigned = defenders.filter((u) => u.defenseTask);
-  assert.ok(assigned.length > 0 && assigned.length <= E.FRONTLINE.maxNewAssignments);
-  for (const u of assigned)
+  const first = defenders.filter((u) => u.defenseTask);
+  assert.equal(first.length, 1);
+  for (const u of first)
     assert.ok(
       Math.hypot(u.x - initial.get(u.id).x, u.z - initial.get(u.id).z) <=
         E.GROUND_UNITS[u.key].speed * 0.05 + 1e-6,
     );
-  E.advance(s, 35);
-  assigned = defenders.filter((u) => u.defenseTask);
-  assert.equal(assigned.length, 3);
-  assert.ok(
-    assigned.every((u) => u.z < NORTH + 200 && Math.hypot(u.x - u.guard.x, u.z - u.guard.z) < 4),
-  );
-  assert.ok(defenders.filter((u) => !u.defenseTask && u.guard.z > NORTH + 200).length >= 3);
-  const byTime = new Map();
-  for (const event of s.events.filter((e) => e.type === 'defenseRedeployed'))
-    byTime.set(event.time, (byTime.get(event.time) || 0) + 1);
-  assert.ok([...byTime.values()].every((count) => count <= E.FRONTLINE.maxNewAssignments));
+  E.advance(s, 18);
+  assert.equal(defenders.filter((u) => u.defenseTask).length, 6);
+  for (const p of primary) assert.deepEqual(defenders.find((u) => u.id === p.id).guard, p.guard);
+  const events = s.events.filter((e) => e.type === 'defenseRedeployed');
+  for (let i = 1; i < events.length; i++)
+    assert.ok(events[i].time - events[i - 1].time >= 3 - 1e-6);
 });
 
 test('a quiet front returns the real reserve to its own reserved posts and applies cooldown', () => {
   const { s, defenders, enemies } = battle();
-  E.advance(s, 35);
+  E.advance(s, 18);
   const sent = defenders
     .filter((u) => u.defenseTask)
     .map((u) => ({ u, home: { ...u.defenseTask.home } }));
@@ -174,6 +175,35 @@ test('a quiet front returns the real reserve to its own reserved posts and appli
     assert.ok(u.defenseReadyAt > 0);
   }
   assert.ok(s.events.some((e) => e.type === 'defenseReturned'));
+});
+
+test('repeated reinforcement after staggered returns never reuses an occupied temporary guard slot', () => {
+  const { s, defenders } = battle();
+  for (let tick = 0; tick < 1000; tick++) {
+    E.step(s, 0.05);
+    const active = defenders.filter((u) => u.defenseTask && !u.defenseTask.returning);
+    assert.equal(
+      new Set(active.map((u) => `${u.guard.x},${u.guard.z}`)).size,
+      active.length,
+      `overlapping reserve posts at ${s.time}`,
+    );
+    for (let i = 0; i < active.length; i++)
+      for (let j = i + 1; j < active.length; j++) {
+        const clearance =
+          (E.GROUND_UNITS[active[i].key].size + E.GROUND_UNITS[active[j].key].size) * 0.5 + 7;
+        assert.ok(
+          Math.hypot(
+            active[i].guard.x - active[j].guard.x,
+            active[i].guard.z - active[j].guard.z,
+          ) >=
+            clearance - 1e-6,
+        );
+      }
+  }
+  assert.ok(
+    s.events.filter((e) => e.type === 'defenseRedeployed').length > 6,
+    'a second reinforcement cycle must actually occur',
+  );
 });
 
 test('successful manual commands override automatic tasks; failed commands and fire/camouflage do not', () => {
@@ -257,7 +287,9 @@ test('both multiplayer owners and save/load run the same reserve journey, with p
     const loaded = E.load(E.save(s));
     E.advance(s, 35);
     E.advance(loaded, 35);
-    assert.deepEqual(loaded.groundUnits, s.groundUnits);
+    // Loading intentionally invalidates navigation cache epochs, not routes or game outcomes.
+    const outcomes = (units) => units.map(({ navRevision: _revision, ...u }) => u);
+    assert.deepEqual(outcomes(loaded.groundUnits), outcomes(s.groundUnits));
     assert.deepEqual(loaded.frontlineMemory, s.frontlineMemory);
     assert.deepEqual(loaded.trenches, s.trenches);
     assert.deepEqual(loaded.sides, s.sides);

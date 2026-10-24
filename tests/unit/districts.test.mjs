@@ -230,7 +230,8 @@ test('only solo AI receives the same 25 percent bonus on district revenues', () 
 
 test('version eight imports neutral sites without altering troops, stockpiles or elapsed time', () => {
   const s = fresh();
-  soldier(s, 0);
+  // A legacy river-map position within the unchanged town area, not a new sea corridor.
+  soldier(s, 0, { x: -400, z: 200 });
   s.version = 8;
   delete s.districts;
   s.time = 97;

@@ -1,7 +1,7 @@
 import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -88,7 +88,7 @@ export function executeCommand(s, side, type, a = {}) {
     case 'service-enabled':
       if (!validId(a.id) || typeof a.enabled !== 'boolean') return invalid;
       if (!s.buildings.some((b) => b.id === a.id && b.side === side && b.key === 'service'))
-        return '????????? ??????? ??? ?? ???????????';
+        return 'Ремонтная служба вам не принадлежит';
       return E.setServiceEnabled(s, side, a.id, a.enabled);
     case 'rear-auto':
       if (typeof a.enabled !== 'boolean') return invalid;
@@ -195,10 +195,15 @@ export function executeCommand(s, side, type, a = {}) {
       return configured(E.DISTRICT_BY_ID, a.id) && typeof a.enabled === 'boolean'
         ? E.setDistrictRepair(s, side, a.id, a.enabled)
         : invalid;
-    case 'fpv':
-      return unitsOwned(s, side, a.ids) && point(a.point)
-        ? E.launchFPV(s, side, a.ids, a.point)
-        : invalid;
+    case 'fpv': {
+      if (!unitsOwned(s, side, a.ids) || !point(a.point)) return invalid;
+      const id = a.point.targetId;
+      if (id != null && !validId(id)) return invalid;
+      const target = id == null ? null : s.groundUnits.find((u) => u.id === id);
+      if (id != null && !E.observedTarget(s, side, id)) return 'Недоступная цель FPV';
+      if (target && E.observedTarget(s, side, id)?.side !== 1 - side) return 'Недоступная цель FPV';
+      return E.launchFPV(s, side, a.ids, a.point, target?.id ?? null);
+    }
     case 'rally':
     case 'rally-mode':
     case 'repeat':
@@ -208,8 +213,18 @@ export function executeCommand(s, side, type, a = {}) {
         return ['guard', 'wait', 'attackmove'].includes(a.mode)
           ? E.setRallyMode(s, side, a.id, a.mode)
           : invalid;
-      return typeof a.enabled === 'boolean' && configured(E.GROUND_UNITS, a.key)
-        ? E.setRecruitRepeat(s, side, a.id, a.key, a.enabled)
+      return typeof a.enabled === 'boolean' &&
+        configured(E.GROUND_UNITS, a.key) &&
+        (a.target == null ||
+          (Number.isInteger(a.target) && a.target >= 1 && a.target <= E.GROUND_LIMIT))
+        ? E.setRecruitRepeat(
+            s,
+            side,
+            a.id,
+            a.key,
+            a.enabled,
+            a.target == null ? undefined : { target: a.target },
+          )
         : invalid;
     case 'formation':
       if (!['line', 'column', 'spread'].includes(a.value)) return invalid;

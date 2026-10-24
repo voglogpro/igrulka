@@ -28,6 +28,8 @@ export function makeGround(s, side, key, x, z) {
     suppression: 0,
     autoDefense: false,
     defenseTask: null,
+    defensePost: null,
+    defenseCapture: null,
     defenseReadyAt: 0,
     fpvAmmo: key === 'operator' ? 3 : 0,
     civil: !!d.civil,

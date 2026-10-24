@@ -389,3 +389,57 @@
     font-size: 7px;
   }
 }
+.recruit-empty {
+  grid-column: 1 / -1;
+  padding: 24px 16px;
+  border: 1px dashed #82958e40;
+  border-radius: 4px;
+  color: #c0cec5;
+}
+.recruit-empty > b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.recruit-empty p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+#game .recruit-empty button {
+  padding: 7px 10px;
+  font-size: 11px;
+  border: 1px solid #82958e50;
+}
+#game .army-automation {
+  padding: 12px;
+  background: #24332c70;
+  border: 1px solid #82958e38;
+  border-radius: 4px;
+}
+.garrison-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  font-size: 11px;
+}
+.garrison-heading > b {
+  font-weight: 500;
+}
+#game .army-automation .auto-recruit-fields {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(150px, 1.4fr) 110px auto;
+  align-items: end;
+  gap: 8px;
+}
+#game .army-automation #repeat-toggle {
+  padding: 9px 12px;
+  border: 1px solid #e2b77970;
+  color: var(--accent);
+  min-height: 34px;
+}
+@media (max-width: 650px) {
+  #game .army-automation .auto-recruit-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+}

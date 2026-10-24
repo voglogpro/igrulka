@@ -22,6 +22,14 @@
 
 `tickUnit` в `ground/update.js` обрабатывает общую механику пехоты и машин. Не копируйте весь цикл ради новой роли: параметры роли остаются в `types.js`, особое поведение можно вынести рядом с `infantry/support.js` или `infantry/fpv.js`.
 
+В 8.8 ранние противотанковые стрелки — `atrifle` в `infantry/types.js`; эффективность по броне — `ground/engagement.js`. Автоматический FPV и резервирование урона — `infantry/fpv.js`, сопровождение наблюдаемой цели — `aviation/guided-fpv.js`. Целевой гарнизон, интервал и резерв ресурсов — `ground/repeat.js`; поля выбора — `ui/army-recruitment.js`.
+
+Оборона разделена на `game/defense/geometry.js` (берег и территориальная линия), `formation.js` (уникальные посты, закрытие потерь, захват), `reserves.js` (дозированное усиление и возврат), `coordinator.js` (планирование). Сетевое представление чужих планов отсекает `network/perspective.js`. Обе линии рисуются независимо; `breakBefore` запрещает соединение через море.
+
+Новые цены только зданий и история покупок — `game/city/pricing.js`; параллельные лаборатории — `game/research/research.js`; миграции — `game/persistence/economy.js` и `map-layout.js`. Полноэкранное дерево и связи — `ui/tech-tree.js`, `research.css`. Подробные правила — [FRONT-88.md](FRONT-88.md).
+
+Живые записи двигателей, дистанция и ограничение голосов — `audio/engines.js`, встроенные петли — `audio/samples/`; оригинальные обработанные WAV, лицензии CC0 и воспроизводимый кодировщик — `assets/audio/`. Глубинное затемнение разведки — `rendering/fog-veil.js` и `effects/post-processing.js`; отдельной плоскости над землёй больше нет.
+
 ## Техника
 
 | Задача                                                    | Где менять                                         |

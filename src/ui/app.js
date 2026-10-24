@@ -61,7 +61,7 @@ let world,
   deployPoint = null,
   deployHoverAt = 0,
   armyCategory = 'infantry',
-  armyAutomation = { siteId: null, key: 'infantry' },
+  armyAutomation = { siteId: null, key: 'infantry', target: 12 },
   network = null,
   soloBackup = null,
   networkApplied = false,
@@ -464,6 +464,7 @@ function updateWeatherChip() {
   chip.classList.toggle('online', f.now === 'clear');
 }
 function updateHUD() {
+  updateBuildingPrices();
   updateRadarChip();
   updateWeatherChip();
   frontlineHUD.update(state, {
@@ -510,6 +511,24 @@ function updateHUD() {
     ? `Воздушная тревога: ${inbound} целей. Прикройте снабжение и командный пункт.`
     : `Уничтожьте штаб врага. Районы: ${e.districts.owned}/4 · работают ${e.districts.active}.`;
 }
+function updateBuildingPrices() {
+  for (const button of document.querySelectorAll('[data-build]')) {
+    const key = button.dataset.build,
+      d = E.BUILDINGS[key];
+    if (!d) continue;
+    const quote = E.purchaseQuote(state, 0, 'building', key);
+    const locked = d.tech && !state.sides[0].tech.includes(d.tech);
+    let label = button.querySelector('small');
+    if (!label) {
+      label = document.createElement('small');
+      button.append(label);
+    }
+    label.textContent = locked ? 'Исследование' : `${quote.cost} ₡ · ${quote.metal} спл.`;
+    button.classList.toggle('locked', !!locked);
+    button.dataset.priceFactor = quote.factor;
+    button.title = `${d.description || d.name} Цена ${Math.round(quote.factor * 100)}% базовой; растёт только у этого типа зданий, максимум 150%.`;
+  }
+}
 function buildList() {
   const keys =
     tab === 'city'
@@ -530,6 +549,7 @@ function buildList() {
     (tab === 'army'
       ? '<button class="build-card" data-panel="army"><span>Набор войск →<small>Пехота · техника · ПВО</small></span></button><button class="build-card" data-action="army-all"><span>Выбрать армию<small>Ctrl+A · все войска</small></span></button>'
       : '');
+  updateBuildingPrices();
 }
 function clearArmySelection() {
   interactionRevision++;
@@ -641,9 +661,10 @@ function previewRoad(p) {
 function previewBuilding(plan) {
   if (!tool || tool === 'road') return;
   const d = E.BUILDINGS[tool];
+  const quote = E.purchaseQuote(state, 0, 'building', tool);
   $('#tool-note').textContent =
     plan.error ||
-    `${d.name} · ${d.cost + (plan.driveCost || 0)} ₡ · ${d.metal} спл. · ${d.time} сек.${plan.near ? ' · подъезд подключится автоматически' : ''}`;
+    `${d.name} · ${quote.cost + (plan.driveCost || 0)} ₡ · ${quote.metal} спл. · ${d.time} сек.${plan.near ? ' · подъезд подключится автоматически' : ''}`;
   $('#tool-note').classList.toggle('warning', !!plan.error);
 }
 async function place(key, x, z, rotation) {
@@ -1376,12 +1397,14 @@ document.addEventListener('click', async (ev) => {
   }
   if (d.action === 'repeat-toggle') {
     const id = Number($('#repeat-site').value),
-      key = $('#repeat-key').value;
+      key = $('#repeat-key').value,
+      target = Number($('#repeat-target').value);
     const current = E.recruitRepeatStatus(state, 0, id);
     const result = await execute('repeat', {
       id,
       key,
-      enabled: !(current?.enabled && current.key === key),
+      target,
+      enabled: !(current?.enabled && current.key === key && current.target === target),
     });
     if (typeof result === 'string') toast(result, true);
     else {
@@ -1550,9 +1573,10 @@ document.addEventListener('change', async (ev) => {
     saveSettings();
   }
   if (ev.target.id === 'stance-post' && armySelection.length) setStance('defend');
-  if (ev.target.id === 'repeat-site' || ev.target.id === 'repeat-key') {
+  if (['repeat-site', 'repeat-key', 'repeat-target'].includes(ev.target.id)) {
     armyAutomation.siteId = Number($('#repeat-site').value);
     armyAutomation.key = $('#repeat-key').value;
+    armyAutomation.target = Number($('#repeat-target').value);
     updateLivePanel();
   }
   if (ev.target.id === 'formation') {

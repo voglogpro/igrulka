@@ -3,6 +3,7 @@ export const UNIT_PROFILES = {
   infantry: ['Линейная пехота', 'Захват районов · прикрытие', 'rifle'],
   machinegunner: ['Огневая поддержка', 'Подавление пехоты с позиции', 'machinegun'],
   sniper: ['Дальний огонь', 'Пехота · наблюдение', 'sniper'],
+  atrifle: ['Противотанковый стрелок', 'Лёгкая броня · ранняя оборона', 'atrifle'],
   assault: ['Штурм', 'Ближний бой · здания', 'assault'],
   atgm: ['Противотанковый расчёт', 'Бронетехника · огонь с места', 'missile'],
   engineer: ['Инженер', 'Окопы · ремонт техники', 'engineer'],
@@ -35,6 +36,9 @@ const paths = {
   machinegun:
     soldier + '<path d="M38 30h43v5H38zM71 35l7 18h-3l-6-16-5 16h-3l6-18zM48 35h10v7H48z"/>',
   sniper: soldier + '<path d="M38 30h53v3H38zM56 25h16v3H56zM51 33l-4 9-4-2 3-7z"/>',
+  atrifle:
+    soldier +
+    '<path d="M36 31h65v4H36zM95 28h9v9h-4v-5h-5zM76 35l8 18h-3l-8-16-7 16h-3l8-18zM45 35l-6 9-4-3 4-6z"/>',
   assault:
     soldier +
     '<path d="M38 30h28v5H38zM51 35l-3 9-4-2 2-7z"/><path d="M56 50l7-12h8l5 16h-6l-3-9-5 10z" opacity=".5"/><circle cx="67" cy="31" r="5" opacity=".5"/>',

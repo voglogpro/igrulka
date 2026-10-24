@@ -42,7 +42,7 @@ test('commuters pay: residents with reachable jobs add income, an unmatched city
   );
 });
 
-test('markets on both sides send caravans across the river that pay both sides', () => {
+test('markets on both sides send real caravans around the enlarged sea and pay both sides', () => {
   const s = fresh();
   ready(s, 0, 'power', -670, -80);
   ready(s, 1, 'power', 670, -80);
@@ -55,7 +55,7 @@ test('markets on both sides send caravans across the river that pay both sides',
   assert.equal(truck.trade.to, theirs.id);
   const a = s.sides[0].credits,
     b = s.sides[1].credits;
-  E.advance(s, 90);
+  E.advance(s, 120);
   assert.ok(s.stats.trades >= 1);
   assert.ok(s.sides[0].credits - a > E.TRADE.owner.credits * 0.8 - 400);
   assert.ok(s.events.some((e) => e.type === 'trade'));

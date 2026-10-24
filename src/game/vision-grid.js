@@ -1,11 +1,17 @@
-import { BUILDINGS, GROUND_UNITS } from './config.js';
+import { BUILDINGS, GROUND_UNITS, MAP } from './config.js';
 import { buildingConnected } from './city/road-network.js';
 
 // Fog of intelligence: enemy buildings are always known, but enemy units and launches are only
 // seen by a friendly observer nearby. A powered radar shows everything. The check is a lookup in a
 // coarse per-side grid rebuilt a few times per second.
 export const VISION = { radar: 320 };
-export const GRID = { cell: 40, cols: 80, rows: 60, ox: -1600, oz: -1200 };
+export const GRID = {
+  cell: 40,
+  cols: Math.ceil(MAP.width / 40),
+  rows: Math.ceil(MAP.depth / 40),
+  ox: -MAP.width / 2,
+  oz: -MAP.depth / 2,
+};
 const REFRESH = 0.2;
 const caches = new WeakMap();
 
