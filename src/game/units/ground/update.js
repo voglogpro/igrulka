@@ -14,6 +14,7 @@ import { updateRecruitRepeat } from './repeat.js';
 import { veteranAccuracy, veteranSuppression } from './veterancy.js';
 import { squadArrivalPoint } from './squads.js';
 import { updateGroundTactics } from './tactics.js';
+import { applyStance, updateStance } from './stance.js';
 import {
   prepareGroundEngagement,
   groundEngagement,
@@ -81,7 +82,10 @@ export function tickUnit(s, u, dt, rates, hooks) {
   }
   updateGuard(s, u);
   const { target, stopToFight } = groundEngagement(s, u);
-  if (mobile) updateGroundTactics(s, u, target);
+  if (mobile) {
+    updateGroundTactics(s, u, target);
+    updateStance(s, u);
+  }
   const retreat = u.order?.mode === 'retreat';
   u.moving = false;
   if (mobile && u.path?.length && !stopToFight) {
@@ -252,7 +256,9 @@ export function updateGround(s, rates, dt, hooks) {
           }
           s.groundUnits.push(u);
           event(s, 'recruited', { ...p, side: b.side, key: q.key, unitId: u.id });
-          if (Object.hasOwn(q, 'destination')) {
+          if (q.stance) {
+            applyStance(s, b.side, [u.id], q.stance);
+          } else if (Object.hasOwn(q, 'destination')) {
             const arrival = squadArrivalPoint(q);
             if (arrival) {
               const accepted =
@@ -270,7 +276,10 @@ export function updateGround(s, rates, dt, hooks) {
             }
           } else {
             const rallyMode = defaultRallyMode(s, b);
-            if (rallyMode === 'guard') guardGround(s, b.side, [u.id], b.rally || p);
+            if (rallyMode === 'attack') applyStance(s, b.side, [u.id], { mode: 'attack' });
+            else if (rallyMode === 'defend')
+              applyStance(s, b.side, [u.id], { mode: 'defend', post: 'auto' });
+            else if (rallyMode === 'guard') guardGround(s, b.side, [u.id], b.rally || p);
             else if (rallyMode === 'attackmove' && b.rally)
               orderGround(s, b.side, [u.id], { ...b.rally, mode: 'attackmove' });
           }

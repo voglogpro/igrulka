@@ -476,3 +476,101 @@
     width: 300px;
   }
 }
+
+/* Unit card: stance switch, grouped orders, clearer summary. */
+#army-controls {
+  border-top: 2px solid #8fb89a55;
+  padding-top: 11px;
+}
+.stance-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.stance-label {
+  font-size: 8px;
+  letter-spacing: 1.4px;
+  color: #8eae98;
+}
+.stance-switch {
+  display: inline-flex;
+  border: 1px solid #b4d0b83a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.stance-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #c4d6c3;
+  background: #b1d9b908;
+}
+.stance-switch button + button {
+  border-left: 1px solid #b4d0b83a;
+}
+.stance-switch svg {
+  width: 14px;
+  height: 14px;
+}
+.stance-switch button[data-stance='attack'].active,
+.stance-switch button[data-recruit-mode='attack'].active {
+  background: #c9754a38;
+  color: #ffd9c2;
+}
+.stance-switch button[data-stance='defend'].active,
+.stance-switch button[data-recruit-mode='defend'].active {
+  background: #5d9bb738;
+  color: #cdeaf7;
+}
+.stance-switch button[data-recruit-mode='point'].active {
+  background: #b5d1a728;
+  color: #e3f3da;
+}
+#stance-post,
+#recruit-post {
+  font-size: 10px;
+  padding: 5px 6px;
+  margin: 0;
+  width: auto;
+}
+.stance-note {
+  font-size: 9px;
+  color: #9eb8a4;
+}
+.order-sep {
+  align-self: stretch;
+  width: 1px;
+  margin: 3px 3px;
+  background: #b4d0b82e;
+}
+.army-primary-orders button:hover:not(:disabled) {
+  border-color: #cfe6c97a;
+}
+.army-summary .health {
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #ffffff12;
+}
+.army-summary .health i {
+  background: linear-gradient(90deg, #7fbf86, #c3dc8a);
+}
+.recruit-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 8px;
+}
+.recruit-mode > span {
+  font-size: 9px;
+  color: #8eae98;
+}
+.recruit-mode .stance-switch button {
+  padding: 6px 9px;
+  font-size: 10px;
+}

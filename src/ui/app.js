@@ -165,6 +165,12 @@ networkStatus.hidden = true;
 $('#game').append(networkStatus);
 // Start screen: game mode and bot difficulty. A running campaign keeps its own difficulty;
 // the choice then applies to "new game".
+let recruitMode = ['point', 'attack', 'defend'].includes(settings.recruitMode)
+    ? settings.recruitMode
+    : 'point',
+  recruitPost = ['auto', 'north', 'south'].includes(settings.recruitPost)
+    ? settings.recruitPost
+    : 'auto';
 let chosenDifficulty = E.DIFFICULTY[settings.difficulty] ? settings.difficulty : 'normal';
 function renderWelcomeSetup() {
   const current = E.difficultyOf(state);
@@ -962,6 +968,46 @@ async function troopTarget(p) {
   persist();
   renderInspector();
 }
+function stanceFor(mode, post) {
+  return mode === 'attack' ? { mode: 'attack' } : { mode: 'defend', post };
+}
+async function recruitWithStance(key) {
+  const revision = interactionRevision,
+    stance = stanceFor(recruitMode, recruitPost),
+    result = await execute('recruit', { key, count: recruitCount, stance });
+  if (revision !== interactionRevision) return;
+  if (result !== true) toast(typeof result === 'string' ? result : 'Не удалось нанять', true);
+  else {
+    toast(
+      `${E.GROUND_UNITS[key].name} ×${recruitCount}: ${
+        recruitMode === 'attack'
+          ? 'пойдут в атаку'
+          : 'займут ' + (E.POST_NAMES[recruitPost] || 'мост')
+      } после подготовки`,
+    );
+    persist();
+    renderGroups();
+    updateHUD();
+  }
+}
+async function setStance(mode) {
+  if (!armySelection.length) return;
+  const revision = interactionRevision,
+    select = $('#stance-post'),
+    stance = stanceFor(mode, select?.value || 'auto'),
+    result = await execute('set-stance', { ids: [...armySelection], stance });
+  if (revision !== interactionRevision) return;
+  if (typeof result === 'string') toast(result, true);
+  else {
+    toast(
+      mode === 'attack'
+        ? `Атака: ${result} ед. идут на штаб противника`
+        : `Оборона: ${result} ед. занимают мост`,
+    );
+    persist();
+    renderInspector();
+  }
+}
 async function troopCommand(command) {
   clearTroopTarget();
   const revision = interactionRevision;
@@ -1126,6 +1172,8 @@ function renderPanel() {
     armyCategory,
     recruitCount,
     armyAutomation,
+    recruitMode,
+    recruitPost,
   });
   if (panel === 'settings') {
     $('#panel .settings-list').insertAdjacentHTML(
@@ -1199,7 +1247,7 @@ function updateLivePanel() {
     updateFactoryPlansPanel(state);
   }
   if (panel === 'army') {
-    updateArmyRecruitment({ state, recruitCount });
+    updateArmyRecruitment({ state, recruitCount, recruitMode });
   }
   if (panel === 'research') updateTechTree(state, $('#panel'));
   if (panel === 'economy') {
@@ -1379,7 +1427,15 @@ document.addEventListener('click', async (ev) => {
       persist();
     } else toast(id, true);
   }
-  if (d.recruit) {
+  if (d.recruitMode) {
+    recruitMode = d.recruitMode;
+    settings.recruitMode = recruitMode;
+    saveSettings();
+    renderPanel();
+  }
+  if (d.stance) setStance(d.stance);
+  if (d.recruit && recruitMode !== 'point') recruitWithStance(d.recruit);
+  else if (d.recruit) {
     beginDeployment(d.recruit);
   }
   if (d.upgrade) {
@@ -1566,6 +1622,12 @@ document.addEventListener('change', async (ev) => {
     else persist();
   }
   if (ev.target.id === 'deployment-key') beginDeployment(ev.target.value);
+  if (ev.target.id === 'recruit-post') {
+    recruitPost = ev.target.value;
+    settings.recruitPost = recruitPost;
+    saveSettings();
+  }
+  if (ev.target.id === 'stance-post' && armySelection.length) setStance('defend');
   if (ev.target.id === 'repeat-site' || ev.target.id === 'repeat-key') {
     armyAutomation.siteId = Number($('#repeat-site').value);
     armyAutomation.key = $('#repeat-key').value;

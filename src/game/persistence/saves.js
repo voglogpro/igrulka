@@ -4,6 +4,8 @@ import { ROAD_HP, normalizeRoadOverlaps } from '../city/road-network.js';
 import { campRoads } from '../city/roads.js';
 import { log } from '../shared/events.js';
 import { restoreDistricts } from '../territory/persistence.js';
+import { validStance } from '../units/ground/stance.js';
+import { RALLY_MODES } from '../units/ground/recruitment.js';
 import { isFactoryPlan } from '../units/aviation/factory-plans.js';
 import { validateSquadMetadata } from './squads.js';
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
@@ -228,6 +230,7 @@ export function load(raw) {
         throw Error('Повреждена реакция гарнизона');
     if (u.guardTargetId != null && (!Number.isSafeInteger(u.guardTargetId) || u.guardTargetId <= 0))
       throw Error('Повреждена цель гарнизона');
+    if (u.stance != null && !validStance(u.stance)) throw Error('Повреждён режим отряда');
     for (const key of ['threatX', 'threatZ', 'threatAt', 'coverCheckAt', 'coverSince'])
       if (u[key] != null && !Number.isFinite(u[key])) throw Error('Повреждена реакция на огонь');
     if (
@@ -241,7 +244,10 @@ export function load(raw) {
       throw Error('Повреждена реакция на огонь');
   }
   for (const b of s.buildings) {
-    for (const q of b.armyQueue || []) validateSquadMetadata(q, true);
+    for (const q of b.armyQueue || []) {
+      validateSquadMetadata(q, true);
+      if (q.stance != null && !validStance(q.stance)) throw Error('Повреждён режим пополнения');
+    }
     if (b.productionPlan != null) {
       if (b.key !== 'factory' || !isFactoryPlan(b.productionPlan))
         throw Error('Повреждён план боезапаса');
@@ -258,7 +264,7 @@ export function load(raw) {
         Math.abs(b.rally.z) > MAP.depth / 2 - 16)
     )
       throw Error('Повреждена точка сбора');
-    if (b.rallyMode != null && !['guard', 'wait', 'attackmove'].includes(b.rallyMode))
+    if (b.rallyMode != null && !RALLY_MODES.includes(b.rallyMode))
       throw Error('Повреждены приказы новобранцам');
     if (b.armyQueue?.some((q) => !configured(GROUND_UNITS, q.key) || !Number.isFinite(q.progress)))
       throw Error('Повреждена очередь казарм');

@@ -26,6 +26,7 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
     cancelTransportDelivery(u);
     u.guard = null;
     u.guardTargetId = null;
+    if (!aim.keepStance) u.stance = null;
     u.path = path;
     u.order = {
       ...destination,
@@ -85,6 +86,7 @@ export function commandUnits(s, side, ids, command) {
   let changed = 0;
   for (const u of units) {
     if (command === 'stop') {
+      u.stance = null;
       clearGroundRoute(u);
       cancelTransportDelivery(u);
       u.guard = null;

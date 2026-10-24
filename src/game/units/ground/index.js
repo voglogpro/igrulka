@@ -14,6 +14,16 @@ export { damageGround, impactGround } from './combat.js';
 export { updateGround } from './update.js';
 export { groundPath, walkable, GROUND_LIMIT, BRIDGES } from './navigation.js';
 export { guardGround, defendLineGround } from './guard.js';
+export {
+  applyStance,
+  validStance,
+  stanceLabel,
+  bridgePoint,
+  chooseBridge,
+  STANCE_MODES,
+  DEFEND_POSTS,
+  POST_NAMES,
+} from './stance.js';
 export { setRecruitRepeat, recruitRepeatStatus } from './repeat.js';
 export {
   veteranRank,

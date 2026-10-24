@@ -38,6 +38,8 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
       key: u.key,
       side: u.side,
       unitId: u.id,
+      yaw: u.yaw || 0,
+      crouched: !!(u.digging || u.trenchId || u.camouflaged),
       ...(visibleTo ? { visibleTo } : {}),
     });
     for (const passenger of s.groundUnits)
@@ -66,9 +68,9 @@ export function impactGround(s, p, event = emit) {
   const splash = profile === 'cannon' || artillery;
   const radius =
     profile === 'artillery'
-      ? 24
+      ? 18
       : profile === 'rocket'
-        ? 15
+        ? 11
         : splash
           ? 14
           : profile === 'antiArmor'
@@ -105,7 +107,9 @@ export function impactGround(s, p, event = emit) {
         damageGround(
           s,
           u,
-          p.damage * groundDamageMultiplier(p.shooterKey, u, p.kind) * (1 - dist / (radius * 1.5)),
+          p.damage *
+            groundDamageMultiplier(p.shooterKey, u, p.kind) *
+            (1 - dist / (radius * (artillery ? 1.15 : 1.5))),
           event,
           'blast',
           from,

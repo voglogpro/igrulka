@@ -291,6 +291,7 @@ export function sync() {
       );
       if (e.type === 'groundDestroyed') {
         if (E.isInfantry(e.key)) {
+          this.infantry.addCorpse(e, this.state.time);
           for (let i = 0; i < 5; i++)
             this.combatFX.puff(e.x, 0.8, e.z, 0.6, 0.7, {
               opacity: 0.16,

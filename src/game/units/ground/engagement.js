@@ -61,7 +61,7 @@ const profiles = {
     kind: 'shell',
     speed: 125,
     cost: 2.5,
-    spread: 12,
+    spread: 17,
     canBlind: true,
     stationary: true,
     suppressionLimit: Infinity,
@@ -72,7 +72,7 @@ const profiles = {
     kind: 'shell',
     speed: 140,
     cost: 3,
-    spread: 9,
+    spread: 14,
     canBlind: true,
     stationary: true,
     suppressionLimit: Infinity,
@@ -164,9 +164,9 @@ export function groundDamageMultiplier(shooterKey, target, kind = 'bullet') {
     sniper: { infantry: 1, light: 0.08, heavy: 0.01, building: 0.45 },
     cannon: { infantry: 1, light: 1.1, heavy: 1, building: 1 },
     antiArmor: { infantry: 0.045, light: 1.1, heavy: 1.25, building: 0.18 },
-    artillery: { infantry: 1, light: 0.75, heavy: 0.4, building: 1.3 },
+    artillery: { infantry: 0.9, light: 0.6, heavy: 0.3, building: 1.1 },
     autocannon: { infantry: 1, light: 0.85, heavy: 0.1, building: 0.7 },
-    rocket: { infantry: 1, light: 0.8, heavy: 0.35, building: 1.2 },
+    rocket: { infantry: 0.85, light: 0.6, heavy: 0.25, building: 1 },
   };
   return values[profile][armor];
 }

@@ -1,6 +1,7 @@
 import { GROUND_UNITS, defenseStats } from '../../config.js';
 import { clamp } from '../../shared/math.js';
 import { GROUND_LIMIT, walkable } from './navigation.js';
+import { validStance } from './stance.js';
 export function makeGround(s, side, key, x, z) {
   const d = GROUND_UNITS[key];
   const u = {
@@ -37,11 +38,12 @@ export function makeGround(s, side, key, x, z) {
   return u;
 }
 
-export function recruit(s, side, key, siteId = null, count = 1) {
+export function recruit(s, side, key, siteId = null, count = 1, stance = null) {
   const f = s.sides[side],
     d = GROUND_UNITS[key];
   count = clamp(Math.floor(count) || 1, 1, 5);
   if (s.result) return 'Кампания завершена';
+  if (!validStance(stance)) return 'Неизвестный режим';
   if (!d || (d.tech && !f.tech.includes(d.tech))) return 'Нужно исследование';
   const sites = s.buildings.filter(
     (b) =>
@@ -68,7 +70,11 @@ export function recruit(s, side, key, siteId = null, count = 1) {
   f.materials -= d.metal * count;
   for (let i = 0; i < count; i++) {
     sites.sort((a, b) => (a.armyQueue?.length || 0) - (b.armyQueue?.length || 0));
-    (sites[0].armyQueue ||= []).push({ key, progress: 0 });
+    (sites[0].armyQueue ||= []).push({
+      key,
+      progress: 0,
+      ...(stance ? { stance: { mode: stance.mode, post: stance.post ?? 'auto' } } : {}),
+    });
   }
   return true;
 }
@@ -88,7 +94,7 @@ export function setRally(s, side, id, point) {
   return true;
 }
 
-export const RALLY_MODES = ['guard', 'wait', 'attackmove'];
+export const RALLY_MODES = ['guard', 'wait', 'attackmove', 'attack', 'defend'];
 
 export function defaultRallyMode(s, site) {
   return site.rallyMode || (s.mode !== 'multiplayer' && site.side === 1 ? 'wait' : 'guard');

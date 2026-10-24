@@ -102,6 +102,7 @@ function assignPost(s, u, p, snapToCover = false) {
   clearGroundRoute(u);
   cancelTransportDelivery(u);
   u.guard = post;
+  u.stance = null;
   u.guardTargetId = null;
   u.guardNextThink = 0;
   u.path = placement.path;

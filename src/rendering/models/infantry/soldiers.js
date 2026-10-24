@@ -2,6 +2,9 @@ import * as T from '../../../../vendor/three/three.module.js';
 import { GROUND_UNITS, isInfantry } from '../../../game/config.js';
 import { groundVisible } from '../../../game/units/infantry/cover.js';
 import { buildInfantryAT } from './anti-tank.js';
+const CORPSE_LIFE = 40,
+  CORPSE_FALL = 0.45,
+  CORPSE_LIMIT = 90;
 const temp = new T.Object3D(),
   normal = new T.Vector3(),
   vertex = new T.Vector3(),
@@ -168,6 +171,7 @@ export class InfantryBatch {
     this.pools = new Map();
     this.material = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 });
     this.meshes = [];
+    this.corpses = [];
     this.selected = new T.InstancedMesh(
       new T.RingGeometry(0.9, 1, 24),
       new T.MeshBasicMaterial({
@@ -182,6 +186,22 @@ export class InfantryBatch {
     this.selected.frustumCulled = false;
     w.scene.add(this.selected);
     this.selected.count = 0;
+  }
+  // Fallen soldiers stay on the ground for a while; they are drawn from the same role pools.
+  addCorpse(e, time) {
+    if (!isInfantry(e.key)) return;
+    this.corpses.push({
+      key: e.key,
+      side: e.side,
+      x: e.x,
+      z: e.z,
+      yaw: e.yaw || 0,
+      at: time,
+      tilt: (Math.random() < 0.5 ? -1 : 1) * (0.15 + Math.random() * 0.25),
+      roll: (Math.random() - 0.5) * 0.6,
+      members: Math.max(1, GROUND_UNITS[e.key].members || 1),
+    });
+    if (this.corpses.length > CORPSE_LIMIT) this.corpses.shift();
   }
   pool(key, side) {
     const id = key + side;
@@ -278,6 +298,41 @@ export class InfantryBatch {
         temp.scale.setScalar(u.key === 'mog' ? 7 : u.key === 'assault' ? 4.5 : 1.8);
         temp.updateMatrix();
         this.selected.setMatrixAt(selected++, temp.matrix);
+      }
+    }
+    this.corpses = this.corpses.filter((c) => time - c.at < CORPSE_LIFE && time >= c.at - 1);
+    for (const c of this.corpses) {
+      bounds.center.set(c.x, 2, c.z);
+      if (!frustum.intersectsSphere(bounds)) continue;
+      const pool = this.pool(c.key, c.side),
+        age = time - c.at,
+        fall = Math.min(1, age / CORPSE_FALL),
+        // Ease-out: the body drops fast, then settles.
+        t = 1 - (1 - fall) * (1 - fall),
+        sink = age > CORPSE_LIFE - 5 ? (age - (CORPSE_LIFE - 5)) / 5 : 0;
+      for (let m = 0; m < c.members && pool.count < 512; m++) {
+        const index = pool.count++,
+          off = c.members > 1 ? (m - (c.members - 1) / 2) * 2.4 : 0,
+          cs = Math.cos(c.yaw),
+          sn = Math.sin(c.yaw);
+        temp.position.set(c.x + off * cs, 0.55 + 0.1 * (1 - t) - sink * 0.9, c.z - off * sn);
+        temp.rotation.set((-Math.PI / 2) * t + c.tilt * t, c.yaw + m, c.roll * t, 'YXZ');
+        temp.scale.set(1, 1, 1);
+        temp.updateMatrix();
+        pool.body.setMatrixAt(index, temp.matrix);
+        pool.body.userData.unitIds[index] = -1;
+        for (let leg = 0; leg < 2; leg++) {
+          temp.position.set(
+            c.x + off * cs + (leg ? 0.3 : -0.3) * cs,
+            0.35 - sink * 0.9,
+            c.z - off * sn - (leg ? 0.3 : -0.3) * sn - 0.6 * t,
+          );
+          temp.rotation.set((-Math.PI / 2) * t, c.yaw, (leg ? 1 : -1) * 0.2 * t, 'YXZ');
+          temp.scale.set(0.31, 1.22, 0.37);
+          temp.updateMatrix();
+          pool.legs.setMatrixAt(index * 2 + leg, temp.matrix);
+          pool.legs.userData.unitIds[index * 2 + leg] = -1;
+        }
       }
     }
     for (const u of units)

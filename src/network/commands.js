@@ -82,7 +82,12 @@ export function executeCommand(s, side, type, a = {}) {
         return invalid;
       if (a.siteId != null && (!validId(a.siteId) || !own(s, side, a.siteId)))
         return 'Казармы вам не принадлежат';
-      return E.recruit(s, side, a.key, a.siteId ?? null, a.count);
+      if (a.stance != null && !E.validStance(a.stance)) return invalid;
+      return E.recruit(s, side, a.key, a.siteId ?? null, a.count, a.stance ?? null);
+    case 'set-stance':
+      return unitsOwned(s, side, a.ids) && a.stance && E.validStance(a.stance)
+        ? E.applyStance(s, side, a.ids, a.stance)
+        : invalid;
     case 'deploy': {
       if (
         !configured(E.GROUND_UNITS, a.key) ||

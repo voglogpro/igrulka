@@ -11,6 +11,8 @@ export function panelHTML({
   armyCategory,
   recruitCount,
   armyAutomation,
+  recruitMode,
+  recruitPost,
 }) {
   let html = `<div class="panel-head"><span class="eyebrow">${{ attack: 'АРСЕНАЛ И АТАКА', research: 'ИССЛЕДОВАНИЯ', economy: 'ЭКОНОМИКА', settings: 'НАСТРОЙКИ', help: 'ПРАВИЛА', army: 'НАЗЕМНАЯ АРМИЯ' }[panel]}</span><button data-action="close-panel" aria-label="Закрыть">×</button></div>`;
   if (panel === 'attack') {
@@ -28,7 +30,14 @@ export function panelHTML({
   if (panel === 'attack') html += factoryPlansHTML();
   if (panel === 'research') html += techTreeHTML();
   if (panel === 'army') {
-    html += recruitmentHTML({ state, armyCategory, recruitCount, armyAutomation });
+    html += recruitmentHTML({
+      state,
+      armyCategory,
+      recruitCount,
+      armyAutomation,
+      recruitMode,
+      recruitPost,
+    });
   }
   if (panel === 'economy') {
     html += `<h2>Город и снабжение</h2><div id="economy-values"></div><div id="economy-buildings"></div><p class="status-note">Предприятие у связанной со штабом дороги работает на 100%. При разрыве пути его выпуск падает до 20%. Дефицит электричества и повреждения снижают его дополнительно.</p><p class="status-note">Пусковые автономны и не требуют дороги. Дороги снабжают заводы и экономику; их можно чинить или обходить новой улицей. Бонус бота зависит от сложности (0–45%) и действует только на поступления ресурсов; цены совпадают.</p>`;

@@ -1,5 +1,6 @@
 import * as E from '../game/index.js';
 import { $ } from './format.js';
+import { icon } from './icons.js';
 
 export const ARMY_CATEGORIES = {
   infantry: {
@@ -19,6 +20,8 @@ export function recruitmentHTML({
   armyCategory = 'infantry',
   recruitCount = 1,
   armyAutomation,
+  recruitMode = 'point',
+  recruitPost = 'auto',
 }) {
   const category = ARMY_CATEGORIES[armyCategory] || ARMY_CATEGORIES.infantry;
   return `<div class="army-category-tabs">${Object.entries(ARMY_CATEGORIES)
@@ -28,7 +31,7 @@ export function recruitmentHTML({
     )
     .join(
       '',
-    )}</div><div class="recruit-batch"><span>За клик</span><button data-recruit-count="1" class="${recruitCount === 1 ? 'active' : ''}">×1</button><button data-recruit-count="5" class="${recruitCount === 5 ? 'active' : ''}">×5</button><span id="army-capacity"></span></div><div class="army-recruit">${category.keys
+    )}</div><div class="recruit-batch"><span>За клик</span><button data-recruit-count="1" class="${recruitCount === 1 ? 'active' : ''}">×1</button><button data-recruit-count="5" class="${recruitCount === 5 ? 'active' : ''}">×5</button><span id="army-capacity"></span></div><div class="recruit-mode"><span>Куда</span><div class="stance-switch" role="group" aria-label="Куда отправлять новых бойцов"><button data-recruit-mode="point" class="${recruitMode === 'point' ? 'active' : ''}" title="Выбрать точку на карте">${icon('hand')}В точку</button><button data-recruit-mode="attack" class="${recruitMode === 'attack' ? 'active' : ''}" title="Сразу идти на штаб противника">${icon('sword')}В атаку</button><button data-recruit-mode="defend" class="${recruitMode === 'defend' ? 'active' : ''}" title="Занять мост и окопаться">${icon('shield')}Оборона</button></div><select id="recruit-post" aria-label="Мост для обороны" ${recruitMode === 'defend' ? '' : 'hidden'}><option value="auto" ${recruitPost === 'auto' ? 'selected' : ''}>Мост: авто</option><option value="north" ${recruitPost === 'north' ? 'selected' : ''}>Северный</option><option value="south" ${recruitPost === 'south' ? 'selected' : ''}>Южный</option></select></div><div class="army-recruit">${category.keys
     .map((key) => {
       const d = E.GROUND_UNITS[key],
         locked = d.tech && !state.sides[0].tech.includes(d.tech);
@@ -53,7 +56,7 @@ function autoRecruitmentHTML(state, choice = { siteId: null, key: 'infantry' }) 
     )}</select></label></div><button data-action="repeat-toggle" id="repeat-toggle">Включить</button><p class="status-note" id="repeat-status"></p><p class="army-panel-hint">Новый отряд оплачивается после завершения очереди. Отключение сохраняет уже оплаченную очередь.</p></details>`;
 }
 
-export function updateArmyRecruitment({ state, recruitCount }) {
+export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'point' }) {
   const faction = state.sides[0];
   const sites = state.buildings.filter((b) => b.side === 0 && b.key === 'barracks' && b.hp > 0);
   const ready = sites.filter((b) => b.progress >= 1);
@@ -128,6 +131,10 @@ export function updateArmyRecruitment({ state, recruitCount }) {
           ? 'Не хватает ресурсов'
           : full
             ? 'Очередь заполнена'
-            : `Указать точку ×${recruitCount} ↗`;
+            : recruitMode === 'attack'
+              ? `В атаку ×${recruitCount}`
+              : recruitMode === 'defend'
+                ? `На оборону ×${recruitCount}`
+                : `Указать точку ×${recruitCount} ↗`;
   }
 }
