@@ -4,6 +4,7 @@ import { ROAD_HP, normalizeRoadOverlaps } from '../city/road-network.js';
 import { campRoads } from '../city/roads.js';
 import { log } from '../shared/events.js';
 import { restoreDistricts } from '../territory/persistence.js';
+import { createWeather, validWeather } from '../weather.js';
 import { validStance } from '../units/ground/stance.js';
 import { RALLY_MODES } from '../units/ground/recruitment.js';
 import { isFactoryPlan } from '../units/aviation/factory-plans.js';
@@ -368,6 +369,8 @@ export function load(raw) {
       r.repairing = false;
     }
   }
+  s.weather ??= createWeather(s.seed);
+  if (!validWeather(s.weather)) throw Error('Повреждена погода');
   restoreDistricts(s);
   s.version = VERSION;
   s.events = [];

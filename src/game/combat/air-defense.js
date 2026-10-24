@@ -12,6 +12,7 @@ import { sensorSources, unitVisible } from '../visibility.js';
 import { random } from '../shared/random.js';
 import { COMBAT } from './config.js';
 import { recordFire } from '../units/infantry/cover.js';
+import { weatherSpread } from '../weather.js';
 export function interceptPoint(origin, u, speed) {
   const rx = u.x - origin.x,
     ry = u.y - origin.y,
@@ -148,6 +149,7 @@ export function fireDefenses(s, rates, dt) {
           (radar ? 0.75 : 1) *
           (b.tracking < 1.2 ? 1.5 : 1) *
           d.accuracy *
+          weatherSpread(s) *
           (1 + Math.pow(b.heat, 2) * 3) *
           (infantry && b.key !== 'mog' ? 1.7 : 1);
     aim.x += (random(s) - 0.5) * spread * 2;

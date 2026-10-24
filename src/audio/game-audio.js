@@ -11,6 +11,7 @@ import {
   impulseResponse,
   sirenLoop,
   mopedLoop,
+  rainLoop,
 } from './synth.js';
 
 // How loud each weapon is and how often the same class may start a new sound.
@@ -149,6 +150,7 @@ export class GameAudio {
         jet: this.buffer(jetLoop(rate)),
         moped: this.buffer(mopedLoop(rate)),
         siren: this.buffer(sirenLoop(rate)),
+        rain: this.buffer(rainLoop(rate)),
       },
       jobs = [];
     const add = (name, make) => jobs.push(() => (out[name] ||= []).push(this.buffer(make())));
@@ -301,6 +303,15 @@ export class GameAudio {
         });
       return;
     }
+    if (e.type === 'lightning') {
+      // Light arrives at once, the thunder after the distance has been covered.
+      this.sample('blastLarge', where.distance, where.pan, 1.6, {
+        rate: 0.45,
+        force: true,
+        delay: 0.25 + where.distance / 300,
+      });
+      return;
+    }
     if (e.type === 'build') {
       this.tone(210, 160, 0.09, 0.045, 'triangle');
       return;
@@ -370,6 +381,15 @@ export class GameAudio {
     sirenWet.connect(this.reverbIn);
     siren.start();
     this.siren = { source: siren, level: sirenLevel, filter: sirenTone, on: false };
+    const rain = c.createBufferSource(),
+      rainLevel = c.createGain();
+    rain.buffer = this.buffers.rain;
+    rain.loop = true;
+    rainLevel.gain.value = 0;
+    rain.connect(rainLevel);
+    rainLevel.connect(this.dry);
+    rain.start();
+    this.rain = { level: rainLevel };
   }
   // Raid warning: enemy aircraft in the air close to any of the listener's buildings.
   raidThreat(state, side) {
@@ -406,6 +426,17 @@ export class GameAudio {
       rightZ: m[2],
     };
     if (!paused) this.incoming(state);
+    if (this.rain) {
+      const wx = state.weather,
+        wet = wx && (wx.kind === 'rain' || wx.kind === 'storm') ? wx.amount : 0;
+      // Rain is quieter from high above the valley.
+      const height = Math.max(0.35, Math.min(1, 380 / Math.max(120, camera.position.y)));
+      this.rain.level.gain.setTargetAtTime(
+        this.enabled && !paused ? wet * 0.14 * height : 0,
+        t,
+        0.8,
+      );
+    }
     if (this.siren) {
       const city = paused ? null : this.raidThreat(state, side);
       const near = city
@@ -521,6 +552,7 @@ export class GameAudio {
       enginePool: this.engines.length,
       activeEngines: this.activeEngines,
       siren: !!this.siren?.on,
+      rain: this.rain?.level.gain.value ?? 0,
     };
   }
 }

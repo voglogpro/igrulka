@@ -29,25 +29,27 @@ export function radarSources(s, side) {
         .map((b) => ({ x: b.x, z: b.z, air: VISION.radar, kind: 'radar', id: b.id }));
 }
 
+// Rain, fog and night shrink every observation circle; radar is not affected.
 export const weatherVisibility = (s) => s.weather?.visibility ?? 1;
 
-// Seeing distance of an observer; direct-fire weapons always see as far as they can shoot.
-export function observerRadius(o) {
+// Seeing distance of an observer. Weather and night shrink the sight but never below the range
+// of its own direct-fire weapon, so a gun can always shoot at what it could reach.
+export function observerRadius(o, scale = 1) {
   const d = GROUND_UNITS[o.key];
   if (d) {
     const reach = d.indirect ? 0 : Math.max(d.groundRange || 0, d.range || 0);
-    return Math.max(d.sight || 150, reach);
+    return Math.max((d.sight || 150) * scale, reach);
   }
   const b = BUILDINGS[o.key];
-  if (o.key === 'hq') return 260;
-  return Math.max(150, b?.range || 0);
+  const sight = o.key === 'hq' ? 260 : 150;
+  return Math.max(sight * scale, b?.range || 0);
 }
 
 function build(s, side) {
   const grid = new Uint8Array(GRID.cols * GRID.rows),
     scale = weatherVisibility(s),
     mark = (x, z, radius) => {
-      const r = radius * scale,
+      const r = radius,
         c0 = Math.max(0, Math.floor((x - r - GRID.ox) / GRID.cell)),
         c1 = Math.min(GRID.cols - 1, Math.floor((x + r - GRID.ox) / GRID.cell)),
         r0 = Math.max(0, Math.floor((z - r - GRID.oz) / GRID.cell)),
@@ -64,9 +66,9 @@ function build(s, side) {
     };
   for (const b of s.buildings)
     if (b.side === side && b.hp > 0 && b.progress >= 1 && !b.demolished)
-      mark(b.x, b.z, observerRadius(b));
+      mark(b.x, b.z, observerRadius(b, scale));
   for (const u of s.groundUnits || [])
-    if (u.side === side && u.hp > 0 && !u.carrierId) mark(u.x, u.z, observerRadius(u));
+    if (u.side === side && u.hp > 0 && !u.carrierId) mark(u.x, u.z, observerRadius(u, scale));
   return { radar: radarSources(s, side).length > 0, grid };
 }
 

@@ -3,6 +3,7 @@ import { campRoads } from './city/roads.js';
 import { log } from './shared/events.js';
 import { createDistricts } from './territory/state.js';
 import { DIFFICULTY, DEFAULT_DIFFICULTY } from './ai/difficulty.config.js';
+import { createWeather } from './weather.js';
 export const newSide = () => ({
   credits: 3200,
   materials: 200,
@@ -21,6 +22,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
     difficulty: DIFFICULTY[difficulty] ? difficulty : DEFAULT_DIFFICULTY,
     time: 0,
     seed,
+    weather: createWeather(seed),
     rng: seed || 1,
     nextId: 3,
     networkRevision: 0,

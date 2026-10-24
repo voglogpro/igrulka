@@ -455,8 +455,23 @@ function updateRadarChip() {
     ? 'Радар работает: видны все вражеские войска и пуски'
     : 'Без радара видны только войска рядом с вашими бойцами и постройками. Пуски и стрельбу слышно.';
 }
+function updateWeatherChip() {
+  const chip = $('#weather-chip'),
+    f = E.forecast(state),
+    w = state.weather;
+  if (!f || !w) return;
+  const info = E.WEATHER[f.now],
+    percent = Math.round((1 - w.visibility) * 100);
+  chip.textContent =
+    f.now === 'clear'
+      ? `${info.name}${f.next && f.next !== 'clear' ? ' · далее: ' + E.WEATHER[f.next].name.toLowerCase() : ''}`
+      : `${info.name} ${Math.round(f.amount * 100)}% · обзор −${percent}%`;
+  chip.title = `Погода меняет обзор (−${percent}%), разброс (${w.spread.toFixed(2)}×) и скорость техники (${w.speed.toFixed(2)}×). Радар не страдает.`;
+  chip.classList.toggle('online', f.now === 'clear');
+}
 function updateHUD() {
   updateRadarChip();
+  updateWeatherChip();
   districtHUD.update(
     state,
     armySelection,

@@ -304,6 +304,10 @@ export function sync() {
           this.addShake(e.x, e.z, 0.5);
         }
       }
+      if (e.type === 'lightning') {
+        this.weatherFX.lightning();
+        this.addShake(e.x, e.z, 0.35);
+      }
       if (e.type === 'shot') {
         const model = this.models.get(e.buildingId);
         if (model) model.recoil = 1;

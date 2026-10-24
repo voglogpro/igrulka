@@ -26,6 +26,7 @@ import * as T from '../../vendor/three/three.module.js';
 import { InfantryBatch } from './models/infantry/soldiers.js';
 import { CombatEffects } from './effects/combat-effects.js';
 import { FogVeil } from './fog-veil.js';
+import { WeatherFX } from './effects/weather-fx.js';
 import { disposeTree } from './mesh-utils.js';
 import { aircraftModel } from './models/aircraft.js';
 import { FixedCamera } from './camera.js';
@@ -287,6 +288,7 @@ export class RTSWorld {
     this.infantry = new InfantryBatch(this);
     this.combatFX = new CombatEffects(this);
     this.fogVeil = new FogVeil(this.scene);
+    this.weatherFX = new WeatherFX(this.scene);
     this.tactical = new TacticalView(this);
     this.deploymentPreview = new DeploymentPreview(this.scene);
     this.sync();
@@ -494,7 +496,8 @@ export class RTSWorld {
       effects: this.combatFX.diagnostics().particles,
       fx: this.combatFX.diagnostics(),
       memory: { ...this.renderer.info.memory, programs: this.renderer.info.programs.length },
-      fogOfWar: false,
+      fogOfWar: true,
+      weather: this.weatherFX.diagnostics(),
       detectedEnemies: this.state.units.filter(
         (u) => u.side === 1 && E.unitVisible(this.state, 0, u),
       ).length,
@@ -544,6 +547,9 @@ export class RTSWorld {
     this.updateDaylight();
     this.sync();
     this.fogVeil.update(this.state, wallDt);
+    const wx = this.state.weather,
+      rainy = wx && (wx.kind === 'rain' || wx.kind === 'storm') ? wx.amount : 0;
+    this.weatherFX.update(wallDt, this.elapsed, this.controls.target, rainy);
     this.combatFX.emit(this.state, this.visualDt, (u) => E.unitVisible(this.state, 0, u));
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);
     if (this.buildKey && this.lastPointer) this.updateGhost(this.lastPointer);

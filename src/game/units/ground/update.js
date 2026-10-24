@@ -15,6 +15,7 @@ import { veteranAccuracy, veteranSuppression } from './veterancy.js';
 import { squadArrivalPoint } from './squads.js';
 import { updateGroundTactics } from './tactics.js';
 import { applyStance, updateStance } from './stance.js';
+import { weatherSpread, weatherSpeed } from '../../weather.js';
 import {
   prepareGroundEngagement,
   groundEngagement,
@@ -94,7 +95,7 @@ export function tickUnit(s, u, dt, rates, hooks) {
       dz = p.z - u.z,
       len = Math.hypot(dx, dz),
       slow = retreat ? 1.3 : u.suppression > 0.8 ? 0.3 : u.suppression > 0.45 ? 0.65 : 1,
-      speed = d.speed * (u.hp / u.maxHp < 0.3 ? 0.75 : 1) * slow,
+      speed = d.speed * (u.hp / u.maxHp < 0.3 ? 0.75 : 1) * slow * weatherSpeed(s),
       dist = Math.min(len, speed * dt);
     u.yaw = Math.atan2(dx, dz);
     if (
@@ -147,7 +148,8 @@ export function tickUnit(s, u, dt, rates, hooks) {
       (u.moving ? 2 : 1) *
       (1 + u.suppression * 2) *
       (1 + Math.pow(u.heat || 0, 2) * 2) *
-      veteranAccuracy(u),
+      veteranAccuracy(u) *
+      weatherSpread(s),
     predicted = blind ? aim : groundAimPoint(u, aim, shot.speed, s),
     tx = predicted.x + (random(s) - 0.5) * spread,
     tz = predicted.z + (random(s) - 0.5) * spread,

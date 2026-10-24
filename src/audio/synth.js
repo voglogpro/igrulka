@@ -366,3 +366,29 @@ export function mopedLoop(sampleRate) {
   }
   return finish(data, 1.4);
 }
+
+// Steady rain on open ground: broadband hiss with a soft low patter underneath.
+export function rainLoop(sampleRate) {
+  const data = new Float32Array(sampleRate * 3),
+    high = onePole(6500, sampleRate),
+    low = onePole(1400, sampleRate),
+    rumble = onePole(200, sampleRate);
+  let a = 0,
+    b = 0,
+    c = 0;
+  for (let i = 0; i < data.length; i++) {
+    const white = Math.random() * 2 - 1;
+    a += high * (white - a);
+    b += low * (white - b);
+    c += rumble * (white - c);
+    const patter = Math.random() < 0.012 ? (Math.random() - 0.5) * 1.6 : 0;
+    data[i] = (a - b) * 1.3 + b * 0.5 + c * 1.5 + patter;
+  }
+  // Crossfade the ends so the loop has no seam.
+  const fade = Math.floor(sampleRate * 0.25);
+  for (let i = 0; i < fade; i++) {
+    const t = i / fade;
+    data[i] = data[i] * t + data[data.length - fade + i] * (1 - t);
+  }
+  return finish(data.subarray(0, data.length - fade), 1.1);
+}

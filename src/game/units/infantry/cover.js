@@ -144,7 +144,7 @@ export function groundVisible(s, side, u) {
   if (!c.concealment || u.moving) return true;
   const factor = u.camouflaged ? 0.2 : 0.43,
     flash = s.time - (u.lastFire ?? -1000) < 2.2,
-    night = 0.65 + dayPhase(s.time).daylight * 0.35;
+    night = (0.65 + dayPhase(s.time).daylight * 0.35) * (s.weather?.visibility ?? 1);
   for (const v of s.groundUnits || [])
     if (v.side === side && v.hp > 0 && !v.carrierId && observes(s, v, u, factor, flash, night))
       return true;

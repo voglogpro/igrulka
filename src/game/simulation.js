@@ -10,10 +10,12 @@ import { moveProjectiles } from './combat/projectiles.js';
 import { ai } from './ai/city-ai.js';
 import { updateDistricts } from './territory/districts.js';
 import { updateFactoryPlans } from './units/aviation/factory-plans.js';
+import { updateWeather } from './weather.js';
 export function step(s, dt) {
   if (s.result || !Number.isFinite(dt) || dt <= 0) return;
   dt = Math.min(0.1, dt);
   s.time += dt;
+  updateWeather(s, dt);
   const rates = [economy(s, 0), economy(s, 1)];
   for (let owner = 0; owner < 2; owner++) {
     const f = s.sides[owner],

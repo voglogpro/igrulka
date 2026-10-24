@@ -1,5 +1,7 @@
 import * as T from '../../vendor/three/three.module.js';
 import * as E from '../game/index.js';
+export const WEATHER_FOG = new T.Color('#5d6c74');
+export const FLASH_FOG = new T.Color('#cfe0ff');
 export const NIGHT_FOG = new T.Color('#111e30');
 
 export const DAY_FOG = new T.Color('#7297b0');
@@ -23,6 +25,25 @@ export function updateDaylight() {
   this.scene.fog.color.copy(NIGHT_FOG).lerp(DAY_FOG, d.daylight);
   this.scene.background.copy(this.scene.fog.color);
   this.scene.fog.density = 0.00055 + d.night * 0.0002;
+  // Weather: overcast sky, flat light, thick fog; lightning briefly floods the valley.
+  const wx = this.state.weather,
+    amount = wx?.amount ?? 0,
+    kind = wx?.kind ?? 'clear',
+    overcast = kind === 'fog' ? 0.35 : kind === 'clear' ? 0 : 0.6,
+    flash = this.weatherFX?.flash ?? 0;
+  if (amount > 0) {
+    this.sun.intensity *= 1 - overcast * amount;
+    this.hemi.intensity *= 1 - 0.18 * overcast * amount;
+    this.scene.fog.density +=
+      amount * (kind === 'fog' ? 0.0034 : kind === 'storm' ? 0.0011 : 0.0007);
+    this.scene.fog.color.lerp(WEATHER_FOG, Math.min(1, amount * (kind === 'fog' ? 0.75 : 0.5)));
+    this.scene.background.copy(this.scene.fog.color);
+  }
+  if (flash > 0) {
+    this.hemi.intensity += flash * 3.2;
+    this.scene.fog.color.lerp(FLASH_FOG, flash * 0.6);
+    this.scene.background.copy(this.scene.fog.color);
+  }
   this.sunDisc.position.set(Math.cos(d.angle) * -2300, Math.sin(d.angle) * 2300, -800);
   this.sunDisc.visible = d.daylight > 0;
   // Moving the shadow coverage translates the light AND its target together.
@@ -42,7 +63,7 @@ export function updateDaylight() {
   this.sun.target.position.copy(anchor);
   this.sun.target.updateMatrixWorld();
   if (this.facadeMat) this.facadeMat.emissiveIntensity = 0.12 + d.night * 1.2;
-  this.renderer.toneMappingExposure = 1.25 + d.night * 0.2;
+  this.renderer.toneMappingExposure = 1.25 + d.night * 0.2 - 0.14 * amount * overcast;
   for (const mat of this.sharedMaterials)
     if (mat.emissiveIntensity > 0 && mat !== this.facadeMat) {
       mat.userData.baseEmission ??= mat.emissiveIntensity;
