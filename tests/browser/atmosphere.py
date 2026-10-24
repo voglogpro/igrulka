@@ -62,7 +62,7 @@ try:
         ids = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),s=w.state,next=E.createGame(2410);next.mode='multiplayer';next.rules.rear=false;
           for(const f of next.sides){f.credits=20000;f.materials=3000;f.rearAuto=false;}
           Object.assign(s,next);w.previousSimTime=s.time;
-          const house=E.build(s,0,'housing',-960,-80);house.progress=1;house.hp=house.maxHp-120;
+          const house=E.build(s,0,'housing',-960,-80);house.progress=1;house.hp=house.maxHp;
           w.controls.focus(-1020,-45,240);w.controls.update(3);w.sync();return {house:house.id};}''')
         card = page.locator('[data-build="service"]')
         card.scroll_into_view_if_needed()

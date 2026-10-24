@@ -101,7 +101,7 @@ try:
         for side,page in enumerate(pages):
             activate(page)
             page.locator('[data-build="power"]').click()
-            point=page.evaluate('''side=>{const w=skyfront.getWorld(),v=w.camera.position.clone().set(side?670:-670,0,-80).project(w.camera),r=w.renderer.domElement.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}''',side)
+            point=page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),hq=w.state.buildings.find(b=>b.key==='hq'&&b.side===0),x=hq.x+Math.sign(hq.x)*55,z=hq.z-80,error=E.canPlace(w.state,'power',x,z);if(error)throw Error(error);const v=w.camera.position.clone().set(x,0,z).project(w.camera),r=w.renderer.domElement.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}''')
             page.mouse.click(point['x'],point['y'])
             page.wait_for_function('skyfront.getState().buildings.some(b=>b.key==="power"&&b.side===0)',polling=50)
             page.keyboard.press('Escape')
