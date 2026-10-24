@@ -97,6 +97,14 @@ export function launchSupplyRequests(s, side) {
     const allowed = weaponKeys.filter(
       (key) => launchSiteAllows(site, key) && movableWeaponStock(s, side, key) >= 1,
     );
+    const requested = Object.entries(site.weaponDemand || {}).find(
+      ([key, count]) => count > availableLaunchStock(site, key),
+    );
+    if (requested) {
+      const [key] = requested;
+      if (allowed.includes(key)) requests.push({ siteId: site.id, key, amount: 1 });
+      continue;
+    }
     // Balance stocked types instead of filling every slot with the first weapon.
     allowed.sort((a, b) => availableLaunchStock(site, a) - availableLaunchStock(site, b));
     if (allowed.length) requests.push({ siteId: site.id, key: allowed[0], amount: 1 });
@@ -117,8 +125,34 @@ export function updateLaunchSupply(s) {
       !buildingConnected(s, site, BUILDINGS.factory.size)
     )
       continue;
+    // The factory's own ready bay and warehouse share one location. Preparing
+    // its requested type is a local transfer; remote racks still need a van.
+    for (const [key, target] of Object.entries(site.weaponDemand || {})) {
+      if (!launchSiteAllows(site, key)) continue;
+      while (availableLaunchStock(site, key) < target && s.sides[site.side].inventory[key] > 0) {
+        if (launchStoreTotal(site) >= launchStoreCapacity(site)) {
+          const other = drones.find((k) => k !== key && availableLaunchStock(site, k) > 0);
+          if (!other) break;
+          site.launchStore[other]--;
+          s.sides[site.side].inventory[other]++;
+        }
+        const accepted = acceptLaunchDelivery(site, key, 1);
+        if (!accepted) break;
+        s.sides[site.side].inventory[key] -= accepted;
+      }
+    }
     while (launchStoreTotal(site) < launchStoreCapacity(site)) {
-      const choices = drones.filter((key) => s.sides[site.side].inventory[key] >= 1);
+      const free = launchStoreCapacity(site) - launchStoreTotal(site);
+      const choices = drones.filter(
+        (key) =>
+          s.sides[site.side].inventory[key] >= 1 &&
+          free >
+            Object.entries(site.weaponDemand || {}).reduce(
+              (n, [wanted, target]) =>
+                n + (wanted === key ? 0 : Math.max(0, target - availableLaunchStock(site, wanted))),
+              0,
+            ),
+      );
       choices.sort((a, b) => availableLaunchStock(site, a) - availableLaunchStock(site, b));
       if (!choices.length) break;
       const accepted = acceptLaunchDelivery(site, choices[0], 1);

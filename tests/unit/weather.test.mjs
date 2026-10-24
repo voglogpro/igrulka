@@ -40,7 +40,7 @@ test('weather is deterministic for a seed, saved and restored', () => {
   assert.throws(() => E.load(JSON.stringify(broken)));
 });
 
-test('fog and rain shrink sight and spoil aim, but never a unit’s own weapon reach', () => {
+test('atmospheric fog spoils aim without hiding ordinary units on the open map', () => {
   const s = E.createGame(3);
   s.mode = 'multiplayer';
   const spotter = E.makeGround(s, 0, 'infantry', -100, 0),
@@ -51,8 +51,7 @@ test('fog and rain shrink sight and spoil aim, but never a unit’s own weapon r
   s.weather = { ...createWeather(3), kind: 'fog', goal: 1, amount: 1, until: 1e9 };
   updateWeather(s, 0.05);
   s.time += 1;
-  // Infantry sight (185) times fog (0.74) no longer reaches 220 away.
-  assert.equal(E.groundVisible(s, 0, near), false);
+  assert.equal(E.groundVisible(s, 0, near), true);
   // The leopard still sees what it can shoot at.
   assert.equal(E.groundVisible(s, 0, farTank), true);
   assert.ok(E.weatherSpread(s) > 1);

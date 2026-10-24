@@ -15,7 +15,7 @@ export {
   requestWeaponDelivery,
   updateAmmoLogistics,
 } from './city/ammo-logistics.js';
-export { setSupportAutomatic } from './units/ground/rear.js';
+export { setSupportAutomatic, setRearAutomatic } from './units/ground/rear.js';
 export { COMBAT } from './combat/config.js';
 export { random } from './shared/random.js';
 export {

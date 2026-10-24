@@ -30,7 +30,7 @@ export function load(raw) {
   const s = JSON.parse(raw);
   const sourceVersion = s.version;
   if (
-    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, VERSION].includes(s.version) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||

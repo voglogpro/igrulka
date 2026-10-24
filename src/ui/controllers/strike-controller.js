@@ -6,6 +6,7 @@ export function createStrikeController({
   getWorld,
   getStarted,
   getRevision,
+  getEpoch = () => 0,
   execute,
   interaction,
   home,
@@ -24,6 +25,34 @@ export function createStrikeController({
     waypoints: [],
     routeEditing: false,
   };
+  let supplyRequest = 0,
+    pendingSupply = null;
+  async function requestSupply() {
+    const state = getState(),
+      key = model.weapon,
+      site = game.selectedLaunchSite(state, 0, model.launcherId, key),
+      count = model.count;
+    if (!site) return;
+    const epoch = getEpoch(),
+      revision = getRevision(),
+      signature = `${epoch}/${site.id}/${key}/${count}`;
+    if (pendingSupply === signature) return;
+    pendingSupply = signature;
+    const request = ++supplyRequest;
+    const result = await execute('launch-supply', { id: site.id, key, count });
+    if (request !== supplyRequest) return;
+    pendingSupply = null;
+    if (epoch !== getEpoch()) return;
+    if (result === true) persist();
+    if (
+      revision !== getRevision() ||
+      model.weapon !== key ||
+      game.selectedLaunchSite(getState(), 0, model.launcherId, key)?.id !== site.id
+    )
+      return;
+    if (typeof result === 'string') toast(result, true);
+    updateStrikeHUD();
+  }
   function attackAim() {
     return { ...model.aimPoint, waypoints: model.weapon === 'ballistic' ? [] : model.waypoints };
   }
@@ -116,6 +145,7 @@ export function createStrikeController({
     }
     updateStrikeHUD();
     refreshOrderPreview();
+    void requestSupply();
   }
   async function chooseAimPoint(p, modifiers = {}) {
     if (!getStarted() || !model.aiming) return;
@@ -173,6 +203,7 @@ export function createStrikeController({
     refreshOrderPreview,
     previewAimPoint,
     updateSiteSelect,
+    requestSupply,
     updateStrikeHUD,
     armStrike,
     chooseAimPoint,

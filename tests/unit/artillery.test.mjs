@@ -9,7 +9,6 @@ function fresh() {
   for (const f of s.sides) {
     f.credits = 1e5;
     f.materials = 1e5;
-    f.tech = Object.keys(E.TECH);
   }
   return s;
 }
@@ -21,14 +20,14 @@ function unit(s, side, key, x, z = 250) {
 
 test('a howitzer fires over a building that blocks direct fire', () => {
   const s = fresh(),
-    gun = unit(s, 0, 'howitzer', -560),
-    target = unit(s, 1, 'leopard', -260);
+    gun = unit(s, 0, 'howitzer', -960),
+    target = unit(s, 1, 'leopard', -660);
   target.hp = target.maxHp = 1e5;
   s.buildings.push({
     id: s.nextId++,
     key: 'radar',
     side: 0,
-    x: -410,
+    x: -810,
     z: 250,
     hp: 300,
     maxHp: 300,
@@ -43,12 +42,19 @@ test('a howitzer fires over a building that blocks direct fire', () => {
 
 test('artillery shells fly a high arc and burst with area damage', () => {
   const s = fresh();
-  const gun = unit(s, 0, 'howitzer', -560);
-  const crowd = [0, 1, 2].map((i) => unit(s, 1, 'infantry', -180 + i * 3, 250 + i * 2));
-  for (const u of crowd) u.holdFire = true;
+  const forest = E.COVER_PATCHES.find(
+    (p) => p.forest && p.x < -750 && p.x > -1300 && Math.abs(p.z) > 100 && Math.abs(p.z) < 700,
+  );
+  assert.ok(forest);
+  const gun = unit(s, 0, 'howitzer', forest.x - 380, forest.z);
+  const crowd = [0, 1, 2].map((i) => unit(s, 1, 'infantry', forest.x + i * 3, forest.z + i * 2));
+  for (const u of crowd) {
+    u.holdFire = true;
+    u.camouflaged = true;
+  }
   // Hidden infantry in the forest has to be spotted first.
   assert.equal(groundEngagement(s, gun).target, null);
-  unit(s, 0, 'sniper', -215).holdFire = true;
+  unit(s, 0, 'sniper', forest.x - 20, forest.z).holdFire = true;
   gun.nextThink = 0;
   let apex = 0;
   for (let i = 0; i < 400 && crowd.some((u) => u.hp === u.maxHp); i++) {
@@ -62,7 +68,7 @@ test('artillery shells fly a high arc and burst with area damage', () => {
 
 test('targets inside the dead zone are ignored', () => {
   const s = fresh(),
-    gun = unit(s, 0, 'howitzer', -500);
-  unit(s, 1, 'leopard', -440);
+    gun = unit(s, 0, 'howitzer', -1000);
+  unit(s, 1, 'leopard', -940);
   assert.equal(groundEngagement(s, gun).target, null);
 });

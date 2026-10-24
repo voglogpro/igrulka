@@ -48,7 +48,7 @@ export function renderArmyControls({ state, armySelection }, primary) {
   const d = E.GROUND_UNITS[primary.key];
   if (host.dataset.id !== signature) {
     host.dataset.id = signature;
-    host.innerHTML = `<div class="army-summary"><button class="army-name" data-action="army-focus" title="Показать выбранную группу"><b>${units.length > 1 ? `${units.length} единиц` : d.name}</b><small id="ground-info"></small></button><div class="health"><i id="inspect-health"></i></div><small id="ground-state"></small></div><div class="army-orders"><div class="stance-row"><span class="stance-label">РЕЖИМ</span><div class="stance-switch" role="group" aria-label="Режим выбранных бойцов"><button data-stance="attack" title="Сразу идти на штаб противника, останавливаясь для боя">${icon('sword')}Атака</button><button data-stance="defend" title="Занять коридор, окопаться и не подпускать врага">${icon('shield')}Оборона</button></div><select id="stance-post" aria-label="Какой коридор оборонять"><option value="auto">Коридор: авто</option><option value="north">Северный коридор</option><option value="south">Южный коридор</option></select><span id="stance-note" class="stance-note"></span></div><div class="army-primary-orders">${commands.map(([key, label, title], i) => `${i && GROUPS.has(key) ? '<i class="order-sep"></i>' : ''}<button data-troop="${key}" title="${title}">${label}</button>`).join('')}${units.some((u) => u.key === 'operator') ? '<button class="fpv-button" data-troop="fpv" title="Q · Навести FPV выбранного оператора">FPV ↗</button>' : ''}</div><div class="army-tools"><label>Строй <select id="formation" aria-label="Построение армии"><option value="line">Линия</option><option value="column">Колонна</option><option value="spread">Рассредоточить</option></select></label><button data-action="army-all" title="Ctrl+A · Все свои войска">Вся армия</button><button data-panel="army">Набор ↗</button><details class="army-details"><summary>Состояние</summary><div><p id="army-detail-text"></p><p id="army-auto-defense-note"></p><div id="defense-detail"></div></div></details><span class="army-mouse-hint">ПКМ — приказ · Esc — снять выбор</span></div></div><button class="army-close" data-action="deselect" aria-label="Снять выделение">×</button>`;
+    host.innerHTML = `<div class="army-summary"><button class="army-name" data-action="army-focus" title="Показать выбранную группу"><b>${units.length > 1 ? `${units.length} единиц` : d.name}</b><small id="ground-info"></small></button><div class="health"><i id="inspect-health"></i></div><small id="ground-state"></small></div><div class="army-orders"><div class="stance-row"><span class="stance-label">РЕЖИМ</span><div class="stance-switch" role="group" aria-label="Режим выбранных бойцов"><button data-stance="attack" title="Сразу идти на штаб противника, останавливаясь для боя">${icon('sword')}Атака</button><button data-stance="defend" title="Занять коридор, окопаться и не подпускать врага">${icon('shield')}Оборона</button></div><select id="stance-post" aria-label="Какой коридор оборонять"><option value="auto">Коридор: авто</option><option value="north">Северный коридор</option><option value="south">Южный коридор</option></select><span id="stance-note" class="stance-note"></span></div><div class="army-primary-orders">${commands.map(([key, label, title], i) => `${i && GROUPS.has(key) ? '<i class="order-sep"></i>' : ''}<button data-troop="${key}" title="${title}">${label}</button>`).join('')}${units.some((u) => u.key === 'operator') ? '<button class="fpv-button" data-troop="fpv" title="Q · Навести FPV выбранного оператора">FPV ↗</button>' : ''}</div><div class="army-tools"><label>Строй <select id="formation" aria-label="Построение армии"><option value="line">Линия</option><option value="column">Колонна</option><option value="spread">Рассредоточить</option></select></label><button data-action="army-all" title="Ctrl+A · Все свои войска">Вся армия</button><button data-panel="army">Набор ↗</button><details class="army-details"><summary>Оснащение и состояние</summary><div><p id="army-detail-text"></p><p id="army-auto-defense-note"></p><div id="defense-detail"></div></div></details><button data-action="support-auto" data-enabled="true" hidden>Автопомощь</button><span class="army-mouse-hint">ПКМ — приказ · Esc — снять выбор</span></div></div><button class="army-close" data-action="deselect" aria-label="Снять выделение">×</button>`;
     $('#formation').value = state.formations[0];
   }
   const hp = units.reduce((n, u) => n + u.hp, 0),
@@ -119,6 +119,20 @@ export function renderArmyControls({ state, armySelection }, primary) {
           : ` · ${rounds ?? stats.magazine}/${stats.magazine} · нагрев ${Math.round((primary.heat || 0) * 100)}%`;
   }
   host.querySelector('[data-troop="deliver"]').hidden = units.length !== 1 || !d.capacity;
+  const supportButton = host.querySelector('[data-action="support-auto"]'),
+    supportOnly = units.every((u) => ['medic', 'supply'].includes(E.GROUND_UNITS[u.key]?.support)),
+    automatic = units.filter((u) => !u.supportManual && state.sides[0].rearAuto !== false).length;
+  supportButton.hidden = !supportOnly;
+  if (supportOnly) {
+    const enabled = automatic === units.length;
+    supportButton.dataset.enabled = String(!enabled);
+    supportButton.setAttribute('aria-pressed', enabled ? 'true' : automatic ? 'mixed' : 'false');
+    supportButton.textContent = enabled ? 'Автопомощь: вкл' : 'Возобновить автопомощь';
+    supportButton.title =
+      state.sides[0].rearAuto === false
+        ? 'Включает службу и ставит выбранных на автоматику; ручные приказы остальных сохраняются'
+        : 'Санитары и снабжение сами помогают соседям. После «Стоять» или прямого приказа здесь можно вернуть автоматику.';
+  }
   const routed = units.filter((u) => u.routeState);
   if (units.length === 1 && E.ammunitionStatus) {
     const ammo = E.ammunitionStatus(state, primary);

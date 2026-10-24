@@ -1,13 +1,10 @@
 import { groundVisible } from './units/infantry/cover.js';
-// Enemy buildings are always known; enemy units and launches need an observer or a radar.
-import { fogVisible, radarSources, VISION } from './vision-grid.js';
+// The map and ordinary targets are open. Infantry concealment remains independent.
+import { radarSources, VISION } from './vision-grid.js';
 export { VISION };
 export const sensorSources = radarSources;
-export const pointVisible = (s, side, x, z) => fogVisible(s, side, x, z);
-export const unitVisible = (s, side, u) =>
-  u.delay <= 0 &&
-  (u.hp > 0 || u.status === 'falling') &&
-  (u.side === side || fogVisible(s, side, u.x, u.z));
+export const pointVisible = () => true;
+export const unitVisible = (_s, _side, u) => u.delay <= 0 && (u.hp > 0 || u.status === 'falling');
 export const eventVisible = () => true;
 export function observedTarget(s, side, id) {
   const u = (s.groundUnits || []).find((u) => u.id === Number(id) && u.hp > 0);

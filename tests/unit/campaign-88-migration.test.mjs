@@ -12,7 +12,7 @@ test('actual exported 8.8 city migrates facilities, paid work, health and explic
   const before = fixture();
   const s = E.load(JSON.stringify(before));
   assert.equal(before.version, 14);
-  assert.equal(s.version, 15);
+  assert.equal(s.version, E.VERSION);
   assert.equal(s.buildings[0].x, -E.HQ_X);
   assert.equal(s.buildings[1].x, E.HQ_X);
   const lab = before.buildings.find((b) => b.key === 'lab');

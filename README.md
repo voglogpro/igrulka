@@ -1,12 +1,14 @@
 # Небесный рубеж
 
-3D-стратегия в реальном времени: городская экономика, дороги, нефть, воздушные налёты, ПВО и наземная армия. Текущая версия — **8.9.0**.
+3D-стратегия в реальном времени: городская экономика, дороги, нефть, воздушные налёты, ПВО и наземная армия. Текущая версия — **8.9.1**.
 
 ## Запуск
 
 Откройте `Играть.cmd` или [play/Skyfront.html](play/Skyfront.html) в Chrome/Edge. Для одиночной игры установка пакетов и подключение к интернету не нужны. Готовый HTML включён в репозиторий.
 
 Перед переходом закройте вкладку предыдущей версии: локальные HTML в одном профиле Chrome используют общее сохранение. Для переноса между браузерами или профилями доступны «Экспорт» и «Импорт» в настройках.
+
+В 8.9.1 карта открыта без тумана войны, добавлены записанные шаги и мотор колёсной техники. Заполненная пусковая меняет тип вооружения через физический вывоз и доставку. Ремонтную технику можно направить в точку и вернуть к автоматической помощи из карточки. [Полный чеклист запросов](docs/REQUESTS_CHECKLIST.md) содержит проверку требований, заменённые решения и ограничения.
 
 В 8.9 убраны лаборатории и исследования. Улучшения оплачиваются деньгами прямо в карточке объекта: растут точность, темп огня и дальность, меняется модель. Вооружение доступно сразу, если построена нужная производственная база и хватает ресурсов:
 
@@ -53,23 +55,25 @@ npm run build      # play/Skyfront.html
 
 [Проверки 8.9 и измерения оптимизации](docs/qa/PRODUCTION-89.md) описывают сценарии, результаты и ограничения.
 
-| Задача                            | Файл                                                                            |
-| --------------------------------- | ------------------------------------------------------------------------------- |
-| Пехота                            | `src/game/units/infantry/types.js`                                              |
-| Техника и её стоимость            | `src/game/units/vehicles/types.js`                                              |
-| Здания и производственные базы    | `src/game/city/buildings.config.js`                                             |
-| Состав армии и автопополнение     | `src/game/units/ground/composition.js`                                          |
-| Подготовка, очередь, точка сбора  | `src/game/units/ground/recruitment.js`                                          |
-| Производство и подвоз боеприпасов | `src/game/city/ammo-production.js`, `src/game/city/ammo-logistics.js`           |
-| Местные магазины и перезарядка    | `src/game/units/ground/ammunition.js`                                           |
-| Темп пуска и готовый запас        | `src/game/units/aviation/launch-supply.js`, `src/game/units/aviation/launch.js` |
-| Рубежи, распределение, резервы    | `src/game/defense/`                                                             |
-| Выбор вооружения и налёт          | `src/ui/controllers/strike-controller.js`                                       |
-| Звук дронов / ракет               | `src/audio/engines.js`, `src/audio/missiles.js`                                 |
-| Дым, кратеры, взрывы              | `src/rendering/effects/`                                                        |
-| Карта и перенос координат         | `src/game/map.js`, `src/game/persistence/map-layout.js`                         |
-| Blender: исходники и экспорт      | `assets/models/`                                                                |
-| Старые исследования и компенсация | `src/game/persistence/retired-research.js`                                      |
-| Сетевая авторизация / приватность | `src/network/commands.js`, `src/network/perspective.js`                         |
+| Задача                               | Файл                                                                            |
+| ------------------------------------ | ------------------------------------------------------------------------------- |
+| Пехота                               | `src/game/units/infantry/types.js`                                              |
+| Техника и её стоимость               | `src/game/units/vehicles/types.js`                                              |
+| Здания и производственные базы       | `src/game/city/buildings.config.js`                                             |
+| Состав армии и автопополнение        | `src/game/units/ground/composition.js`                                          |
+| Подготовка, очередь, точка сбора     | `src/game/units/ground/recruitment.js`                                          |
+| Производство и подвоз боеприпасов    | `src/game/city/ammo-production.js`, `src/game/city/ammo-logistics.js`           |
+| Местные магазины и перезарядка       | `src/game/units/ground/ammunition.js`                                           |
+| Темп пуска и готовый запас           | `src/game/units/aviation/launch-supply.js`, `src/game/units/aviation/launch.js` |
+| Смена оружия на заполненной площадке | `src/game/city/weapon-transfer.js`                                              |
+| Рубежи, распределение, резервы       | `src/game/defense/`                                                             |
+| Выбор вооружения и налёт             | `src/ui/controllers/strike-controller.js`                                       |
+| Звук дронов / ракет                  | `src/audio/engines.js`, `src/audio/missiles.js`                                 |
+| Шаги и моторы колёсной техники       | `src/audio/footsteps.js`, `src/audio/game-audio.js`                             |
+| Дым, кратеры, взрывы                 | `src/rendering/effects/`                                                        |
+| Карта и перенос координат            | `src/game/map.js`, `src/game/persistence/map-layout.js`                         |
+| Blender: исходники и экспорт         | `assets/models/`                                                                |
+| Старые исследования и компенсация    | `src/game/persistence/retired-research.js`                                      |
+| Сетевая авторизация / приватность    | `src/network/commands.js`, `src/network/perspective.js`                         |
 
 Исторические заметки 8.7–8.8 описывают прежние правила. Текущие правила имеют приоритет. Шрифты, звук и сторонний код сопровождаются лицензиями в `assets/`, `fonts/` и `vendor/`.

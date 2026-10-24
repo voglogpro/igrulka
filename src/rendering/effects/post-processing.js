@@ -58,7 +58,7 @@ export class EveningPost {
    uniform sampler2D visionFrame;uniform vec2 visionOrigin;uniform vec2 visionExtent;uniform float visionActive;uniform vec3 visionTint;
    ${FILM_GRAIN_GLSL}
    void main(){vec3 col=texture2D(frame,vUv).rgb+texture2D(glow,vUv).rgb*.72;
-    if(groundFog>.001||visionActive>.5){float depth=texture2D(depthFrame,vUv).x;if(depth<.999999){
+    if(groundFog>.001){float depth=texture2D(depthFrame,vUv).x;if(depth<.999999){
       vec4 view=inverseProjection*vec4(vUv*2.-1.,depth*2.-1.,1.);view/=view.w;
       vec3 world=(cameraWorld*view).xyz;
       // Integrate a soft height density along the eye ray. Tall roofs fade gradually
@@ -69,10 +69,7 @@ export class EveningPost {
       float wisps=.9+.1*sin(world.x*.012+sin(world.z*.009)+time*.065);
       float haze=1.-exp(-groundFog*.007*length(view.xyz)*max(0.,density)*wisps);
       col=mix(col,fogTint,clamp(haze,0.,.38));
-      if(visionActive>.5){vec2 uv=(world.xz-visionOrigin)/visionExtent;
-        float veil=texture2D(visionFrame,clamp(uv,vec2(0.),vec2(1.))).a;
-        col=mix(col,visionTint,veil);
-      }
+
     }}
     float vig=1.-smoothstep(.23,.8,length((vUv-.5)*vec2(1.,.85)));col*=.88+.12*vig;
     gl_FragColor=vec4(col,1.);
@@ -89,11 +86,9 @@ export class EveningPost {
     this.uniforms.groundFog.value = weatherStyle(weather).groundFog;
     this.uniforms.fogTint.value.copy(this.fogNight).lerp(this.fogDay, daylight);
   }
-  setVision(vision) {
-    this.uniforms.visionFrame.value = vision.texture;
-    this.uniforms.visionOrigin.value.copy(vision.origin);
-    this.uniforms.visionExtent.value.copy(vision.extent);
-    this.uniforms.visionActive.value = vision.active ? 1 : 0;
+  // Retained for older callers; map fog cannot be re-enabled by a stale mask.
+  setVision() {
+    this.uniforms.visionActive.value = 0;
   }
   resize(width, height) {
     const ratio = this.renderer.getPixelRatio();
@@ -106,8 +101,7 @@ export class EveningPost {
   render(scene, camera, time) {
     this.uniforms.time.value = time;
     // Clear weather needs neither a depth resolve nor a full-screen depth texture fetch.
-    this.target.resolveDepthBuffer =
-      this.uniforms.groundFog.value > 0.001 || this.uniforms.visionActive.value > 0;
+    this.target.resolveDepthBuffer = this.uniforms.groundFog.value > 0.001;
     camera.updateMatrixWorld();
     this.uniforms.inverseProjection.value.copy(camera.projectionMatrixInverse);
     this.uniforms.cameraWorld.value.copy(camera.matrixWorld);

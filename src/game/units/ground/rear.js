@@ -4,6 +4,7 @@ import { random } from '../../shared/random.js';
 import { groundPath } from './navigation.js';
 import { loadSupplyTruck, supplyNearbyAmmo } from '../../city/ammo-logistics.js';
 import { createAmmoStock, ammunitionProfile, ammunitionStatus } from './ammunition.js';
+import { clearGroundRoute } from './route-queue.js';
 
 // Everything in this file happens without orders: soldiers who would die are sometimes only
 // wounded, medics find and revive them, supply trucks mend machines and refill magazines, and each
@@ -202,8 +203,27 @@ function truckTick(s, u, dt) {
   if ((u.supportAt || 0) > s.time) return;
   u.supportAt = s.time + THINK * 1.5 + (u.id % 5) * 0.05;
   if (u.supportManual) return;
-  if (!Object.values(u.ammoCargo).some((n) => n > 0)) {
-    const depot = loadSupplyTruck(s, u);
+  const missing = Object.values(u.ammoCargo).some((n) => n > 0)
+    ? [
+        ...new Set(
+          [...s.groundUnits, ...s.buildings]
+            .filter(
+              (v) =>
+                v.side === u.side &&
+                v.hp > 0 &&
+                !v.carrierId &&
+                !v.demolished &&
+                Math.hypot(v.x - u.x, v.z - u.z) < 380 &&
+                ammunitionProfile(v) &&
+                ammunitionStatus(s, v).reserve < ammunitionStatus(s, v).capacity,
+            )
+            .map((v) => ammunitionProfile(v).kind)
+            .filter((kind) => !u.ammoCargo[kind]),
+        ),
+      ]
+    : Object.keys(u.ammoCargo);
+  if (missing.length) {
+    const depot = loadSupplyTruck(s, u, missing);
     if (depot) {
       const point = { x: depot.x, z: depot.z + BUILDINGS.ammofactory.size * 0.7 + 8 };
       walkTo(s, u, point, 10);
@@ -263,7 +283,7 @@ function truckTick(s, u, dt) {
 
 export function updateRear(s, dt) {
   for (const u of s.groundUnits) {
-    if (u.hp <= 0 || u.carrierId || u.downed) continue;
+    if (u.hp <= 0 || u.carrierId || u.downed || s.sides[u.side].rearAuto === false) continue;
     const kind = GROUND_UNITS[u.key]?.support;
     if (kind === 'medic') medicTick(s, u, dt);
     else if (kind === 'supply') truckTick(s, u, dt);
@@ -274,23 +294,70 @@ export function updateRear(s, dt) {
 export function autoRear() {}
 
 export function setSupportAutomatic(s, side, ids, enabled = true) {
-  if (s.result || typeof enabled !== 'boolean') return 'Недоступный режим поддержки';
-  let changed = 0;
-  for (const u of s.groundUnits)
-    if (
-      u.side === side &&
-      u.hp > 0 &&
-      ['medic', 'supplytruck'].includes(u.key) &&
-      ids.includes(u.id)
-    ) {
-      u.supportManual = !enabled;
-      u.supportAt = 0;
-      if (enabled) {
+  if (
+    s.result ||
+    ![0, 1].includes(side) ||
+    typeof enabled !== 'boolean' ||
+    !Array.isArray(ids) ||
+    !ids.length ||
+    ids.length > 120 ||
+    ids.some((id) => !Number.isSafeInteger(id) || id < 1) ||
+    new Set(ids).size !== ids.length
+  )
+    return 'Недоступный режим поддержки';
+  const units = ids.map((id) =>
+    s.groundUnits.find(
+      (u) =>
+        u.id === id &&
+        u.side === side &&
+        u.hp > 0 &&
+        ['medic', 'supplytruck'].includes(u.key) &&
+        !u.carrierId &&
+        !u.boardingId &&
+        !u.downed,
+    ),
+  );
+  if (units.some((u) => !u)) return 'Выберите своих доступных медиков или машины снабжения';
+  // This explicit action also revives support in a legacy save with the old side switch off.
+  // Other units retain their own manual flags and orders.
+  if (enabled) s.sides[side].rearAuto = true;
+  for (const u of units) {
+    if (enabled || !u.supportManual) {
+      u.path = [];
+      u.order = null;
+      u.guard = null;
+      u.guardTargetId = null;
+      u.moving = false;
+      u.patientId = null;
+      clearGroundRoute(u);
+    }
+    u.supportManual = !enabled;
+    u.supportAt = 0;
+    if (enabled) u.stance = null;
+  }
+  return units.length;
+}
+
+export function setRearAutomatic(s, side, enabled) {
+  if (s.result || ![0, 1].includes(side) || typeof enabled !== 'boolean')
+    return 'Недоступный режим поддержки';
+  s.sides[side].rearAuto = enabled;
+  const units = s.groundUnits.filter(
+    (u) => u.side === side && u.hp > 0 && ['medic', 'supplytruck'].includes(u.key),
+  );
+  if (enabled) {
+    const ids = units.filter((u) => !u.carrierId && !u.boardingId && !u.downed).map((u) => u.id);
+    if (ids.length) setSupportAutomatic(s, side, ids, true);
+  } else
+    for (const u of units)
+      if (!u.supportManual) {
         u.path = [];
         u.order = null;
         u.guard = null;
+        u.guardTargetId = null;
+        u.moving = false;
+        u.patientId = null;
+        clearGroundRoute(u);
       }
-      changed++;
-    }
-  return changed || 'Выберите медика или машину снабжения';
+  return true;
 }

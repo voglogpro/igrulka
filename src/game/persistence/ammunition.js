@@ -27,8 +27,12 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
     s.ammoVehicles = [];
     s.ammoLogisticsAt = 0;
   }
-  for (const f of s.sides)
+  for (const f of s.sides) {
     if (!stock(f.ammoStock, C.stock)) throw Error('Повреждён склад боеприпасов');
+    f.ammoProductionSpent ??= 0;
+    if (!Number.isFinite(f.ammoProductionSpent) || f.ammoProductionSpent < 0)
+      throw Error('Повреждена статистика производства боеприпасов');
+  }
   for (const u of [...s.buildings, ...s.groundUnits]) {
     const profile = ammunitionProfile(u);
     if (sourceVersion < 15 && profile) {
@@ -61,6 +65,34 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
         ))
     )
       throw Error('Повреждён заказ доставки');
+    if (sourceVersion < 16 && u.weaponDemand) {
+      for (const [key, count] of Object.entries(u.weaponDemand)) {
+        const inbound = (s.ammoVehicles || []).reduce(
+          (n, van) =>
+            n +
+            (van.targetId === u.id &&
+            van.cargo?.kind === 'weapon' &&
+            van.cargo.key === key &&
+            van.hp > 0 &&
+            van.status !== 'returning'
+              ? van.cargo.amount
+              : 0),
+          0,
+        );
+        u.weaponDemand[key] = Math.min(
+          launchStoreCapacity(u),
+          count + (u.launchStore?.[key] || 0) + inbound,
+        );
+      }
+      // Older commands appended types. The last outstanding selection becomes
+      // the single active preference; all physical racks and cargo stay intact.
+      const last = Object.entries(u.weaponDemand)
+        .filter(([, count]) => count > 0)
+        .at(-1);
+      u.weaponDemand = last ? Object.fromEntries([last]) : {};
+    }
+    if (Object.keys(u.weaponDemand || {}).length > 1)
+      throw Error('Несколько активных типов доставки');
     if (u.ammoEnabled != null && (u.key !== 'ammofactory' || typeof u.ammoEnabled !== 'boolean'))
       throw Error('Повреждён завод боеприпасов');
     if (
@@ -133,6 +165,7 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
       (v.status === 'destroyed'
         ? v.hp !== 0 ||
           v.cargo != null ||
+          v.pickup != null ||
           v.path.length !== 0 ||
           v.targetId != null ||
           v.targetKind != null ||
@@ -165,7 +198,16 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
               v.cargo.amount > C.cargo[v.cargo.key]
             : depot.key !== 'factory' ||
               !['drone', 'heavy', 'cruise', 'ballistic'].includes(v.cargo.key) ||
-              v.cargo.amount > 1)))
+              v.cargo.amount > 1))) ||
+      (v.pickup != null &&
+        (!record(v.pickup) ||
+          depot.key !== 'factory' ||
+          v.cargo != null ||
+          v.targetKind !== 'building' ||
+          v.targetId == null ||
+          !['outbound', 'unloading', 'blocked'].includes(v.status) ||
+          !['drone', 'heavy', 'cruise', 'ballistic'].includes(v.pickup.key) ||
+          v.pickup.amount !== 1))
     )
       throw Error('Повреждена машина снабжения');
     if (s.ammoVehicles.filter((car) => car.side === v.side).length > C.fleetLimit)
@@ -174,6 +216,8 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
       (u) => u.id === v.targetId,
     );
     if (target && target.side !== v.side) throw Error('Чужой получатель снабжения');
+    if (target && v.pickup && !launchStoreCapacity(target, v.pickup.key))
+      throw Error('Несовместимый возврат вооружения');
     if (
       target &&
       v.cargo &&

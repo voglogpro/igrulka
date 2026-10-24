@@ -1,6 +1,5 @@
 import { groundVisible } from '../game/units/infantry/cover.js';
 import { unitVisible } from '../game/visibility.js';
-import { fogVisible } from '../game/vision-grid.js';
 
 const publicFields = (item, fields) =>
   Object.fromEntries(
@@ -139,16 +138,12 @@ export function playerView(authority, side) {
   view.buildings = view.buildings.map((b) =>
     b.side === side ? b : publicFields(b, buildingFields),
   );
-  view.trenches = (view.trenches || [])
-    .filter((t) => t.side === side || fogVisible(authority, side, t.x, t.z))
-    .map((t) =>
-      t.side === side
-        ? t
-        : publicFields(t, ['id', 'side', 'x', 'z', 'yaw', 'progress', 'fortificationWork']),
-    );
-  view.groundScars = (view.groundScars || []).filter(
-    (scar) => scar.side === side || fogVisible(authority, side, scar.x, scar.z),
+  view.trenches = (view.trenches || []).map((t) =>
+    t.side === side
+      ? t
+      : publicFields(t, ['id', 'side', 'x', 'z', 'yaw', 'progress', 'fortificationWork']),
   );
+  view.groundScars ||= [];
   view.frontlineMemory = [0, 1].map((owner) => {
     const memory = authority.frontlineMemory?.[owner];
     return owner === side && memory
@@ -175,13 +170,11 @@ export function playerView(authority, side) {
   view.serviceVehicles = (view.serviceVehicles || []).map((v) =>
     v.side === side ? v : publicFields(v, serviceFields),
   );
-  view.ammoVehicles = (view.ammoVehicles || [])
-    .filter((v) => v.side === side || fogVisible(authority, side, v.x, v.z))
-    .map((v) =>
-      v.side === side
-        ? v
-        : publicFields(v, ['id', 'side', 'depotId', 'x', 'y', 'z', 'yaw', 'status', 'hp', 'maxHp']),
-    );
+  view.ammoVehicles = (view.ammoVehicles || []).map((v) =>
+    v.side === side
+      ? v
+      : publicFields(v, ['id', 'side', 'depotId', 'x', 'y', 'z', 'yaw', 'status', 'hp', 'maxHp']),
+  );
   delete view.ammoLogisticsAt;
   view.ships = (view.ships || []).map((v) => (v.side === side ? v : publicFields(v, shipFields)));
   view.projectiles = view.projectiles

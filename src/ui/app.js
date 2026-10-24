@@ -95,6 +95,7 @@ const strike = createStrikeController({
   getWorld: () => world,
   getStarted: () => started,
   getRevision: () => interactionRevision,
+  getEpoch: () => campaignEpoch,
   execute,
   home,
   persist,
@@ -430,20 +431,6 @@ function handleEvent(e) {
     toast(`Налёт противника: ${e.count} целей`, true);
   }
 }
-function updateRadarChip() {
-  const chip = $('#radar-chip'),
-    online = E.sensorSources(state, 0).length > 0,
-    has = state.buildings.some((b) => b.side === 0 && b.key === 'radar' && b.hp > 0);
-  chip.textContent = online
-    ? 'РАДАР · вся карта'
-    : has
-      ? 'РАДАР без питания'
-      : 'ТУМАН · нужен радар';
-  chip.classList.toggle('online', online);
-  chip.title = online
-    ? 'Радар работает: видны все вражеские войска и пуски'
-    : 'Без радара видны только войска рядом с вашими бойцами и постройками. Пуски и стрельбу слышно.';
-}
 function updateWeatherChip() {
   const chip = $('#weather-chip'),
     f = E.forecast(state),
@@ -460,7 +447,6 @@ function updateWeatherChip() {
 }
 function updateHUD() {
   updateBuildingPrices();
-  updateRadarChip();
   updateWeatherChip();
   frontlineHUD.update(state, {
     visible: started && !panel && !strike.model.aiming && !troopMode && !tool && lobby.host.hidden,
@@ -1205,7 +1191,7 @@ function updateLivePanel() {
       ],
       ['Связаны со штабом', e.connected],
       ['Нет снабжения', e.isolated],
-      ['Боеприпасы потрачены', num(f.spentAmmo) + ' ₡'],
+      ['Производство боеприпасов', num(f.ammoProductionSpent || 0) + ' ₡'],
     ]
       .map(([a, b]) => `<div class="stat"><span>${a}</span><b>${b}</b></div>`)
       .join('');
@@ -1425,6 +1411,7 @@ document.addEventListener('click', async (ev) => {
   if (d.salvo) {
     strike.model.count = Number(d.salvo);
     updateStrikeHUD();
+    void strike.requestSupply();
   }
   if (d.produce) {
     const r = await execute('produce', { key: d.produce });
@@ -1470,6 +1457,18 @@ document.addEventListener('click', async (ev) => {
       revision = interactionRevision;
     b.disabled = true;
     const result = await execute('upgrade', { id: Number(d.upgrade) });
+    if (epoch !== campaignEpoch) return;
+    if (typeof result === 'string') toast(result, true);
+    else persist();
+    if (revision === interactionRevision) renderInspector();
+  }
+  if (d.action === 'support-auto') {
+    const epoch = campaignEpoch,
+      revision = interactionRevision;
+    const result = await execute('support-auto', {
+      ids: [...armySelection],
+      enabled: d.enabled === 'true',
+    });
     if (epoch !== campaignEpoch) return;
     if (typeof result === 'string') toast(result, true);
     else persist();
@@ -1581,10 +1580,12 @@ document.addEventListener('change', async (ev) => {
     strike.model.launcherId = ev.target.value === 'auto' ? null : Number(ev.target.value);
     updateStrikeHUD();
     refreshOrderPreview();
+    void strike.requestSupply();
   }
   if (ev.target.id === 'launch-site') {
     strike.model.launcherId = ev.target.value === 'auto' ? null : Number(ev.target.value);
     updateLivePanel();
+    void strike.requestSupply();
   }
   if (ev.target.id === 'attack-target') {
     const t = E.targetById(state, Number(ev.target.value));

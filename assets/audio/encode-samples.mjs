@@ -1,6 +1,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
-for (const name of ['fpv-rotor', 'prop-engine']) {
+for (const name of [
+  'fpv-rotor',
+  'prop-engine',
+  'footstep-1',
+  'footstep-2',
+  'footstep-3',
+  'truck-engine',
+]) {
   const wav = await readFile(new URL(`./${name}.wav`, import.meta.url));
   if (wav.toString('ascii', 0, 4) !== 'RIFF' || wav.toString('ascii', 8, 12) !== 'WAVE')
     throw Error('Expected a WAV file');

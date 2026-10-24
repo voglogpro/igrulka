@@ -111,6 +111,7 @@ export function updateAmmoProduction(s) {
       )
         continue;
       f.credits -= credits * fraction;
+      f.ammoProductionSpent = (f.ammoProductionSpent || 0) + credits * fraction;
       f.materials -= metal * fraction;
       if (oilEnabled(s)) f.oil -= oil * fraction;
       f.ammoStock[key] += amount;

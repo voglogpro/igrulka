@@ -310,7 +310,7 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
 
 test('old protocols are explicitly refused and protocol eight creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 8);
+  assert.equal(PROTOCOL_VERSION, 9);
   const host = await connect();
   host.send({ type: 'create', protocol: 5, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
@@ -381,7 +381,7 @@ test('WebSocket auto-defense belongs to each owner and snapshots preserve only o
     assert.equal(E.fortificationStatus(view.trenches.find((v) => v.id === own.trenchId)).level, 1);
     assert.equal(
       view.trenches.some((v) => v.id === defenders[1 - side].trenchId),
-      false,
+      true,
     );
     assert.deepEqual(
       E.frontlineReport(view, 0).polyline,

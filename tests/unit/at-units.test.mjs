@@ -92,17 +92,39 @@ test('AT automatically chooses armour over closer infantry and still obeys an ex
   assert.equal(groundEngagement(s, at).target.id, infantry.id);
 });
 
-test('two cheaper AT crews stop an advancing tank in the actual simulation', () => {
-  const s = fresh(),
-    [a, b] = openRow(s, 220);
-  const first = unit(s, 0, 'atgm', a.x, a.z - 4);
-  const second = unit(s, 0, 'atgm', a.x, a.z + 4);
-  const tank = unit(s, 1, 'leopard', b.x, b.z);
-  attack(s, tank, first);
-  runUntil(s, () => tank.hp <= 0, 35);
-  assert.ok(first.hp > 0 || second.hp > 0, 'screened pair should retain a surviving crew');
-  assert.ok(2 * E.GROUND_UNITS.atgm.cost < E.GROUND_UNITS.leopard.cost);
-  assert.ok(s.events.some((e) => e.type === 'groundDestroyed' && e.unitId === tank.id));
+test('two cheaper dispersed AT crews stop an advancing tank from their intended standoff range', () => {
+  for (const side of [0, 1]) {
+    const s = fresh(),
+      [a, b] = openRow(s, 220);
+    // Separate firing positions: the former 8m cluster put both crews inside one tank splash.
+    // Distance alone no longer hides a crew after the explicit removal of map fog.
+    const first = unit(s, side, 'atgm', a.x, a.z - 20);
+    const second = unit(s, side, 'atgm', a.x, a.z + 20);
+    const tank = unit(s, 1 - side, 'leopard', b.x, b.z);
+    for (const crew of [first, second]) {
+      assert.equal(E.walkable(s, crew.x, crew.z, 3), true);
+      assert.equal(
+        E.coverInfo(s, crew).cover,
+        0,
+        'these exposed crews do not gain a hidden cover buff',
+      );
+      const range = Math.hypot(crew.x - tank.x, crew.z - tank.z);
+      assert.ok(
+        range < E.GROUND_UNITS.atgm.groundRange && range > E.GROUND_UNITS.leopard.groundRange,
+      );
+      assert.equal(
+        E.groundVisible(s, tank.side, crew),
+        true,
+        'both crews are visible before firing',
+      );
+    }
+    attack(s, tank, first);
+    runUntil(s, () => tank.hp <= 0, 35);
+    assert.ok(first.hp > 0 || second.hp > 0, 'dispersed pair should retain a surviving crew');
+    assert.ok(2 * E.GROUND_UNITS.atgm.cost < E.GROUND_UNITS.leopard.cost);
+    assert.ok(2 * E.GROUND_UNITS.atgm.metal < E.GROUND_UNITS.leopard.metal);
+    assert.ok(s.events.some((e) => e.type === 'groundDestroyed' && e.unitId === tank.id));
+  }
 });
 
 test('anti-tank vehicle defeats an advancing tank from its intended range without teleporting', () => {
@@ -253,6 +275,6 @@ test('AT models share geometry and a hundred infantry crews use two instanced ro
   const crews = Array.from({ length: 100 }, (_, i) => unit(s, 0, 'atgm', -650 + i, 350));
   batch.sync(crews, 0);
   assert.equal(batch.pools.size, 1);
-  assert.equal(batch.meshes.length, 2);
+  assert.equal(batch.meshes.filter((mesh) => mesh.visible && mesh.count > 0).length, 2);
   assert.equal(batch.pools.get('atgm0').body.count, 200);
 });

@@ -16,6 +16,7 @@ export function damageAmmoVehicle(s, vehicle, amount) {
     (side) => side === vehicle.side || fogVisible(s, side, vehicle.x, vehicle.z),
   );
   vehicle.cargo = null;
+  vehicle.pickup = null;
   vehicle.path = [];
   vehicle.targetId = null;
   vehicle.targetKind = null;

@@ -2,20 +2,32 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import * as E from '../../src/game/index.js';
 const summaries = [];
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length && !args[0].startsWith('--report-prefix=')))
+  throw Error('Use --report-prefix=<basename>');
+const reportPrefix = args.length ? args[0].slice('--report-prefix='.length) : 'soak89-final';
+if (
+  !/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(reportPrefix) ||
+  /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(reportPrefix)
+)
+  throw Error(
+    'Report prefix must be a safe basename of 1 to 64 letters, digits, underscores or hyphens',
+  );
 const reportDirectory = new URL('../../artifacts/qa/', import.meta.url);
 mkdirSync(reportDirectory, { recursive: true });
 const report = {
   campaigns: 0,
   minutesPerCampaign: 20,
   version: E.VERSION,
+  reportPrefix,
   status: 'running',
   summaries,
 };
 const saveReport = () =>
-  writeFileSync(new URL('soak89-final.json', reportDirectory), JSON.stringify(report, null, 2));
+  writeFileSync(new URL(reportPrefix + '.json', reportDirectory), JSON.stringify(report, null, 2));
 writeFileSync(
-  new URL('soak89-final.log', reportDirectory),
-  '8.9 campaign soak: 12 x 20 game minutes; ordinary paid AI, no resource grants\n',
+  new URL(reportPrefix + '.log', reportDirectory),
+  `${reportPrefix}: 12 x 20 game minutes; ordinary paid AI, no resource grants\n`,
 );
 try {
   for (let seed = 1; seed <= 12; seed++) {
@@ -24,9 +36,43 @@ try {
     // Economy, construction, ammunition, fleet and army purchases use ordinary starting resources.
     s.buildings[0].hp = s.buildings[0].maxHp = 1e8;
     const cargoVehicles = new Set();
+    const previousCars = new Map(),
+      previousSpend = [0, 0];
     for (let seconds = 0; seconds < 1200; seconds += 5) {
       E.advance(s, 5);
-      for (const v of s.ammoVehicles) if (v.cargo) cargoVehicles.add(v.id);
+      for (const v of s.ammoVehicles) {
+        if (v.cargo) cargoVehicles.add(v.id);
+        const last = previousCars.get(v.id);
+        if (last)
+          assert.ok(
+            Math.hypot(v.x - last.x, v.z - last.z) <=
+              E.AMMUNITION.speed * (s.time - last.time) + 1e-6,
+            `seed ${seed}: delivery vehicle ${v.id} cannot teleport between samples`,
+          );
+        previousCars.set(v.id, { x: v.x, z: v.z, time: s.time });
+        if (v.pickup) {
+          const site = s.buildings.find((b) => b.id === v.targetId && b.side === v.side);
+          assert.ok(
+            site &&
+              E.launchSiteAllows(site, v.pickup.key) &&
+              v.pickup.amount === 1 &&
+              v.cargo == null,
+            `seed ${seed}: collection vehicle has one compatible own pickup, not duplicated cargo`,
+          );
+        }
+      }
+      for (const [side, f] of s.sides.entries()) {
+        assert.ok(
+          Number.isFinite(f.ammoProductionSpent) && f.ammoProductionSpent >= previousSpend[side],
+          `seed ${seed}: paid ammo production cost is finite, nonnegative and never refunded by shooting`,
+        );
+        previousSpend[side] = f.ammoProductionSpent;
+      }
+      for (const b of s.buildings)
+        assert.ok(
+          Object.keys(b.weaponDemand || {}).length <= 1,
+          `seed ${seed}: a launcher cannot accumulate conflicting requested loadouts`,
+        );
       for (const f of s.sides)
         for (const kind of E.AMMUNITION.kinds) {
           assert.ok(
@@ -128,11 +174,12 @@ try {
       fleet: s.ammoVehicles.filter((v) => v.side === 1 && v.hp > 0).length,
       cargoVehiclesObserved: cargoVehicles.size,
       cruiseStock: E.weaponStock(s, 1, 'cruise'),
+      ammoProductionSpent: s.sides[1].ammoProductionSpent,
     });
     report.campaigns = summaries.length;
     const line = JSON.stringify(summaries.at(-1));
     console.log(line);
-    appendFileSync(new URL('soak89-final.log', reportDirectory), line + '\n');
+    appendFileSync(new URL(reportPrefix + '.log', reportDirectory), line + '\n');
     saveReport();
   }
   report.status = 'passed';
@@ -143,7 +190,7 @@ try {
   report.failure = { seed: summaries.length + 1, message: error.message };
   saveReport();
   appendFileSync(
-    new URL('soak89-final.log', reportDirectory),
+    new URL(reportPrefix + '.log', reportDirectory),
     'FAIL ' + JSON.stringify(report.failure) + '\n',
   );
   throw error;

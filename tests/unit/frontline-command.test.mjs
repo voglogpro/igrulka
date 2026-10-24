@@ -75,7 +75,14 @@ test('terrain lines do not follow moving troops; only public territory anchors a
 test('hidden enemies cannot move the estimated line, create threat or trigger reserves', () => {
   const s = fresh();
   unit(s, 0, 'infantry', -1000, NORTH, false);
-  const hidden = unit(s, 1, 'leopard', 650, SOUTH);
+  const hidden = unit(s, 1, 'infantry', 650, SOUTH);
+  hidden.camouflaged = true;
+  for (const p of [
+    { x: 650, z: SOUTH },
+    { x: 700, z: -850 },
+  ])
+    s.trenches.push({ id: s.nextId++, side: 1, ...p, progress: 1 });
+  assert.equal(E.groundVisible(s, 0, hidden), false);
   E.step(s, 0.05);
   assert.equal(s.frontlineMemory[0].seen.length, 0);
   const before = structuredClone(E.frontlineReport(s, 0));
@@ -117,11 +124,14 @@ test('observed casualties disappear from memory immediately; unseen movement sta
     s.frontlineMemory[0].seen.some((v) => v.id === foe.id),
     false,
   );
-  const next = unit(s, 1, 'leopard', -780, NORTH);
+  const next = unit(s, 1, 'infantry', -830, NORTH);
   E.advance(s, 1.1);
   const last = s.frontlineMemory[0].seen.find((v) => v.id === next.id);
   next.x = 650;
   next.z = 450;
+  next.camouflaged = true;
+  s.trenches.push({ id: s.nextId++, side: 1, x: next.x, z: next.z, progress: 1 });
+  assert.equal(E.groundVisible(s, 0, next), false);
   E.advance(s, 2);
   const remembered = s.frontlineMemory[0].seen.find((v) => v.id === next.id);
   assert.equal(remembered.x, last.x);

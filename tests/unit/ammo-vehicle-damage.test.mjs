@@ -161,14 +161,14 @@ test('blast falloff affects both sides while actual artillery impact preserves e
   assert.ok(Math.abs(enemy.hp - (1000 - amount)) < 1e-10);
 });
 
-test('fleet death events respect fog audience and supply cargo uses readable finite-stock labels', () => {
+test('far fleet death events remain public on the open map and cargo labels are readable', () => {
   const s = fresh();
   const van = { id: s.nextId++, side: 1, x: 1500, z: 700, hp: C.hp, status: 'idle' };
   s.ammoVehicles = [van];
   damageAmmoVehicle(s, van, C.hp);
   const event = s.events.find((e) => e.unitId === van.id);
-  assert.deepEqual(event.visibleTo, [1]);
-  assert.ok(!playerView(s, 0).events.some((e) => e.id === event.id));
+  assert.deepEqual(event.visibleTo, [0, 1]);
+  assert.ok(playerView(s, 0).events.some((e) => e.id === event.id));
   assert.ok(playerView(s, 1).events.some((e) => e.id === event.id));
   const truck = E.makeGround(s, 0, 'supplytruck', -1300, 250);
   truck.ammoCargo = { small: 120, shell: 12, rocket: 0, sam: 4 };

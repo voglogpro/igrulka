@@ -7,6 +7,8 @@ import { batchStatic } from '../mesh-utils.js';
 import { isInfantry, GROUND_UNITS, groundHeight } from '../../game/config.js';
 import { mogModel } from './infantry/mog.js';
 import { buildArmoredCar, buildMLRS, buildSupplyTruck } from './vehicles/light-vehicles.js';
+import { addVehicleEquipment } from './equipment.js';
+import { upgradeable } from '../../game/combat/upgrades.js';
 // Shared hulls are rescaled to tell the weight classes apart at a glance.
 const HULL_SCALE = { lighttank: 0.8, ifv: 0.9, heavytank: 1.14 };
 const templates = new Map();
@@ -56,6 +58,8 @@ export function groundModel(world, u) {
         box(turret, 2.6, 4.2, -1, 1.8, 0.5, 0.9, accent);
       }
     }
+    if (upgradeable(u) && !['mog', 'gepard', 'shilka'].includes(u.key))
+      addVehicleEquipment(world, root, u.level || 0);
     batchStatic(root, dynamic);
     if (HULL_SCALE[u.key]) root.scale.setScalar(HULL_SCALE[u.key]);
     root.traverse((o) => {

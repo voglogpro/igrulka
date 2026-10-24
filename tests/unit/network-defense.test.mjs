@@ -25,7 +25,7 @@ function unit(s, side, x, z) {
 }
 
 test('protocol eight auto-defense validates either owner, complete ownership and boolean before mutating any selection', () => {
-  assert.equal(PROTOCOL_VERSION, 8);
+  assert.equal(PROTOCOL_VERSION, 9);
   const s = fresh(),
     troops = [unit(s, 0, -850, -270), unit(s, 1, 850, -270)];
   for (const side of [0, 1]) {
@@ -126,7 +126,7 @@ test('either perspective retains its own observed memory, never the enemy memory
   assert.deepEqual(s, before, 'projection is read-only');
 });
 
-test('fortifications outside observation remain hidden and visible enemy structures expose only physical appearance', () => {
+test('far fortifications remain visible while enemy structures expose only physical appearance', () => {
   for (const side of [0, 1]) {
     const s = fresh(),
       sign = side ? -1 : 1;
@@ -149,7 +149,7 @@ test('fortifications outside observation remain hidden and visible enemy structu
     assert.ok(view.trenches.some((t) => t.id === own.id));
     assert.equal(
       view.trenches.some((t) => t.id === hidden.id),
-      false,
+      true,
     );
     const seen = view.trenches.find((t) => t.id === visible.id);
     assert.equal(seen.side, 1);

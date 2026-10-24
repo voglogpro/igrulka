@@ -26,7 +26,6 @@ import { updateMinimap as updateMinimapForWorld } from './minimap.js';
 import * as T from '../../vendor/three/three.module.js';
 import { InfantryBatch } from './models/infantry/soldiers.js';
 import { CombatEffects } from './effects/combat-effects.js';
-import { FogVeil } from './fog-veil.js';
 import { FrontlineView } from './defense/frontline-view.js';
 import { FortificationView } from './defense/fortifications.js';
 import { Traffic } from './traffic.js';
@@ -302,8 +301,6 @@ export class RTSWorld {
     this.roadBatch = new VehicleBatch(this.scene);
     this.contactShadows = new ContactShadows(this.scene);
     this.combatFX = new CombatEffects(this);
-    this.fogVeil = new FogVeil(this.scene);
-    this.post.setVision(this.fogVeil);
     this.weatherFX = new WeatherFX(this.scene);
     this.traffic = new Traffic(this);
     this.serviceFleet = new ServiceFleet(this.scene, {
@@ -613,8 +610,6 @@ export class RTSWorld {
         E.dayPhase(this.state.time).night * (Math.sin(this.battleTime * 2.2) > 0.6 ? 900 : 0);
     this.sync();
     if (this.frontlineView.enabled) this.frontlineView.update(E.frontlineReport(this.state, 0));
-    this.fogVeil.update(this.state, wallDt);
-    this.post.setVision(this.fogVeil);
     this.weatherFX.update(this.visualDt, this.controls.target, this.state.weather);
     this.combatFX.emit(this.state, this.visualDt, (u) => E.unitVisible(this.state, 0, u));
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);

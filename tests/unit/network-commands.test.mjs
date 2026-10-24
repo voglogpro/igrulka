@@ -282,8 +282,8 @@ test('visible enemy death effects survive removal while concealed casualties sta
   const deaths = s.events.filter((e) => e.type === 'groundDestroyed');
   assert.deepEqual(deaths.find((e) => e.unitId === hidden.id).visibleTo, [1]);
   assert.deepEqual(deaths.find((e) => e.unitId === visible.id).visibleTo, [0, 1]);
-  // The far-away tank is outside every enemy observer's range.
-  assert.deepEqual(deaths.find((e) => e.unitId === tank.id).visibleTo, [0]);
+  // Ordinary vehicles stay visible across the open map.
+  assert.deepEqual(deaths.find((e) => e.unitId === tank.id).visibleTo, [0, 1]);
   s.groundUnits = [];
   const one = playerView(s, 1);
   const zero = playerView(s, 0);
@@ -291,7 +291,7 @@ test('visible enemy death effects survive removal while concealed casualties sta
     zero.events.filter((e) => e.type === 'groundDestroyed').map((e) => e.unitId),
     [visible.id, tank.id],
   );
-  assert.equal(one.events.filter((e) => e.type === 'groundDestroyed').length, 2);
+  assert.equal(one.events.filter((e) => e.type === 'groundDestroyed').length, 3);
   assert.ok(one.events.every((e) => !Object.hasOwn(e, 'visibleTo')));
   assert.ok(zero.events.every((e) => !Object.hasOwn(e, 'visibleTo')));
   assert.ok(deaths.every((e) => Array.isArray(e.visibleTo)));

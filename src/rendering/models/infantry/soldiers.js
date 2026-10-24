@@ -2,6 +2,8 @@ import * as T from '../../../../vendor/three/three.module.js';
 import { GROUND_UNITS, isInfantry } from '../../../game/config.js';
 import { groundVisible } from '../../../game/units/infantry/cover.js';
 import { buildInfantryAT } from './anti-tank.js';
+import { infantryEquipmentGeometry } from '../equipment.js';
+import { upgradeable } from '../../../game/combat/upgrades.js';
 const CORPSE_LIFE = 40,
   CORPSE_FALL = 0.45,
   CORPSE_LIMIT = 90;
@@ -196,6 +198,19 @@ export class InfantryBatch {
     this.pools = new Map();
     this.material = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 });
     this.meshes = [];
+    this.equipment = [1, 2].map((level) => {
+      const mesh = new T.InstancedMesh(infantryEquipmentGeometry(level), this.material, 4096);
+      mesh.name = `infantry-equipment-level-${level}`;
+      mesh.count = 0;
+      mesh.frustumCulled = false;
+      mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+      mesh.userData.infantryBatch = true;
+      mesh.userData.unitIds = [];
+      w.sharedGeometries.add(mesh.geometry);
+      w.scene.add(mesh);
+      this.meshes.push(mesh);
+      return mesh;
+    });
     this.corpses = [];
     this.selected = new T.InstancedMesh(
       new T.RingGeometry(0.9, 1, 24),
@@ -251,6 +266,13 @@ export class InfantryBatch {
     }
     return this.pools.get(id);
   }
+  stampEquipment(u, matrix) {
+    if (!upgradeable(u) || !(u.level > 0)) return;
+    const mesh = this.equipment[Math.min(2, u.level) - 1];
+    if (mesh.count >= mesh.instanceMatrix.count) return;
+    mesh.setMatrixAt(mesh.count, matrix);
+    mesh.userData.unitIds[mesh.count++] = u.id;
+  }
   sync(units, time, visibleIds = null) {
     const camera = this.world.camera;
     camera.updateMatrixWorld();
@@ -258,6 +280,7 @@ export class InfantryBatch {
       viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
     );
     for (const p of this.pools.values()) p.count = 0;
+    for (const mesh of this.equipment) mesh.count = 0;
     let selected = 0;
     for (const u of units) {
       if (
@@ -303,6 +326,7 @@ export class InfantryBatch {
           temp.updateMatrix();
           pool.body.setMatrixAt(index, temp.matrix);
           pool.body.userData.unitIds[index] = u.id;
+          this.stampEquipment(u, temp.matrix);
           for (let leg = 0; leg < 2; leg++) {
             temp.position.set(
               wx + (leg ? 0.3 : -0.3) * c,
@@ -329,6 +353,7 @@ export class InfantryBatch {
         temp.updateMatrix();
         pool.body.setMatrixAt(index, temp.matrix);
         pool.body.userData.unitIds[index] = u.id;
+        this.stampEquipment(u, temp.matrix);
         for (let leg = 0; leg < 2; leg++) {
           const swing = u.moving ? Math.sin(time * 12 + m * 1.7 + leg * Math.PI) * 0.55 : 0;
           temp.position.set(
@@ -400,6 +425,13 @@ export class InfantryBatch {
         temp.updateMatrix();
         this.selected.setMatrixAt(selected++, temp.matrix);
       }
+    for (const mesh of this.equipment) {
+      mesh.visible = mesh.count > 0;
+      if (mesh.count) {
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.computeBoundingSphere();
+      }
+    }
     for (const p of this.pools.values()) {
       p.body.count = p.count;
       p.legs.count = p.count * 2;

@@ -16,8 +16,9 @@ import {
   launchStoreTotal,
   acceptLaunchDelivery,
   availableLaunchStock,
-  movableWeaponStock,
 } from '../units/aviation/launch-supply.js';
+import { collectionRequest, collectWeapon, deliverySpace } from './weapon-transfer.js';
+export { requestWeaponDelivery } from './weapon-transfer.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const depotActive = (s, b) => ammoDepotReady(b) && b.ammoEnabled !== false;
@@ -38,24 +39,6 @@ const incoming = (s, id, kind, key) =>
         : 0),
     0,
   );
-
-export function requestWeaponDelivery(s, side, siteId, key, amount = 1) {
-  const b = s.buildings.find((t) => t.id === siteId && t.side === side && ammoDepotReady(t));
-  if (
-    s.result ||
-    !b ||
-    !launchStoreCapacity(b, key) ||
-    !Number.isSafeInteger(amount) ||
-    amount < 1 ||
-    amount > 6
-  )
-    return 'Недоступная доставка вооружения';
-  if (launchStoreTotal(b) >= launchStoreCapacity(b)) return 'Местный склад заполнен';
-  if (!(movableWeaponStock(s, side, key) > 0) && !incoming(s, b.id, 'weapon', key))
-    return 'Нет готового вооружения на базе дронов';
-  (b.weaponDemand ||= {})[key] = Math.min(amount, launchStoreCapacity(b) - launchStoreTotal(b));
-  return true;
-}
 
 function reconcile(s) {
   s.ammoVehicles ||= [];
@@ -119,6 +102,7 @@ function reconcile(s) {
         targetId: null,
         targetKind: null,
         cargo: null,
+        pickup: null,
         retryAt: 0,
         revision: s.networkRevision,
       });
@@ -139,6 +123,7 @@ function route(s, v, point, status) {
   return true;
 }
 function returnHome(s, v) {
+  v.pickup = null;
   v.targetId = null;
   v.targetKind = null;
   if (!route(s, v, v.home, 'returning')) {
@@ -153,6 +138,12 @@ function jobs(s, v, depot) {
     result = [];
   const weaponAvailable = (key) => (f.inventory[key] || 0) + availableLaunchStock(depot, key);
   if (depot.key === 'factory') {
+    for (const site of s.buildings) {
+      if (site.side !== v.side || !ammoDepotReady(site)) continue;
+      const pickup = collectionRequest(s, site);
+      if (pickup)
+        result.push({ target: site, targetKind: 'building', cargo: null, pickup, urgency: 6 });
+    }
     for (const t of s.groundUnits)
       if (
         t.side === v.side &&
@@ -172,7 +163,8 @@ function jobs(s, v, depot) {
     for (const b of s.buildings)
       if (b.side === v.side && ammoDepotReady(b))
         for (const [key, amount] of Object.entries(b.weaponDemand || {}))
-          if (amount > 0) requests.unshift({ siteId: b.id, key, amount, manual: true });
+          if (amount > availableLaunchStock(b, key) + incoming(s, b.id, 'weapon', key))
+            requests.unshift({ siteId: b.id, key, amount, manual: true });
     const seen = new Set();
     for (const request of requests) {
       const id = request.siteId,
@@ -197,6 +189,9 @@ function jobs(s, v, depot) {
         1,
         weaponAvailable(key),
         launchStoreCapacity(t) - launchStoreTotal(t) - allIncoming,
+        request.manual
+          ? request.amount - availableLaunchStock(t, key) - incoming(s, t.id, 'weapon', key)
+          : Infinity,
       );
       if (amount > 0)
         result.push({
@@ -238,12 +233,25 @@ function unload(s, v) {
   const target = targetOf(s, v);
   if (!target || distance(v, target) > C.reach + (BUILDINGS[target.key]?.size || 0) * 0.5)
     return false;
+  if (v.pickup) {
+    collectWeapon(s, v, target);
+    returnHome(s, v);
+    return true;
+  }
+  if (!v.cargo) {
+    returnHome(s, v);
+    return true;
+  }
   const accepted =
     v.cargo.kind === 'ammo'
       ? receiveAmmunition(target, v.cargo.key, v.cargo.amount)
       : target.key === 'operator' && v.cargo.key === 'drone'
         ? Math.min(v.cargo.amount, 3 - (target.fpvAmmo || 0))
-        : acceptLaunchDelivery(target, v.cargo.key, v.cargo.amount);
+        : acceptLaunchDelivery(
+            target,
+            v.cargo.key,
+            Math.min(v.cargo.amount, deliverySpace(s, target, v.cargo.key)),
+          );
   if (v.cargo.kind === 'weapon' && target.key === 'operator' && v.cargo.key === 'drone')
     target.fpvAmmo = (target.fpvAmmo || 0) + accepted;
   v.cargo.amount -= accepted;
@@ -306,13 +314,13 @@ export function updateAmmoLogistics(s, dt) {
         v.targetId = job.target.id;
         v.targetKind = job.targetKind;
         v.cargo = job.cargo;
+        v.pickup = job.pickup || null;
         const f = s.sides[v.side];
+        if (!v.cargo) break;
         if (v.cargo.kind === 'ammo') f.ammoStock[v.cargo.key] -= v.cargo.amount;
         else {
           if (f.inventory[v.cargo.key] > 0) f.inventory[v.cargo.key] -= v.cargo.amount;
           else depot.launchStore[v.cargo.key] -= v.cargo.amount;
-          if (job.target.weaponDemand?.[v.cargo.key] > 0)
-            job.target.weaponDemand[v.cargo.key] -= v.cargo.amount;
         }
         break;
       }
@@ -385,33 +393,50 @@ export function ammoLogisticsStatus(s, side, targetId) {
   const fleet = (s.ammoVehicles || []).filter(
     (v) => v.hp > 0 && v.side === side && v.targetId === targetId,
   );
-  const pending = Object.values(target.weaponDemand || {}).reduce((a, b) => a + b, 0);
+  const pending = Object.entries(target.weaponDemand || {}).reduce(
+    (n, [key, count]) => n + Math.max(0, count - availableLaunchStock(target, key)),
+    0,
+  );
   const inTransit = fleet.reduce((n, v) => n + (v.cargo?.amount || 0), 0);
+  const collecting = fleet.some((v) => v.pickup);
   const blocked = target.ammoSupplyBlocked || fleet.some((v) => v.status === 'blocked');
-  const status = blocked ? 'blocked' : inTransit ? 'moving' : pending ? 'waiting' : 'idle';
+  const status = blocked
+    ? 'blocked'
+    : inTransit || collecting
+      ? 'moving'
+      : pending
+        ? 'waiting'
+        : 'idle';
   return {
     pending,
     inTransit,
     status,
     reason: blocked
       ? 'Нет сухого пути к получателю'
-      : inTransit
-        ? 'Машина в пути'
-        : pending
-          ? 'Ожидает свободную машину и груз'
-          : 'Нет доставки',
+      : collecting
+        ? 'Машина освобождает место для выбранного вооружения'
+        : inTransit
+          ? 'Машина в пути'
+          : pending
+            ? 'Ожидает свободную машину и груз'
+            : 'Нет доставки',
   };
 }
 
-export function loadSupplyTruck(s, u) {
+export function loadSupplyTruck(s, u, kinds = C.kinds) {
   u.ammoCargo ||= createAmmoStock();
+  const stock = s.sides[u.side].ammoStock || createAmmoStock();
+  const wanted = C.kinds.filter(
+    (kind) => kinds.includes(kind) && stock[kind] > 0 && u.ammoCargo[kind] < C.cargo[kind],
+  );
+  // Do not keep sending a partly loaded truck to an empty warehouse.
+  if (!wanted.length) return null;
   const depot = s.buildings
     .filter((b) => b.side === u.side && b.key === 'ammofactory' && depotActive(s, b))
     .sort((a, b) => distance(u, a) - distance(u, b) || a.id - b.id)[0];
   if (!depot) return null;
   if (distance(u, depot) > C.reach + BUILDINGS.ammofactory.size * 0.5) return depot;
-  const stock = s.sides[u.side].ammoStock || createAmmoStock();
-  for (const kind of C.kinds) {
+  for (const kind of wanted) {
     const amount = Math.min(C.cargo[kind] - u.ammoCargo[kind], stock[kind]);
     u.ammoCargo[kind] += amount;
     stock[kind] -= amount;

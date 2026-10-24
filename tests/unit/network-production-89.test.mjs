@@ -7,7 +7,7 @@ import { event } from '../../src/game/shared/events.js';
 
 test('army composition commands are bounded, atomic and apply only to the authenticated side', () => {
   const s = E.createGame(89);
-  assert.equal(PROTOCOL_VERSION, 8);
+  assert.equal(PROTOCOL_VERSION, 9);
   assert.equal(executeCommand(s, 1, 'army-target', { key: 'infantry', count: 50, side: 0 }), true);
   assert.deepEqual(s.sides[0].armyComposition.targets, {});
   assert.deepEqual(s.sides[1].armyComposition.targets, { infantry: 50 });
@@ -28,7 +28,7 @@ test('army composition commands are bounded, atomic and apply only to the authen
   assert.deepEqual(s.sides[1].armyComposition.targets, {});
 });
 
-test('both player perspectives retain only their own production goals and permitted craters', () => {
+test('both player perspectives retain only their own production goals while public craters remain visible', () => {
   const s = E.createGame(90);
   E.setArmyTarget(s, 0, 'infantry', 50);
   E.setArmyTarget(s, 1, 'leopard', 5);
@@ -40,9 +40,11 @@ test('both player perspectives retain only their own production goals and permit
     const view = playerView(s, side);
     assert.deepEqual(view.sides[0].armyComposition, s.sides[side].armyComposition);
     assert.equal(view.sides[1].armyComposition, undefined);
-    assert.equal(view.groundScars.length, 1, 'hidden opposing craters cannot reveal strikes');
-    assert.equal(view.groundScars[0].side, 0, 'local ownership is normalized');
-    assert.equal(view.groundScars[0].x, side === 0 ? -E.HQ_X : E.HQ_X);
+    assert.equal(view.groundScars.length, 2, 'the removed map fog cannot hide distant craters');
+    const own = view.groundScars.find((c) => c.x === (side === 0 ? -E.HQ_X : E.HQ_X));
+    const enemy = view.groundScars.find((c) => c.x === (side === 0 ? E.HQ_X : -E.HQ_X));
+    assert.equal(own.side, 0, 'local ownership is normalized');
+    assert.equal(enemy.side, 1);
   }
 });
 
@@ -64,7 +66,7 @@ test('small drone craters survive current save/load and malformed entries are re
   assert.throws(() => E.load(E.save(duplicate)));
 });
 
-test('physical supply fleet reveals permitted positions while keeping cargo and delivery plans private', () => {
+test('both owners see the complete physical fleet while cargo, collection jobs and requested stocks remain private', () => {
   const s = E.createGame(93);
   s.sides[0].ammoStock.small = 60;
   s.sides[1].ammoStock.rocket = 12;
@@ -77,20 +79,72 @@ test('physical supply fleet reveals permitted positions while keeping cargo and 
     targetId: 999,
     path: [{ x: 900, z: 100 }],
     cargo: { kind: 'weapon', key: 'ballistic', amount: 1 },
+    hp: E.AMMUNITION.vehicle.hp,
+    maxHp: E.AMMUNITION.vehicle.hp,
   };
-  s.ammoVehicles = [
-    { ...base, id: s.nextId++, side: 0, x: -E.HQ_X },
-    { ...base, id: s.nextId++, side: 1, x: -E.HQ_X + 30 },
-    { ...base, id: s.nextId++, side: 1, x: E.HQ_X },
-  ];
-  const a = playerView(s, 0),
-    b = playerView(s, 1);
-  assert.equal(a.ammoVehicles.length, 2, 'an unobserved enemy truck is not published');
-  const observed = a.ammoVehicles.find((v) => v.side === 1);
-  for (const key of ['cargo', 'targetId', 'path']) assert.equal(observed[key], undefined);
-  assert.deepEqual(a.ammoVehicles.find((v) => v.side === 0).cargo, base.cargo);
-  assert.deepEqual(a.sides[0].ammoStock, s.sides[0].ammoStock);
-  assert.equal(a.sides[1].ammoStock, undefined);
-  assert.ok(b.ammoVehicles.some((v) => v.side === 0 && v.x === E.HQ_X));
-  assert.equal(a.ammoLogisticsAt, undefined);
+  for (const side of [0, 1]) {
+    const x = (side ? 1 : -1) * E.HQ_X;
+    const site = {
+      id: s.nextId++,
+      side,
+      key: 'silo',
+      x,
+      z: 200,
+      hp: 300,
+      maxHp: 300,
+      progress: 1,
+      launchStore: { drone: 0, heavy: 0, cruise: 1, ballistic: 1 },
+      weaponDemand: { ballistic: 3 },
+    };
+    s.buildings.push(site);
+    s.ammoVehicles.push(
+      { ...base, id: s.nextId++, side, x, targetId: site.id, targetKind: 'building', pickup: null },
+      {
+        ...base,
+        id: s.nextId++,
+        side,
+        x: x + 30,
+        targetId: site.id,
+        targetKind: 'building',
+        cargo: null,
+        pickup: { key: 'cruise', amount: 1 },
+      },
+    );
+  }
+  const authority = structuredClone(s);
+  for (const side of [0, 1]) {
+    const view = playerView(s, side);
+    assert.equal(
+      view.ammoVehicles.length,
+      4,
+      'public vehicles remain visible at both distant bases',
+    );
+    for (const original of s.ammoVehicles) {
+      const projected = view.ammoVehicles.find((v) => v.id === original.id);
+      assert.equal(projected.x, original.x);
+      assert.equal(projected.z, original.z);
+      assert.equal(projected.side, original.side === side ? 0 : 1);
+      assert.equal(projected.hp, original.hp);
+      assert.equal(projected.maxHp, original.maxHp);
+      for (const key of ['cargo', 'pickup', 'targetId', 'targetKind', 'path']) {
+        if (original.side === side) assert.deepEqual(projected[key], original[key]);
+        else
+          assert.equal(Object.hasOwn(projected, key), false, `foreign ${key} must remain private`);
+      }
+    }
+    for (const site of s.buildings.filter((b) => b.key === 'silo')) {
+      const projected = view.buildings.find((b) => b.id === site.id);
+      if (site.side === side) {
+        assert.deepEqual(projected.weaponDemand, site.weaponDemand);
+        assert.deepEqual(projected.launchStore, site.launchStore);
+      } else {
+        assert.equal(Object.hasOwn(projected, 'weaponDemand'), false);
+        assert.equal(Object.hasOwn(projected, 'launchStore'), false);
+      }
+    }
+    assert.deepEqual(view.sides[0].ammoStock, s.sides[side].ammoStock);
+    assert.equal(view.sides[1].ammoStock, undefined);
+    assert.equal(view.ammoLogisticsAt, undefined);
+  }
+  assert.deepEqual(s, authority, 'projection never mutates authoritative cargo or requested stock');
 });

@@ -312,8 +312,8 @@ export function updateGround(s, rates, dt, hooks) {
           trainRecruit(s, u);
           s.groundUnits.push(u);
           event(s, 'recruited', { ...p, side: b.side, key: q.key, unitId: u.id });
-          if (d.support) {
-            // Rear service units look after themselves; no rally point or stance applies.
+          if (d.support && !Object.hasOwn(q, 'destination')) {
+            // Automatic recruits ignore combat stances; explicit paid destinations still apply.
           } else if (q.stance) {
             applyStance(s, b.side, [u.id], q.stance);
           } else if (Object.hasOwn(q, 'destination')) {

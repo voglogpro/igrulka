@@ -8,7 +8,6 @@ import {
 } from '../../config.js';
 import { COVER_PATCHES } from '../../map.js';
 import { segmentDistance } from '../../city/road-network.js';
-import { fogVisible } from '../../vision-grid.js';
 import { fortificationStatus } from '../../defense/fortifications.js';
 import { FORTIFICATION } from '../../defense/config.js';
 // Forests and thickets are generated with the terrain so hills and woods line up.
@@ -142,7 +141,6 @@ function observes(s, v, u, factor, flash, night) {
 export function groundVisible(s, side, u) {
   if (!u || u.hp <= 0 || u.carrierId) return false;
   if (u.side === side) return true;
-  if (!fogVisible(s, side, u.x, u.z)) return false;
   if (!isInfantry(u.key)) return true;
   const c = coverInfo(s, u);
   if (!c.concealment || u.moving) return true;

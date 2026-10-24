@@ -1,7 +1,7 @@
 import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -73,6 +73,15 @@ export function executeCommand(s, side, type, a = {}) {
         return invalid;
       return E.launch(s, side, a.key, a.aim, a.count, a.siteId ?? null);
     }
+    case 'launch-supply':
+      return validId(a.id) &&
+        own(s, side, a.id) &&
+        configured(E.WEAPONS, a.key) &&
+        Number.isInteger(a.count) &&
+        a.count >= 1 &&
+        a.count <= 6
+        ? E.requestWeaponDelivery(s, side, a.id, a.key, a.count)
+        : invalid;
     case 'army-target':
       return configured(E.GROUND_UNITS, a.key) &&
         Number.isInteger(a.count) &&
@@ -103,8 +112,11 @@ export function executeCommand(s, side, type, a = {}) {
       return E.setServiceEnabled(s, side, a.id, a.enabled);
     case 'rear-auto':
       if (typeof a.enabled !== 'boolean') return invalid;
-      s.sides[side].rearAuto = a.enabled;
-      return true;
+      return E.setRearAutomatic(s, side, a.enabled);
+    case 'support-auto':
+      return unitsOwned(s, side, a.ids) && typeof a.enabled === 'boolean'
+        ? E.setSupportAutomatic(s, side, a.ids, a.enabled)
+        : invalid;
     case 'set-stance':
       return unitsOwned(s, side, a.ids) && a.stance && E.validStance(a.stance)
         ? E.applyStance(s, side, a.ids, a.stance)

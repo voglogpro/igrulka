@@ -61,7 +61,7 @@ test('expanded 4000x3200 map contains the 2240m sea and both land corridors span
   assert.equal(walkable(s, 0, 0, 3), false, 'sea centre remains impassable');
 });
 
-test('vision grid covers observers and contacts in both expanded corridors', () => {
+test('legacy vision dimensions cover both corridors but points are open for both sides', () => {
   const s = E.createGame(117);
   assert.equal(GRID.rows * GRID.cell, 3200);
   assert.equal(GRID.cols * GRID.cell, 4000);
@@ -69,7 +69,7 @@ test('vision grid covers observers and contacts in both expanded corridors', () 
   for (const z of E.CORRIDORS) {
     assert.equal(fogVisible(s, 0, -20, z), true);
     assert.equal(fogVisible(s, 0, 20, z), true);
-    assert.equal(fogVisible(s, 1, -20, z), false);
+    assert.equal(fogVisible(s, 1, -20, z), true);
   }
 });
 
@@ -78,7 +78,7 @@ test('version13 import preserves identity, money and central coordinates while f
   const before = structuredClone(s);
   const restored = E.load(E.save(s));
   assert.deepEqual(s, before, 'save and load must not mutate the caller campaign');
-  assert.equal(restored.version, 15);
+  assert.equal(restored.version, E.VERSION);
   assert.deepEqual(
     restored.sides.map((f) => [f.credits, f.materials, f.science, f.oil, f.inventory]),
     s.sides.map((f) => [f.credits, f.materials, 0, f.oil, f.inventory]),

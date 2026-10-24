@@ -5,7 +5,7 @@ import { detailBuilding, batchStatic } from '../mesh-utils.js';
 import { serviceStationModel } from './city/service-station.js';
 import { oilWellModel, oilTankModel, portModel, trainingModel } from './city/oil.js';
 const tierTemplates = new WeakMap();
-const tiered = new Set(['gun', 'sam', 'cannon', 'launcher', 'silo', 'ammofactory']);
+const tiered = new Set(['gun', 'sam', 'cannon', 'launcher', 'silo', 'ammofactory', 'factory']);
 function cloneTier(template, b, world) {
   const root = template.clone(true);
   root.position.set(b.x, Math.max(0, world.height(b.x, b.z)), b.z);
@@ -108,6 +108,14 @@ export function model(b) {
       this.box(content, -9 + i * 9, 16.8, 0, 5, 2, 18, '#929b96');
     }
     this.box(content, -10, 1, 17, 5, 3, 4, accent);
+    if (b.level > 0) {
+      this.box(content, 10, 16.7, -6, 3, 1.8, 3.5, '#4c6258');
+      this.box(content, 10, 18.5, -6, 0.12, 4, 0.12, '#9caf9b');
+    }
+    if (b.level > 1) {
+      this.box(content, -10, 1, 17, 5.4, 4.2, 4.2, '#647869');
+      this.box(content, 5, 16.7, -6, 3, 1.8, 3.5, '#a6aa83');
+    }
   } else if (b.key === 'vehiclebase') {
     // Wide assembly bays and an overhead crane distinguish armour production from drones.
     this.box(content, -3, 0.7, -2, 34, 13, 28, '#747e76');

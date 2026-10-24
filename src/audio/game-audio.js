@@ -14,6 +14,7 @@ import {
 } from './synth.js';
 import { recordedEngineLoop, uavEngineMix } from './engines.js';
 import { rocketIgnition, missileDive } from './missiles.js';
+import { FootstepScheduler, recordedGroundSample } from './footsteps.js';
 
 // How loud each weapon is and how often the same class may start a new sound.
 const WEAPON_SOUND = {
@@ -88,6 +89,7 @@ export class GameAudio {
     this.activeEngines = 0;
     this.whistled = new Set();
     this.listener = null;
+    this.footsteps = new FootstepScheduler();
   }
   // An OfflineAudioContext may be passed to render the mix to a file for listening tests.
   unlock(context = null) {
@@ -163,6 +165,7 @@ export class GameAudio {
     const rate = this.context.sampleRate,
       out = {
         diesel: this.buffer(dieselLoop(rate)),
+        truck: this.buffer(recordedGroundSample(rate, 'truck')),
         rotor: this.buffer(recordedEngineLoop(rate, 'rotor')),
         jet: this.buffer(jetLoop(rate)),
         moped: this.buffer(recordedEngineLoop(rate, 'prop', mopedLoop(rate))),
@@ -171,6 +174,7 @@ export class GameAudio {
       },
       jobs = [];
     const add = (name, make) => jobs.push(() => (out[name] ||= []).push(this.buffer(make())));
+    for (let i = 0; i < 3; i++) add('footstep', () => recordedGroundSample(rate, 'footstep', i));
     for (const key of ['rifle', 'mg', 'hmg', 'shilka', 'autocannon', 'blast', 'tank'])
       if (GUNS[key]) add(key, () => gunshot(rate, GUNS[key]));
     add('blast', () => explosion(rate, 1.2));
@@ -370,6 +374,7 @@ export class GameAudio {
     const c = this.context,
       kinds = [
         ['diesel', 3],
+        ['truck', 2],
         ['rotor', 2],
         ['moped', 3],
         ['jet', 2],
@@ -477,6 +482,16 @@ export class GameAudio {
       rightZ: m[2],
     };
     if (!paused) this.incoming(state);
+    const walker = this.footsteps.take(
+      state.groundUnits || [],
+      this.listener,
+      state.time ?? t,
+      paused || !this.enabled || this.voices >= 36,
+    );
+    if (walker) {
+      const where = this.locate(walker, 0, 0);
+      this.sample('footstep', where.distance, where.pan, 0.17, { delay: 0 });
+    }
     if (this.rain) {
       const wx = state.weather,
         wet = wx && (wx.kind === 'rain' || wx.kind === 'storm') ? wx.amount : 0;
@@ -502,7 +517,7 @@ export class GameAudio {
         city ? 1.2 : 2.5,
       );
     }
-    const wanted = { diesel: [], rotor: [], moped: [], jet: [] };
+    const wanted = { diesel: [], truck: [], rotor: [], moped: [], jet: [] };
     if (!paused) {
       for (const u of state.units)
         if (u.hp > 0 && u.delay <= 0 && u.status !== 'falling')
@@ -513,9 +528,10 @@ export class GameAudio {
                 ? 'rotor'
                 : 'moped'
           ].push(u);
-      // Only machines have engines; soldiers on foot are silent while walking.
+      // Nearby foot soldiers use the bounded one-shot scheduler above.
       for (const u of state.groundUnits || [])
-        if (u.hp > 0 && u.moving && VEHICLES.has(u.key)) wanted.diesel.push(u);
+        if (u.hp > 0 && u.moving && VEHICLES.has(u.key))
+          wanted[WHEELED.has(u.key) || u.key === 'supplytruck' ? 'truck' : 'diesel'].push(u);
     }
     let active = 0;
     for (const kind of Object.keys(wanted)) {
@@ -542,11 +558,13 @@ export class GameAudio {
             mix = distanceMix(d, 1),
             uav = kind === 'rotor' || kind === 'moped' ? uavEngineMix(u, d, this.listener) : null;
           gain =
-            kind === 'diesel'
-              ? 0.32 * mix.dry * (['leopard', 'howitzer', 'heavytank'].includes(u.key) ? 1.25 : 1)
-              : uav
-                ? uav.gain
-                : 0.3 * mix.dry;
+            kind === 'truck'
+              ? 0.24 * mix.dry
+              : kind === 'diesel'
+                ? 0.32 * mix.dry * (['leopard', 'howitzer', 'heavytank'].includes(u.key) ? 1.25 : 1)
+                : uav
+                  ? uav.gain
+                  : 0.3 * mix.dry;
           voice.source.playbackRate.setTargetAtTime(
             kind === 'diesel' ? (WHEELED.has(u.key) ? 1.15 : 0.9) : uav ? uav.rate : 1,
             t,

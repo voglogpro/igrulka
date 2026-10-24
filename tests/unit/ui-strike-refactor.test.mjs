@@ -6,7 +6,10 @@ function fixture() {
   const calls = [],
     elements = new Map();
   let revision = 0,
+    epoch = 0,
+    localStock = 2,
     started = true,
+    supplyReply = Promise.resolve(true),
     reply = Promise.resolve(2);
   const query = (key) => {
     if (!elements.has(key))
@@ -27,15 +30,18 @@ function fixture() {
         drone: { name: 'Drone', blast: 10, speed: 100 },
         ballistic: { name: 'Ballistic', blast: 50, speed: 100 },
         heavy: { name: 'Heavy', blast: 25, speed: 80, tech: 'heavy' },
+        cruise: { name: 'Cruise', blast: 40, speed: 100 },
       },
       MAP: { width: 1728, depth: 1152 },
       COMBAT: { queueLimit: 12 },
       BUILDINGS: { launcher: { name: 'Drone launcher' }, silo: { name: 'Missile silo' } },
       launchSites: (s, side, key) =>
         s.buildings.filter(
-          (b) => b.side === side && (key === 'ballistic' ? b.key === 'silo' : b.key === 'launcher'),
+          (b) =>
+            b.side === side &&
+            (['ballistic', 'cruise'].includes(key) ? b.key === 'silo' : b.key === 'launcher'),
         ),
-      availableLaunchStock: () => 2,
+      availableLaunchStock: () => localStock,
       weaponStock: () => 10,
       queuedLaunches: () => 0,
       selectedLaunchSite: () => ({ id: 7 }),
@@ -50,9 +56,10 @@ function fixture() {
     }),
     getStarted: () => started,
     getRevision: () => revision,
+    getEpoch: () => epoch,
     execute: (...args) => {
       calls.push(['execute', ...args]);
-      return reply;
+      return args[0] === 'launch-supply' ? supplyReply : reply;
     },
     interaction: {
       clearTroopTarget: () => calls.push('clear-target'),
@@ -74,11 +81,53 @@ function fixture() {
     calls,
     elements,
     setRevision: (value) => (revision = value),
+    setEpoch: (value) => (epoch = value),
+    setStock: (value) => (localStock = value),
     setStarted: (value) => (started = value),
     setReply: (value) => (reply = value),
+    setSupplyReply: (value) => (supplyReply = value),
     setState: (value) => (state = value),
   };
 }
+
+test('arming an empty compatible rack requests bounded physical supply without launching or duplicating pending demand', async () => {
+  const f = fixture();
+  f.setStock(0);
+  let resolve;
+  f.setSupplyReply(new Promise((done) => (resolve = done)));
+  f.controller.armStrike('drone');
+  await f.controller.requestSupply();
+  assert.deepEqual(
+    f.calls.filter((c) => c[0] === 'execute'),
+    [['execute', 'launch-supply', { id: 7, key: 'drone', count: 1 }]],
+  );
+  f.setEpoch(1);
+  resolve(true);
+  await Promise.resolve();
+  assert.ok(!f.calls.includes('persist'), 'late supply reply cannot write the next campaign');
+  assert.ok(!f.calls.some((c) => c[0] === 'execute' && c[1] === 'launch'));
+});
+
+test('switching to an already stocked weapon replaces stale supply preferences without autoattack', async () => {
+  const f = fixture();
+  f.setState({
+    buildings: [{ id: 7, key: 'silo', side: 0, hp: 10, progress: 1 }],
+    sides: [{ inventory: { ballistic: 0, cruise: 4 } }],
+  });
+  f.setStock(0);
+  f.controller.armStrike('ballistic');
+  await Promise.resolve();
+  f.setStock(4);
+  f.controller.armStrike('cruise');
+  await Promise.resolve();
+  assert.deepEqual(
+    f.calls.filter((c) => c[0] === 'execute'),
+    [
+      ['execute', 'launch-supply', { id: 7, key: 'ballistic', count: 1 }],
+      ['execute', 'launch-supply', { id: 7, key: 'cruise', count: 1 }],
+    ],
+  );
+});
 
 test('changing weapon removes incompatible selected sites and shows local stock separately', () => {
   const f = fixture();
@@ -117,6 +166,7 @@ test('strike routes keep original map/ten-point limits and ballistic launches di
   const f = fixture(),
     strike = f.controller;
   strike.armStrike();
+  await Promise.resolve();
   f.calls.length = 0;
   strike.model.routeEditing = true;
   await strike.chooseAimPoint({ x: 10, z: 20 });
@@ -130,7 +180,7 @@ test('strike routes keep original map/ten-point limits and ballistic launches di
   strike.armStrike('ballistic');
   assert.equal(strike.model.routeEditing, false);
   await strike.chooseAimPoint({ x: 100, z: 200 }, { shift: true });
-  const launch = f.calls.find((c) => c[0] === 'execute');
+  const launch = f.calls.find((c) => c[0] === 'execute' && c[1] === 'launch');
   assert.deepEqual(launch, [
     'execute',
     'launch',
@@ -142,6 +192,7 @@ test('late launch replies cannot repaint a newer interaction; unlocked route edi
   const f = fixture(),
     strike = f.controller;
   strike.armStrike();
+  await Promise.resolve();
   f.calls.length = 0;
   let resolve;
   f.setReply(new Promise((done) => (resolve = done)));

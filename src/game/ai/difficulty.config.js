@@ -1,5 +1,5 @@
 // Bot difficulty. Prices and starting resources stay equal; only the bot's resource income bonus
-// and the pace of its army, raids and research change. "hard" matches earlier versions.
+// and the pace of its army and raids change. "hard" matches earlier versions.
 export const DIFFICULTY = {
   easy: {
     name: 'Лёгкий',
@@ -33,7 +33,7 @@ export const DIFFICULTY = {
   },
   ultra: {
     name: 'Ультра',
-    description: 'Доход бота +45%, волны каждые полминуты, быстрые исследования.',
+    description: 'Доход бота +45%, частые налёты и быстрый набор армии.',
     bonus: 1.45,
     armyFrom: 180,
     armyEvery: 12,

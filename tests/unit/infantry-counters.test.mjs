@@ -140,16 +140,14 @@ test('autonomous FPV prioritizes observed tanks and reserves in-flight damage ra
   assert.equal(s.units.length, 4, 'cadence and cooldown prevent duplicate launches');
 });
 
-test('automatic operators respect hold fire, motion, suppression, passenger state and actual hidden targets', () => {
-  for (const blocked of ['holdFire', 'moving', 'suppression', 'carrierId', 'hidden']) {
+test('automatic operators respect hold fire, motion, suppression, passenger state and carried targets', () => {
+  for (const blocked of ['holdFire', 'moving', 'suppression', 'carrierId', 'carriedTarget']) {
     const s = fresh(),
       [a, b] = row(s, 100),
       operator = unit(s, 0, 'operator', a.x, a.z, false),
       target = unit(s, 1, 'leopard', b.x, b.z);
-    if (blocked === 'hidden') {
-      target.x = operator.x - 260;
-      target.z = operator.z;
-      assert.ok(Math.hypot(target.x - operator.x, target.z - operator.z) <= 320);
+    if (blocked === 'carriedTarget') {
+      target.carrierId = 123;
       assert.equal(E.groundVisible(s, 0, target), false);
     } else
       operator[blocked] = blocked === 'suppression' ? 0.9 : blocked === 'carrierId' ? 123 : true;
@@ -184,16 +182,20 @@ test('a guided FPV physically chases and hits a moving observed tank away from i
   }
 });
 
-test('guidance never reads a hidden tank new position and the real flight impacts only its last observed coordinates', () => {
+test('guidance never reads concealed infantry new position and the real flight impacts only its last observed coordinates', () => {
   const s = fresh(),
     [a, b] = row(s, 130),
     operator = unit(s, 0, 'operator', a.x, a.z),
-    tank = unit(s, 1, 'leopard', b.x, b.z);
+    tank = unit(s, 1, 'infantry', b.x, b.z);
+  tank.moving = true;
   assert.equal(launchFPV(s, 0, [operator.id], b, tank.id), true);
   const air = s.units[0],
     aim = { x: air.tx, z: air.tz };
   tank.x = 1000;
   tank.z = 700;
+  tank.moving = false;
+  tank.camouflaged = true;
+  s.trenches.push({ id: s.nextId++, side: 1, x: tank.x, z: tank.z, progress: 1 });
   assert.equal(E.groundVisible(s, 0, tank), false);
   const hp = tank.hp;
   for (let i = 0; i < 100 && air.hp > 0; i++) {
@@ -228,7 +230,15 @@ test('the actual command gateway locks a visible vehicle for either owner and re
     assert.equal(operator.fpvAmmo, 2);
     const denied = fresh(),
       op = unit(denied, side, 'operator', a.x, a.z),
-      hidden = unit(denied, 1 - side, 'leopard', a.x - 260, a.z);
+      hidden = unit(denied, 1 - side, 'infantry', a.x - 260, a.z);
+    hidden.camouflaged = true;
+    denied.trenches.push({
+      id: denied.nextId++,
+      side: 1 - side,
+      x: hidden.x,
+      z: hidden.z,
+      progress: 1,
+    });
     assert.equal(E.groundVisible(denied, side, hidden), false);
     const before = E.save(denied);
     for (const targetId of [hidden.id, op.id, -1, 'constructor', 999999]) {
