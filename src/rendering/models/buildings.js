@@ -3,6 +3,7 @@ import { BUILDINGS } from '../../game/index.js';
 import { radarModel, defenseModel } from './defenses.js';
 import { detailBuilding, batchStatic } from '../mesh-utils.js';
 import { serviceStationModel } from './city/service-station.js';
+import { oilWellModel, oilTankModel, portModel } from './city/oil.js';
 export function model(b) {
   const root = new T.Group();
   root.position.set(b.x, Math.max(0, this.height(b.x, b.z)), b.z);
@@ -14,7 +15,7 @@ export function model(b) {
     size = d?.size || 30,
     own = b.side === 0,
     accent = own ? '#87c6a4' : '#d58e76';
-  if (b.key !== 'gun') {
+  if (!['gun', 'port'].includes(b.key)) {
     this.box(root, 0, 0, 0, size + 7, 0.65, size + 7, '#6d706a');
     this.box(root, 0, 0.68, size / 2 + 2, size + 5, 0.15, 0.65, accent, {
       emissive: accent,
@@ -33,6 +34,12 @@ export function model(b) {
   this.sharedMaterials.add(windowMat);
   if (b.key === 'service') {
     serviceStationModel(this, content, accent);
+  } else if (b.key === 'oilwell') {
+    oilWellModel(this, content, root, accent);
+  } else if (b.key === 'oiltank') {
+    oilTankModel(this, content, accent);
+  } else if (b.key === 'port') {
+    portModel(this, content, accent);
   } else if (b.key === 'housing') {
     for (let i = 0; i < 3; i++) {
       const x = (i - 1) * 8,
@@ -151,7 +158,7 @@ export function model(b) {
     defenseModel(this, b, content, root);
   }
   // Warm porch lights are emissive geometry, avoiding a point light per structure.
-  if (!['gun', 'cannon', 'sam'].includes(b.key))
+  if (!['gun', 'cannon', 'sam', 'oilwell', 'oiltank', 'port'].includes(b.key))
     for (const x of [-size * 0.4, size * 0.4]) {
       this.cyl(content, x, 0.8, size * 0.43, 0.18, 7, '#485951');
       this.box(content, x, 7.5, size * 0.43, 1.7, 0.35, 1.7, '#ffcf8e', {
@@ -207,7 +214,7 @@ export function model(b) {
   root.add(scaffold);
   this.clearTrees(b.x, b.z, size + 10);
   detailBuilding(this, b, content);
-  const dynamic = new Set([root.userData.turret].filter(Boolean));
+  const dynamic = new Set([root.userData.turret, root.userData.pump].filter(Boolean));
   batchStatic(content, dynamic);
   batchStatic(scaffold);
   this.scene.add(root);

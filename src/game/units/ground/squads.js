@@ -1,5 +1,5 @@
 import { clamp } from '../../shared/math.js';
-import { GROUND_UNITS, isInfantry } from '../../config.js';
+import { FIELD, GROUND_UNITS, isInfantry } from '../../config.js';
 
 const squadId = (id) => Number.isSafeInteger(id) && id > 0;
 
@@ -31,14 +31,14 @@ export function squadDestination(point) {
     typeof point !== 'object' ||
     Array.isArray(point) ||
     ![point.x, point.z].every(Number.isFinite) ||
-    Math.abs(point.x) > 864 ||
-    Math.abs(point.z) > 576 ||
+    Math.abs(point.x) > FIELD.x ||
+    Math.abs(point.z) > FIELD.z ||
     (point.mode != null && !['move', 'attackmove'].includes(point.mode))
   )
     return undefined;
   return {
-    x: clamp(point.x, -850, 850),
-    z: clamp(point.z, -560, 560),
+    x: clamp(point.x, -(FIELD.x - 14), FIELD.x - 14),
+    z: clamp(point.z, -(FIELD.z - 14), FIELD.z - 14),
     mode: point.mode || 'attackmove',
   };
 }

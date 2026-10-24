@@ -154,14 +154,14 @@ test('invalid appends and refused direct commands preserve the active route', ()
     null,
     [],
     { x: Infinity, z: 0 },
-    { x: 865, z: 0 },
+    { x: E.FIELD.x + 1, z: 0 },
     { x: -300, z: 300, mode: 'constructor' },
     { x: 0, z: 0 },
   ]) {
     assert.equal(typeof appendGroundOrder(s, 0, [u.id], point), 'string');
     assert.deepEqual(u, before);
   }
-  assert.equal(typeof E.orderGround(s, 0, [u.id], { x: 999, z: 0 }), 'string');
+  assert.equal(typeof E.orderGround(s, 0, [u.id], { x: E.FIELD.x + 100, z: 0 }), 'string');
   assert.equal(typeof E.guardGround(s, 0, [u.id], { x: 0, z: 0 }), 'string');
   assert.deepEqual(u, before);
   assert.equal(groundRouteStatus(s, 1, u.id), null);
@@ -198,25 +198,24 @@ test('delivery replaces a loaded APC route while preserving all boarded infantry
   assert.equal(p.carrierId, null);
 });
 
-test('a queued march crosses the river through the actual bridge and continues on the far bank', () => {
+test('a queued march crosses the northern land corridor and continues on the far shore', () => {
   const s = fresh();
-  const u = unit(s, 'infantry', -180, -270);
-  add(s, u, 180, -270);
-  add(s, u, 180, -150);
-  let bridgeSamples = 0;
+  const z = E.CORRIDORS[0];
+  const u = unit(s, 'infantry', -300, z);
+  add(s, u, 300, z);
+  add(s, u, 330, z + 120);
+  let corridorSamples = 0;
   until(
     s,
     () => {
-      if (E.riverDistance(u.x, u.z) < 77) {
-        bridgeSamples++;
-        assert.ok(Math.abs(u.z + 270) < 23);
-      }
+      assert.ok(E.seaDistance(u.x, u.z) > 0, 'the march never wades into the sea');
+      if (Math.abs(u.x) < 40) corridorSamples++;
       return !u.routeState;
     },
-    60,
+    80,
   );
-  assert.ok(bridgeSamples > 0);
-  assert.ok(distance(u, { x: 180, z: -150 }) < 4);
+  assert.ok(corridorSamples > 0);
+  assert.ok(distance(u, { x: 330, z: z + 120 }) < 4);
 });
 
 test('a queued point blocked by a new building remains pending until its demolition', () => {

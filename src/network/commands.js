@@ -1,3 +1,4 @@
+import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
 export const PROTOCOL_VERSION = 5;
@@ -8,8 +9,8 @@ const point = (p) =>
   Object.hasOwn(p, 'x') &&
   Object.hasOwn(p, 'z') &&
   [p.x, p.z].every(Number.isFinite) &&
-  Math.abs(p.x) <= 864 &&
-  Math.abs(p.z) <= 576;
+  Math.abs(p.x) <= FIELD.x &&
+  Math.abs(p.z) <= FIELD.z;
 const ids = (list) =>
   Array.isArray(list) &&
   list.length > 0 &&

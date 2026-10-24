@@ -5,7 +5,7 @@ import { buildingConnected } from './city/road-network.js';
 // seen by a friendly observer nearby. A powered radar shows everything. The check is a lookup in a
 // coarse per-side grid rebuilt a few times per second.
 export const VISION = { radar: 320 };
-export const GRID = { cell: 32, cols: 56, rows: 38, ox: -896, oz: -608 };
+export const GRID = { cell: 40, cols: 80, rows: 60, ox: -1600, oz: -1200 };
 const REFRESH = 0.2;
 const caches = new WeakMap();
 

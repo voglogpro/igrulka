@@ -13,6 +13,8 @@ export const newSide = () => ({
   inventory: { drone: 0, heavy: 0, cruise: 0, ballistic: 0 },
   spentAmmo: 0,
   rearAuto: true,
+  // Barrels of oil in storage (see city/oil.js, OIL.start).
+  oil: 150,
   kills: 0,
   losses: 0,
 });
@@ -24,7 +26,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
     time: 0,
     seed,
     weather: createWeather(seed),
-    rules: { rear: true },
+    rules: { rear: true, oil: true },
     rng: seed || 1,
     nextId: 3,
     networkRevision: 0,
@@ -57,6 +59,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
     ],
     roads: [],
     serviceVehicles: [],
+    ships: [],
     units: [],
     groundUnits: [],
     trenches: [],

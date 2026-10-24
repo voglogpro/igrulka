@@ -5,7 +5,24 @@ import { veteranAccuracy } from './units/ground/veterancy.js';
 export { BUILDINGS, WEAPONS, GROUND_UNITS };
 export { TECH } from './research/tech-tree.config.js';
 export { isInfantry } from './units/ground/types.js';
-export { VERSION, MAP, riverX, riverDistance } from './map.js';
+export {
+  VERSION,
+  MAP,
+  FIELD,
+  inField,
+  SEA,
+  CORRIDORS,
+  HQ_X,
+  ISLAND,
+  OIL_FIELDS,
+  HILLS,
+  riverX,
+  riverDistance,
+  seaDistance,
+  isWater,
+  groundHeight,
+  terrainClear,
+} from './map.js';
 export { dayPhase } from './clock.js';
 export function weaponStats(f, key) {
   const d = WEAPONS[key];

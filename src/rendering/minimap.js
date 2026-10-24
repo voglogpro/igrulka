@@ -1,5 +1,50 @@
 import * as E from '../game/index.js';
-import { MAP, riverX } from '../game/index.js';
+import { MAP } from '../game/index.js';
+
+// The land, the sea, hills and woods never change: paint them once per minimap size.
+const backgrounds = new Map();
+function background(w, h) {
+  const key = w + 'x' + h;
+  if (backgrounds.has(key)) return backgrounds.get(key);
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d'),
+    image = g.createImageData(w, h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const wx = (x / w - 0.5) * MAP.width,
+        wz = (y / h - 0.5) * MAP.depth,
+        sea = E.seaDistance(wx, wz),
+        hill = E.groundHeight(wx, wz),
+        i = (y * w + x) * 4;
+      const rgb =
+        sea < 0
+          ? [42 + Math.max(-40, sea) * 0.2, 76 + Math.max(-40, sea) * 0.3, 92]
+          : sea < 14
+            ? [120, 116, 88]
+            : [38 + hill * 2.2, 56 + hill * 2.6, 45 + hill * 1.2];
+      image.data.set([...rgb, 255], i);
+    }
+  g.putImageData(image, 0, 0);
+  g.fillStyle = '#1f3524c0';
+  for (const p of E.COVER_PATCHES) {
+    if (!p.forest) continue;
+    g.beginPath();
+    g.ellipse(
+      (p.x / MAP.width + 0.5) * w,
+      (p.z / MAP.depth + 0.5) * h,
+      (p.r / MAP.width) * w,
+      (p.r / MAP.depth) * h,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    g.fill();
+  }
+  backgrounds.set(key, c);
+  return c;
+}
 export function updateMinimap(canvas) {
   const ctx = canvas.getContext('2d'),
     w = canvas.width,
@@ -7,13 +52,7 @@ export function updateMinimap(canvas) {
     sensors = E.sensorSources(this.state, 0),
     px = (x) => (x / MAP.width + 0.5) * w,
     pz = (z) => (z / MAP.depth + 0.5) * h;
-  ctx.fillStyle = '#26382f';
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = '#567b88';
-  ctx.lineWidth = 9;
-  ctx.beginPath();
-  for (let i = 0; i <= 100; i++) ctx.lineTo(px(riverX((i / 100 - 0.5) * MAP.depth)), (i / 100) * h);
-  ctx.stroke();
+  ctx.drawImage(background(w, h), 0, 0);
   for (const raw of this.state.roads) {
     const r = E.observedTarget(this.state, 0, raw.id, sensors);
     if (!r || r.removed) continue;
@@ -63,13 +102,16 @@ export function updateMinimap(canvas) {
     ctx.fillStyle = u.side === 0 ? '#a6d7ff' : '#ffa48a';
     ctx.fillRect(px(u.x) - 1.5, pz(u.z) - 1.5, 3, 3);
   }
-  for (const z of E.BRIDGES) {
+  // Border posts of the two land corridors.
+  for (const z of E.CORRIDORS) {
     ctx.strokeStyle = '#cfbf96';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.moveTo(px(E.riverX(z) - 110), pz(z));
-    ctx.lineTo(px(E.riverX(z) + 110), pz(z));
+    ctx.moveTo(px(0), pz(z) - 14);
+    ctx.lineTo(px(0), pz(z) + 14);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
   for (const d of E.DISTRICTS) {
     const value = E.districtStatus(this.state, d.id);

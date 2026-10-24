@@ -3,7 +3,7 @@ import { buildTankDestroyer } from './vehicles/tank-destroyer.js';
 import { buildTrackedVehicle, animateVehicleDrive } from './vehicles/tracked-chassis.js';
 import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
-import { isInfantry, GROUND_UNITS } from '../../game/config.js';
+import { isInfantry, GROUND_UNITS, groundHeight } from '../../game/config.js';
 import { mogModel } from './infantry/mog.js';
 import { buildArmoredCar, buildMLRS, buildSupplyTruck } from './vehicles/light-vehicles.js';
 // Shared hulls are rescaled to tell the weight classes apart at a glance.
@@ -70,7 +70,15 @@ export function groundModel(world, u) {
 const dummy = new T.Object3D();
 export function animateGround(model, u, time, dt = 0) {
   model.position.set(u.x, u.y || 1, u.z);
-  model.rotation.y = u.yaw || 0;
+  // Machines lean with the slope of a hill; soldiers stay upright.
+  if (!isInfantry(u.key)) {
+    const yaw = u.yaw || 0,
+      fx = Math.sin(yaw) * 3,
+      fz = Math.cos(yaw) * 3,
+      pitch = Math.atan2(groundHeight(u.x + fx, u.z + fz) - groundHeight(u.x - fx, u.z - fz), 6),
+      roll = Math.atan2(groundHeight(u.x + fz, u.z - fx) - groundHeight(u.x - fz, u.z + fx), 6);
+    model.rotation.set(-pitch, yaw, roll, 'YXZ');
+  } else model.rotation.y = u.yaw || 0;
   if (u.key === 'mog') {
     const field = model.userData.fieldPosition;
     if (field) {

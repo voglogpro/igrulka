@@ -1,5 +1,5 @@
 import { walkable } from '../ground/navigation.js';
-import { GROUND_UNITS, isInfantry, riverDistance } from '../../config.js';
+import { GROUND_UNITS, isInfantry, groundHeight } from '../../config.js';
 import { orderGround } from '../ground/orders.js';
 export function freeSpot(s, center, radius = 2, start = 0) {
   for (let i = 0; i < 64; i++) {
@@ -146,7 +146,7 @@ export function unloadGround(
   if (plan.error === 'Некорректный состав пассажиров БТР') return 0;
   for (const p of plan.placements) {
     const u = plan.passengers.find((u) => u.id === p.id);
-    const y = riverDistance(p.x, p.z) < 82 ? 2 : 1;
+    const y = 1 + groundHeight(p.x, p.z);
     Object.assign(u, {
       x: p.x,
       y,

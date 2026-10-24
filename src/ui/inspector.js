@@ -37,7 +37,7 @@ export function renderInspector(context) {
     if (!$('#rally-mode'))
       host.insertAdjacentHTML(
         'beforeend',
-        '<label class="barracks-rally-mode">Новобранцы<select id="rally-mode" aria-label="Приказы новым бойцам"><option value="guard">Охранять точку сбора</option><option value="wait">Ждать приказа у казарм</option><option value="attackmove">С боем к точке сбора</option><option value="attack">В атаку на штаб врага</option><option value="defend">Оборонять мост</option></select></label>',
+        '<label class="barracks-rally-mode">Новобранцы<select id="rally-mode" aria-label="Приказы новым бойцам"><option value="guard">Охранять точку сбора</option><option value="wait">Ждать приказа у казарм</option><option value="attackmove">С боем к точке сбора</option><option value="attack">В атаку на штаб врага</option><option value="defend">Оборонять коридор</option></select></label>',
       );
     $('#rally-mode').value = E.defaultRallyMode(state, b);
   }

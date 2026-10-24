@@ -49,6 +49,10 @@ export function sync() {
       this.models.set(b.id, m);
       this.renderer.shadowMap.needsUpdate = true;
     }
+    // The pumpjack nods while its well is working.
+    const pump = m.root.userData.pump;
+    if (pump && b.hp > 0 && b.progress >= 1)
+      pump.rotation.x = Math.sin(this.battleTime * 1.7 + b.id) * 0.28;
     if (b.hp <= 0) {
       if (!m.dead) {
         m.dead = true;

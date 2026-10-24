@@ -1,4 +1,4 @@
-import { GROUND_UNITS } from '../../config.js';
+import { FIELD, GROUND_UNITS } from '../../config.js';
 import { walkable } from './navigation.js';
 import { groundFormationDestinations, orderGround } from './orders.js';
 import { groundVisible, lineOfSight } from '../infantry/cover.js';
@@ -22,8 +22,8 @@ export function appendGroundOrder(s, side, ids, point) {
     !point ||
     Array.isArray(point) ||
     ![point.x, point.z].every(Number.isFinite) ||
-    Math.abs(point.x) > 864 ||
-    Math.abs(point.z) > 576 ||
+    Math.abs(point.x) > FIELD.x ||
+    Math.abs(point.z) > FIELD.z ||
     (point.mode != null && !modes.includes(point.mode))
   )
     return 'Выберите допустимую точку маршрута на карте';

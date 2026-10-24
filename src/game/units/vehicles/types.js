@@ -3,6 +3,8 @@ export const VEHICLE_TYPES = {
   armoredcar: {
     name: 'Бронеавтомобиль',
     cost: 190,
+    oil: 12,
+    fuel: 0.012,
     metal: 12,
     time: 14,
     hp: 170,
@@ -25,6 +27,8 @@ export const VEHICLE_TYPES = {
   lighttank: {
     name: 'Лёгкий танк',
     cost: 420,
+    oil: 25,
+    fuel: 0.02,
     metal: 30,
     time: 24,
     hp: 340,
@@ -48,6 +52,8 @@ export const VEHICLE_TYPES = {
   ifv: {
     name: 'БМП',
     cost: 480,
+    oil: 28,
+    fuel: 0.02,
     metal: 34,
     time: 26,
     hp: 360,
@@ -72,6 +78,8 @@ export const VEHICLE_TYPES = {
   tankdestroyer: {
     name: 'Противотанковая машина',
     cost: 520,
+    oil: 30,
+    fuel: 0.022,
     metal: 40,
     time: 28,
     hp: 260,
@@ -94,6 +102,8 @@ export const VEHICLE_TYPES = {
   shilka: {
     name: 'Шилка',
     cost: 380,
+    oil: 30,
+    fuel: 0.02,
     metal: 26,
     time: 22,
     hp: 240,
@@ -115,6 +125,8 @@ export const VEHICLE_TYPES = {
   gepard: {
     name: 'Gepard',
     cost: 560,
+    oil: 35,
+    fuel: 0.022,
     metal: 40,
     time: 28,
     hp: 330,
@@ -136,6 +148,8 @@ export const VEHICLE_TYPES = {
   leopard: {
     name: 'Leopard',
     cost: 740,
+    oil: 45,
+    fuel: 0.03,
     metal: 55,
     time: 34,
     hp: 650,
@@ -151,6 +165,8 @@ export const VEHICLE_TYPES = {
   howitzer: {
     name: 'Самоходная гаубица',
     cost: 900,
+    oil: 35,
+    fuel: 0.02,
     metal: 60,
     time: 38,
     hp: 380,
@@ -174,6 +190,8 @@ export const VEHICLE_TYPES = {
   heavytank: {
     name: 'Тяжёлый танк',
     cost: 1150,
+    oil: 55,
+    fuel: 0.035,
     metal: 90,
     time: 46,
     hp: 1050,
@@ -193,6 +211,8 @@ export const VEHICLE_TYPES = {
   mlrs: {
     name: 'РСЗО',
     cost: 980,
+    oil: 40,
+    fuel: 0.022,
     metal: 70,
     time: 40,
     hp: 280,
@@ -219,6 +239,8 @@ export const VEHICLE_TYPES = {
     name: 'Тыловой грузовик',
     support: 'supply',
     cost: 300,
+    oil: 10,
+    fuel: 0.01,
     metal: 18,
     time: 18,
     hp: 230,
@@ -245,6 +267,8 @@ export const VEHICLE_TYPES = {
   apc: {
     name: 'Бронетранспортёр',
     cost: 330,
+    oil: 18,
+    fuel: 0.015,
     metal: 23,
     time: 20,
     hp: 330,

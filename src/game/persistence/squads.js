@@ -1,3 +1,4 @@
+import { FIELD } from '../map.js';
 const id = (value) => value == null || (Number.isSafeInteger(value) && value > 0);
 const point = (p) =>
   p === null ||
@@ -5,8 +6,8 @@ const point = (p) =>
     typeof p === 'object' &&
     !Array.isArray(p) &&
     [p.x, p.z].every(Number.isFinite) &&
-    Math.abs(p.x) <= 850 &&
-    Math.abs(p.z) <= 560 &&
+    Math.abs(p.x) <= FIELD.x - 14 &&
+    Math.abs(p.z) <= FIELD.z - 14 &&
     ['move', 'attackmove'].includes(p.mode));
 export function validateSquadMetadata(value, queued = false) {
   if (

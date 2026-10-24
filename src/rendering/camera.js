@@ -1,12 +1,15 @@
 import { Vector3, MathUtils } from '../../vendor/three/three.module.js';
+import { FIELD } from '../game/map.js';
 export const CAMERA = {
   min: 100,
-  max: 570,
+  max: 720,
   home: 540,
   minPitch: (Math.PI * 35) / 180,
   maxPitch: (Math.PI * 80) / 180,
   angle: new Vector3(-0.55, 0.8, 0.65).normalize(),
 };
+// The camera target stays over the playable field.
+const BOUNDS = { x: FIELD.x - 60, z: FIELD.z - 60 };
 export class FixedCamera {
   constructor(camera, canvas) {
     this.camera = camera;
@@ -119,7 +122,11 @@ export class FixedCamera {
     this.right.set(-this.forward.z, 0, this.forward.x);
   }
   focus(x, z, distance = CAMERA.max) {
-    this.desired.set(MathUtils.clamp(x, -795, 795), 0, MathUtils.clamp(z, -480, 480));
+    this.desired.set(
+      MathUtils.clamp(x, -BOUNDS.x, BOUNDS.x),
+      0,
+      MathUtils.clamp(z, -BOUNDS.z, BOUNDS.z),
+    );
     this.zoomDistance = MathUtils.clamp(distance, CAMERA.min, CAMERA.max);
   }
   update(dt = 1 / 60, keys = null) {
@@ -138,18 +145,18 @@ export class FixedCamera {
           this.distance * 0.6 * Math.min(0.1, Math.max(0, dt)),
         );
         this.desired.set(
-          MathUtils.clamp(this.desired.x, -795, 795),
+          MathUtils.clamp(this.desired.x, -BOUNDS.x, BOUNDS.x),
           0,
-          MathUtils.clamp(this.desired.z, -480, 480),
+          MathUtils.clamp(this.desired.z, -BOUNDS.z, BOUNDS.z),
         );
       }
     }
     const t = 1 - Math.exp(-Math.max(0, dt) * 10);
     this.target.lerp(this.desired, t);
     this.target.set(
-      MathUtils.clamp(this.target.x, -795, 795),
+      MathUtils.clamp(this.target.x, -BOUNDS.x, BOUNDS.x),
       0,
-      MathUtils.clamp(this.target.z, -480, 480),
+      MathUtils.clamp(this.target.z, -BOUNDS.z, BOUNDS.z),
     );
     this.distance = MathUtils.clamp(
       this.distance + (this.zoomDistance - this.distance) * t,

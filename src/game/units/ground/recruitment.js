@@ -1,3 +1,4 @@
+import { oilCost, hasOil, spendOil } from '../../city/oil.js';
 import { GROUND_UNITS, defenseStats } from '../../config.js';
 import { clamp } from '../../shared/math.js';
 import { GROUND_LIMIT, walkable } from './navigation.js';
@@ -67,8 +68,10 @@ export function recruit(s, side, key, siteId = null, count = 1, stance = null) {
     return 'Очередь казарм заполнена';
   if (f.credits < d.cost * count || f.materials < d.metal * count)
     return 'Не хватает денег или сплавов';
+  if (!hasOil(s, side, oilCost(key) * count)) return 'Не хватает нефти: постройте нефтевышки';
   f.credits -= d.cost * count;
   f.materials -= d.metal * count;
+  spendOil(s, side, oilCost(key) * count);
   for (let i = 0; i < count; i++) {
     sites.sort((a, b) => (a.armyQueue?.length || 0) - (b.armyQueue?.length || 0));
     (sites[0].armyQueue ||= []).push({

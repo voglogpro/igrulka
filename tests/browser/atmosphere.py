@@ -111,7 +111,7 @@ try:
           for(const f of s.sides){f.credits=50000;f.materials=5000;f.tech=Object.keys(E.TECH);}
           const b=E.build(s,0,'gun',-450,0);b.progress=1;b.hp=b.maxHp;
           const m=E.makeGround(s,0,'mog',-420,50);m.setup=1;s.groundUnits.push(m);
-          const site=E.build(s,1,'launcher',-180,10);site.progress=1;site.hp=site.maxHp;s.sides[1].inventory.heavy=1;E.launch(s,1,'heavy',{x:-650,z:10});
+          const site=E.build(s,1,'launcher',-265,175);site.progress=1;site.hp=site.maxHp;s.sides[1].inventory.heavy=1;E.launch(s,1,'heavy',{x:-650,z:10});
           Object.assign(s.units[0],{route:null,startX:0,startZ:10,tx:-650,tz:10,total:650,travelled:300,speed:.001,hp:100000,maxHp:100000,delay:0});
           E.advance(s,7);Object.assign(w.state,s);w.previousSimTime=s.time;w.controls.focus(-380,20,300);w.controls.update(3);w.updateDaylight();w.sync();
           w.weatherFX.update(3,w.controls.target,s.weather);w.combatFX.emit(s,.1);w.combatFX.update(.1,w.battleTime,w.camera);w.post.render(w.scene,w.camera,w.battleTime);

@@ -24,7 +24,15 @@ const ready = (s, key, x, z, side = 0) => {
   b.progress = 1;
   return b;
 };
-const patch = () => E.COVER_PATCHES.find((p) => p.x > 100 && p.x < 450 && Math.abs(p.z) < 400);
+const patch = () =>
+  E.COVER_PATCHES.find(
+    (p) =>
+      p.x > 100 &&
+      p.x < 1300 &&
+      Math.abs(p.z) < 800 &&
+      E.groundHeight(p.x, p.z) < 0.5 &&
+      E.terrainClear(p.x - 180, p.z, 2.2, p.x + 40, p.z, 2.2),
+  );
 test('stationary cannon is removed, mobile gun vehicles remain, and individual roles are distinct', () => {
   assert.equal(E.BUILDINGS.cannon, undefined);
   for (const key of [
@@ -289,7 +297,7 @@ test('v7 cannon conversion refunds the difference and legacy five-man units beco
 test('mobile MOG needs deployment, intercepts drones, shares its magazine and cools while holding fire', () => {
   const s = fresh(),
     u = soldier(s, 'mog', -300, 100),
-    site = ready(s, 'launcher', -180, 100, 1);
+    site = ready(s, 'launcher', -265, 175, 1);
   s.sides[1].inventory.heavy = 1;
   E.launch(s, 1, 'heavy', { x: -600, z: 100 });
   E.advance(s, 0.1);

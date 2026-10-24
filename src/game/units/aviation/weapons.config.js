@@ -3,6 +3,7 @@ export const WEAPONS = {
   drone: {
     name: 'Лёгкий дрон',
     cost: 90,
+    oil: 3,
     metal: 8,
     time: 12,
     hp: 30,
@@ -14,6 +15,7 @@ export const WEAPONS = {
   heavy: {
     name: 'Тяжёлый дрон',
     cost: 180,
+    oil: 6,
     metal: 18,
     time: 20,
     hp: 90,
@@ -26,6 +28,7 @@ export const WEAPONS = {
   cruise: {
     name: 'Крылатая ракета',
     cost: 340,
+    oil: 15,
     metal: 28,
     time: 28,
     hp: 65,
@@ -38,6 +41,7 @@ export const WEAPONS = {
   ballistic: {
     name: 'Баллистическая ракета',
     cost: 650,
+    oil: 25,
     metal: 52,
     time: 42,
     hp: 150,

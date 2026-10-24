@@ -339,7 +339,7 @@ test('old campaigns migrate with an empty fleet; malformed, foreign and wrong-ty
   const raw = JSON.parse(E.save(s));
   for (const corrupt of [
     (v) => {
-      v.serviceVehicles[0].x = 900;
+      v.serviceVehicles[0].x = 1700;
     },
     (v) => {
       v.serviceVehicles[0].state = '__proto__';

@@ -1,6 +1,6 @@
 import { event } from '../../shared/events.js';
 import { random } from '../../shared/random.js';
-import { riverDistance, BUILDINGS, WEAPONS } from '../../config.js';
+import { riverDistance, BUILDINGS, WEAPONS, MAP, groundHeight } from '../../config.js';
 import { COMBAT } from '../../combat/config.js';
 import { applyBlast } from '../../combat/damage.js';
 import { clamp } from '../../shared/math.js';
@@ -39,7 +39,7 @@ export function damageAircraft(s, u, damage, attacker) {
 }
 
 export function collisionHeight(s, x, z) {
-  let height = riverDistance(x, z) < 65 ? -2.5 : 0;
+  let height = riverDistance(x, z) < MAP.riverWidth ? -2.5 : groundHeight(x, z);
   for (const b of s.buildings)
     if (
       !b.demolished &&

@@ -1,3 +1,4 @@
+import { FIELD } from '../map.js';
 import { BUILDINGS } from '../city/buildings.config.js';
 const object = (v) => v && typeof v === 'object' && !Array.isArray(v);
 const id = (v) => Number.isSafeInteger(v) && v > 0;
@@ -5,8 +6,8 @@ const point = (p) =>
   object(p) &&
   Number.isFinite(p.x) &&
   Number.isFinite(p.z) &&
-  Math.abs(p.x) <= 880 &&
-  Math.abs(p.z) <= 600;
+  Math.abs(p.x) <= FIELD.x &&
+  Math.abs(p.z) <= FIELD.z;
 
 export function restoreServices(s) {
   for (const b of s.buildings)

@@ -1,5 +1,5 @@
 import { ROAD_HP, dirtyNetwork, overlappingRoad, segmentDistance } from './road-network.js';
-import { riverDistance, BUILDINGS } from '../config.js';
+import { riverDistance, BUILDINGS, FIELD, groundHeight } from '../config.js';
 import { event } from '../shared/events.js';
 export function addRoad(s, side, ax, az, bx, bz, extra = {}) {
   const r = { id: s.nextId++, side, ax, az, bx, bz, hp: ROAD_HP, maxHp: ROAD_HP, ...extra };
@@ -25,8 +25,11 @@ export function roadPreview(s, owner, ax, az, bx, bz) {
     const t = i / Math.ceil(length / 5),
       x = ax + (bx - ax) * t,
       z = az + (bz - az) * t;
-    if (Math.abs(x) > 865 || Math.abs(z) > 585) return { error: 'За границей карты', length, cost };
+    if (Math.abs(x) > FIELD.x || Math.abs(z) > FIELD.z)
+      return { error: 'За границей карты', length, cost };
     if (riverDistance(x, z) < 75) return { error: 'Улица должна проходить по суше', length, cost };
+    if (groundHeight(x, z) > 1.2)
+      return { error: 'Улица не поднимается на холм: ведите её по равнине', length, cost };
   }
   if (overlappingRoad(s, ax, az, bx, bz))
     return {

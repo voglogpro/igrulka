@@ -1,3 +1,4 @@
+import { oilCost, hasOil, spendOil } from '../../city/oil.js';
 import { WEAPONS } from '../../config.js';
 import { clamp } from '../../shared/math.js';
 export function produce(s, owner, key, count = 1, factoryId = null) {
@@ -19,10 +20,12 @@ export function produce(s, owner, key, count = 1, factoryId = null) {
   if (!factories.length) return 'Сначала постройте сборочный завод';
   if (f.credits < d.cost * count || f.materials < d.metal * count)
     return 'Не хватает денег или сплавов';
+  if (!hasOil(s, owner, oilCost(key) * count)) return 'Не хватает нефти: постройте нефтевышки';
   if (living.reduce((n, b) => n + (b.queue?.length || 0), 0) + count > 24)
     return 'Очередь завода заполнена';
   f.credits -= d.cost * count;
   f.materials -= d.metal * count;
+  spendOil(s, owner, oilCost(key) * count);
   for (let i = 0; i < count; i++) {
     factories.sort((a, b) => (a.queue?.length || 0) - (b.queue?.length || 0));
     (factories[0].queue ||= []).push({ key, progress: 0 });

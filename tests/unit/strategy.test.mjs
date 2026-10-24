@@ -38,7 +38,7 @@ function ground(s, key, x, z, side = 0) {
   return u;
 }
 function target(s, key = 'heavy') {
-  const site = ready(s, 1, 'launcher', -200, 100);
+  const site = ready(s, 1, 'launcher', -265, 175);
   s.sides[1].inventory[key] = 1;
   E.launch(s, 1, key, { x: -700, z: 100 });
   E.advance(s, 0.1);
@@ -186,15 +186,15 @@ test('barracks produce paid soldiers and vehicles, army upkeep is charged and qu
   assert.deepEqual(loaded.groundUnits, s.groundUnits);
   assert.deepEqual(loaded.buildings.find((t) => t.id === b.id).armyQueue, b.armyQueue);
 });
-test('ground navigation crosses the river only on bridges and avoids building corners', () => {
+test('ground navigation goes around the sea through a land corridor and avoids building corners', () => {
   const s = fresh();
   ready(s, 0, 'launcher', -300, -120);
   const path = E.groundPath(s, { x: -500, z: 0 }, { x: 500, z: 0 }, 4);
   assert.ok(path.length > 20);
   assert.ok(path.every((p) => E.walkable(s, p.x, p.z, 4)));
-  const crossing = path.filter((p) => E.riverDistance(p.x, p.z) < 78);
-  assert.ok(crossing.length > 3);
-  assert.ok(crossing.every((p) => E.BRIDGES.some((z) => Math.abs(p.z - z) < 20)));
+  assert.ok(path.every((p) => E.seaDistance(p.x, p.z) > 0));
+  // The only dry crossing lies beyond the end of the sea.
+  assert.ok(Math.max(...path.map((p) => Math.abs(p.z))) > E.SEA.halfZ);
   for (let i = 1; i < path.length; i++) {
     const a = path[i - 1],
       b = path[i];
@@ -202,11 +202,11 @@ test('ground navigation crosses the river only on bridges and avoids building co
       assert.ok(E.walkable(s, a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, 4));
   }
 });
-test('orders actually move soldiers across a bridge, tanks damage an enemy HQ and blasts damage troops', () => {
+test('orders actually move soldiers through a corridor, tanks damage an enemy HQ and blasts damage troops', () => {
   const s = fresh(),
     u = ground(s, 'infantry', -500, 0);
   assert.equal(E.orderGround(s, 0, [u.id], { x: 450, z: 0 }), 1);
-  E.advance(s, 100);
+  E.advance(s, 220);
   assert.ok(u.x > 200, JSON.stringify(u));
   const tank = ground(s, 'leopard', 500, 0),
     hq = s.buildings[1],

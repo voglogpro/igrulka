@@ -1,21 +1,17 @@
-import { BUILDINGS, GROUND_UNITS, isInfantry, riverDistance, dayPhase } from '../../config.js';
+import {
+  BUILDINGS,
+  GROUND_UNITS,
+  isInfantry,
+  dayPhase,
+  groundHeight,
+  terrainClear,
+} from '../../config.js';
+import { COVER_PATCHES } from '../../map.js';
 import { segmentDistance } from '../../city/road-network.js';
 import { fogVisible } from '../../vision-grid.js';
-let seed = 81273;
-const rnd = () => {
-  seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-  return seed / 4294967296;
-};
-export const COVER_PATCHES = [];
+// Forests and thickets are generated with the terrain so hills and woods line up.
+export { COVER_PATCHES };
 const coverCache = new WeakMap();
-for (let i = 0; i < 180 && COVER_PATCHES.length < 82; i++) {
-  const x = (rnd() - 0.5) * 1640,
-    z = (rnd() - 0.5) * 1080,
-    r = 13 + rnd() * 17;
-  if (riverDistance(x, z) < 105 || Math.hypot(x + 615, z) < 175 || Math.hypot(x - 615, z) < 175)
-    continue;
-  COVER_PATCHES.push({ x, z, r, forest: i % 3 !== 0 });
-}
 // Patches never move: bucket them once so a lookup checks only the patches around a point.
 const PATCH_CELL = 64;
 const patchCells = new Map();
@@ -128,7 +124,12 @@ export function lineOfSight(s, a, b) {
     if ((d?.height || 15) <= 4) continue;
     if (segmentDistance(o.x, o.z, a.x, a.z, b.x, b.z) < (d?.size || 30) * 0.48) return false;
   }
-  return true;
+  // Hills: the crest between two eyes hides them from each other.
+  return terrainClear(a.x, a.z, eyeHeight(a), b.x, b.z, eyeHeight(b));
+}
+function eyeHeight(o) {
+  const lift = BUILDINGS[o.key] ? 8 : GROUND_UNITS[o.key] && !isInfantry(o.key) ? 3.4 : 2.2;
+  return groundHeight(o.x, o.z) + lift;
 }
 function observes(s, v, u, factor, flash, night) {
   const sight = GROUND_UNITS[v.key]?.sight || (v.key === 'hq' ? 220 : 120),

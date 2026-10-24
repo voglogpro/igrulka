@@ -489,6 +489,9 @@ function updateHUD() {
   $('#money-rate').textContent = rate(e.net) + '/мин';
   $('#metal').textContent = num(f.materials);
   $('#metal-rate').textContent = rate(e.materials) + '/мин';
+  $('#oil').textContent = `${num(f.oil ?? 0)} / ${num(E.oilStorage(state, 0))}`;
+  $('#oil-rate').textContent = rate(f.oilRate || 0) + '/мин';
+  $('#oil').parentElement.classList.toggle('low', (f.oil ?? 0) < 30);
   $('#science').textContent = num(f.science);
   $('#science-rate').textContent = rate(e.science) + '/мин';
   $('#power').textContent = `${Math.round(e.power)} / ${e.demand}`;
@@ -520,9 +523,11 @@ function buildList() {
   const keys =
     tab === 'city'
       ? ['road', 'housing', 'industry', 'power', 'lab', 'market', 'service']
-      : tab === 'army'
-        ? ['barracks']
-        : ['factory', 'launcher', 'gun', 'sam', 'radar'];
+      : tab === 'oil'
+        ? ['oilwell', 'oiltank', 'port']
+        : tab === 'army'
+          ? ['barracks']
+          : ['factory', 'launcher', 'gun', 'sam', 'radar'];
   $('#build-list').innerHTML =
     keys
       .map((key) => {
@@ -1020,7 +1025,7 @@ async function recruitWithStance(key) {
       `${E.GROUND_UNITS[key].name} ×${recruitCount}: ${
         recruitMode === 'attack'
           ? 'пойдут в атаку'
-          : 'займут ' + (E.POST_NAMES[recruitPost] || 'мост')
+          : 'займут ' + (E.POST_NAMES[recruitPost] || 'коридор')
       } после подготовки`,
     );
     persist();
@@ -1040,7 +1045,7 @@ async function setStance(mode) {
     toast(
       mode === 'attack'
         ? `Атака: ${result} ед. идут на штаб противника`
-        : `Оборона: ${result} ед. занимают мост`,
+        : `Оборона: ${result} ед. занимают коридор`,
     );
     persist();
     renderInspector();

@@ -135,7 +135,7 @@ test('empty, foreign, pending boarding and invalid destination refusals preserve
   assert.equal(deliverGround(s, 0, apc.id, destination), 1);
   const mission = structuredClone(apc.delivery);
   const order = structuredClone(apc.order);
-  for (const point of [null, [], { x: NaN, z: 0 }, { x: 900, z: 0 }, { x: 0, z: 0 }]) {
+  for (const point of [null, [], { x: NaN, z: 0 }, { x: 1700, z: 0 }, { x: 0, z: 0 }]) {
     assert.equal(typeof deliverGround(s, 0, apc.id, point), 'string');
     assert.deepEqual(apc.delivery, mission);
     assert.deepEqual(apc.order, order);
@@ -256,7 +256,7 @@ test('a newly blocked destination waits for demolition instead of unloading away
 
 test('shore and city-wall exits remain on connected walkable ground', () => {
   const { s, apc, passengers } = loaded(['infantry', 'infantry']);
-  const shore = { x: -130, z: 0 };
+  const shore = { x: -275, z: 0 };
   assert.equal(deliverGround(s, 0, apc.id, shore), 2);
   until(s, () => !apc.delivery, 35);
   assertLanded(s, apc, passengers);

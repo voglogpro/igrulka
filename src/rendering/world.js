@@ -4,7 +4,8 @@ import {
   terrain as terrainForWorld,
   environment as environmentForWorld,
   makeCover as makeCoverForWorld,
-  bridges as bridgesForWorld,
+  landmarks as landmarksForWorld,
+  island as islandForWorld,
   clearTrees as clearTreesForWorld,
 } from './terrain/environment.js';
 import { syncTrenches as syncTrenchesForWorld } from './terrain/trenches.js';
@@ -28,6 +29,7 @@ import { CombatEffects } from './effects/combat-effects.js';
 import { FogVeil } from './fog-veil.js';
 import { Traffic } from './traffic.js';
 import { ServiceFleet } from './service-fleet.js';
+import { Ships } from './ships.js';
 import { WeatherFX } from './effects/weather-fx.js';
 import { disposeTree } from './mesh-utils.js';
 import { aircraftModel } from './models/aircraft.js';
@@ -114,7 +116,7 @@ export class RTSWorld {
       top: 700,
       bottom: -700,
       near: 1,
-      far: 2300,
+      far: 3200,
     });
     this.sun.shadow.normalBias = 1.1;
     this.sun.shadow.bias = -0.00025;
@@ -129,7 +131,7 @@ export class RTSWorld {
     this.glowTexture = this.makeGlow();
     this.terrain();
     this.environment();
-    this.bridges();
+    this.landmarks();
     this.makeCover();
     this.districtView = new DistrictView(this);
     this.selection = new T.Mesh(
@@ -296,6 +298,7 @@ export class RTSWorld {
       height: (x, z) => this.height(x, z),
       visible: (s, v) => v.side === 0 || E.fogVisible(s, 0, v.x, v.z),
     });
+    this.ships = new Ships(this);
     this.tactical = new TacticalView(this);
     this.deploymentPreview = new DeploymentPreview(this.scene);
     this.sync();
@@ -378,8 +381,11 @@ export class RTSWorld {
       }
     }
   }
-  bridges(...args) {
-    return bridgesForWorld.call(this, ...args);
+  landmarks(...args) {
+    return landmarksForWorld.call(this, ...args);
+  }
+  island(...args) {
+    return islandForWorld.call(this, ...args);
   }
   updateDaylight(...args) {
     return updateDaylightForWorld.call(this, ...args);
@@ -509,6 +515,7 @@ export class RTSWorld {
       weather: this.weatherFX.diagnostics(),
       traffic: this.traffic.diagnostics(),
       serviceFleet: this.serviceFleet.diagnostics(),
+      ships: this.ships.diagnostics(),
       detectedEnemies: this.state.units.filter(
         (u) => u.side === 1 && E.unitVisible(this.state, 0, u),
       ).length,
@@ -523,7 +530,7 @@ export class RTSWorld {
       pixelRatio: this.renderer.getPixelRatio(),
       renderScale: this.renderBudget.scale,
       camera: this.controls.diagnostics(),
-      riverBed: this.height(riverX(0), 0),
+      seaBed: this.height(riverX(0), 300),
       waterLevel: -2.5,
     };
   }
@@ -557,6 +564,12 @@ export class RTSWorld {
     }
     this.updateDaylight();
     this.combatFX.lead = this.simLead || 0;
+    // Ripples drift with battle time, so they rest when the game is paused.
+    this.waterNormals?.offset.set(this.battleTime * 0.004, this.battleTime * 0.009);
+    if (this.foam) this.foam.material.opacity = 0.05 + Math.sin(this.battleTime * 0.9) * 0.03;
+    if (this.beacon)
+      this.beacon.intensity =
+        E.dayPhase(this.state.time).night * (Math.sin(this.battleTime * 2.2) > 0.6 ? 900 : 0);
     this.sync();
     this.fogVeil.update(this.state, wallDt);
     this.weatherFX.update(this.visualDt, this.controls.target, this.state.weather);
@@ -564,6 +577,11 @@ export class RTSWorld {
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);
     this.traffic.update(this.state, this.visualDt, this.combatFX);
     this.serviceFleet.update(this.battleTime);
+    this.ships.update(
+      this.state,
+      this.battleTime,
+      (ship) => ship.side === 0 || E.fogVisible(this.state, 0, ship.x, ship.z),
+    );
     if (this.buildKey && this.lastPointer) this.updateGhost(this.lastPointer);
     if (this.aiming && this.lastPointer && !this.controls.rotating) {
       const p = this.groundPoint(this.lastPointer);

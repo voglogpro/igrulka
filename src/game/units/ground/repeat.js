@@ -1,3 +1,4 @@
+import { oilCost, hasOil, spendOil } from '../../city/oil.js';
 import { GROUND_UNITS } from '../../config.js';
 import { GROUND_LIMIT } from './navigation.js';
 
@@ -24,6 +25,7 @@ export function recruitRepeatStatus(s, side, siteId) {
     else if (queued) status = 'queued';
     else if (alive + sideQueued >= GROUND_LIMIT) status = 'unit-limit';
     else if (f.credits < d.cost || f.materials < d.metal) status = 'resources';
+    else if (!hasOil(s, side, oilCost(key))) status = 'oil';
     else status = 'ready';
   }
   return {
@@ -58,6 +60,7 @@ export function updateRecruitRepeat(s) {
     const f = s.sides[b.side];
     f.credits -= d.cost;
     f.materials -= d.metal;
+    spendOil(s, b.side, oilCost(b.recruitRepeat.key));
     (b.armyQueue ||= []).push({ key: b.recruitRepeat.key, progress: 0 });
   }
 }

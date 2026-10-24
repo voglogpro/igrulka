@@ -319,6 +319,16 @@ export class GameAudio {
         });
       return;
     }
+    if (e.type === 'oilfire') {
+      // A tank farm going up: a deep fireball and a slow rolling second boom.
+      this.sample('blastLarge', where.distance, where.pan, 1.9, { force: true, rate: 0.7 });
+      this.sample('blastLarge', where.distance, where.pan, 1.2, {
+        force: true,
+        rate: 0.5,
+        delay: 0.6,
+      });
+      return;
+    }
     if (e.type === 'lightning') {
       // Light arrives at once, the thunder after the distance has been covered.
       this.sample('blastLarge', where.distance, where.pan, 1.6, {

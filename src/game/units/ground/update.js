@@ -1,4 +1,5 @@
-import { GROUND_UNITS, BUILDINGS, isInfantry, defenseStats, riverDistance } from '../../config.js';
+import { fuelFactor } from '../../city/oil.js';
+import { GROUND_UNITS, BUILDINGS, isInfantry, defenseStats, groundHeight } from '../../config.js';
 import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
 import { lineOfSight, recordFire } from '../infantry/cover.js';
 import { updateInfantrySupport } from '../infantry/support.js';
@@ -30,6 +31,25 @@ import {
 const AUTOMATIC = new Set(['machinegunner', 'apc', 'mog', 'armoredcar', 'lighttank', 'ifv']);
 // Bullets are aimed slightly upward and fall onto the target; the rise matches a parabolic drop.
 const LOFT_GRAVITY = 42;
+
+// A step that clips a building corner moves along the free axis instead, like sliding on a wall.
+function slide(s, u, dx, dz, dist, radius) {
+  for (const [sx, sz] of Math.abs(dx) > Math.abs(dz)
+    ? [
+        [Math.sign(dx), 0],
+        [0, Math.sign(dz)],
+      ]
+    : [
+        [0, Math.sign(dz)],
+        [Math.sign(dx), 0],
+      ])
+    if ((sx || sz) && walkable(s, u.x + sx * dist, u.z + sz * dist, radius)) {
+      u.x += sx * dist;
+      u.z += sz * dist;
+      return true;
+    }
+  return false;
+}
 
 export function tickUnit(s, u, dt, rates, hooks) {
   const { event, random } = hooks,
@@ -105,7 +125,8 @@ export function tickUnit(s, u, dt, rates, hooks) {
       dz = p.z - u.z,
       len = Math.hypot(dx, dz),
       slow = retreat ? 1.3 : u.suppression > 0.8 ? 0.3 : u.suppression > 0.45 ? 0.65 : 1,
-      speed = d.speed * (u.hp / u.maxHp < 0.3 ? 0.75 : 1) * slow * weatherSpeed(s),
+      speed =
+        d.speed * (u.hp / u.maxHp < 0.3 ? 0.75 : 1) * slow * weatherSpeed(s) * fuelFactor(s, u),
       dist = Math.min(len, speed * dt);
     u.yaw = Math.atan2(dx, dz);
     if (
@@ -114,13 +135,15 @@ export function tickUnit(s, u, dt, rates, hooks) {
       u.x += (dx / (len || 1)) * dist;
       u.z += (dz / (len || 1)) * dist;
       if (len < 1 + speed * dt) u.path.shift();
+    } else if (slide(s, u, dx, dz, dist, d.size * 0.42)) {
+      // Grazing a corner: slid along the wall instead of stopping.
     } else if ((u.repathAt || 0) < s.time) {
       u.repathAt = s.time + 2;
       u.path = groundPath(s, u, u.order || p, d.size * 0.42);
     }
     u.moving = !!u.path.length;
   }
-  if (mobile) u.y = riverDistance(u.x, u.z) < 82 ? 2 : 1;
+  if (mobile) u.y = 1 + groundHeight(u.x, u.z);
   if (u.key === 'mog') u.setup = u.moving ? 0 : Math.min(1, (u.setup || 0) + dt / 3);
   updateInfantrySupport(s, u, dt);
 
@@ -167,10 +190,12 @@ export function tickUnit(s, u, dt, rates, hooks) {
     speed = shot.speed,
     length = Math.hypot(tx - u.x, tz - u.z) || 1,
     flight = length / speed,
-    originY = shot.indirect ? 6 : foot ? 2.6 : 4,
+    // Muzzle and aim heights sit on the ground under the shooter and the target, hills included.
+    ground = groundHeight(u.x, u.z),
+    originY = ground + (shot.indirect ? 6 : foot ? 2.6 : 4),
     arc = shot.indirect ? Math.min(150, length * 0.33) : 0,
     loft = arc ? 0 : Math.min(14, (LOFT_GRAVITY * flight * flight) / 8),
-    endY = arc ? 2 : 2.4,
+    endY = groundHeight(tx, tz) + (arc ? 2 : 2.4),
     cost = shot.cost,
     f = s.sides[u.side];
   if (f.credits < cost) return;
@@ -205,7 +230,8 @@ export function tickUnit(s, u, dt, rates, hooks) {
     kind: tank ? 'shell' : 'bullet',
     tracer: tank || u.groundAmmo % (AUTOMATIC.has(u.key) ? 2 : 4) === 0,
     originY,
-    ...(arc ? { arc } : { loft, endY }),
+    endY,
+    ...(arc ? { arc } : { loft }),
     x: u.x,
     y: originY,
     z: u.z,
@@ -230,13 +256,13 @@ export function tickUnit(s, u, dt, rates, hooks) {
     shooter: u.key,
     buildingId: u.id,
     x: u.x,
-    y: foot ? 2.6 : 4,
+    y: ground + (foot ? 2.6 : 4),
     z: u.z,
     mx: u.x,
-    my: foot ? 2.6 : 4,
+    my: ground + (foot ? 2.6 : 4),
     mz: u.z,
     tx,
-    ty: 2,
+    ty: endY,
     tz,
     ground: true,
   });

@@ -9,6 +9,7 @@ function fresh() {
   const s = game.createGame(39);
   s.mode = 'multiplayer';
   s.rules.rear = false;
+  s.rules.oil = false;
   for (const side of s.sides) {
     side.credits = 1e6;
     side.materials = 1e6;
@@ -55,7 +56,7 @@ function separated({ s, rally, units }) {
   assert.equal(new Set(units.map((u) => `${u.guard.x},${u.guard.z}`)).size, units.length);
   for (const u of units) {
     assert.ok(distance(u.guard, rally) <= GUARD_POST_RADIUS + 1e-6);
-    assert.ok(Math.abs(u.guard.x) <= 864 && Math.abs(u.guard.z) <= 576);
+    assert.ok(Math.abs(u.guard.x) <= game.FIELD.x && Math.abs(u.guard.z) <= game.FIELD.z);
     assert.equal(
       game.walkable(s, u.guard.x, u.guard.z, game.GROUND_UNITS[u.key].size * 0.42),
       true,
@@ -105,7 +106,7 @@ test('ten actual auto-recruited APCs reserve space for their larger footprints',
   separated(produce('apc', 10));
 });
 
-test('rally reservations remain separated near a city wall, forest, river bank and map corner', async (t) => {
+test('rally reservations remain separated near a city wall, forest, sea shore and map corner', async (t) => {
   const setups = {
     wall(s) {
       const wall = game.build(s, 0, 'launcher', -350, 100);
@@ -114,9 +115,14 @@ test('rally reservations remain separated near a city wall, forest, river bank a
       wall.hp = wall.maxHp;
       return { x: wall.x + game.BUILDINGS.launcher.size * 0.56 + 25, z: wall.z };
     },
-    forest: () => ({ x: -523.1944160442799, z: -183.21451216936111 }),
-    river: () => ({ x: game.riverX(0) - 84, z: 0 }),
-    corner: () => ({ x: -855, z: -570 }),
+    forest: () => {
+      const p = game.COVER_PATCHES.find(
+        (p) => p.forest && p.r > 30 && p.x < 0 && Math.hypot(p.x + 615, p.z) < 700,
+      );
+      return { x: p.x, z: p.z };
+    },
+    shore: () => ({ x: -275, z: 0 }),
+    corner: () => ({ x: -(game.FIELD.x - 9), z: -(game.FIELD.z - 6) }),
   };
   for (const [name, setup] of Object.entries(setups))
     await t.test(name, () => {

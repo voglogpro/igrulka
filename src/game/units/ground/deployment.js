@@ -1,4 +1,5 @@
-import { GROUND_UNITS } from '../../config.js';
+import { oilCost, hasOil } from '../../city/oil.js';
+import { GROUND_UNITS, FIELD } from '../../config.js';
 import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
 import { freeSpot } from '../vehicles/transport.js';
 import { recruit } from './recruitment.js';
@@ -53,6 +54,7 @@ export function deploymentPlan(s, side, key, point, count = 1, siteId = null) {
   const f = s.sides[side];
   if (f.credits < result.cost.credits || f.materials < result.cost.materials)
     return fail('Не хватает денег или сплавов');
+  if (!hasOil(s, side, oilCost(key) * count)) return fail('Не хватает нефти: постройте нефтевышки');
   if (!walkable(s, destination.x, destination.z, d.size * 0.42))
     return fail('Точка отправки должна быть на доступной суше');
   const arrivals = Array.from({ length: count }, (_, squadSlot) =>
@@ -60,7 +62,10 @@ export function deploymentPlan(s, side, key, point, count = 1, siteId = null) {
   );
   if (
     arrivals.some(
-      (p) => Math.abs(p.x) > 850 || Math.abs(p.z) > 560 || !walkable(s, p.x, p.z, d.size * 0.42),
+      (p) =>
+        Math.abs(p.x) > FIELD.x - 14 ||
+        Math.abs(p.z) > FIELD.z - 14 ||
+        !walkable(s, p.x, p.z, d.size * 0.42),
     )
   )
     return fail('Для всего отряда нет места. Отодвиньте точку от препятствий и края карты');

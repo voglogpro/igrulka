@@ -15,6 +15,7 @@
 - Камера: `src/rendering/camera.js`; маршрутизация кликов: `src/rendering/input/build-tools.js`; освещение: `src/rendering/lighting.js`.
 - Сохранения: `src/game/persistence/saves.js`. История решений: `docs/history/`.
 - Выстрелы и трассеры (зафиксированы): `docs/SHOTS.md`.
+- Карта (море, коридоры, холмы, леса, месторождения): `src/game/map.js`; нефть: `city/oil.js`; порты и суда: `city/ports.js` (пути от `src/game/`).
 
 ## Правила изменений
 

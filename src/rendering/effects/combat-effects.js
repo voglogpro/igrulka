@@ -608,6 +608,25 @@ export class CombatEffects {
                     : 1.2,
       );
     if (e.type === 'destroy') this.collapse(e.x, e.z, e.key);
+    if (e.type === 'oilfire') {
+      // The tank bursts: a rising fireball over the blast, then state-driven fire burns on.
+      this.explode(e.x, 6, e.z, 2.6);
+      for (let i = 0; i < 18; i++)
+        this.glow.spawn(
+          e.x + (Math.random() - 0.5) * 12,
+          8 + i * 2.2,
+          e.z + (Math.random() - 0.5) * 12,
+          {
+            size: 7 + Math.random() * 6,
+            life: 0.9 + Math.random() * 0.8,
+            growth: 9,
+            vy: 14 + Math.random() * 10,
+            opacity: 0.55,
+            color: i % 2 ? [4.2, 1.1, 0.08] : [2.6, 0.45, 0.03],
+          },
+        );
+      this.light(e.x, 20, e.z, 260, 420, 1.4);
+    }
     if (e.type === 'cleared')
       for (let i = 0; i < 7; i++)
         this.puff(e.x, 1, e.z, 2, 1.1, { color: [0.42, 0.39, 0.32], opacity: 0.25 });
@@ -726,6 +745,42 @@ export class CombatEffects {
     if (this.trails.size > 64) {
       const live = new Set(state.projectiles.map((p) => p.id));
       for (const id of this.trails.keys()) if (!live.has(id)) this.trails.delete(id);
+    }
+    // Burning oil tanks: a towering black column and roaring flames for as long as state says.
+    for (const b of state.buildings) {
+      // A burning tank farm is seen from anywhere: the column rises far above the fog of war.
+      if (!(b.fire > 0)) continue;
+      if (this.clock - (this.emitters.get('fire' + b.id) || 0) < 0.07) continue;
+      this.emitters.set('fire' + b.id, this.clock);
+      const strength = Math.min(1, b.fire / 40) * 0.6 + 0.4;
+      this.puff(
+        b.x + (Math.random() - 0.5) * 8,
+        10,
+        b.z + (Math.random() - 0.5) * 8,
+        5 * strength,
+        9,
+        {
+          vx: 2.2,
+          vy: 11 + Math.random() * 5,
+          vz: 1.1,
+          growth: 5.5,
+          drag: 0.25,
+          opacity: 0.42,
+          color: [0.035, 0.035, 0.04],
+        },
+      );
+      this.glow.spawn(
+        b.x + (Math.random() - 0.5) * 10,
+        3 + Math.random() * 6,
+        b.z + (Math.random() - 0.5) * 10,
+        {
+          size: (4 + Math.random() * 4) * strength,
+          life: 0.4,
+          vy: 6,
+          opacity: 0.75,
+          color: [4, 1, 0.07],
+        },
+      );
     }
     // Burning wrecks: a smoke column with flickering flames that dies down.
     this.wrecks = this.wrecks.filter((w) => w.until > this.clock);

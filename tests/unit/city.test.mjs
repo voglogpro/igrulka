@@ -21,6 +21,8 @@ function funds(s) {
     f.materials = 3000;
     f.science = 1000;
   }
+  // Ammunition production is tested here, not the oil economy.
+  s.rules.oil = false;
 }
 function town(s, side = 0) {
   const x = side === 0 ? -615 : 615;
@@ -242,7 +244,7 @@ test('camera keeps zoom and focus bounds and changes angle only on request', () 
   controls.focus(10000, -10000);
   controls.update(10);
   assert.equal(controls.distance, CAMERA.max);
-  assert.ok(controls.target.x <= 795 && controls.target.z >= -480);
+  assert.ok(controls.target.x <= E.FIELD.x - 60 && controls.target.z >= -(E.FIELD.z - 60));
   assert.ok(cam.position.clone().sub(controls.target).normalize().distanceTo(angle) < 1e-10);
   assert.equal(controls.enableRotate, true);
   assert.equal(controls.enablePan, false);
@@ -270,7 +272,9 @@ test('WASD and arrows pan relative to the screen while keeping angle, zoom and m
   controls.update(0.1, {});
   assert.equal(controls.desired.distanceTo(before), 0);
   for (let i = 0; i < 1000; i++) controls.update(0.1, { KeyW: true });
-  assert.ok(Math.abs(controls.target.x) <= 795 && Math.abs(controls.target.z) <= 480);
+  assert.ok(
+    Math.abs(controls.target.x) <= E.FIELD.x - 60 && Math.abs(controls.target.z) <= E.FIELD.z - 60,
+  );
   assert.ok(camera.position.y > 140);
 });
 test('AI builds a connected, compact city and manufactures real attacks from identical reserves', () => {
@@ -283,7 +287,12 @@ test('AI builds a connected, compact city and manufactures real attacks from ide
   assert.ok(own.some((b) => b.key === 'launcher'));
   assert.ok(own.some((b) => b.key === 'factory'));
   assert.ok(own.every((b) => E.supplyFactor(s, b) === 1));
-  assert.ok(own.every((b) => Math.abs(b.x - 615) <= 200 && Math.abs(b.z) <= 300));
+  // Oil wells and the port stand where the fields and the shore are; the city itself is compact.
+  assert.ok(
+    own
+      .filter((b) => !['oilwell', 'port'].includes(b.key))
+      .every((b) => Math.abs(b.x - 615) <= 200 && Math.abs(b.z) <= 300),
+  );
   assert.ok(s.stats.impacts > 0 || s.units.some((u) => u.side === 1));
 });
 test('state round trips, validates resources and rejects foreign saves', () => {

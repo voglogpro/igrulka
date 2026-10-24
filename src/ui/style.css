@@ -2620,3 +2620,11 @@ body {
   border-color: #e2b77970;
   background: var(--accent-dim);
 }
+
+/* Oil: the stock glows amber, and turns red when the war machine is running dry. */
+#game .oil-resource b {
+  color: #e2b46a;
+}
+#game .oil-resource.low b {
+  color: #ef7c62;
+}

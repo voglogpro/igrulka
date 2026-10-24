@@ -1,3 +1,4 @@
+import { oilCost, hasOil } from '../../city/oil.js';
 import { WEAPONS } from '../../config.js';
 import { produce } from './production.js';
 
@@ -71,6 +72,7 @@ function status(s, b, counted) {
   else if (factoryQueued || counted.total >= 24) value = 'queue';
   else if (f.credits - d.cost < plan.reserveCredits) value = 'credits';
   else if (f.materials - d.metal < plan.reserveMaterials) value = 'materials';
+  else if (!hasOil(s, b.side, oilCost(plan.key))) value = 'oil';
   else value = 'active';
   return {
     enabled: !!plan?.enabled,

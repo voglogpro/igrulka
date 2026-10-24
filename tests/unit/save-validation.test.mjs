@@ -88,8 +88,8 @@ test('malformed rally values cannot enter an imported campaign', () => {
     { x: '10', z: 20 },
     { x: 10, z: null },
     { x: Infinity, z: 20 },
-    { x: 865, z: 0 },
-    { x: 0, z: 585 },
+    { x: game.FIELD.x + 1, z: 0 },
+    { x: 0, z: game.FIELD.z + 1 },
   ];
   for (const rally of values) {
     const { s, b } = campaign();

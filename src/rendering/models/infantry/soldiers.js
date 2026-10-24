@@ -334,7 +334,7 @@ export class InfantryBatch {
         }
       }
       if (this.world.armySelection?.includes(u.id) && selected < 600) {
-        temp.position.set(u.x, 1.4, u.z);
+        temp.position.set(u.x, (u.y || 1) + 0.4, u.z);
         temp.rotation.set(-Math.PI / 2, 0, 0);
         temp.scale.setScalar(u.key === 'mog' ? 7 : u.key === 'assault' ? 4.5 : 1.8);
         temp.updateMatrix();
@@ -384,7 +384,7 @@ export class InfantryBatch {
         this.world.armySelection?.includes(u.id) &&
         selected < 600
       ) {
-        temp.position.set(u.x, 1.4, u.z);
+        temp.position.set(u.x, (u.y || 1) + 0.4, u.z);
         temp.rotation.set(-Math.PI / 2, 0, 0);
         temp.scale.setScalar(Math.max(4, GROUND_UNITS[u.key].size * 0.72));
         temp.updateMatrix();

@@ -174,7 +174,7 @@ export class NetworkSession {
     if (span <= 0 || span > 1 || this.room?.phase !== 'playing') return;
     const t = Math.max(0, Math.min(1, (span - 0.1 + (now - this.latest.received) / 1000) / span));
     display.time = a.time + span * t;
-    for (const key of ['units', 'groundUnits', 'serviceVehicles', 'projectiles']) {
+    for (const key of ['units', 'groundUnits', 'serviceVehicles', 'ships', 'projectiles']) {
       const before = new Map((a[key] || []).map((u) => [u.id, u]));
       const after = new Map((b[key] || []).map((u) => [u.id, u]));
       for (const u of display[key] || []) {

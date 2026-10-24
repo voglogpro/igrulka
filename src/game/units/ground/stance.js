@@ -1,16 +1,17 @@
-import { GROUND_UNITS, isInfantry, riverX } from '../../config.js';
+import { GROUND_UNITS, isInfantry } from '../../config.js';
 import { BRIDGES, walkable } from './navigation.js';
 import { orderGround } from './orders.js';
 import { guardGround } from './guard.js';
 
 // A stance is a standing order that outlives a single click: new units take it when they leave
 // the barracks. "attack" advances on the enemy headquarters with combat stops, "defend" holds
-// the home end of a bridge and digs in.
+// the home end of a land corridor around the sea and digs in.
 export const STANCE_MODES = ['attack', 'defend'];
 export const DEFEND_POSTS = ['auto', 'north', 'south'];
-export const POST_NAMES = { north: 'Северный мост', south: 'Южный мост' };
+export const POST_NAMES = { north: 'Северный коридор', south: 'Южный коридор' };
 const BRIDGE_Z = { north: BRIDGES[0], south: BRIDGES[1] };
-const POST_OFFSET = 92;
+// Posts stand in the corridor on the home side of the line between the cities.
+const POST_OFFSET = 300;
 
 export function validStance(stance) {
   return (
@@ -25,7 +26,7 @@ export function validStance(stance) {
 
 export function bridgePoint(side, post) {
   const z = BRIDGE_Z[post];
-  const x = riverX(z) + (side === 0 ? -POST_OFFSET : POST_OFFSET);
+  const x = side === 0 ? -POST_OFFSET : POST_OFFSET;
   return { x, z };
 }
 

@@ -1,11 +1,12 @@
+import { FIELD } from '../../map.js';
 import { flightRoute } from '../aviation/routes.js';
 import { event as emit } from '../../shared/events.js';
 export function launchFPV(s, side, ids, aim) {
   if (
     !aim ||
     ![aim.x, aim.z].every(Number.isFinite) ||
-    Math.abs(aim.x) > 880 ||
-    Math.abs(aim.z) > 600
+    Math.abs(aim.x) > FIELD.x ||
+    Math.abs(aim.z) > FIELD.z
   )
     return 'Выберите точку карты';
   const u = s.groundUnits.find(

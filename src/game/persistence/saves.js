@@ -1,4 +1,4 @@
-import { VERSION, MAP, BUILDINGS, GROUND_UNITS, TECH, WEAPONS } from '../config.js';
+import { FIELD, VERSION, MAP, BUILDINGS, GROUND_UNITS, TECH, WEAPONS } from '../config.js';
 import { DIFFICULTY, DEFAULT_DIFFICULTY } from '../ai/difficulty.config.js';
 import { ROAD_HP, normalizeRoadOverlaps } from '../city/road-network.js';
 import { campRoads } from '../city/roads.js';
@@ -10,6 +10,7 @@ import { RALLY_MODES } from '../units/ground/recruitment.js';
 import { isFactoryPlan } from '../units/aviation/factory-plans.js';
 import { validateSquadMetadata } from './squads.js';
 import { restoreServices } from './services.js';
+import { restoreOil } from './oil.js';
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
   const copy = structuredClone(s);
@@ -20,7 +21,7 @@ export function save(s) {
 export function load(raw) {
   const s = JSON.parse(raw);
   if (
-    ![3, 4, 5, 6, 7, 8, 9, 10, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, VERSION].includes(s.version) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
@@ -197,8 +198,8 @@ export function load(raw) {
             !p ||
             !Number.isFinite(p.x) ||
             !Number.isFinite(p.z) ||
-            Math.abs(p.x) > 850 ||
-            Math.abs(p.z) > 560 ||
+            Math.abs(p.x) > FIELD.x - 14 ||
+            Math.abs(p.z) > FIELD.z - 14 ||
             !['move', 'attackmove'].includes(p.mode),
         ))
     )
@@ -216,8 +217,8 @@ export function load(raw) {
         typeof u.delivery !== 'object' ||
         Array.isArray(u.delivery) ||
         !['x', 'z', 'retryAt'].every((key) => Number.isFinite(u.delivery[key])) ||
-        Math.abs(u.delivery.x) > 850 ||
-        Math.abs(u.delivery.z) > 560 ||
+        Math.abs(u.delivery.x) > FIELD.x - 14 ||
+        Math.abs(u.delivery.z) > FIELD.z - 14 ||
         u.delivery.retryAt < 0 ||
         !['moving', 'blocked'].includes(u.delivery.status))
     )
@@ -228,8 +229,8 @@ export function load(raw) {
       u.guard != null &&
       (!Number.isFinite(u.guard.x) ||
         !Number.isFinite(u.guard.z) ||
-        Math.abs(u.guard.x) > 864 ||
-        Math.abs(u.guard.z) > 576)
+        Math.abs(u.guard.x) > FIELD.x ||
+        Math.abs(u.guard.z) > FIELD.z)
     )
       throw Error('Повреждён оборонительный пост');
     for (const key of ['guardNextThink', 'guardRepathAt'])
@@ -264,8 +265,8 @@ export function load(raw) {
       (typeof u.coverResume !== 'object' ||
         !Number.isFinite(u.coverResume.x) ||
         !Number.isFinite(u.coverResume.z) ||
-        Math.abs(u.coverResume.x) > 864 ||
-        Math.abs(u.coverResume.z) > 576)
+        Math.abs(u.coverResume.x) > FIELD.x ||
+        Math.abs(u.coverResume.z) > FIELD.z)
     )
       throw Error('Повреждена реакция на огонь');
   }
@@ -399,13 +400,19 @@ export function load(raw) {
   if (!validWeather(s.weather)) throw Error('Повреждена погода');
   if (s.tradeNext != null && !Number.isFinite(s.tradeNext)) throw Error('Повреждена торговля');
   s.rules ??= { rear: true };
-  if (typeof s.rules !== 'object' || typeof s.rules.rear !== 'boolean')
+  s.rules.oil ??= true;
+  if (
+    typeof s.rules !== 'object' ||
+    typeof s.rules.rear !== 'boolean' ||
+    typeof s.rules.oil !== 'boolean'
+  )
     throw Error('Повреждены правила');
   for (const f of s.sides) f.rearAuto ??= true;
   if (s.sides.some((f) => typeof f.rearAuto !== 'boolean'))
     throw Error('Повреждена тыловая служба');
   restoreDistricts(s);
   restoreServices(s);
+  restoreOil(s);
   s.version = VERSION;
   s.events = [];
   s.stats = {

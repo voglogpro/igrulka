@@ -1,4 +1,4 @@
-import { BUILDINGS, MAP, riverDistance } from '../config.js';
+import { BUILDINGS, MAP, riverDistance, groundHeight, seaDistance, OIL_FIELDS } from '../config.js';
 import {
   projectPoint,
   nearestRoad,
@@ -10,12 +10,33 @@ import {
 import { ROAD_REQUIRED } from './rules.js';
 import { addRoad } from './roads.js';
 import { event } from '../shared/events.js';
+// The oil field under a point, if a well placed there would tap it.
+export const oilFieldAt = (x, z) =>
+  OIL_FIELDS.find((f) => Math.hypot(x - f.x, z - f.z) <= f.r * 0.7) || null;
+
 export function physicalPlacement(s, key, x, z) {
   const d = BUILDINGS[key];
   if (!d || ![x, z].every(Number.isFinite)) return 'Некорректная постройка';
   if (Math.abs(x) > MAP.width / 2 - d.size || Math.abs(z) > MAP.depth / 2 - d.size)
     return 'За границей карты';
-  if (riverDistance(x, z) < MAP.riverWidth + d.size * 0.65 + 26) return 'Нужна сухая ровная земля';
+  const shore = seaDistance(x, z);
+  if (key === 'port') {
+    // A port stands on the waterline: its quay reaches into the sea, its yard stays on land.
+    if (shore < 8 || shore > 34) return 'Порт строится у самой воды, на берегу моря';
+  } else if (riverDistance(x, z) < MAP.riverWidth + d.size * 0.65 + 26)
+    return 'Нужна сухая ровная земля';
+  if (key === 'oilwell' && !oilFieldAt(x, z))
+    return 'Вышка ставится только на нефтяное месторождение';
+  if (key !== 'port')
+    for (const [dx, dz] of [
+      [0, 0],
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ])
+      if (groundHeight(x + dx * d.size * 0.55, z + dz * d.size * 0.55) > 1.2)
+        return 'Здесь склон холма: нужна ровная земля';
   for (const b of s.buildings)
     if (
       !b.demolished &&

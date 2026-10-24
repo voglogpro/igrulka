@@ -1,4 +1,4 @@
-import { GROUND_UNITS } from '../../config.js';
+import { FIELD, GROUND_UNITS } from '../../config.js';
 import { clamp } from '../../shared/math.js';
 import { walkable } from '../ground/navigation.js';
 import { orderGround } from '../ground/orders.js';
@@ -18,8 +18,8 @@ const pointValid = (p) =>
   !Array.isArray(p) &&
   Number.isFinite(p.x) &&
   Number.isFinite(p.z) &&
-  Math.abs(p.x) <= 864 &&
-  Math.abs(p.z) <= 576;
+  Math.abs(p.x) <= FIELD.x &&
+  Math.abs(p.z) <= FIELD.z;
 
 export function deliverGround(s, side, carrierId, point) {
   if (s.result) return 'Кампания завершена';
@@ -28,7 +28,10 @@ export function deliverGround(s, side, carrierId, point) {
   if (!pointValid(point)) return 'Выберите точку доставки в пределах карты';
   if (s.groundUnits.some((p) => p.hp > 0 && p.boardingId === u.id))
     return 'Дождитесь посадки бойцов в БТР';
-  const destination = { x: clamp(point.x, -850, 850), z: clamp(point.z, -560, 560) };
+  const destination = {
+    x: clamp(point.x, -(FIELD.x - 14), FIELD.x - 14),
+    z: clamp(point.z, -(FIELD.z - 14), FIELD.z - 14),
+  };
   if (!walkable(s, destination.x, destination.z, GROUND_UNITS[u.key].size * 0.42))
     return 'Точка доставки должна быть на доступной для БТР суше';
   const plan = planGroundUnload(s, u, destination);

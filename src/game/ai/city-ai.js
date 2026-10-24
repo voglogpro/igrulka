@@ -10,6 +10,7 @@ import { random } from '../shared/random.js';
 import { produce } from '../units/aviation/production.js';
 import { knownTargets } from '../visibility.js';
 import { launch } from '../units/aviation/launch.js';
+import { oilPlan } from './oil-ai.js';
 export function ai(s) {
   const side = 1,
     f = s.sides[1],
@@ -42,8 +43,11 @@ export function ai(s) {
       planned = s.buildings
         .filter((b) => b.side === 1 && b.hp > 0 && b.progress < 1)
         .reduce((n, b) => n - (BUILDINGS[b.key]?.power || 0), 0);
-    let key =
-      e.power - e.demand + planned < 7
+    // Oil comes before everything except power: without it no machine leaves the factory.
+    const oilBusy = e.power - e.demand + planned >= 7 && oilPlan(s, 1, hq, active);
+    let key = oilBusy
+      ? null
+      : e.power - e.demand + planned < 7
         ? 'power'
         : active('housing').length < 3
           ? 'housing'
@@ -58,7 +62,7 @@ export function ai(s) {
                   : !active('lab').length
                     ? 'lab'
                     : null;
-    if (!key) {
+    if (!key && !oilBusy) {
       const goals = [
         ['housing', Math.min(9, 3 + Math.floor(s.time / 130))],
         ['industry', Math.min(5, 2 + Math.floor(s.time / 250))],

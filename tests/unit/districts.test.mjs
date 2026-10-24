@@ -84,8 +84,8 @@ test('both sides contest and freeze progress regardless of the larger force', ()
   soldier(s, 0);
   E.advance(s, 5);
   const control = s.districts[0].control;
-  soldier(s, 0, { x: E.DISTRICTS[0].x + 12, z: -270 });
-  soldier(s, 1, { x: E.DISTRICTS[0].x - 12, z: -270 });
+  soldier(s, 0, { x: E.DISTRICTS[0].x + 12, z: E.DISTRICTS[0].z });
+  soldier(s, 1, { x: E.DISTRICTS[0].x - 12, z: E.DISTRICTS[0].z });
   E.advance(s, 8);
   assert.equal(s.districts[0].contested, true);
   assert.equal(s.districts[0].capturing, null);
@@ -157,7 +157,9 @@ test('capture orders send real units to separate nearby posts and eventually tak
   assert.equal(E.captureDistrict(s, 0, [a.id, b.id], E.DISTRICTS[0].id), 2);
   assert.notDeepEqual(a.guard, b.guard);
   assert.ok(a.path.length);
-  assert.ok(Math.hypot(a.guard.x - E.DISTRICTS[0].x, a.guard.z + 270) < E.DISTRICTS[0].radius);
+  assert.ok(
+    Math.hypot(a.guard.x - E.DISTRICTS[0].x, a.guard.z - E.DISTRICTS[0].z) < E.DISTRICTS[0].radius,
+  );
   E.advance(s, 100);
   assert.equal(s.districts[0].owner, 0);
   assert.equal(typeof E.captureDistrict(s, 0, [a.id], 'constructor'), 'string');
@@ -212,7 +214,7 @@ test('repair cannot overdraw an empty stockpile and destruction cancels it', () 
   E.advance(s, 1);
   assert.ok(d.hp >= 10);
   assert.ok(Number.isFinite(s.sides[0].materials) && s.sides[0].materials >= 0);
-  E.applyBlast(s, E.DISTRICTS[0].x, -270, 10000, 10);
+  E.applyBlast(s, E.DISTRICTS[0].x, E.DISTRICTS[0].z, 10000, 10);
   assert.equal(d.repairing, false);
   assert.equal(d.hp, 0);
 });

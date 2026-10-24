@@ -47,6 +47,7 @@ const buildingFields = [
   'progress',
   'rotation',
   'demolished',
+  'fire',
   'level',
   'heat',
   'targetX',
@@ -114,6 +115,8 @@ const projectileFields = [
 // Civil service traffic has public positions like buildings and roads. Tasks, route
 // caches and station scheduling remain private even if new fleet fields are added.
 const serviceFields = ['id', 'side', 'x', 'z', 'yaw', 'state', 'stationId'];
+// Merchant ships are seen on the water; their cargo and trade decisions are private.
+const shipFields = ['id', 'side', 'portId', 'x', 'z', 'yaw', 'state', 'path'];
 
 // The UI always calls its own faction 0. World coordinates and entity IDs stay unchanged.
 export function playerView(authority, side) {
@@ -147,6 +150,7 @@ export function playerView(authority, side) {
   view.serviceVehicles = (view.serviceVehicles || []).map((v) =>
     v.side === side ? v : publicFields(v, serviceFields),
   );
+  view.ships = (view.ships || []).map((v) => (v.side === side ? v : publicFields(v, shipFields)));
   view.projectiles = view.projectiles
     .filter((p) => {
       if (p.side === side) return true;
@@ -227,6 +231,7 @@ export function playerView(authority, side) {
     'units',
     'groundUnits',
     'serviceVehicles',
+    'ships',
     'projectiles',
     'trenches',
     'events',

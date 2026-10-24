@@ -1,4 +1,4 @@
-import { GROUND_UNITS, isInfantry } from '../../config.js';
+import { FIELD, GROUND_UNITS, isInfantry } from '../../config.js';
 import { groundPath, walkable } from './navigation.js';
 import { coverInfo, groundVisible, lineOfSight } from '../infantry/cover.js';
 import { cancelTransportDelivery } from '../vehicles/transport.js';
@@ -20,8 +20,8 @@ const pointValid = (s, u, p) =>
   p &&
   Number.isFinite(p.x) &&
   Number.isFinite(p.z) &&
-  Math.abs(p.x) <= 864 &&
-  Math.abs(p.z) <= 576 &&
+  Math.abs(p.x) <= FIELD.x &&
+  Math.abs(p.z) <= FIELD.z &&
   walkable(s, p.x, p.z, GROUND_UNITS[u.key].size * 0.42);
 
 function coveredPost(s, u, p) {

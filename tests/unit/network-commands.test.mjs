@@ -108,7 +108,7 @@ test('side 1 can command only its own units and objects with unchanged world coo
 
 test('a hidden infantry ID cannot be used as a forced attack target', () => {
   const s = fresh();
-  const patch = game.COVER_PATCHES.find((p) => p.x < -100 && p.x > -450);
+  const patch = game.COVER_PATCHES.find((p) => p.x < -100 && p.x > -1300 && Math.abs(p.z) < 800);
   const hidden = unit(s, 0, 'infantry', patch.x, patch.z);
   hidden.camouflaged = true;
   const attacker = unit(s, 1, 'infantry', 450, 300);
@@ -125,7 +125,14 @@ test('a hidden infantry ID cannot be used as a forced attack target', () => {
 
 test('projection hides concealed infantry, private effects and future enemy plans', () => {
   const s = fresh();
-  const patch = game.COVER_PATCHES.find((p) => p.x > 100 && p.x < 450 && Math.abs(p.z) < 400);
+  const patch = game.COVER_PATCHES.find(
+    (p) =>
+      p.x > 100 &&
+      p.x < 1300 &&
+      Math.abs(p.z) < 800 &&
+      game.groundHeight(p.x, p.z) < 0.5 &&
+      game.terrainClear(p.x - 180, p.z, 2.2, p.x + 40, p.z, 2.2),
+  );
   const hidden = unit(s, 1, 'mog', patch.x, patch.z);
   hidden.camouflaged = true;
   const visible = unit(s, 1, 'infantry', 500, 420);
@@ -256,7 +263,14 @@ test('projection hides concealed infantry, private effects and future enemy plan
 
 test('visible enemy death effects survive removal while concealed casualties stay private', () => {
   const s = fresh();
-  const patch = game.COVER_PATCHES.find((p) => p.x > 100 && p.x < 450 && Math.abs(p.z) < 400);
+  const patch = game.COVER_PATCHES.find(
+    (p) =>
+      p.x > 100 &&
+      p.x < 1300 &&
+      Math.abs(p.z) < 800 &&
+      game.groundHeight(p.x, p.z) < 0.5 &&
+      game.terrainClear(p.x - 180, p.z, 2.2, p.x + 40, p.z, 2.2),
+  );
   const hidden = unit(s, 1, 'infantry', patch.x, patch.z);
   hidden.camouflaged = true;
   const visible = unit(s, 1, 'infantry', 500, 420);

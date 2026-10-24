@@ -1,4 +1,4 @@
-import { isInfantry, GROUND_UNITS } from '../../config.js';
+import { FIELD, isInfantry, GROUND_UNITS } from '../../config.js';
 import { clamp } from '../../shared/math.js';
 import { groundPath } from './navigation.js';
 import { unloadGround, cancelTransportDelivery } from '../vehicles/transport.js';
@@ -8,8 +8,8 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
   if (
     !aim ||
     ![aim.x, aim.z].every(Number.isFinite) ||
-    Math.abs(aim.x) > 864 ||
-    Math.abs(aim.z) > 576
+    Math.abs(aim.x) > FIELD.x ||
+    Math.abs(aim.z) > FIELD.z
   )
     return 'Выберите точку в пределах карты';
   const units = (s.groundUnits || []).filter(
@@ -59,8 +59,8 @@ export function groundFormationDestinations(s, side, units, aim) {
         ? Math.floor(index / 2) * spacing
         : Math.floor(index / cols) * spacing * (formation === 'spread' ? 1.8 : 1);
     return {
-      x: clamp(aim.x + (units.length > 1 ? dx : 0), -850, 850),
-      z: clamp(aim.z + (units.length > 1 ? dz : 0), -560, 560),
+      x: clamp(aim.x + (units.length > 1 ? dx : 0), -(FIELD.x - 14), FIELD.x - 14),
+      z: clamp(aim.z + (units.length > 1 ? dz : 0), -(FIELD.z - 14), FIELD.z - 14),
     };
   });
 }

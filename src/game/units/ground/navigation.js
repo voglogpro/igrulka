@@ -1,16 +1,18 @@
-import { MAP, BUILDINGS, riverDistance } from '../../config.js';
-export const BRIDGES = [-270, 270],
+import { FIELD, BUILDINGS, riverDistance, CORRIDORS } from '../../config.js';
+// The ground crossings between the cities. The name stays for older code and saves: since the sea
+// map they are the two land corridors, not bridges.
+export const BRIDGES = CORRIDORS,
   GROUND_LIMIT = 120;
 const CELL = 24,
-  WIDTH = 72,
-  DEPTH = 48,
-  OX = -864,
-  OZ = -576;
+  // The lattice keeps the alignment of the original valley grid (origin -864, -576).
+  OX = -864 - Math.floor((FIELD.x - 864) / CELL) * CELL,
+  OZ = -576 - Math.floor((FIELD.z - 576) / CELL) * CELL,
+  WIDTH = Math.floor((FIELD.x - OX) / CELL) + 1,
+  DEPTH = Math.floor((FIELD.z - OZ) / CELL) + 1;
 const masks = new WeakMap();
 export function walkable(s, x, z, radius = 3, ignore = null) {
-  if (Math.abs(x) > MAP.width / 2 - 16 || Math.abs(z) > MAP.depth / 2 - 16) return false;
-  if (riverDistance(x, z) < 77 + radius && !BRIDGES.some((b) => Math.abs(z - b) < 23 - radius))
-    return false;
+  if (Math.abs(x) > FIELD.x || Math.abs(z) > FIELD.z) return false;
+  if (riverDistance(x, z) < 77 + radius) return false;
   return !s.buildings.some(
     (b) =>
       b.id !== ignore &&
@@ -19,10 +21,11 @@ export function walkable(s, x, z, radius = 3, ignore = null) {
       Math.abs(z - b.z) < (BUILDINGS[b.key]?.size || 30) * 0.56 + radius,
   );
 }
-// Bounded A*, no diagonal corner cutting. The navigation lattice covers only the playable valley.
+// Bounded A* over the whole field with a binary heap, no diagonal corner cutting.
 export function groundPath(s, from, to, radius = 3) {
   const clear = (a, b) => {
-    const n = Math.ceil(Math.hypot(a.x - b.x, a.z - b.z) / 6);
+    // Sample finer than a footprint corner so a straight leg never grazes a building.
+    const n = Math.ceil(Math.hypot(a.x - b.x, a.z - b.z) / 3);
     for (let i = 0; i <= n; i++) {
       const t = i / (n || 1);
       if (!walkable(s, a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, radius)) return false;
@@ -97,23 +100,53 @@ export function groundPath(s, from, to, radius = 3) {
   scores[start] = 0;
   const prev = new Int32Array(blocked.length);
   prev.fill(-1);
-  const open = new Set([start]),
-    closed = new Uint8Array(blocked.length),
-    goal = point(end);
+  const closed = new Uint8Array(blocked.length),
+    goal = point(end),
+    heap = [];
   const heuristic = (i) => {
     const p = point(i);
     return Math.hypot(goal.x - p.x, goal.z - p.z);
   };
-  while (open.size) {
-    let current = -1,
-      best = Infinity;
-    for (const i of open) {
-      const score = scores[i] + heuristic(i);
-      if (score < best) {
-        best = score;
-        current = i;
+  // Min-heap of [score, cell]; stale entries are skipped when popped.
+  const push = (score, i) => {
+    heap.push([score, i]);
+    let k = heap.length - 1;
+    while (k) {
+      const parent = (k - 1) >> 1;
+      if (
+        heap[parent][0] < heap[k][0] ||
+        (heap[parent][0] === heap[k][0] && heap[parent][1] <= heap[k][1])
+      )
+        break;
+      [heap[parent], heap[k]] = [heap[k], heap[parent]];
+      k = parent;
+    }
+  };
+  const pop = () => {
+    const top = heap[0],
+      last = heap.pop();
+    if (heap.length) {
+      heap[0] = last;
+      let k = 0;
+      for (;;) {
+        const l = k * 2 + 1,
+          r = l + 1;
+        let m = k;
+        const less = (a, b) =>
+          heap[a][0] < heap[b][0] || (heap[a][0] === heap[b][0] && heap[a][1] < heap[b][1]);
+        if (l < heap.length && less(l, m)) m = l;
+        if (r < heap.length && less(r, m)) m = r;
+        if (m === k) break;
+        [heap[m], heap[k]] = [heap[k], heap[m]];
+        k = m;
       }
     }
+    return top;
+  };
+  push(heuristic(start), start);
+  while (heap.length) {
+    const current = pop()[1];
+    if (closed[current]) continue;
     if (current === end) {
       const path = [];
       let i = end;
@@ -125,7 +158,6 @@ export function groundPath(s, from, to, radius = 3) {
       if (walkable(s, to.x, to.z, radius)) path.push({ x: to.x, z: to.z });
       return [point(start), ...path];
     }
-    open.delete(current);
     closed[current] = 1;
     const cx = current % WIDTH,
       cz = Math.floor(current / WIDTH);
@@ -153,7 +185,7 @@ export function groundPath(s, from, to, radius = 3) {
       if (score < scores[next]) {
         scores[next] = score;
         prev[next] = current;
-        open.add(next);
+        push(score + heuristic(next), next);
       }
     }
   }

@@ -115,22 +115,23 @@ test('resource, research, queue and army limits are checked before payment', () 
   }
 });
 
-test('a batch needs room for every slot and cannot buy an unreachable cross-river order', () => {
+test('a batch needs room for every slot and cannot buy an order beyond blocked corridors', () => {
   const s = fresh();
   barracks(s);
-  assert.equal(deploymentPlan(s, 0, 'infantry', { x: -850, z: 250 }, 1).ok, true);
+  assert.equal(deploymentPlan(s, 0, 'infantry', { x: -(E.FIELD.x - 14), z: 250 }, 1).ok, true);
   const before = E.save(s);
-  assert.equal(deployGround(s, 0, 'infantry', { x: -850, z: 250 }, 5), false);
+  assert.equal(deployGround(s, 0, 'infantry', { x: -(E.FIELD.x - 14), z: 250 }, 5), false);
   assert.equal(E.save(s), before);
   const obstacles = [];
-  for (const bridge of [-270, 270])
-    for (const offset of [-12, 12]) {
+  // Wall off both land corridors with enemy buildings from the sea to the map edge.
+  for (const sign of [-1, 1])
+    for (let z = E.SEA.halfZ - 60; z <= E.FIELD.z + 10; z += 20) {
       const b = {
         id: s.nextId++,
         side: 1,
         key: 'radar',
-        x: E.riverX(bridge),
-        z: bridge + offset,
+        x: 0,
+        z: sign * z,
         hp: 100,
         maxHp: 100,
         progress: 1,
@@ -445,7 +446,7 @@ test('save validation preserves all five squad slots and rejects corrupt queued 
       v.groundUnits[0].squadGoal.mode = '__proto__';
     },
     (v) => {
-      v.groundUnits[0].squadGoal.x = 851;
+      v.groundUnits[0].squadGoal.x = E.FIELD.x + 1;
     },
   ]) {
     const damaged = structuredClone(raw);
