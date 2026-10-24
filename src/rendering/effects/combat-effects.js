@@ -3,6 +3,7 @@ import { ParticleBatch } from './particles.js';
 import { StreakBatch, StreakParticles } from './streaks.js';
 import { CasingPool } from './casings.js';
 import { WEAPON_FX, weaponClass } from './weapon-profiles.js';
+import { projectilePoint, projectileHeading } from './tracer-path.js';
 
 // Beyond this camera distance shots keep only their flash; nearby combat gets the full detail.
 const DETAIL_DISTANCE = 720;
@@ -10,10 +11,21 @@ const WRECK_LIFE = 14;
 const SPARK_COLOR = [5, 2.4, 0.6];
 // Tracer compositions differ by army, as in real conflicts: red-orange for us, green for them.
 const TRACER = [
-  [6.5, 1.5, 0.35],
-  [1.1, 5.5, 1.3],
+  [6.2, 1.5, 0.32],
+  [1, 5.4, 1.2],
 ];
 const tracerColor = (p) => TRACER[p.side === 1 ? 1 : 0];
+const HOT_CORE = [4.6, 4, 3.1];
+const SHELL_HEAD = [7, 3, 0.7];
+const INTERCEPTOR_HEAD = [5, 3.4, 1.4];
+const PLAIN_ROUND = [0.95, 0.9, 0.8];
+const TAIL_STEPS = 6;
+const scaled = (color, k, out) => {
+  out[0] = color[0] * k;
+  out[1] = color[1] * k;
+  out[2] = color[2] * k;
+  return out;
+};
 
 export class CombatEffects {
   constructor(world) {
@@ -21,7 +33,7 @@ export class CombatEffects {
     this.smoke = new ParticleBatch(world.scene, 1280, 0);
     this.glow = new ParticleBatch(world.scene, 1280, 1);
     this.rings = new ParticleBatch(world.scene, 64, 2);
-    this.streaks = new StreakBatch(world.scene, 2048);
+    this.streaks = new StreakBatch(world.scene, 3072);
     this.sparks = new StreakParticles(900);
     this.casings = new CasingPool(world.scene, 320);
     this.clock = 0;
@@ -79,6 +91,13 @@ export class CombatEffects {
     this.tracers.frustumCulled = false;
     world.scene.add(this.tracers);
     this.tracerHeads = 0;
+    this.lead = 0;
+    this.point = { x: 0, y: 0, z: 0 };
+    this.point2 = { x: 0, y: 0, z: 0 };
+    this.point3 = { x: 0, y: 0, z: 0 };
+    this.halo = [0, 0, 0];
+    this.body = [0, 0, 0];
+    this.core = [0, 0, 0];
   }
   cameraDistance(x, y, z) {
     const camera = this.world.camera;
@@ -470,6 +489,92 @@ export class CombatEffects {
         28 + Math.random() * 20,
       );
   }
+  // A round striking the ground, a wall, armour or a soldier. Heavier guns throw bigger plumes.
+  bulletImpact(e) {
+    const fx = WEAPON_FX[weaponClass({ ground: true }, e.shooter)] || WEAPON_FX.rifle,
+      size = Math.min(3, Math.max(1, fx.flash / 0.8)),
+      floor = this.floor(e.x, e.z),
+      fx0 = e.x - (e.fromX ?? e.x - 1),
+      fz0 = e.z - (e.fromZ ?? e.z),
+      fl = Math.hypot(fx0, fz0) || 1,
+      // Direction the round was travelling; debris flies back toward the shooter.
+      bx = -fx0 / fl,
+      bz = -fz0 / fl,
+      jitter = () => Math.random() - 0.5;
+    if (e.surface === 'armor') {
+      // Hot spall and a white flash: the round glances off or breaks up on the plate.
+      this.glow.spawn(e.x, floor + 2.2, e.z, {
+        size: 0.9 * size,
+        life: 0.05,
+        opacity: 1,
+        growth: 6 * size,
+        color: [7, 5.5, 3],
+      });
+      for (let i = 0; i < 5 + 3 * size; i++)
+        this.spark(e.x, floor + 2.2, e.z, 0.26, 0.2 + Math.random() * 0.35, {
+          vx: bx * 18 + jitter() * 46,
+          vy: 3 + Math.random() * 20,
+          vz: bz * 18 + jitter() * 46,
+          gravity: 24,
+          color: [7, 4, 1.4],
+        });
+      this.puff(e.x, floor + 2.2, e.z, 0.5 * size, 0.6, {
+        vy: 1.2,
+        opacity: 0.2,
+        color: [0.3, 0.3, 0.32],
+      });
+      return;
+    }
+    if (e.surface === 'body') {
+      this.puff(e.x, floor + 1.4, e.z, 0.45, 0.5, {
+        vx: bx * 2,
+        vy: 1.5,
+        vz: bz * 2,
+        growth: 0.8,
+        opacity: 0.2,
+        color: [0.3, 0.26, 0.22],
+      });
+      return;
+    }
+    const wall = e.surface === 'wall',
+      dust = wall ? [0.56, 0.54, 0.5] : [0.42, 0.36, 0.27],
+      y = floor + (wall ? 2.5 + Math.random() * 4 : 0.5);
+    // A thin vertical spurt, then a lazy cloud that drifts and settles.
+    this.puff(e.x, y + 0.6 * size, e.z, 0.32 * size, 0.45, {
+      vx: bx * 3,
+      vy: 9 * size,
+      vz: bz * 3,
+      drag: 3.2,
+      growth: 0.6,
+      opacity: 0.34,
+      color: dust,
+    });
+    this.puff(e.x, y, e.z, 0.6 * size, 0.9 + 0.3 * size, {
+      vx: bx * 2 + jitter() * 2,
+      vy: 1.6,
+      vz: bz * 2 + jitter() * 2,
+      growth: 1.3 * size,
+      opacity: 0.22,
+      color: dust,
+    });
+    for (let i = 0; i < 2 + size * 1.5; i++)
+      this.spark(e.x, y, e.z, wall ? 0.18 : 0.22, 0.3 + Math.random() * 0.25, {
+        vx: bx * 8 + jitter() * 14,
+        vy: 6 + Math.random() * 9 * size,
+        vz: bz * 8 + jitter() * 14,
+        gravity: 30,
+        color: wall ? [0.75, 0.72, 0.66] : [0.5, 0.42, 0.3],
+        opacity: 0.85,
+      });
+    // Stones and concrete sometimes strike a spark.
+    if (Math.random() < (wall ? 0.35 : 0.12))
+      this.spark(e.x, y, e.z, 0.2, 0.18, {
+        vx: bx * 20 + jitter() * 20,
+        vy: 5 + Math.random() * 8,
+        vz: bz * 20 + jitter() * 20,
+        color: SPARK_COLOR,
+      });
+  }
   handle(e, shooter = null) {
     if (e.type === 'intercept') {
       if (e.mode === 'fall') {
@@ -517,27 +622,7 @@ export class CombatEffects {
             vz: (Math.random() - 0.5) * 34,
           });
         this.puff(e.x, e.y, e.z, 0.7, 0.9, { vy: 0.5, opacity: 0.22, color: [0.2, 0.2, 0.22] });
-      } else if (this.cameraDistance(e.x, 2, e.z) < DETAIL_DISTANCE) {
-        // A bullet kicking up dirt.
-        const floor = this.floor(e.x, e.z);
-        this.puff(e.x, floor + 0.6, e.z, 0.55, 0.7, {
-          vx: (Math.random() - 0.5) * 2,
-          vy: 3,
-          vz: (Math.random() - 0.5) * 2,
-          growth: 1.2,
-          opacity: 0.24,
-          color: [0.42, 0.36, 0.27],
-        });
-        for (let i = 0; i < 2; i++)
-          this.spark(e.x, floor + 0.4, e.z, 0.22, 0.35, {
-            vx: (Math.random() - 0.5) * 14,
-            vy: 6 + Math.random() * 8,
-            vz: (Math.random() - 0.5) * 14,
-            gravity: 30,
-            color: [0.5, 0.42, 0.3],
-            opacity: 0.8,
-          });
-      }
+      } else if (this.cameraDistance(e.x, 2, e.z) < DETAIL_DISTANCE) this.bulletImpact(e);
     }
     if (e.type === 'shot') this.muzzle(e, shooter);
     if (e.type === 'launch') {
@@ -702,21 +787,24 @@ export class CombatEffects {
         seen.add(p.id);
         this.groundTracers.set(p.id, p);
       }
-      const tail = Math.min(p.life, p.kind === 'bullet' ? 0.09 : 0.07),
+      // The tail follows the real path back from the drawn head and fades toward the muzzle.
+      const ahead = this.lead || 0,
+        tail = p.kind === 'bullet' ? (p.domain === 'ground' ? 0.12 : 0.16) : 0.08,
         color =
           p.kind === 'interceptor'
             ? [1.6, 2.6, 4]
             : p.kind === 'shell'
               ? [4, 1.7, 0.4]
-              : tracerColor(p).map((v) => v * 0.8);
-      for (let i = 0; i < 3 && segment < this.traceCapacity; i++, segment++)
+              : tracerColor(p).map((v) => v * 0.75);
+      for (let i = 0; i < TAIL_STEPS && segment < this.traceCapacity; i++, segment++)
         for (let end = 0; end < 2; end++) {
-          const t = tail * (1 - (i + end) / 3),
-            offset = segment * 6 + end * 3;
-          this.tracePositions[offset] = p.x - p.vx * t;
-          this.tracePositions[offset + 1] = p.y - p.vy * t - 0.5 * (p.gravity || 0) * t * t;
-          this.tracePositions[offset + 2] = p.z - p.vz * t;
-          const intensity = 0.2 + (0.8 * (i + end)) / 3;
+          const k = (i + end) / TAIL_STEPS,
+            offset = segment * 6 + end * 3,
+            q = projectilePoint(p, ahead - tail * k, this.point);
+          this.tracePositions[offset] = q.x;
+          this.tracePositions[offset + 1] = q.y;
+          this.tracePositions[offset + 2] = q.z;
+          const intensity = (1 - k) ** 1.6;
           this.traceColors[offset] = color[0] * intensity;
           this.traceColors[offset + 1] = color[1] * intensity;
           this.traceColors[offset + 2] = color[2] * intensity;
@@ -741,7 +829,7 @@ export class CombatEffects {
     for (const [id, p] of this.groundTracers) {
       if (seen.has(id)) continue;
       this.groundTracers.delete(id);
-      if (++vanished > 24 || Math.random() > 0.4) continue;
+      if (++vanished > 24 || Math.random() > 0.32) continue;
       const speed = Math.hypot(p.vx, p.vz) || 1,
         turn = (Math.random() - 0.5) * 1.6,
         dx = p.vx / speed,
@@ -766,30 +854,79 @@ export class CombatEffects {
       });
     }
   }
-  // Glowing heads for every tracer and interceptor, aligned with the flight direction.
+  // Glowing heads for every tracer and interceptor, aligned with the flight direction. A tracer is
+  // three layers: a white-hot core, the burning colour and a wide dim halo. Far from the camera the
+  // layers widen, so fire stays readable when zoomed out. Plain rounds near the camera leave only a
+  // faint heat streak.
   drawTracerStreaks() {
     let heads = 0;
+    const ahead = this.lead || 0,
+      camera = this.world.camera;
+    if (camera) this.eye.setFromMatrixPosition(camera.matrixWorld);
     for (const p of this.tracerProjectiles || []) {
-      if (p.kind === 'bullet' && !p.tracer) continue;
       const speed = Math.hypot(p.vx, p.vy, p.vz);
-      if (!speed || p.life <= 0) continue;
+      if (!speed) continue;
+      const q = projectilePoint(p, ahead, this.point),
+        x = q.x,
+        y = q.y,
+        z = q.z,
+        { dx, dy, dz } = projectileHeading(p, ahead, this.point2, this.point3),
+        flown = p.life + ahead,
+        distance = camera ? Math.hypot(this.eye.x - x, this.eye.y - y, this.eye.z - z) : 0;
+      if (flown <= 0) continue;
+      if (p.kind === 'bullet' && !p.tracer) {
+        if (distance < 320)
+          this.streaks.add(
+            x,
+            y,
+            z,
+            dx,
+            dy,
+            dz,
+            Math.min(6, speed * 0.022, speed * flown),
+            0.1,
+            PLAIN_ROUND,
+            0.22 * (1 - distance / 320),
+          );
+        continue;
+      }
       const interceptor = p.kind === 'interceptor',
         shell = p.kind === 'shell',
-        length = Math.min(interceptor ? 9 : shell ? 14 : 16, speed * 0.055, speed * p.life),
-        width = interceptor ? 1.1 : shell ? 0.62 : 0.28,
-        color = interceptor ? [5, 3.4, 1.4] : shell ? [5, 2.1, 0.45] : tracerColor(p);
-      this.streaks.add(
-        p.x,
-        p.y,
-        p.z,
-        p.vx / speed,
-        p.vy / speed,
-        p.vz / speed,
-        length,
-        width,
-        color,
-        0.9,
-      );
+        zoom = Math.min(2.6, Math.max(1, distance / 380)),
+        // The compound ignites a few metres out of the muzzle, then burns with a slight flicker.
+        ignite = Math.min(1, flown / 0.035),
+        flicker = 0.84 + 0.16 * Math.sin(this.clock * 53 + ((p.id * 2.399) % 6.283) * 7),
+        glow = ignite * (interceptor ? 1 : flicker),
+        length = Math.min(interceptor ? 9 : shell ? 11 : 8, speed * 0.032, speed * flown) * zoom,
+        width = (interceptor ? 1.1 : shell ? 0.5 : 0.24) * zoom,
+        color = interceptor ? INTERCEPTOR_HEAD : shell ? SHELL_HEAD : tracerColor(p);
+      if (!interceptor)
+        this.streaks.add(
+          x,
+          y,
+          z,
+          dx,
+          dy,
+          dz,
+          length * 0.85,
+          width * 3.4,
+          scaled(color, 0.15 * glow, this.halo),
+          0.5,
+        );
+      this.streaks.add(x, y, z, dx, dy, dz, length, width, scaled(color, glow, this.body), 0.9);
+      if (!interceptor)
+        this.streaks.add(
+          x,
+          y,
+          z,
+          dx,
+          dy,
+          dz,
+          length * 0.45,
+          width * 0.38,
+          scaled(HOT_CORE, glow, this.core),
+          1,
+        );
       heads++;
     }
     this.tracerHeads = heads;

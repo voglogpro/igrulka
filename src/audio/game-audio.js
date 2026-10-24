@@ -374,7 +374,7 @@ export class GameAudio {
     sirenTone.type = 'lowpass';
     sirenTone.frequency.value = 2600;
     sirenLevel.gain.value = 0;
-    sirenWet.gain.value = 1.4;
+    sirenWet.gain.value = 0.8;
     siren.connect(sirenTone);
     sirenTone.connect(sirenLevel);
     sirenLevel.connect(this.dry);
@@ -447,7 +447,7 @@ export class GameAudio {
         : null;
       this.siren.on = !!city;
       this.siren.level.gain.setTargetAtTime(
-        this.enabled && city ? 0.16 * Math.max(0.4, Math.min(1, near.dry * 4)) : 0,
+        this.enabled && city ? 0.07 * Math.max(0.35, Math.min(1, near.dry * 4)) : 0,
         t,
         city ? 1.2 : 2.5,
       );

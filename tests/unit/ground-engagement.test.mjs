@@ -226,3 +226,42 @@ test('a peaceful city does not build a ground target index, while a legacy stati
   assert.equal(cache.ids.get(target.id), target);
   assert.equal(groundEngagementMetrics(s).indexBuilds, 1);
 });
+
+test('direct-fire rounds rise slightly and drop onto the target instead of flying flat', () => {
+  const s = fresh(),
+    u = unit(s, 0, 'machinegunner', -450),
+    foe = unit(s, 1, 'infantry', -360);
+  foe.holdFire = true;
+  let p = null;
+  for (let i = 0; i < 200 && !p; i++) {
+    E.step(s, 0.05);
+    p = s.projectiles.find((q) => q.source === u.id && q.kind === 'bullet');
+  }
+  assert.ok(p, 'the machine gunner must open fire');
+  assert.ok(p.loft > 0 && p.loft < 14 && !p.arc);
+  const start = p.y,
+    heights = [];
+  while (!p.dead) {
+    E.step(s, 0.05);
+    heights.push(p.y);
+  }
+  assert.ok(Math.max(...heights) > start, 'the round climbs above the muzzle mid-flight');
+  assert.ok(Math.abs(p.y - p.endY) < 0.01, 'and comes down at the target height');
+});
+
+test('bullet hits report what they struck so impacts can differ', () => {
+  const s = fresh(),
+    shooter = unit(s, 0, 'infantry', -450),
+    soldier = unit(s, 1, 'infantry', -400),
+    tank = unit(s, 1, 'leopard', -400, 320);
+  impactGround(s, round(shooter, soldier));
+  impactGround(s, round(shooter, tank));
+  impactGround(s, round(shooter, soldier, { tx: -400, tz: 200 }));
+  const hits = s.events.filter((e) => e.type === 'hit');
+  assert.deepEqual(
+    hits.map((e) => e.surface),
+    ['body', 'armor', 'ground'],
+  );
+  assert.equal(hits[0].shooter, 'infantry');
+  assert.equal(hits[0].fromX, shooter.x);
+});

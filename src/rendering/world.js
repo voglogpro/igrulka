@@ -548,11 +548,20 @@ export class RTSWorld {
       this.camera.updateMatrixWorld();
     }
     this.updateDaylight();
+    this.combatFX.lead = this.simLead || 0;
     this.sync();
     this.fogVeil.update(this.state, wallDt);
     const wx = this.state.weather,
-      rainy = wx && (wx.kind === 'rain' || wx.kind === 'storm') ? wx.amount : 0;
-    this.weatherFX.update(wallDt, this.elapsed, this.controls.target, rainy);
+      rainy = wx && (wx.kind === 'rain' || wx.kind === 'storm') ? wx.amount : 0,
+      misty = wx ? wx.amount * (wx.kind === 'fog' ? 1 : wx.kind === 'clear' ? 0 : 0.3) : 0;
+    this.weatherFX.update(
+      wallDt,
+      this.elapsed,
+      this.controls.target,
+      rainy,
+      misty,
+      this.scene.fog.color,
+    );
     this.combatFX.emit(this.state, this.visualDt, (u) => E.unitVisible(this.state, 0, u));
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);
     this.traffic.update(this.state, this.visualDt, this.combatFX);

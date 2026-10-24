@@ -29,7 +29,8 @@ export function gunshot(sampleRate, p) {
     body2 = 0,
     tail1 = 0,
     tail2 = 0,
-    phase = 0;
+    phase = 0,
+    subPhase = 0;
   for (let i = 0; i < data.length; i++) {
     const t = i / sampleRate,
       white = Math.random() * 2 - 1,
@@ -46,9 +47,26 @@ export function gunshot(sampleRate, p) {
     tail2 += tailA * (tail1 - tail2);
     const tail = tail2 * p.tail * 6 * Math.exp(-t / p.tailDecay) * (1 - Math.exp(-t / 0.012));
     const action = p.action && t > 0.03 && t < 0.034 ? white * p.action : 0;
-    data[i] = attack * (crack + body + thump) + tail + action;
+    // Sub-bass punch felt in the chest, slower and lower than the thump.
+    subPhase +=
+      (2 * Math.PI * (p.thumpTo * 0.55 + p.thumpTo * 0.6 * Math.exp(-t / 0.06))) / sampleRate;
+    const sub = Math.sin(subPhase) * p.thump * 0.75 * Math.exp(-t / (p.thumpDecay * 2.6));
+    data[i] = attack * (crack + body + thump + sub) + tail + action;
   }
-  return finish(data, p.drive ?? 1.6);
+  // Two slap-back reflections from nearby walls give every shot a hard, menacing ring.
+  for (const [delay, gain] of [
+    [0.043, 0.32],
+    [0.097, 0.18],
+  ]) {
+    const offset = Math.floor(delay * sampleRate);
+    let low = 0;
+    const a = onePole(1400, sampleRate);
+    for (let i = data.length - 1; i >= offset; i--) {
+      low += a * (data[i - offset] - low);
+      data[i] += low * gain;
+    }
+  }
+  return finish(data, (p.drive ?? 1.6) * 1.15);
 }
 
 export const GUNS = {
@@ -180,14 +198,18 @@ export const GUNS = {
 
 // Explosion: blast front, a deep falling boom, then crackling debris.
 export function explosion(sampleRate, size) {
-  const length = 1.8 + size * 0.9,
+  const length = 2.4 + size * 1.2,
     data = new Float32Array(Math.ceil(sampleRate * length)),
     a = onePole(220 + 160 / size, sampleRate),
     b = onePole(1800, sampleRate);
   let low1 = 0,
     low2 = 0,
     mid = 0,
-    phase = 0;
+    phase = 0,
+    subPhase = 0,
+    roll1 = 0,
+    roll2 = 0;
+  const r = onePole(90, sampleRate);
   for (let i = 0; i < data.length; i++) {
     const t = i / sampleRate,
       white = Math.random() * 2 - 1;
@@ -199,13 +221,20 @@ export function explosion(sampleRate, size) {
     const boom =
       low2 * 5 * Math.exp(-t / (0.35 * size)) + Math.sin(phase) * 1.2 * Math.exp(-t / (0.3 * size));
     const front = mid * 1.4 * Math.exp(-t / 0.03);
+    // A deep sub drop and a long rolling rumble that swells and fades like thunder.
+    subPhase += (2 * Math.PI * (11 + 34 * Math.exp(-t / (0.22 * size)))) / sampleRate;
+    const sub = Math.sin(subPhase) * 1.5 * Math.exp(-t / (0.55 * size));
+    roll1 += r * (white - roll1);
+    roll2 += r * (roll1 - roll2);
+    const swell = (1 - Math.exp(-t / 0.25)) * Math.exp(-t / (0.5 + 0.45 * size));
+    const rumble = roll2 * 9 * swell * (0.75 + 0.25 * Math.sin(t * 9.5 + Math.sin(t * 3.1) * 2));
     const debris =
-      t > 0.15 && Math.random() < 0.0009 * size
-        ? (Math.random() - 0.5) * 1.5 * Math.exp(-t / length)
+      t > 0.15 && Math.random() < 0.0016 * size
+        ? (Math.random() - 0.5) * 1.8 * Math.exp(-t / length)
         : 0;
-    data[i] = Math.min(1, t / 0.002) * (boom + front) + debris;
+    data[i] = Math.min(1, t / 0.002) * (boom + front + sub) + rumble + debris;
   }
-  return finish(data, 2.1);
+  return finish(data, 2.4);
 }
 
 // Missile or rocket motor ignition: a pop followed by a rushing roar.

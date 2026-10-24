@@ -28,7 +28,7 @@ export class EveningPost {
       fragmentShader: `uniform sampler2D frame;uniform vec2 pixel;varying vec2 vUv;
       vec3 bright(vec2 p){return max(texture2D(frame,p).rgb-vec3(1.05),vec3(0.));}
       void main(){vec3 c=bright(vUv)*.2;
-        for(int i=0;i<8;i++){float a=float(i)*.785398;vec2 d=vec2(cos(a),sin(a));c+=bright(vUv+d*pixel*5.)*.1;}
+        for(int i=0;i<8;i++){float a=float(i)*.785398;vec2 d=vec2(cos(a),sin(a));vec2 e=vec2(cos(a+.3927),sin(a+.3927));c+=bright(vUv+d*pixel*2.5)*.06+bright(vUv+e*pixel*5.)*.045;}
         gl_FragColor=vec4(c,1.);}`,
     });
     this.bloomScene.add(new T.Mesh(geometry, this.bloomMaterial));

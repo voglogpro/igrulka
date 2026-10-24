@@ -369,13 +369,18 @@ function begin() {
 }
 function frame(dt) {
   if (!world || replacingCampaign) return;
-  if (network) network.renderInto(state);
+  if (network) {
+    network.renderInto(state);
+    world.simLead = 0;
+  }
   if (!network && started && !paused && !state.result) {
     acc = Math.min(0.25, acc + dt);
     while (acc >= 0.05) {
       E.step(state, 0.05);
       acc -= 0.05;
     }
+    // Time already passed since the last step: effects draw moving rounds this far ahead.
+    world.simLead = acc;
     saveTimer += dt;
     if (saveTimer >= 10) {
       persist();

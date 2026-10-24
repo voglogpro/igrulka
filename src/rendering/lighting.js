@@ -25,7 +25,8 @@ export function updateDaylight() {
   this.scene.fog.color.copy(NIGHT_FOG).lerp(DAY_FOG, d.daylight);
   this.scene.background.copy(this.scene.fog.color);
   this.scene.fog.density = 0.00055 + d.night * 0.0002;
-  // Weather: overcast sky, flat light, thick fog; lightning briefly floods the valley.
+  // Weather: overcast light and a slightly denser haze. Fog weather is drawn by the ground mist in
+  // weather-fx.js, so distance fog stays light and the sky never turns into a grey wall.
   const wx = this.state.weather,
     amount = wx?.amount ?? 0,
     kind = wx?.kind ?? 'clear',
@@ -35,10 +36,12 @@ export function updateDaylight() {
     this.sun.intensity *= 1 - overcast * amount;
     this.hemi.intensity *= 1 - 0.18 * overcast * amount;
     this.scene.fog.density +=
-      amount * (kind === 'fog' ? 0.0034 : kind === 'storm' ? 0.0011 : 0.0007);
-    this.scene.fog.color.lerp(WEATHER_FOG, Math.min(1, amount * (kind === 'fog' ? 0.75 : 0.5)));
+      amount * (kind === 'fog' ? 0.00045 : kind === 'storm' ? 0.0005 : 0.0003);
+    this.scene.fog.color.lerp(WEATHER_FOG, Math.min(1, amount * 0.4));
     this.scene.background.copy(this.scene.fog.color);
   }
+  const sky = this.sky.material.uniforms.overcast;
+  if (sky) sky.value = kind === 'fog' ? 0 : overcast * amount;
   if (flash > 0) {
     this.hemi.intensity += flash * 3.2;
     this.scene.fog.color.lerp(FLASH_FOG, flash * 0.6);

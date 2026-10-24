@@ -28,6 +28,9 @@ import {
 } from './engagement.js';
 // Belt-fed and vehicle guns show every second round as a tracer, rifles every fourth.
 const AUTOMATIC = new Set(['machinegunner', 'apc', 'mog', 'armoredcar', 'lighttank', 'ifv']);
+// Bullets are aimed slightly upward and fall onto the target; the rise matches a parabolic drop.
+const LOFT_GRAVITY = 42;
+
 export function tickUnit(s, u, dt, rates, hooks) {
   const { event, random } = hooks,
     d = GROUND_UNITS[u.key] || BUILDINGS[u.key],
@@ -196,7 +199,13 @@ export function tickUnit(s, u, dt, rates, hooks) {
     domain: 'ground',
     kind: tank ? 'shell' : 'bullet',
     tracer: tank || u.groundAmmo % (AUTOMATIC.has(u.key) ? 2 : 4) === 0,
-    ...(shot.indirect ? { arc: Math.min(150, length * 0.33), originY: 6 } : {}),
+    ...(shot.indirect
+      ? { arc: Math.min(150, length * 0.33), originY: 6 }
+      : {
+          loft: Math.min(14, (LOFT_GRAVITY * (length / speed) ** 2) / 8),
+          originY: foot ? 2.6 : 4,
+          endY: 2.4,
+        }),
     x: u.x,
     y: foot ? 2.6 : 4,
     z: u.z,

@@ -108,13 +108,13 @@ export function environment() {
   const sky = new T.Mesh(
     new T.SphereGeometry(5400, 32, 20),
     new T.ShaderMaterial({
-      uniforms: { daylight: { value: 0.1 } },
+      uniforms: { daylight: { value: 0.1 }, overcast: { value: 0 } },
       side: T.BackSide,
       depthWrite: false,
       vertexShader:
         'varying vec3 v;void main(){v=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
       fragmentShader:
-        'uniform float daylight;varying vec3 v;void main(){float h=normalize(v).y;vec3 col=mix(vec3(.40,.31,.30),vec3(.075,.13,.23),smoothstep(-.06,.5,h));float glow=pow(max(0.,dot(normalize(v),normalize(vec3(-1.,.11,-.5)))),24.);col+=vec3(.40,.17,.065)*glow;vec3 night=mix(vec3(.04,.06,.09),vec3(.008,.018,.042),smoothstep(0.,.6,h));vec3 day=mix(vec3(.62,.73,.78),vec3(.12,.31,.55),smoothstep(-.1,.7,h));col=mix(night,mix(col,day,smoothstep(.12,.7,daylight)),smoothstep(0.,.15,daylight));gl_FragColor=vec4(col,1.);}',
+        'uniform float daylight;uniform float overcast;varying vec3 v;void main(){float h=normalize(v).y;vec3 col=mix(vec3(.40,.31,.30),vec3(.075,.13,.23),smoothstep(-.06,.5,h));float glow=pow(max(0.,dot(normalize(v),normalize(vec3(-1.,.11,-.5)))),24.);col+=vec3(.40,.17,.065)*glow;vec3 night=mix(vec3(.04,.06,.09),vec3(.008,.018,.042),smoothstep(0.,.6,h));vec3 day=mix(vec3(.62,.73,.78),vec3(.12,.31,.55),smoothstep(-.1,.7,h));col=mix(night,mix(col,day,smoothstep(.12,.7,daylight)),smoothstep(0.,.15,daylight));float lum=dot(col,vec3(.3,.5,.2));col=mix(col,vec3(lum*.9+.02),overcast*.75);gl_FragColor=vec4(col,1.);}',
     }),
   );
   this.scene.add(sky);

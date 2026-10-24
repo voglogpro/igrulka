@@ -167,7 +167,9 @@ export function load(raw) {
       !['x', 'y', 'z', 'vx', 'vy', 'vz', 'speed', 'life', 'maxLife'].every((k) =>
         Number.isFinite(p[k]),
       ) ||
-      ['originX', 'originZ'].some((key) => p[key] != null && !Number.isFinite(p[key]))
+      ['originX', 'originZ', 'originY', 'endY', 'arc', 'loft'].some(
+        (key) => p[key] != null && !Number.isFinite(p[key]),
+      )
     )
       throw Error('Повреждены снаряды');
   s.groundUnits ||= [];

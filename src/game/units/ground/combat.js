@@ -140,6 +140,7 @@ export function impactGround(s, p, event = emit) {
     );
     if (before > direct.hp) gainGroundExperience(s, p.source, before - direct.hp, direct.hp <= 0);
   }
+  let wall = false;
   for (const b of s.buildings)
     if (b.id === p.targetId && b.side !== p.side && b.hp > 0) {
       const half = (BUILDINGS[b.key]?.size || 30) * 0.55;
@@ -153,6 +154,7 @@ export function impactGround(s, p, event = emit) {
         groundDamageMultiplier(p.shooterKey, b, p.kind) *
         (1 - distance / (radius * 1.5));
       const before = b.hp;
+      wall = true;
       b.hp = Math.max(0, b.hp - amount);
       if (before > b.hp) gainGroundExperience(s, p.source, (before - b.hp) * 0.25, b.hp <= 0);
       if (!b.hp) {
@@ -176,5 +178,10 @@ export function impactGround(s, p, event = emit) {
             : 'infantry',
     radius: radius,
     side: p.side,
+    // What the round struck, for the picture only: sparks on armour, dust on walls and earth.
+    shooter: p.shooterKey,
+    surface: direct ? (isInfantry(direct.key) ? 'body' : 'armor') : wall ? 'wall' : 'ground',
+    fromX: from.x,
+    fromZ: from.z,
   });
 }

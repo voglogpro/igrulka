@@ -28,11 +28,15 @@ export function moveProjectiles(s, dt) {
       const travel = Math.min(dt, Math.max(0, p.flight - (p.life - dt)));
       p.x += p.vx * travel;
       p.z += p.vz * travel;
-      if (p.arc) {
-        // Ballistic lob: height follows a parabola over the flight; vy is kept for tracers.
-        const k = Math.min(1, p.life / p.flight);
-        p.y = (p.originY ?? 6) * (1 - k) + 2 * k + 4 * p.arc * k * (1 - k);
-        p.vy = (4 * p.arc * (1 - 2 * k) + 2 - (p.originY ?? 6)) / p.flight;
+      const peak = p.arc || p.loft;
+      if (peak) {
+        // Height follows a parabola over the flight; vy is kept for tracers. Artillery lobs high
+        // (arc); bullets and tank rounds rise a little and drop onto the target (loft).
+        const k = Math.min(1, p.life / p.flight),
+          from = p.originY ?? 6,
+          to = p.endY ?? 2;
+        p.y = from * (1 - k) + to * k + 4 * peak * k * (1 - k);
+        p.vy = (4 * peak * (1 - 2 * k) + to - from) / p.flight;
       }
       if (p.life >= p.flight) {
         p.x = p.tx;
