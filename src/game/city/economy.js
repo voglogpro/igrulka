@@ -7,6 +7,7 @@ export function supplyFactor(s, b) {
   return ROAD_REQUIRED.has(b.key) && !buildingConnected(s, b, BUILDINGS[b.key].size) ? 0.2 : 1;
 }
 
+export const COMMUTE_INCOME = 0.07;
 export function economy(s, owner) {
   const faction = s.sides[owner],
     alive = s.buildings.filter((b) => b.side === owner && b.hp > 0 && b.progress >= 1);
@@ -42,6 +43,19 @@ export function economy(s, owner) {
     materials += (d.materials || 0) * f * efficient;
     science += (d.science || 0) * f;
   }
+  // Commuters: residents drive to the workplaces they can reach; every employed resident earns.
+  let homes = 0,
+    jobs = 0;
+  for (const b of alive) {
+    const d = BUILDINGS[b.key];
+    if (!d || supplyFactor(s, b) < 1) continue;
+    const health = 0.5 + (0.5 * b.hp) / b.maxHp;
+    homes += (d.residents || 0) * health;
+    jobs += (d.jobs || 0) * health;
+  }
+  const employed = Math.min(homes, jobs),
+    commute = employed * COMMUTE_INCOME * productivity * efficient;
+  income += commute;
   const armyUpkeep = (s.groundUnits || [])
     .filter((u) => u.side === owner && u.hp > 0)
     .reduce((n, u) => n + GROUND_UNITS[u.key].upkeep, 0);
@@ -65,6 +79,12 @@ export function economy(s, owner) {
     connected,
     isolated,
     armyUpkeep,
+    commute: {
+      homes: Math.round(homes),
+      jobs: Math.round(jobs),
+      employed: Math.round(employed),
+      income: commute * bonus,
+    },
     districts: {
       ...districts,
       income: districts.income * bonus,

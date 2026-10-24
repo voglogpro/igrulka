@@ -37,6 +37,11 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
     cancelTransportDelivery(u);
     clearGroundRoute(u);
     s.sides[u.side].losses++;
+    // A raided caravan drops part of its cargo to the other side.
+    if (u.civil && u.trade) {
+      s.sides[1 - u.side].credits += 80;
+      s.sides[1 - u.side].materials += 2;
+    }
     event(s, 'groundDestroyed', {
       x: u.x,
       y: 2,

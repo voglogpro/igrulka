@@ -106,6 +106,25 @@ export function model(b) {
     );
     dome.position.set(0, 21, 0);
     content.add(dome);
+  } else if (b.key === 'market') {
+    // Covered stalls with striped awnings, crates, a loading dock and a flag over the entrance.
+    this.box(content, 0, 0.7, -4, 20, 6.5, 12, '#a99f87');
+    this.box(content, 0, 7.2, -4, 21.5, 0.9, 13.5, '#59655d');
+    for (let i = 0; i < 6; i++) {
+      this.box(content, -8.5 + i * 3.4, 4.6, 6.5, 3.4, 0.4, 7, i % 2 ? '#d7ccb0' : '#b8524a');
+      this.box(content, -8.5 + i * 3.4, 0.7, 9.4, 3, 1.4, 1.6, '#7b6a50');
+    }
+    for (let i = 0; i < 5; i++) {
+      this.box(content, -8 + i * 4, 0.7, 4, 2.2, 1.8, 2.2, i % 2 ? '#8d6f45' : '#a2854f');
+      this.box(content, -8 + i * 4, 2.5, 4, 1.6, 1.2, 1.6, '#b79a62');
+    }
+    this.box(content, 12, 0.7, -4, 4, 3.2, 10, '#667a8a');
+    this.box(content, 12, 3.9, -4, 4.4, 0.4, 10.4, '#4c5b66');
+    this.cyl(content, -10, 0.7, -10, 0.25, 17, '#aeb7af');
+    this.box(content, -7.5, 15, -10, 5, 2.6, 0.25, accent, {
+      emissive: accent,
+      emissiveIntensity: 0.5,
+    });
   } else if (b.key === 'hq') {
     this.box(content, 0, 2.5, 0, 12, 6, 26, '#6f8075');
     this.box(content, 0, 3, 12, 12, 8, 8, '#89988a');

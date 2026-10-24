@@ -26,6 +26,7 @@ import * as T from '../../vendor/three/three.module.js';
 import { InfantryBatch } from './models/infantry/soldiers.js';
 import { CombatEffects } from './effects/combat-effects.js';
 import { FogVeil } from './fog-veil.js';
+import { Traffic } from './traffic.js';
 import { WeatherFX } from './effects/weather-fx.js';
 import { disposeTree } from './mesh-utils.js';
 import { aircraftModel } from './models/aircraft.js';
@@ -289,6 +290,7 @@ export class RTSWorld {
     this.combatFX = new CombatEffects(this);
     this.fogVeil = new FogVeil(this.scene);
     this.weatherFX = new WeatherFX(this.scene);
+    this.traffic = new Traffic(this);
     this.tactical = new TacticalView(this);
     this.deploymentPreview = new DeploymentPreview(this.scene);
     this.sync();
@@ -498,6 +500,7 @@ export class RTSWorld {
       memory: { ...this.renderer.info.memory, programs: this.renderer.info.programs.length },
       fogOfWar: true,
       weather: this.weatherFX.diagnostics(),
+      traffic: this.traffic.diagnostics(),
       detectedEnemies: this.state.units.filter(
         (u) => u.side === 1 && E.unitVisible(this.state, 0, u),
       ).length,
@@ -552,6 +555,7 @@ export class RTSWorld {
     this.weatherFX.update(wallDt, this.elapsed, this.controls.target, rainy);
     this.combatFX.emit(this.state, this.visualDt, (u) => E.unitVisible(this.state, 0, u));
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);
+    this.traffic.update(this.state, this.visualDt, this.combatFX);
     if (this.buildKey && this.lastPointer) this.updateGhost(this.lastPointer);
     if (this.aiming && this.lastPointer && !this.controls.rotating) {
       const p = this.groundPoint(this.lastPointer);

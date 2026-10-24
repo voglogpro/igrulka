@@ -79,6 +79,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
       airbursts: 0,
       districtsCaptured: 0,
       districtsDestroyed: 0,
+      trades: 0,
     },
   };
   campRoads(s);

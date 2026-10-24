@@ -48,6 +48,7 @@ function autoRecruitmentHTML(state, choice = { siteId: null, key: 'infantry' }) 
   return `<details class="army-automation"><summary>Автонабор <span id="repeat-summary"></span></summary><div class="auto-recruit-fields"><label>Казармы<select id="repeat-site" aria-label="Казармы для автоматического набора">${sites.map((b) => `<option value="${b.id}" ${b.id === choice.siteId ? 'selected' : ''}>Казармы #${b.id}</option>`).join('')}</select></label><label>Выпуск<select id="repeat-key" aria-label="Тип автоматического набора">${Object.entries(
     E.GROUND_UNITS,
   )
+    .filter(([, t]) => !t.civil)
     .map(
       ([key, d]) =>
         `<option value="${key}" ${key === choice.key ? 'selected' : ''} ${d.tech && !state.sides[0].tech.includes(d.tech) ? 'disabled' : ''}>${d.name} · ${d.cost} ₡</option>`,
@@ -61,7 +62,7 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
   const faction = state.sides[0];
   const sites = state.buildings.filter((b) => b.side === 0 && b.key === 'barracks' && b.hp > 0);
   const ready = sites.filter((b) => b.progress >= 1);
-  const units = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0);
+  const units = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0 && !u.civil);
   const queue = sites.reduce((n, b) => n + (b.armyQueue?.length || 0), 0);
   const rearToggle = $('#rear-auto');
   if (rearToggle && document.activeElement !== rearToggle)

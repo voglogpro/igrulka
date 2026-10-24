@@ -241,6 +241,14 @@ export function load(raw) {
         u.downed.revive < 0)
     )
       throw Error('Повреждено состояние раненого');
+    if (
+      u.trade != null &&
+      (typeof u.trade !== 'object' ||
+        !Number.isSafeInteger(u.trade.from) ||
+        !(u.trade.to === null || Number.isSafeInteger(u.trade.to)) ||
+        !Number.isFinite(u.trade.bonus))
+    )
+      throw Error('Повреждён торговый караван');
     for (const key of ['supplyAt', 'supportAt'])
       if (u[key] != null && !Number.isFinite(u[key])) throw Error('Повреждена тыловая задача');
     for (const key of ['threatX', 'threatZ', 'threatAt', 'coverCheckAt', 'coverSince'])
@@ -276,6 +284,7 @@ export function load(raw) {
         Math.abs(b.rally.z) > MAP.depth / 2 - 16)
     )
       throw Error('Повреждена точка сбора');
+    if (b.tradeAt != null && !Number.isFinite(b.tradeAt)) throw Error('Повреждена торговля');
     if (b.rallyMode != null && !RALLY_MODES.includes(b.rallyMode))
       throw Error('Повреждены приказы новобранцам');
     if (b.armyQueue?.some((q) => !configured(GROUND_UNITS, q.key) || !Number.isFinite(q.progress)))
@@ -382,6 +391,7 @@ export function load(raw) {
   }
   s.weather ??= createWeather(s.seed);
   if (!validWeather(s.weather)) throw Error('Повреждена погода');
+  if (s.tradeNext != null && !Number.isFinite(s.tradeNext)) throw Error('Повреждена торговля');
   s.rules ??= { rear: true };
   if (typeof s.rules !== 'object' || typeof s.rules.rear !== 'boolean')
     throw Error('Повреждены правила');
@@ -402,6 +412,7 @@ export function load(raw) {
     airbursts: 0,
     districtsCaptured: 0,
     districtsDestroyed: 0,
+    trades: 0,
     ...s.stats,
   };
   s.networkRevision = (s.networkRevision || 0) + 1;

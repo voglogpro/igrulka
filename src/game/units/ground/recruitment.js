@@ -26,6 +26,7 @@ export function makeGround(s, side, key, x, z) {
     yaw: 0,
     suppression: 0,
     fpvAmmo: key === 'operator' ? 3 : 0,
+    civil: !!d.civil,
     aiDefender:
       side === 1 &&
       ['mog', 'sniper', 'machinegunner'].includes(key) &&
@@ -44,7 +45,7 @@ export function recruit(s, side, key, siteId = null, count = 1, stance = null) {
   count = clamp(Math.floor(count) || 1, 1, 5);
   if (s.result) return 'Кампания завершена';
   if (!validStance(stance)) return 'Неизвестный режим';
-  if (!d || (d.tech && !f.tech.includes(d.tech))) return 'Нужно исследование';
+  if (!d || d.civil || (d.tech && !f.tech.includes(d.tech))) return 'Нужно исследование';
   const sites = s.buildings.filter(
     (b) =>
       b.side === side &&

@@ -90,7 +90,13 @@ export function updateDistricts(s, dt) {
     const present = [0, 0],
       foot = [0, 0];
     for (const u of s.groundUnits) {
-      if (u.hp <= 0 || u.carrierId || u.progress < 1 || Math.hypot(u.x - d.x, u.z - d.z) > d.radius)
+      if (
+        u.hp <= 0 ||
+        u.civil ||
+        u.carrierId ||
+        u.progress < 1 ||
+        Math.hypot(u.x - d.x, u.z - d.z) > d.radius
+      )
         continue;
       present[u.side]++;
       if (

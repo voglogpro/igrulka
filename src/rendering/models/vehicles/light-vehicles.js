@@ -154,7 +154,7 @@ export function buildMLRS(world, root, paint, accent, dynamic) {
 }
 
 // Covered supply truck: cab, cargo box with a red cross, small crane and spare wheel.
-export function buildSupplyTruck(world, root, paint, accent) {
+export function buildSupplyTruck(world, root, paint, accent, trade = false) {
   const box = (...args) => world.box(...args);
   box(root, 0, 1.2, 0, 4.4, 0.8, 12.2, '#2e3a32');
   armor(world, root, 0, 1.9, 4.4, 4.6, 2.5, 3.3, paint, 0.9, 0.6);
@@ -165,17 +165,29 @@ export function buildSupplyTruck(world, root, paint, accent) {
   box(root, 0, 2.2, 6.1, 3.6, 0.4, 0.15, accent);
   for (const x of [-1.7, 1.7]) box(root, x, 2.6, 6.1, 0.5, 0.3, 0.1, '#e6d9a3');
   // Cargo box with a tarpaulin roof.
-  box(root, 0, 2, -1.6, 4.5, 2.6, 7.4, '#6d7a5e');
-  box(root, 0, 4.5, -1.6, 4.2, 0.35, 7, '#556247');
+  box(root, 0, 2, -1.6, 4.5, 2.6, 7.4, trade ? '#d9d2b4' : '#6d7a5e');
+  box(root, 0, 4.5, -1.6, 4.2, 0.35, 7, trade ? '#ece7d2' : '#556247');
   for (const sign of [-1, 1]) {
+    if (trade) {
+      // Blue stripe and a coin-like round emblem instead of the medical cross.
+      box(root, sign * 2.27, 2.6, -1.6, 0.05, 0.7, 7.2, '#3f6f8f');
+      const coin = new T.Mesh(world.cylGeo, world.mat('#d9b44a'));
+      coin.rotation.z = Math.PI / 2;
+      coin.scale.set(0.9, 0.08, 0.9);
+      coin.position.set(sign * 2.32, 3.9, -1.6);
+      root.add(coin);
+      continue;
+    }
     box(root, sign * 2.27, 3, -1.6, 0.06, 1.3, 1.9, '#e8e9e0');
     box(root, sign * 2.31, 3.5, -1.6, 0.04, 0.3, 1.1, '#b8352f');
     box(root, sign * 2.31, 3.1, -1.6, 0.04, 1.1, 0.3, '#b8352f');
   }
   // Crane arm and spare wheel at the back.
-  box(root, 0, 4.8, -4.6, 0.5, 2.6, 0.5, '#3d4a3a');
-  const arm = box(root, 0, 7, -3.2, 0.35, 0.35, 3.2, '#3d4a3a');
-  arm.rotation.x = 0.35;
+  if (!trade) {
+    box(root, 0, 4.8, -4.6, 0.5, 2.6, 0.5, '#3d4a3a');
+    const arm = box(root, 0, 7, -3.2, 0.35, 0.35, 3.2, '#3d4a3a');
+    arm.rotation.x = 0.35;
+  }
   const spare = new T.Mesh(world.cylGeo, world.mat('#252f2a'));
   spare.rotation.x = Math.PI / 2;
   spare.scale.set(1.1, 0.5, 1.1);

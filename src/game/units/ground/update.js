@@ -18,6 +18,7 @@ import { applyStance, updateStance } from './stance.js';
 import { weatherSpread, weatherSpeed } from '../../weather.js';
 import { tickDowned, updateRear, autoRear } from './rear.js';
 import { damageGround } from './combat.js';
+import { updateTrade } from './trade.js';
 import {
   prepareGroundEngagement,
   groundEngagement,
@@ -301,6 +302,7 @@ export function updateGround(s, rates, dt, hooks) {
     autoRear(s);
   }
   updateRear(s, dt);
+  updateTrade(s);
   prepareGroundEngagement(s);
   for (const u of s.groundUnits) tickUnit(s, u, dt, rates, hooks);
   for (const b of s.buildings)

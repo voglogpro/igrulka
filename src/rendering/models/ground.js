@@ -36,8 +36,8 @@ export function groundModel(world, u) {
       buildArmoredCar(world, root, paint, accent, dynamic);
     } else if (u.key === 'mlrs') {
       buildMLRS(world, root, paint, accent, dynamic);
-    } else if (u.key === 'supplytruck') {
-      buildSupplyTruck(world, root, paint, accent);
+    } else if (u.key === 'supplytruck' || u.key === 'tradetruck') {
+      buildSupplyTruck(world, root, paint, accent, u.key === 'tradetruck');
     } else if (u.key === 'tankdestroyer') {
       buildTankDestroyer(world, root, paint, accent, dynamic);
     } else {

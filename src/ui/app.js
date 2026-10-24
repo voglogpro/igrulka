@@ -513,7 +513,7 @@ function updateHUD() {
 function buildList() {
   const keys =
     tab === 'city'
-      ? ['road', 'housing', 'industry', 'power', 'lab']
+      ? ['road', 'housing', 'industry', 'power', 'lab', 'market']
       : tab === 'army'
         ? ['barracks']
         : ['factory', 'launcher', 'gun', 'sam', 'radar'];
@@ -814,7 +814,9 @@ function renderGroups() {
 }
 // Quick unit switching: every field squad is one stop, units without a squad are their own stop.
 function armyStops() {
-  const field = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0 && !u.carrierId),
+  const field = state.groundUnits.filter(
+      (u) => u.side === 0 && u.hp > 0 && !u.carrierId && !u.civil,
+    ),
     present = new Set(field.map((u) => u.id)),
     stops = E.squadRoster(state, 0)
       .map((g) => g.ids.filter((id) => present.has(id)))
@@ -1290,6 +1292,22 @@ function updateLivePanel() {
       ['Население', e.population],
       ['Сплавы', rate(e.materials) + '/мин'],
       ['Наука', rate(e.science) + '/мин'],
+      [
+        'Жители / рабочие места',
+        `${e.commute.homes} / ${e.commute.jobs} · на работу ездят ${e.commute.employed}`,
+      ],
+      ['Доход от поездок на работу', '+' + rate(e.commute.income) + ' ₡/мин'],
+      [
+        'Торговля',
+        (() => {
+          const t = E.tradeReport(state, 0);
+          return !t.markets
+            ? 'нет рынка'
+            : !t.partners
+              ? 'ждём рынок партнёра'
+              : `рынков ${t.markets} · караванов ${t.trips} · рейсов ${state.stats.trades || 0}`;
+        })(),
+      ],
       ['Районы под контролем / работают', `${e.districts.owned} / ${e.districts.active}`],
       [
         'Доход районов',
@@ -1562,7 +1580,7 @@ document.addEventListener('click', async (ev) => {
   }
   if (a === 'army-stop') troopCommand('stop');
   if (a === 'army-all') {
-    const units = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0);
+    const units = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0 && !u.civil);
     if (units.length) {
       selectArmy(units.filter((u) => !u.carrierId).map((u) => u.id));
     } else toast('Подготовьте отряды в казармах');
@@ -1794,7 +1812,9 @@ window.addEventListener(
       e.preventDefault();
       e.stopImmediatePropagation();
       selectArmy(
-        state.groundUnits.filter((u) => u.side === 0 && u.hp > 0 && !u.carrierId).map((u) => u.id),
+        state.groundUnits
+          .filter((u) => u.side === 0 && u.hp > 0 && !u.carrierId && !u.civil)
+          .map((u) => u.id),
       );
       return;
     }

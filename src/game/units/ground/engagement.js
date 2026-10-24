@@ -288,6 +288,7 @@ function inRange(u, target, range, minRange = 0) {
     target.hp > 0 &&
     !target.carrierId &&
     !target.downed &&
+    (!target.civil || u.order?.targetId === target.id) &&
     !target.demolished &&
     target.progress >= 1 &&
     (target.x - u.x) ** 2 + (target.z - u.z) ** 2 <= range * range

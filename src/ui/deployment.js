@@ -19,6 +19,7 @@ export function updateDeploymentHUD(state, key, count, plan) {
     host.innerHTML = `<div class="deployment-top"><span>ПОПОЛНЕНИЕ</span><button data-action="cancel-deploy" aria-label="Отменить отправку">×</button></div><select id="deployment-key" aria-label="Тип пополнения">${Object.entries(
       E.GROUND_UNITS,
     )
+      .filter(([, t]) => !t.civil)
       .map(
         ([k, t]) =>
           `<option value="${k}" ${key === k ? 'selected' : ''} ${t.tech && !state.sides[0].tech.includes(t.tech) ? 'disabled' : ''}>${t.name}</option>`,
@@ -82,7 +83,7 @@ export function toggleSquadRoster() {
 export function renderSquadRoster(state, selection) {
   const host = $('#groups-bar');
   const chosen = new Set(selection);
-  const field = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0);
+  const field = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0 && !u.civil);
   const squads = E.squadRoster(state, 0);
   const roles = new Map();
   for (const u of field) {

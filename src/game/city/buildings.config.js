@@ -12,6 +12,7 @@ export const BUILDINGS = {
     power: 4,
     upkeep: 0.25,
     income: 3.8,
+    residents: 10,
     description: 'Заселяется после строительства. Приносит налоги, требует электричество.',
   },
   industry: {
@@ -27,6 +28,7 @@ export const BUILDINGS = {
     upkeep: 0.7,
     income: 1.2,
     materials: 1.5,
+    jobs: 6,
     description: 'Производит сплавы для строительства, вооружения и боеприпасов.',
   },
   power: {
@@ -40,6 +42,7 @@ export const BUILDINGS = {
     size: 23,
     power: -42,
     upkeep: 0.5,
+    jobs: 3,
     description: 'Даёт 42 единицы мощности. Дефицит снижает выпуск экономики и темп стрельбы.',
   },
   factory: {
@@ -53,6 +56,7 @@ export const BUILDINGS = {
     size: 31,
     power: 12,
     upkeep: 0.8,
+    jobs: 5,
     description: 'Собирает дроны и ракеты на общий склад. Нужна связь со штабом по дороге.',
   },
   launcher: {
@@ -81,6 +85,7 @@ export const BUILDINGS = {
     power: 8,
     upkeep: 0.45,
     science: 1,
+    jobs: 4,
     description: 'Даёт очки науки для новых вооружений и улучшений экономики.',
   },
   gun: {
@@ -146,6 +151,22 @@ export const BUILDINGS = {
     upkeep: 0.4,
     description:
       'Один работающий радар открывает всю карту: видны вражеские войска и пуски. Дальность ПВО в радиусе 320 увеличена на 20%, разброс ниже на 25%. При мощности ниже 50% радар отключается.',
+  },
+  market: {
+    height: 12,
+    name: 'Рынок',
+    tag: 'Торговля',
+    cost: 520,
+    metal: 20,
+    time: 20,
+    hp: 260,
+    size: 24,
+    power: 3,
+    upkeep: 0.3,
+    jobs: 3,
+    income: 0.6,
+    description:
+      'Торговый пост. Пока у обеих сторон есть рынок, по мосту сами ездят торговые караваны: каждый рейс приносит деньги и сплавы вам и немного партнёру. Караваны можно перехватить прямым приказом.',
   },
   barracks: {
     height: 13,

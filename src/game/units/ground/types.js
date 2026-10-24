@@ -22,5 +22,6 @@ export const GROUND_UNITS = {
   heavytank: VEHICLE_TYPES.heavytank,
   mlrs: VEHICLE_TYPES.mlrs,
   supplytruck: VEHICLE_TYPES.supplytruck,
+  tradetruck: VEHICLE_TYPES.tradetruck,
 };
 export const isInfantry = (key) => !!GROUND_UNITS[key]?.infantry;

@@ -103,7 +103,7 @@ export async function pointerUp(e) {
       r = this.renderer.domElement.getBoundingClientRect(),
       ids = this.state.groundUnits
         .filter((u) => {
-          if (u.side !== 0 || u.hp <= 0 || u.carrierId) return false;
+          if (u.side !== 0 || u.hp <= 0 || u.carrierId || u.civil) return false;
           const v = new T.Vector3(u.x, u.y + 1, u.z).project(this.camera),
             x = r.left + ((v.x + 1) * r.width) / 2,
             y = r.top + ((1 - v.y) * r.height) / 2;
