@@ -14,7 +14,7 @@ import { updateRecruitRepeat } from './repeat.js';
 import { veteranAccuracy, veteranSuppression } from './veterancy.js';
 import { squadArrivalPoint } from './squads.js';
 import { updateGroundTactics } from './tactics.js';
-import { applyStance, updateStance } from './stance.js';
+import { applyStance } from './stance.js';
 import { weatherSpread, weatherSpeed } from '../../weather.js';
 import { tickDowned, updateRear, autoRear } from './rear.js';
 import { damageGround } from './combat.js';
@@ -92,7 +92,6 @@ export function tickUnit(s, u, dt, rates, hooks) {
   const { target, stopToFight } = groundEngagement(s, u);
   if (mobile) {
     updateGroundTactics(s, u, target);
-    updateStance(s, u);
   }
   const retreat = u.order?.mode === 'retreat';
   u.moving = false;

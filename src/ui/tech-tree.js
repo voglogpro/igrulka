@@ -1,106 +1,197 @@
 import * as E from '../game/index.js';
+import { icon } from './icons.js';
 
-// Branch columns from the front line back to the economy.
-const BRANCHES = ['Армия', 'Пехота', 'Оборона', 'Авиация', 'Город'];
+const BRANCHES = [
+  ['army', 'Армия', 'barracks'],
+  ['infantry', 'Пехота', 'shield'],
+  ['defense', 'Оборона', 'radar'],
+  ['aviation', 'Авиация', 'launcher'],
+  ['city', 'Город', 'industry'],
+];
+const sessions = new WeakMap();
 
-// Depth inside the node's own branch; a prerequisite from another branch starts a new root.
 function depth(key) {
   const d = E.TECH[key];
-  if (!d.requires || E.TECH[d.requires]?.branch !== d.branch) return 0;
-  return depth(d.requires) + 1;
+  return d.requires && E.TECH[d.requires]?.branch === d.branch ? depth(d.requires) + 1 : 0;
 }
 
-function unlocks(key) {
-  return Object.values(E.GROUND_UNITS)
-    .filter((u) => u.tech === key)
-    .map((u) => u.name)
-    .concat(
-      Object.values(E.WEAPONS)
-        .filter((w) => w.tech === key)
-        .map((w) => w.name),
-    );
+export function researchUnlocks(key) {
+  return [
+    ...Object.values(E.GROUND_UNITS),
+    ...Object.values(E.WEAPONS),
+    ...Object.values(E.BUILDINGS),
+  ]
+    .filter((d) => d.tech === key)
+    .map((d) => d.name);
+}
+
+export function researchAvailability(state, key) {
+  const f = state.sides[0],
+    d = E.TECH[key];
+  if (f.tech.includes(key)) return { kind: 'done', text: 'Изучено', disabled: true };
+  if (f.research?.key === key)
+    return {
+      kind: 'running',
+      text: `В работе · ${Math.floor(f.research.progress * 100)}%`,
+      disabled: true,
+    };
+  if (state.result) return { kind: 'locked', text: 'Кампания завершена', disabled: true };
+  if (d.requires && !f.tech.includes(d.requires))
+    return { kind: 'locked', text: `Сначала: ${E.TECH[d.requires].name}`, disabled: true };
+  if (!state.buildings.some((b) => b.side === 0 && b.key === 'lab' && b.hp > 0 && b.progress >= 1))
+    return { kind: 'unavailable', text: 'Нужна готовая лаборатория', disabled: true };
+  if (f.research)
+    return { kind: 'unavailable', text: 'Дождитесь текущего проекта', disabled: true };
+  const missing = [];
+  if (f.science < d.science) missing.push(`${Math.ceil(d.science - f.science)} науки`);
+  if (f.credits < d.cost) missing.push(`${Math.ceil(d.cost - f.credits)} ₡`);
+  return missing.length
+    ? { kind: 'unavailable', text: `Не хватает: ${missing.join(' · ')}`, disabled: true }
+    : { kind: 'ready', text: 'Начать исследование ↗', disabled: false };
 }
 
 export function techTreeHTML() {
-  const columns = BRANCHES.map((branch) => {
-    const tiers = [];
-    for (const [key, d] of Object.entries(E.TECH)) {
-      if (d.branch !== branch) continue;
-      (tiers[depth(key)] ||= []).push(key);
-    }
-    const rows = tiers
-      .map(
-        (keys) =>
-          `<div class="tree-tier">${keys
-            .map((key) => {
-              const d = E.TECH[key],
-                opens = unlocks(key),
-                cross =
-                  d.requires && E.TECH[d.requires].branch !== branch
-                    ? `<small class="tree-cross">после: ${E.TECH[d.requires].name}</small>`
-                    : '';
-              return `<button class="tree-node" data-research="${key}" title="${d.description}"><i data-tech="${key}"></i><b>${d.name}</b>${cross}<em>${d.description}</em>${opens.length ? `<small class="tree-opens">Открывает: ${opens.join(', ')}</small>` : ''}<span class="tree-cost">${d.science} науки · ${d.cost} ₡ · ${d.time} с</span><span class="tree-bar"><span></span></span></button>`;
-            })
-            .join('')}</div>`,
-      )
-      .join('');
-    return `<section class="tree-branch"><h3>${branch}</h3>${rows}</section>`;
-  }).join('');
-  return `<div class="tree-head"><div id="research-progress" class="small-muted"></div><small>E — открыть / закрыть · клик по доступному узлу — начать</small></div><div class="tree-scroll"><div class="tree-grid"><svg class="tree-links" aria-hidden="true"></svg>${columns}</div></div>`;
+  return `<section class="research-console" aria-label="Развитие технологий"><div class="research-overview"><div><h2>Следующее преимущество</h2><p>Выберите направление развития. Один проект за раз.</p></div><div class="research-budget"><b id="research-science">0</b><span>науки в резерве</span></div></div><div class="research-active"><span class="research-active-mark">${icon('lab')}</span><div><b id="research-project">Лаборатория готова</b><span id="research-progress"></span></div><div class="research-active-track" aria-hidden="true"><i id="research-active-fill"></i></div></div><nav class="research-filters" aria-label="Направления исследований">${BRANCHES.map(([id, name, glyph]) => `<button data-research-filter="${id}" aria-pressed="${id === 'army'}">${icon(glyph)}<span>${name}</span><small data-branch-count="${id}"></small></button>`).join('')}<button data-research-filter="all" aria-pressed="false"><span>Все</span></button></nav><div class="tree-scroll" tabindex="0" aria-label="Технологии выбранного направления"><div class="tree-grid">${BRANCHES.map(
+    ([id, branch]) => {
+      const tiers = [];
+      for (const [key, d] of Object.entries(E.TECH))
+        if (d.branch === branch) (tiers[depth(key)] ||= []).push(key);
+      for (const keys of tiers)
+        keys.sort(
+          (a, b) =>
+            Number(!!E.TECH[a].requires && E.TECH[E.TECH[a].requires].branch !== branch) -
+            Number(!!E.TECH[b].requires && E.TECH[E.TECH[b].requires].branch !== branch),
+        );
+      return `<section class="tree-branch" data-research-branch="${id}" ${id === 'army' ? '' : 'hidden'}><div class="tree-branch-heading"><h3>${branch}</h3><span>От базовых решений к новым возможностям</span></div><div class="tree-lanes"><svg class="tree-links" aria-hidden="true"></svg>${tiers
+        .map(
+          (keys, level) =>
+            `<div class="tree-tier"><span class="tree-tier-label">Этап ${level + 1}</span>${keys
+              .map((key) => {
+                const d = E.TECH[key],
+                  opens = researchUnlocks(key),
+                  cross = d.requires && E.TECH[d.requires].branch !== branch;
+                return `<button class="tree-node" data-research="${key}" aria-label="${d.name}"><span class="tree-node-top"><i data-tech="${key}">◇</i><b>${d.name}</b></span><em>${d.description}</em>${opens.length ? `<span class="tree-opens">Открывает: ${opens.join(', ')}</span>` : ''}${cross ? `<span class="tree-cross">Из ветки «${E.TECH[d.requires].branch}»</span>` : ''}<span class="tree-cost">${d.science} науки <i>·</i> ${d.cost} ₡ <i>·</i> ${d.time} с</span><span class="tree-reason" data-research-reason="${key}"></span><span class="tree-bar"><span></span></span></button>`;
+              })
+              .join('')}</div>`,
+        )
+        .join('')}</div></section>`;
+    },
+  ).join(
+    '',
+  )}</div></div><div class="research-legend"><span><i class="ready"></i>Доступно</span><span><i class="running"></i>В работе</span><span><i class="done"></i>Изучено</span><span>E — закрыть</span></div></section>`;
 }
 
-// Live state of every node and the connecting lines between prerequisites.
+function bindFilters(state, root) {
+  if (!sessions.has(root)) {
+    sessions.set(root, { state, signature: '' });
+    root.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-research-filter]');
+      if (!button || !root.contains(button)) return;
+      const branch = button.dataset.researchFilter;
+      root.dataset.researchView = branch;
+      applyFilter(root, branch);
+      drawLinks(sessions.get(root).state, root, true);
+    });
+  }
+  sessions.get(root).state = state;
+  applyFilter(root, root.dataset.researchView || 'army');
+}
+
+function applyFilter(root, branch) {
+  for (const section of root.querySelectorAll('[data-research-branch]'))
+    section.hidden = branch !== 'all' && section.dataset.researchBranch !== branch;
+  for (const button of root.querySelectorAll('[data-research-filter]'))
+    button.setAttribute('aria-pressed', String(button.dataset.researchFilter === branch));
+}
+
 export function updateTechTree(state, root) {
   const f = state.sides[0],
     active = f.research;
-  const progress = root.querySelector('#research-progress');
+  bindFilters(state, root);
+  const project = root.querySelector('#research-project'),
+    progress = root.querySelector('#research-progress');
+  if (project) project.textContent = active ? E.TECH[active.key].name : 'Выберите следующий проект';
   if (progress)
     progress.textContent = active
-      ? `Идёт: ${E.TECH[active.key].name} · ${Math.floor(active.progress * 100)}%`
-      : `Наука: ${Math.floor(f.science)} · один проект за раз, нужна работающая лаборатория.`;
+      ? `${Math.floor(active.progress * 100)}% · осталось около ${Math.ceil((1 - active.progress) * E.TECH[active.key].time)} с`
+      : 'Наука и бюджет списываются при запуске';
+  const science = root.querySelector('#research-science'),
+    fill = root.querySelector('#research-active-fill');
+  if (science) science.textContent = Math.floor(f.science).toLocaleString('ru-RU');
+  if (fill) fill.style.width = `${active ? active.progress * 100 : 0}%`;
+  for (const [id, branch] of BRANCHES) {
+    const keys = Object.keys(E.TECH).filter((key) => E.TECH[key].branch === branch),
+      count = root.querySelector(`[data-branch-count="${id}"]`);
+    if (count)
+      count.textContent = `${keys.filter((key) => f.tech.includes(key)).length}/${keys.length}`;
+  }
   for (const [key, d] of Object.entries(E.TECH)) {
     const node = root.querySelector(`[data-research="${key}"]`);
     if (!node) continue;
-    const done = f.tech.includes(key),
-      locked = !!d.requires && !f.tech.includes(d.requires),
-      running = active?.key === key,
-      affordable = f.science >= d.science && f.credits >= d.cost;
-    node.classList.toggle('done', done);
-    node.classList.toggle('locked', locked && !done);
-    node.classList.toggle('running', running);
-    node.classList.toggle('ready', !done && !locked && !active && affordable);
-    node.disabled = done || locked || !!active;
-    node.style.setProperty('--progress', running ? active.progress : done ? 1 : 0);
-    const mark = node.querySelector(`[data-tech="${key}"]`);
-    if (mark) mark.textContent = done ? '✓' : running ? '…' : locked ? '◇' : '→';
+    const availability = researchAvailability(state, key);
+    for (const kind of ['done', 'locked', 'running', 'ready', 'unavailable'])
+      node.classList.toggle(kind, availability.kind === kind);
+    node.disabled = availability.disabled;
+    node.setAttribute('aria-label', `${d.name}. ${availability.text}`);
+    node.title = `${d.description}\n${availability.text}`;
+    node.style.setProperty(
+      '--progress',
+      active?.key === key ? active.progress : availability.kind === 'done' ? 1 : 0,
+    );
+    node.querySelector(`[data-research-reason="${key}"]`).textContent = availability.text;
+    node.querySelector(`[data-tech="${key}"]`).textContent =
+      availability.kind === 'done'
+        ? '✓'
+        : availability.kind === 'running'
+          ? '◷'
+          : availability.kind === 'ready'
+            ? '↗'
+            : '◇';
   }
   drawLinks(state, root);
 }
 
-function drawLinks(state, root) {
-  const grid = root.querySelector('.tree-grid'),
-    svg = root.querySelector('.tree-links');
-  if (!grid || !svg) return;
-  const box = grid.getBoundingClientRect(),
-    f = state.sides[0];
-  svg.setAttribute('width', grid.scrollWidth);
-  svg.setAttribute('height', grid.scrollHeight);
-  let paths = '';
-  for (const [key, d] of Object.entries(E.TECH)) {
-    if (!d.requires) continue;
-    const from = grid.querySelector(`[data-research="${d.requires}"]`),
-      to = grid.querySelector(`[data-research="${key}"]`);
-    if (!from || !to) continue;
-    const a = from.getBoundingClientRect(),
-      b = to.getBoundingClientRect(),
-      x1 = a.left + a.width / 2 - box.left,
-      y1 = a.bottom - box.top,
-      x2 = b.left + b.width / 2 - box.left,
-      y2 = b.top - box.top,
-      cross = E.TECH[d.requires].branch !== d.branch,
-      lit = f.tech.includes(d.requires);
-    const mid = (y1 + y2) / 2;
-    paths += `<path class="${lit ? 'lit' : ''}${cross ? ' cross' : ''}" d="M${x1} ${y1} C${x1} ${mid} ${x2} ${mid} ${x2} ${y2}"/>`;
+function drawLinks(state, root, force = false) {
+  const session = sessions.get(root),
+    grid = root.querySelector('.tree-grid');
+  if (!session || !grid) return;
+  if (session.grid !== grid) {
+    session.grid = grid;
+    session.signature = '';
   }
-  svg.innerHTML = paths;
+  const signature = [
+    grid.clientWidth,
+    grid.scrollHeight,
+    root.dataset.researchView,
+    state.sides[0].tech.join(','),
+  ].join('/');
+  if (!force && session.signature === signature) return;
+  session.signature = signature;
+  for (const section of root.querySelectorAll('.tree-branch')) {
+    const svg = section.querySelector('.tree-links'),
+      lanes = section.querySelector('.tree-lanes');
+    if (section.hidden) {
+      svg.innerHTML = '';
+      continue;
+    }
+    const bounds = lanes.getBoundingClientRect();
+    svg.setAttribute('width', lanes.scrollWidth);
+    svg.setAttribute('height', lanes.scrollHeight);
+    let paths = '';
+    for (const [key, d] of Object.entries(E.TECH)) {
+      if (!d.requires || E.TECH[d.requires].branch !== d.branch) continue;
+      const from = section.querySelector(`[data-research="${d.requires}"]`),
+        to = section.querySelector(`[data-research="${key}"]`);
+      if (!from || !to) continue;
+      const a = from.getBoundingClientRect(),
+        b = to.getBoundingClientRect(),
+        x1 = a.right - bounds.left,
+        y1 = a.top + a.height / 2 - bounds.top,
+        x2 = b.left - bounds.left,
+        y2 = b.top + b.height / 2 - bounds.top,
+        mid = (x1 + x2) / 2;
+      paths += `<path class="${state.sides[0].tech.includes(d.requires) ? 'lit' : ''}" d="M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}"/>`;
+    }
+    svg.innerHTML = paths;
+  }
 }

@@ -4,6 +4,7 @@ import { log } from './shared/events.js';
 import { createDistricts } from './territory/state.js';
 import { DIFFICULTY, DEFAULT_DIFFICULTY } from './ai/difficulty.config.js';
 import { createWeather } from './weather.js';
+import { createFrontlineMemory } from './defense/frontline.js';
 export const newSide = () => ({
   credits: 3200,
   materials: 200,
@@ -57,6 +58,7 @@ export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFI
     ],
     roads: [],
     serviceVehicles: [],
+    frontlineMemory: createFrontlineMemory(),
     units: [],
     groundUnits: [],
     trenches: [],

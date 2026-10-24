@@ -1,12 +1,14 @@
 # Небесный рубеж
 
-3D-стратегия в реальном времени: строительство города, дорожное снабжение, экономика, налёты, ПВО, пехота и техника. Текущая игровая версия — **8.5.0**.
+3D-стратегия в реальном времени: строительство города, дорожное снабжение, экономика, налёты, ПВО, пехота и техника. Текущая игровая версия — **8.6.0**.
 
 ## Как играть
 
-Скачайте репозиторий через **Code → Download ZIP**, распакуйте и откройте `Играть.cmd` или [play/Skyfront.html](play/Skyfront.html) в Chrome/Edge. Готовый HTML уже включён: интернет, Node.js и установка пакетов для игры не нужны.
+Скачайте репозиторий через **Code → Download ZIP**, распакуйте и откройте `Играть.cmd` или [play/Skyfront.html](play/Skyfront.html) в Chrome/Edge. Готовый HTML уже включён: для одиночной игры интернет, Node.js и установка пакетов не нужны.
 
-В 8.5 обновлены панели и кнопки, сирена стала тише, взрывы получили более глубокие раскаты. Трассеры с ярким ядром повторяют баллистическую дугу. Дождь стал реже и почти вертикальным, атмосферный туман стелется у земли, не закрывая небо и высокие крыши. Добавлена небольшая зернистость. Изменения Claude 8.4 сохранены.
+В 8.6 дерево исследований разделено на понятные ветки, а набор показывает роль, вооружение и назначение бойцов. Пехота на оборонном посту сама окапывается и постепенно строит укреплённый окоп и блокпост. Панель фронта показывает пять секторов по доступным наблюдениям; выбранным защитникам можно включить «Поддерживать фронт», чтобы ограниченный резерв помогал соседям и возвращался на свой пост. Дождь стал тише, зерно изображения — мягче. Код управления, наведения, ввода и сохранений разделён на тематические модули.
+
+Изменения 8.5 сохранены: более тихая сирена, глубокие раскаты взрывов, трассеры по баллистической дуге, редкий почти вертикальный дождь и туман у земли. Изменения Claude 8.4 также сохранены.
 
 На вкладке **Город** появилась **Ремонтная служба**: постройте её у дороги. Две машины сами выезжают к повреждённым зданиям и улицам, чинят и возвращаются. Деньги и сплавы списываются за выполненный ремонт; разрушенные здания остаются руинами. Службу можно отключить в инспекторе. [Правила и стоимость](docs/GAMEPLAY.md#городская-ремонтная-служба).
 
@@ -24,15 +26,21 @@
 
 Обновление боя: Tab / Shift+Tab переключают отряды с переводом камеры, точка выбирает бойца без приказа, двойное нажатие цифры группы наводит на неё камеру, двойной клик выделяет всех таких же бойцов на экране. Прижатая огнём пехота сама ищет укрытие, бойцы добивают раненых и не тратят выстрелы на обречённые цели, ПВО делит цели между установками, а дроны под захватом уклоняются. У каждого класса оружия своя дульная вспышка, гильзы и дым; снаряды Gepard рвутся в воздухе, ЗУР оставляют сплошной след. [Подробности](docs/GAMEPLAY.md).
 
-Далее: компактная панель армии по типам войск, самоходная гаубица с навесным огнём, стрельба очередями, цветные трассеры с рикошетами, новые модели бойцов, реалистичный звук выстрелов с эхом и сирена воздушной тревоги.
+Также доступны компактная панель армии по типам войск, самоходная гаубица с навесным огнём, стрельба очередями, цветные трассеры с рикошетами, новые модели бойцов, реалистичный звук выстрелов с эхом и сирена воздушной тревоги.
 
 ## Игра вдвоём
 
-Откройте `Сетевой сервер.cmd` или выполните `npm run multiplayer` после установки зависимостей. Серверу нужен Node.js 24+, клиентам достаточно браузера. Откройте показанный адрес, выберите «Сетевая дуэль», создайте комнату и передайте код второму игроку. Оба подтверждают готовность; матч начинает создатель.
+Для игры **через интернет из разных сетей** одному игроку нужен Node.js 24+. Он открывает **`Играть через интернет.cmd`** и оставляет окно работающим. При первом запуске зависимости устанавливаются автоматически; резервный `cloudflared` загружается только при необходимости. У хозяина откроется локальная игра для меньшей задержки: создайте дуэль или «Общий фронт» (2 + бот), нажмите **«Копировать приглашение»** и отправьте публичную ссылку другу. Другу достаточно Chrome или Edge: открыть ссылку, указать имя и нажать «Войти». Оба нажимают «Я готов», создатель — «Начать матч».
 
-Это LAN preview: два человека, равная экономика, симуляция на сервере, восстановление места после обрыва связи. Одиночные кампании сохраняются отдельно. [Запуск, устройство сети и ограничения](docs/MULTIPLAYER.md).
+Запуск сначала пробует SSH-туннель [localhost.run](https://localhost.run/docs/), затем резервный Cloudflare Quick Tunnel. Аккаунт, личные SSH-ключи, настройка роутера и проброс портов не нужны. Приглашение временное: оставляйте сервер запущенным, после смены адреса отправьте новую ссылку. Бесплатные домены localhost.run меняются и имеют ограничение скорости; у [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) нет гарантии доступности. Локальные одиночные кампании сохраняются отдельно.
+
+Для локальной сети остаётся `Сетевой сервер.cmd` / `npm run multiplayer`; запуск интернет-варианта из терминала — `npm run multiplayer:internet`. В дуэли старт и экономика равны, в кооперативе два игрока управляют одной стороной против бота. Бой рассчитывает сервер. [Запуск, приглашения, возврат и ограничения](docs/MULTIPLAYER.md).
 
 ## Как разрабатывать
+
+Изменения 8.6 ведутся в ветке `codex/frontline-command`, в отдельной рабочей копии `igrulka-development`. Стабильная `igrulka/main` остаётся доступной для текущей партии и не пересобирается из ветки разработки.
+
+[Результаты и ограничения проверки 8.6](docs/qa/COMMAND-86.md): модульные, браузерные и длительные проверки, публичный WSS и ещё не завершённый браузерный вход через интернет.
 
 Нужен Node.js 24 или новее:
 
@@ -51,34 +59,40 @@ npm run format       # привести исходники к общему оф�
 
 ## Где менять код
 
-| Что изменить                                | Файл или папка                                                                             |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Цена, здоровье, урон и роли солдат          | [src/game/units/infantry/types.js](src/game/units/infantry/types.js)                       |
-| Характеристики Leopard, БТР, Шилки и Gepard | [src/game/units/vehicles/types.js](src/game/units/vehicles/types.js)                       |
-| Вид солдат и их анимация                    | [src/rendering/models/infantry/soldiers.js](src/rendering/models/infantry/soldiers.js)     |
-| Вид танка Leopard                           | [src/rendering/models/vehicles/leopard.js](src/rendering/models/vehicles/leopard.js)       |
-| Вид БТР                                     | [src/rendering/models/vehicles/apc.js](src/rendering/models/vehicles/apc.js)               |
-| Вид Шилки и Gepard                          | [src/rendering/models/vehicles/anti-air.js](src/rendering/models/vehicles/anti-air.js)     |
-| Посадка и высадка                           | [src/game/units/vehicles/transport.js](src/game/units/vehicles/transport.js)               |
-| Доставка десанта                            | [src/game/units/vehicles/transport-orders.js](src/game/units/vehicles/transport-orders.js) |
-| Захват районов и доход                      | [src/game/territory/](src/game/territory/)                                                 |
-| Очередь маршрута армии                      | [src/game/units/ground/route-queue.js](src/game/units/ground/route-queue.js)               |
-| План пополнения боезапаса                   | [src/game/units/aviation/factory-plans.js](src/game/units/aviation/factory-plans.js)       |
-| Приказы и группы армии                      | [src/game/units/ground/orders.js](src/game/units/ground/orders.js)                         |
-| Укрытия и маскировка                        | [src/game/units/infantry/cover.js](src/game/units/infantry/cover.js)                       |
-| Окопы, лечение и сапёры                     | [src/game/units/infantry/support.js](src/game/units/infantry/support.js)                   |
-| Запуск FPV оператором                       | [src/game/units/infantry/fpv.js](src/game/units/infantry/fpv.js)                           |
-| Дроны, ракеты, производство и полёт         | [src/game/units/aviation/](src/game/units/aviation/)                                       |
-| ПВО, перезарядка, снаряды и урон            | [src/game/combat/](src/game/combat/)                                                       |
-| Экономика, дороги и строительство           | [src/game/city/](src/game/city/)                                                           |
-| Исследования                                | [src/game/research/](src/game/research/)                                                   |
-| Поведение бота                              | [src/game/ai/](src/game/ai/)                                                               |
-| Камера и WASD                               | [src/rendering/camera.js](src/rendering/camera.js), [world.js](src/rendering/world.js)     |
-| Солнце, освещение и смена суток             | [src/rendering/lighting.js](src/rendering/lighting.js), [clock.js](src/game/clock.js)      |
-| Взрывы, трассеры, дым                       | [src/rendering/effects/combat-effects.js](src/rendering/effects/combat-effects.js)         |
-| Звук                                        | [src/audio/game-audio.js](src/audio/game-audio.js)                                         |
-| Меню, инспектор и оформление                | [src/ui/](src/ui/)                                                                         |
-| Сохранения и обновление старых кампаний     | [src/game/persistence/saves.js](src/game/persistence/saves.js)                             |
+| Что изменить                                    | Файл или папка                                                                               |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Цена, здоровье, урон и роли солдат              | [src/game/units/infantry/types.js](src/game/units/infantry/types.js)                         |
+| Характеристики Leopard, БТР, Шилки и Gepard     | [src/game/units/vehicles/types.js](src/game/units/vehicles/types.js)                         |
+| Вид солдат и их анимация                        | [src/rendering/models/infantry/soldiers.js](src/rendering/models/infantry/soldiers.js)       |
+| Вид танка Leopard                               | [src/rendering/models/vehicles/leopard.js](src/rendering/models/vehicles/leopard.js)         |
+| Вид БТР                                         | [src/rendering/models/vehicles/apc.js](src/rendering/models/vehicles/apc.js)                 |
+| Вид Шилки и Gepard                              | [src/rendering/models/vehicles/anti-air.js](src/rendering/models/vehicles/anti-air.js)       |
+| Посадка и высадка                               | [src/game/units/vehicles/transport.js](src/game/units/vehicles/transport.js)                 |
+| Доставка десанта                                | [src/game/units/vehicles/transport-orders.js](src/game/units/vehicles/transport-orders.js)   |
+| Захват районов и доход                          | [src/game/territory/](src/game/territory/)                                                   |
+| Очередь маршрута армии                          | [src/game/units/ground/route-queue.js](src/game/units/ground/route-queue.js)                 |
+| План пополнения боезапаса                       | [src/game/units/aviation/factory-plans.js](src/game/units/aviation/factory-plans.js)         |
+| Приказы и группы армии                          | [src/game/units/ground/orders.js](src/game/units/ground/orders.js)                           |
+| Укрытия и маскировка                            | [src/game/units/infantry/cover.js](src/game/units/infantry/cover.js)                         |
+| Окопы, лечение и сапёры                         | [src/game/units/infantry/support.js](src/game/units/infantry/support.js)                     |
+| Строительство укреплений и координация обороны  | [src/game/defense/](src/game/defense/)                                                       |
+| Линия фронта и её панель                        | [src/rendering/defense/](src/rendering/defense/), [src/ui/frontline.js](src/ui/frontline.js) |
+| Запуск FPV оператором                           | [src/game/units/infantry/fpv.js](src/game/units/infantry/fpv.js)                             |
+| Дроны, ракеты, производство и полёт             | [src/game/units/aviation/](src/game/units/aviation/)                                         |
+| ПВО, перезарядка, снаряды и урон                | [src/game/combat/](src/game/combat/)                                                         |
+| Экономика, дороги и строительство               | [src/game/city/](src/game/city/)                                                             |
+| Исследования                                    | [src/game/research/](src/game/research/)                                                     |
+| Поведение бота                                  | [src/game/ai/](src/game/ai/)                                                                 |
+| Камера и WASD                                   | [src/rendering/camera.js](src/rendering/camera.js), [world.js](src/rendering/world.js)       |
+| Солнце, освещение и смена суток                 | [src/rendering/lighting.js](src/rendering/lighting.js), [clock.js](src/game/clock.js)        |
+| Взрывы, трассеры, дым                           | [src/rendering/effects/combat-effects.js](src/rendering/effects/combat-effects.js)           |
+| Звук                                            | [src/audio/game-audio.js](src/audio/game-audio.js)                                           |
+| Меню, инспектор и оформление                    | [src/ui/](src/ui/)                                                                           |
+| Наведение ударов, действия армии, реестр кнопок | [src/ui/controllers/](src/ui/controllers/)                                                   |
+| Клавиатура, фокус карты и события браузера      | [src/ui/input/](src/ui/input/)                                                               |
+| Сессия, настройки и хранение кампании           | [src/ui/session/](src/ui/session/)                                                           |
+| Приглашения и интернет-сервер                   | [src/network/invite.js](src/network/invite.js), [server/tunnel.mjs](server/tunnel.mjs)       |
+| Сохранения и обновление старых кампаний         | [src/game/persistence/saves.js](src/game/persistence/saves.js)                               |
 
 Полная навигация с пояснениями — [карта кода](docs/CODE_MAP.md). Перед изменениями читайте [AGENTS.md](AGENTS.md) и [инструкцию разработчика](docs/DEVELOPMENT.md).
 
@@ -102,6 +116,6 @@ archive/legacy/  старый прототип для отдельных рег�
 
 GitHub Actions проверяет исходники, тесты и соответствие готового HTML сборке при push и pull request. Снимки браузера, отчёты, временные файлы и `node_modules` сохраняются локально и не попадают в Git.
 
-Проверка 8.5: 333 теста правил и модулей, 13 браузерных сценариев, 12 длинных кампаний бота и четыре кампании ремонтной службы. [Результаты, методы и ограничения](docs/qa/ATMOSPHERE-85.md).
+Отчёт предыдущей версии: [проверка 8.5, методы и ограничения](docs/qa/ATMOSPHERE-85.md). Команды проверки текущих изменений приведены в [инструкции разработчика](docs/DEVELOPMENT.md).
 
 Модели, эффекты, текстуры и звук процедурные; характеристики вооружений вымышлены. Сторонние компоненты и их лицензии перечислены в [NOTICE.md](NOTICE.md).

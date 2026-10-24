@@ -1,5 +1,6 @@
 import { groundVisible } from '../game/units/infantry/cover.js';
 import { unitVisible } from '../game/visibility.js';
+import { fogVisible } from '../game/vision-grid.js';
 
 const publicFields = (item, fields) =>
   Object.fromEntries(
@@ -118,6 +119,7 @@ export function playerView(authority, side) {
   if (side !== 0 && side !== 1) throw Error('Некорректная сторона игрока');
   const enemy = 1 - side;
   const view = structuredClone(authority);
+  view.frontlineDirections = side === 0 ? [1, -1] : [-1, 1];
   const allGround = new Set(authority.groundUnits.map((u) => u.id));
   const buildings = new Set(authority.buildings.map((b) => b.id));
   const visible = new Set(
@@ -132,6 +134,25 @@ export function playerView(authority, side) {
   view.buildings = view.buildings.map((b) =>
     b.side === side ? b : publicFields(b, buildingFields),
   );
+  view.trenches = (view.trenches || [])
+    .filter((t) => t.side === side || fogVisible(authority, side, t.x, t.z))
+    .map((t) =>
+      t.side === side
+        ? t
+        : publicFields(t, ['id', 'side', 'x', 'z', 'yaw', 'progress', 'fortificationWork']),
+    );
+  view.frontlineMemory = [0, 1].map((owner) => {
+    const memory = authority.frontlineMemory?.[owner];
+    return owner === side && memory
+      ? {
+          nextThink: memory.nextThink,
+          seen: memory.seen.map((v) => publicFields(v, ['id', 'x', 'z', 'strength', 'time'])),
+        }
+      : { nextThink: 0, seen: [] };
+  });
+  // Derived overlays are calculated from the permitted memory, never copied from imported state.
+  delete view.frontlineReport;
+  delete view.frontlineReports;
   view.units = view.units
     .filter((u) => u.side === side || (u.launched !== false && unitVisible(authority, side, u)))
     .map((u) => {
@@ -164,7 +185,16 @@ export function playerView(authority, side) {
     if (e.type === 'groundDestroyed') return e.visibleTo?.includes(side) === true;
     if (
       e.side === enemy &&
-      ['recruited', 'produced', 'research', 'reload', 'salvo'].includes(e.type)
+      [
+        'recruited',
+        'produced',
+        'research',
+        'reload',
+        'salvo',
+        'fortification',
+        'defenseRedeployed',
+        'defenseReturned',
+      ].includes(e.type)
     )
       return false;
     if (
@@ -210,7 +240,7 @@ export function playerView(authority, side) {
     if (d.capturing != null) d.capturing = 1 - d.capturing;
     d.control = -d.control;
   }
-  for (const key of ['sides', 'groups', 'formations', 'contacts'])
+  for (const key of ['sides', 'groups', 'formations', 'contacts', 'frontlineMemory'])
     if (Array.isArray(view[key])) view[key].reverse();
   for (const list of [
     'buildings',

@@ -448,7 +448,7 @@ export class GameAudio {
       // Rain is quieter from high above the valley.
       const height = Math.max(0.35, Math.min(1, 380 / Math.max(120, camera.position.y)));
       this.rain.level.gain.setTargetAtTime(
-        this.enabled && !paused ? wet * 0.14 * height : 0,
+        this.enabled && !paused ? wet * 0.075 * height : 0,
         t,
         0.8,
       );

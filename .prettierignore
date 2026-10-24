@@ -1,4 +1,5 @@
 node_modules/
+.tools/
 vendor/
 assets/fonts/
 archive/

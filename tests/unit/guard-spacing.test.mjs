@@ -122,8 +122,14 @@ test('rally reservations remain separated near a city wall, forest, river bank a
     await t.test(name, () => {
       const result = produce('infantry', 20, setup);
       separated(result);
-      if (name === 'wall') assert.equal(game.coverInfo(result.s, result.units[0]).kind, 'Стена');
-      if (name === 'forest') assert.equal(game.coverInfo(result.s, result.units[0]).kind, 'Лес');
+      // Automatic digging can improve the cover after arrival; verify the original terrain too.
+      const terrain = { ...result.s, trenches: [] };
+      if (name === 'wall') assert.equal(game.coverInfo(terrain, result.units[0]).kind, 'Стена');
+      if (name === 'forest') assert.equal(game.coverInfo(terrain, result.units[0]).kind, 'Лес');
+      assert.ok(
+        game.coverInfo(result.s, result.units[0]).cover >=
+          game.coverInfo(terrain, result.units[0]).cover,
+      );
       assert.doesNotThrow(() => game.load(game.save(result.s)));
     });
 });

@@ -17,7 +17,7 @@ const bundle = await build({
   write: false,
 });
 
-let fonts = await readFile(path.join(root, 'src/ui/fonts.css'), 'utf8');
+let fonts = (await readFile(path.join(root, 'src/ui/fonts.css'), 'utf8')).replace(/^\uFEFF/, '');
 for (const match of [...fonts.matchAll(/url\(([^)]+)\)/g)]) {
   const name = match[1].replace(/^['"]|['"]$/g, '');
   const fontPath = path.resolve(root, 'src/ui', name);
@@ -28,9 +28,15 @@ for (const match of [...fonts.matchAll(/url\(([^)]+)\)/g)]) {
 }
 const base = (
   await Promise.all(
-    ['src/ui/style.css', 'src/ui/army.css', 'src/ui/multiplayer.css', 'src/ui/districts.css'].map(
-      (file) => readFile(path.join(root, file), 'utf8'),
-    ),
+    [
+      'src/ui/style.css',
+      'src/ui/army.css',
+      'src/ui/multiplayer.css',
+      'src/ui/districts.css',
+      'src/ui/research.css',
+      'src/ui/recruitment.css',
+      'src/ui/frontline.css',
+    ].map(async (file) => (await readFile(path.join(root, file), 'utf8')).replace(/^\uFEFF/, '')),
   )
 )
   .join('\n')
@@ -41,6 +47,7 @@ const js = bundle.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 let html = await readFile(path.join(root, 'index.html'), 'utf8');
 html = html
   .replace(/<link rel="stylesheet"[^>]*>/g, '')
+  .replace(/^[\t ]+$/gm, '')
   .replace(/<script type="module" src="src\/main.js"><\/script>/, '')
   .replace(
     '</head>',

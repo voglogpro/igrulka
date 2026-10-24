@@ -1,6 +1,6 @@
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -96,6 +96,10 @@ export function executeCommand(s, side, type, a = {}) {
     case 'set-stance':
       return unitsOwned(s, side, a.ids) && a.stance && E.validStance(a.stance)
         ? E.applyStance(s, side, a.ids, a.stance)
+        : invalid;
+    case 'auto-defense':
+      return unitsOwned(s, side, a.ids) && typeof a.enabled === 'boolean'
+        ? E.setAutoDefense(s, side, a.ids, a.enabled)
         : invalid;
     case 'deploy': {
       if (

@@ -26,6 +26,8 @@ import * as T from '../../vendor/three/three.module.js';
 import { InfantryBatch } from './models/infantry/soldiers.js';
 import { CombatEffects } from './effects/combat-effects.js';
 import { FogVeil } from './fog-veil.js';
+import { FrontlineView } from './defense/frontline-view.js';
+import { FortificationView } from './defense/fortifications.js';
 import { Traffic } from './traffic.js';
 import { ServiceFleet } from './service-fleet.js';
 import { WeatherFX } from './effects/weather-fx.js';
@@ -298,6 +300,12 @@ export class RTSWorld {
     });
     this.tactical = new TacticalView(this);
     this.deploymentPreview = new DeploymentPreview(this.scene);
+    this.frontlineView = new FrontlineView(this.scene, (x, z) => this.height(x, z));
+    this.fortifications = new FortificationView(this.scene, {
+      height: (x, z) => this.height(x, z),
+      visible: (s, t) => t.side === 0 || E.fogVisible(s, 0, t.x, t.z),
+    });
+    this.trenchModels = this.fortifications.models;
     this.sync();
     // Let the app finish wiring its UI before the first GPU frame.
     this.frame = requestAnimationFrame(this.animate);
@@ -490,6 +498,9 @@ export class RTSWorld {
   setAiming(value) {
     this.aiming = value;
   }
+  setFrontlineVisible(value) {
+    this.frontlineView.setVisible(value);
+  }
   setOrderPreview(order) {
     this.orderPreview = order;
     this.tactical.preview(order);
@@ -509,6 +520,8 @@ export class RTSWorld {
       weather: this.weatherFX.diagnostics(),
       traffic: this.traffic.diagnostics(),
       serviceFleet: this.serviceFleet.diagnostics(),
+      frontline: this.frontlineView.diagnostics(),
+      fortifications: this.fortifications.diagnostics(),
       detectedEnemies: this.state.units.filter(
         (u) => u.side === 1 && E.unitVisible(this.state, 0, u),
       ).length,
@@ -557,6 +570,7 @@ export class RTSWorld {
     }
     this.updateDaylight();
     this.sync();
+    this.frontlineView.update(E.frontlineReport(this.state, 0));
     this.fogVeil.update(this.state, wallDt);
     this.weatherFX.update(this.visualDt, this.controls.target, this.state.weather);
     this.combatFX.emit(this.state, this.visualDt, (u) => E.unitVisible(this.state, 0, u));

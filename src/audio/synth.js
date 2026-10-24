@@ -1,23 +1,7 @@
 // Offline synthesis of every sound the battle uses. Buffers are rendered once on unlock,
 // so a burst of fire costs one buffer source per round instead of a node graph of oscillators.
-
-function onePole(cutoff, sampleRate) {
-  return 1 - Math.exp((-2 * Math.PI * cutoff) / sampleRate);
-}
-
-function finish(data, drive = 1.4) {
-  let peak = 0;
-  for (let i = 0; i < data.length; i++) {
-    data[i] = Math.tanh(data[i] * drive);
-    peak = Math.max(peak, Math.abs(data[i]));
-  }
-  const scale = peak ? 0.95 / peak : 1;
-  for (let i = 0; i < data.length; i++) data[i] *= scale;
-  // Short fade-out so the end of a buffer never clicks.
-  const fade = Math.min(data.length, 256);
-  for (let i = 0; i < fade; i++) data[data.length - 1 - i] *= i / fade;
-  return data;
-}
+import { onePole, finish } from './dsp.js';
+export { rainLoop } from './ambience/rain.js';
 
 // Supersonic crack, propellant boom, a pitched-down thump and a rumbling gas tail.
 export function gunshot(sampleRate, p) {
@@ -391,30 +375,4 @@ export function mopedLoop(sampleRate) {
       (0.85 + 0.15 * Math.sin(2 * Math.PI * 7 * t));
   }
   return finish(data, 1.4);
-}
-
-// Steady rain on open ground: broadband hiss with a soft low patter underneath.
-export function rainLoop(sampleRate) {
-  const data = new Float32Array(sampleRate * 3),
-    high = onePole(6500, sampleRate),
-    low = onePole(1400, sampleRate),
-    rumble = onePole(200, sampleRate);
-  let a = 0,
-    b = 0,
-    c = 0;
-  for (let i = 0; i < data.length; i++) {
-    const white = Math.random() * 2 - 1;
-    a += high * (white - a);
-    b += low * (white - b);
-    c += rumble * (white - c);
-    const patter = Math.random() < 0.012 ? (Math.random() - 0.5) * 1.6 : 0;
-    data[i] = (a - b) * 1.3 + b * 0.5 + c * 1.5 + patter;
-  }
-  // Crossfade the ends so the loop has no seam.
-  const fade = Math.floor(sampleRate * 0.25);
-  for (let i = 0; i < fade; i++) {
-    const t = i / fade;
-    data[i] = data[i] * t + data[data.length - fade + i] * (1 - t);
-  }
-  return finish(data.subarray(0, data.length - fade), 1.1);
 }

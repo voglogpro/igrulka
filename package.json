@@ -1,12 +1,13 @@
 {
   "name": "skyfront-city-defense",
-  "version": "8.5.0",
+  "version": "8.6.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node scripts/dev-server.mjs",
     "dev": "node scripts/dev-server.mjs",
     "multiplayer": "node server/index.mjs",
+    "multiplayer:internet": "node server/index.mjs --internet",
     "build": "node scripts/build-portable.mjs",
     "test": "node --test tests/unit/*.test.mjs tests/legacy/*.test.mjs",
     "test:soak": "node tests/soak/campaign.mjs",
@@ -32,6 +33,7 @@
     "node": ">=24"
   },
   "dependencies": {
+    "https-proxy-agent": "9.1.0",
     "ws": "8.22.0"
   }
 }

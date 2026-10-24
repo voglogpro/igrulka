@@ -2,6 +2,7 @@ import { GROUND_UNITS, isInfantry, riverX } from '../../config.js';
 import { BRIDGES, walkable } from './navigation.js';
 import { orderGround } from './orders.js';
 import { guardGround } from './guard.js';
+import { prepareDefensivePosition } from '../../defense/fortifications.js';
 
 // A stance is a standing order that outlives a single click: new units take it when they leave
 // the barracks. "attack" advances on the enemy headquarters with combat stops, "defend" holds
@@ -59,6 +60,7 @@ export function applyStance(s, side, ids, stance) {
   if (stance.mode === 'attack') {
     const hq = s.buildings.find((b) => b.side !== side && b.key === 'hq' && b.hp > 0);
     if (!hq) return 'Нет цели для атаки';
+    const previous = new Map(units.map((u) => [u.id, u.order]));
     const result = orderGround(s, side, ids, {
       x: hq.x,
       z: hq.z,
@@ -66,17 +68,20 @@ export function applyStance(s, side, ids, stance) {
       mode: 'attackmove',
     });
     if (typeof result !== 'number') return result;
-    for (const u of units) if (u.order) u.stance = { mode: 'attack' };
+    for (const u of units)
+      if (u.order && u.order !== previous.get(u.id)) u.stance = { mode: 'attack' };
     return result;
   }
   const post = stance.post && stance.post !== 'auto' ? stance.post : chooseBridge(s, side);
   const point = bridgePoint(side, post);
+  const previous = new Map(units.map((u) => [u.id, u.guard]));
   const result = guardGround(s, side, ids, point);
   if (typeof result === 'string') return result;
   let assigned = 0;
   for (const u of units)
-    if (u.guard) {
+    if (u.guard && u.guard !== previous.get(u.id)) {
       u.stance = { mode: 'defend', post };
+      u.autoDefense = !stance.post || stance.post === 'auto';
       u.entrenched = false;
       assigned++;
     }
@@ -89,18 +94,7 @@ export function clearStance(u) {
 
 // Defenders dig in once they stand at their post and nobody is shooting at them.
 export function updateStance(s, u) {
-  if (u.stance?.mode !== 'defend' || !u.guard || !isInfantry(u.key) || u.digging) return;
-  if (u.path?.length || u.moving || u.enemyId != null || (u.suppression || 0) > 0.3) return;
-  if (Math.hypot(u.x - u.guard.x, u.z - u.guard.z) > 4) return;
-  let t = s.trenches.find((t) => Math.hypot(t.x - u.x, t.z - u.z) < 4 && t.side === u.side);
-  if (t?.progress >= 1) return;
-  if (!t && s.trenches.length < 240) {
-    t = { id: s.nextId++, side: u.side, x: u.x, z: u.z, progress: 0, yaw: u.yaw || 0 };
-    s.trenches.push(t);
-  }
-  if (!t) return;
-  u.trenchId = t.id;
-  u.digging = true;
+  return prepareDefensivePosition(s, u);
 }
 
 export const stanceMobile = (u) => !!GROUND_UNITS[u.key] && !isInfantry(u.key);

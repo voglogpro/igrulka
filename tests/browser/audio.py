@@ -20,14 +20,24 @@ def module_url(text):
 
 
 def sources(revision=None):
-    def read(path):
-        if revision:
-            return subprocess.check_output(
-                ['git', 'show', f'{revision}:{path}'], cwd=ROOT
-            ).decode('utf-8')
-        return (ROOT / path).read_text(encoding='utf-8')
-    synth = module_url(read('src/audio/synth.js'))
-    return module_url(read('src/audio/game-audio.js').replace("'./synth.js'", json.dumps(synth)))
+    entry = ROOT / 'src/audio/game-audio.js'
+    if revision:
+        sha = subprocess.check_output(['git', 'rev-parse', '--verify', revision], cwd=ROOT).decode().strip()
+        if len(sha) != 40 or any(c not in '0123456789abcdef' for c in sha):
+            raise ValueError('Invalid revision')
+        cache = ARTIFACTS / 'audio-source-cache' / sha
+        assert cache.resolve().is_relative_to(ARTIFACTS.resolve())
+        paths = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', sha, 'src/audio'], cwd=ROOT).decode().splitlines()
+        for name in paths:
+            target = cache / name
+            assert target.resolve().is_relative_to(cache.resolve())
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(subprocess.check_output(['git', 'show', f'{sha}:{name}'], cwd=ROOT))
+        entry = cache / 'src/audio/game-audio.js'
+    # Bundle the actual module graph: adding a focused audio module must not break QA.
+    script = "import{build}from'esbuild';const r=await build({entryPoints:[process.argv[1]],bundle:true,write:false,format:'esm',platform:'browser'});process.stdout.write(r.outputFiles[0].text);"
+    code = subprocess.check_output(['node', '--input-type=module', '-e', script, str(entry)], cwd=ROOT).decode('utf8')
+    return module_url(code)
 
 
 RENDER = r'''async ({url, wav}) => {
@@ -38,7 +48,7 @@ RENDER = r'''async ({url, wav}) => {
   const camera = {position:{x:0,y:100,z:0},matrixWorld:{elements:[1,0,0,0]}};
   const state = {units:[{side:1,hp:1,delay:0,status:'flying',x:0,y:0,z:0,key:'heavy'}],
     buildings:[{side:0,hp:10,x:0,z:0}],groundUnits:[]};
-  for (const mode of ['siren','blast','stress','mute','demo']) {
+  for (const mode of ['siren','blast','stress','mute','demo','rain','rainHigh','rainPaused','rainMuted']) {
     const context = new OfflineAudioContext(2, rate * 8, rate), audio = new GameAudio();
     audio.unlock(context);
     for(let i=0; i<400 && !audio.buffers.reload; i++)
@@ -66,6 +76,11 @@ RENDER = r'''async ({url, wav}) => {
       audio.sample('blastLarge',0,0,1.6,{delay:0});
       audio.set(false,0);
     }
+    if(mode.startsWith('rain')) {
+      if(mode==='rainMuted')audio.set(false,0);
+      const listener=mode==='rainHigh'?{...camera,position:{x:0,y:1500,z:0}}:camera;
+      audio.update({...state,units:[],weather:{kind:'rain',amount:1}},listener,mode==='rainPaused');
+    }
     const buffer = await context.startRendering();
     const channels = [buffer.getChannelData(0),buffer.getChannelData(1)];
     let peak=0,sum=0,tail=0,diff=0,bass=0,low=0,latePeak=0;
@@ -84,7 +99,7 @@ RENDER = r'''async ({url, wav}) => {
     out[mode]={peak,rms:Math.sqrt(sum/(buffer.length*2)),
       tail:Math.sqrt(tail/(buffer.length*2)),stereo:Math.sqrt(diff/buffer.length),
       bass:Math.sqrt(bass/buffer.length),latePeak,voices:audio.voices};
-    if(wav && ['siren','blast','demo'].includes(mode)) {
+    if(wav && ['siren','blast','demo','rain'].includes(mode)) {
       const bytes=new Uint8Array(buffer.length*4), view=new DataView(bytes.buffer);
       for(let i=0;i<buffer.length;i++)for(let ch=0;ch<2;ch++)
         view.setInt16((i*2+ch)*2,Math.round(Math.max(-1,Math.min(1,channels[ch][i]))*32767),true);
@@ -108,6 +123,10 @@ def validate(current):
     assert blast['bass'] > 0.005 and blast['bass'] > blast['rms'] * 0.15, blast
     assert 0.005 < current['siren']['rms'] < 0.05, current['siren']
     assert current['siren']['rms'] < blast['rms'], 'Siren dominates representative distant blast'
+    assert 0.0001 < current['rain']['rms'] < 0.015, current['rain']
+    assert current['rainHigh']['rms'] < current['rain']['rms'] * .5, current['rainHigh']
+    assert current['rainPaused']['peak'] < 1e-7, current['rainPaused']
+    assert current['rainMuted']['peak'] < 1e-7, current['rainMuted']
 
 
 def main():

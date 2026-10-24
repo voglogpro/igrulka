@@ -11,6 +11,7 @@ import { clearGroundRoute } from './route-queue.js';
 import { groundDamageMultiplier, groundWeaponProfile } from './engagement.js';
 import { recordThreat } from './tactics.js';
 import { tryDown } from './rear.js';
+import { forgetObservedFrontlineTarget } from '../../defense/frontline.js';
 export function damageGround(s, u, amount, event = emit, kind = 'bullet', from = null) {
   if (u.hp <= 0 || u.carrierId || !Number.isFinite(amount) || amount <= 0) return;
   const c = isInfantry(u.key) ? coverInfo(s, u, from) : { cover: 0 };
@@ -22,18 +23,19 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
       : 1;
   const hp = Math.max(0, u.hp - amount * vest * (1 - cover * (kind === 'blast' ? 0.4 : 1)));
   // Visibility must be captured while the victim is alive; corpses are removed before snapshots.
+  const observedBy = hp === 0 ? [0, 1].filter((side) => groundVisible(s, side, u)) : [];
   const visibleTo =
-    hp === 0 && (s.mode === 'multiplayer' || s.mode === 'coop')
-      ? [0, 1].filter((side) => groundVisible(s, side, u))
-      : undefined;
+    hp === 0 && (s.mode === 'multiplayer' || s.mode === 'coop') ? observedBy : undefined;
   // Soldiers who would die are sometimes only wounded and can be revived by a medic.
   if (hp === 0 && kind !== 'bleed' && tryDown(s, u, kind)) {
+    forgetObservedFrontlineTarget(s, u.id, observedBy);
     if (from) recordThreat(s, u, from);
     return;
   }
   u.hp = hp;
   if (from) recordThreat(s, u, from);
   if (!u.hp) {
+    forgetObservedFrontlineTarget(s, u.id, observedBy);
     cancelTransportDelivery(u);
     clearGroundRoute(u);
     s.sides[u.side].losses++;
