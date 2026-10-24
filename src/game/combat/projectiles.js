@@ -37,6 +37,10 @@ export function moveProjectiles(s, dt) {
           to = p.endY ?? 2;
         p.y = from * (1 - k) + to * k + 4 * peak * k * (1 - k);
         p.vy = (4 * peak * (1 - 2 * k) + to - from) / p.flight;
+      } else if (p.gravity != null) {
+        // Rounds saved by 8.5 builds that used plain gravity for direct fire.
+        p.y += p.vy * travel - 0.5 * p.gravity * travel * travel;
+        p.vy -= p.gravity * travel;
       }
       if (p.life >= p.flight) {
         p.x = p.tx;

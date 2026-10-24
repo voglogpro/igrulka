@@ -51,7 +51,7 @@ test('fog and rain shrink sight and spoil aim, but never a unit’s own weapon r
   s.weather = { ...createWeather(3), kind: 'fog', goal: 1, amount: 1, until: 1e9 };
   updateWeather(s, 0.05);
   s.time += 1;
-  // Infantry sight (185) times fog (0.5) no longer reaches 220 away.
+  // Infantry sight (185) times fog (0.74) no longer reaches 220 away.
   assert.equal(E.groundVisible(s, 0, near), false);
   // The leopard still sees what it can shoot at.
   assert.equal(E.groundVisible(s, 0, farTank), true);

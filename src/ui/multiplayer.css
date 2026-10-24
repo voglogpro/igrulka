@@ -134,3 +134,74 @@
   color: #a3bc9f;
   margin-top: 2px;
 }
+
+#game #network-lobby {
+  width: 410px;
+  padding: 24px;
+  background: linear-gradient(140deg, #2b3a3a55, transparent 60%), #151d1ffb;
+  border-top: 2px solid var(--accent);
+}
+#game #network-lobby h2 {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: -0.8px;
+}
+#game #network-lobby p {
+  color: var(--muted);
+  font-size: 12px;
+}
+#game #network-lobby label {
+  color: var(--muted);
+  font-size: 11px;
+}
+#game #network-lobby input {
+  min-height: 40px;
+  border-radius: 2px;
+}
+#game #network-lobby button {
+  border-radius: 2px;
+}
+#game #network-lobby .net-room-code {
+  color: var(--accent);
+  font-size: 34px;
+  font-family: 'Manrope', sans-serif;
+}
+#game .net-modes button {
+  background: #1c2729;
+  border-color: #82958e45;
+}
+#game .net-modes button.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+#game .net-modes b {
+  color: var(--text);
+}
+#game .net-modes small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.4;
+  margin-top: 5px;
+}
+#game .net-players {
+  border-top: 1px solid var(--line);
+}
+#game .net-players > div {
+  border-color: var(--line);
+}
+#game .net-players span {
+  color: #aac7b5;
+}
+#game .net-leave {
+  color: #d7ac96;
+  border: 1px solid #d7ac9640;
+}
+#game #network-status {
+  top: 117px;
+  color: var(--accent);
+  border: 1px solid #e2b77960;
+  border-radius: 2px;
+  background: #151d1ff5;
+  box-shadow: 0 4px 18px #0004;
+}

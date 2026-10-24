@@ -11,6 +11,7 @@ import { ai } from './ai/city-ai.js';
 import { updateDistricts } from './territory/districts.js';
 import { updateFactoryPlans } from './units/aviation/factory-plans.js';
 import { updateWeather } from './weather.js';
+import { updateServices } from './city/service.js';
 export function step(s, dt) {
   if (s.result || !Number.isFinite(dt) || dt <= 0) return;
   dt = Math.min(0.1, dt);
@@ -41,6 +42,7 @@ export function step(s, dt) {
   }
   updateFactoryPlans(s);
   updateConstruction(s, rates, dt);
+  updateServices(s, dt);
   updateGround(s, rates, dt, { event, random });
   moveUnits(s, dt);
   fireDefenses(s, rates, dt);

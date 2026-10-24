@@ -1,4 +1,6 @@
 const paths = {
+  service: 'M3 20V9l9-6 9 6v11M7 20v-8h10v8M10 15h4m-2-2v4',
+  barracks: 'M3 21V8l9-5 9 5v13M7 21v-8h10v8M9 8h6M12 6v4',
   housing: 'M4 21V8h7v13M11 21V3h9v18M7 11v1m0 3v1m8-10v2m3-2v2m-3 3v2m3-2v2m-3 3v2m3-2v2',
   industry: 'M3 21V10l6 4V8l6 4V3h4v18M3 21h19M7 17h2m4 0h2',
   power: 'M13 2 5 14h6l-1 8 9-13h-7Z',
@@ -30,4 +32,5 @@ export const short = {
   road: 'Дорога',
   barracks: 'Казармы',
   market: 'Рынок',
+  service: 'Ремонтная служба',
 };

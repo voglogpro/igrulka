@@ -15,7 +15,7 @@ with sync_playwright() as p:
     page.evaluate('raw=>localStorage.setItem("skyfront-realtime-v3",raw)', old)
     page.reload(wait_until='load', timeout=120000)
     page.wait_for_function('Boolean(window.skyfront)')
-    assert page.evaluate('skyfront.getState().version') == 10
+    assert page.evaluate('skyfront.getState().version') == 11
     assert page.evaluate('skyfront.getState().groundUnits.length') == 1
     assert page.evaluate('skyfront.getState().sides[0].credits') == 1234
     assert page.evaluate('skyfront.getState().time') == 60

@@ -1,5 +1,6 @@
 import * as T from '../../vendor/three/three.module.js';
 import * as E from '../game/index.js';
+import { weatherStyle } from './effects/weather-style.js';
 export const WEATHER_FOG = new T.Color('#5d6c74');
 export const FLASH_FOG = new T.Color('#cfe0ff');
 export const NIGHT_FOG = new T.Color('#111e30');
@@ -25,8 +26,7 @@ export function updateDaylight() {
   this.scene.fog.color.copy(NIGHT_FOG).lerp(DAY_FOG, d.daylight);
   this.scene.background.copy(this.scene.fog.color);
   this.scene.fog.density = 0.00055 + d.night * 0.0002;
-  // Weather: overcast light and a slightly denser haze. Fog weather is drawn by the ground mist in
-  // weather-fx.js, so distance fog stays light and the sky never turns into a grey wall.
+  // Overcast light and a restrained distance haze; the post pass keeps fog near the ground.
   const wx = this.state.weather,
     amount = wx?.amount ?? 0,
     kind = wx?.kind ?? 'clear',
@@ -35,9 +35,8 @@ export function updateDaylight() {
   if (amount > 0) {
     this.sun.intensity *= 1 - overcast * amount;
     this.hemi.intensity *= 1 - 0.18 * overcast * amount;
-    this.scene.fog.density +=
-      amount * (kind === 'fog' ? 0.00045 : kind === 'storm' ? 0.0005 : 0.0003);
-    this.scene.fog.color.lerp(WEATHER_FOG, Math.min(1, amount * 0.4));
+    this.scene.fog.density += weatherStyle(wx).haze;
+    this.scene.fog.color.lerp(WEATHER_FOG, amount * 0.12);
     this.scene.background.copy(this.scene.fog.color);
   }
   const sky = this.sky.material.uniforms.overcast;
@@ -47,6 +46,7 @@ export function updateDaylight() {
     this.scene.fog.color.lerp(FLASH_FOG, flash * 0.6);
     this.scene.background.copy(this.scene.fog.color);
   }
+  this.post?.setAtmosphere(wx, d.daylight);
   this.sunDisc.position.set(Math.cos(d.angle) * -2300, Math.sin(d.angle) * 2300, -800);
   this.sunDisc.visible = d.daylight > 0;
   // Moving the shadow coverage translates the light AND its target together.

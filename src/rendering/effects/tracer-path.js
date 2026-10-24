@@ -16,6 +16,10 @@ export function projectilePoint(p, ahead, out) {
         from = p.originY ?? 6,
         to = p.endY ?? 2;
       out.y = from * (1 - k) + to * k + 4 * peak * k * (1 - k);
+    } else if (p.gravity) {
+      // Direct fire saved by early 8.5 builds: plain gravity from the current state.
+      const d = life - done;
+      out.y = p.y + p.vy * d - 0.5 * p.gravity * d * d;
     } else out.y = p.y;
     return out;
   }

@@ -92,3 +92,75 @@
     padding: 3px;
   }
 }
+
+#game #district-strip {
+  top: 116px;
+  right: 12px;
+  gap: 5px;
+  width: min(560px, calc(100vw - 430px));
+}
+#game .district-card {
+  padding: 4px;
+  border-radius: 2px;
+  border-color: #82958e4a;
+  background: #172124f2;
+  box-shadow: 0 4px 12px #0002;
+}
+#game .district-focus {
+  padding: 5px;
+}
+#game .district-focus b {
+  font-size: 10px;
+  color: #d5e0d7;
+}
+#game .district-focus small {
+  color: var(--muted);
+  font-size: 9px;
+  margin-top: 5px;
+}
+#game :is(.district-order, .district-repair) {
+  min-width: 24px;
+  min-height: 28px;
+  border-left: 1px solid var(--line);
+  color: #b7c8bd;
+  padding: 3px;
+}
+#game .district-repair {
+  color: var(--accent);
+}
+#game .district-control {
+  height: 2px;
+  background: #8d9c91;
+}
+#game .district-card[data-owner='own'] {
+  border-top-color: #96b8a580;
+}
+#game .district-card[data-owner='own'] .district-control {
+  background: #a0c4ad;
+}
+#game .district-card[data-owner='enemy'] .district-control {
+  background: #d29c84;
+}
+#game .district-card.contested {
+  border-color: #e2b77999;
+}
+#game .district-card.contested small {
+  color: var(--accent);
+}
+@media (max-width: 1100px) {
+  #game #district-strip {
+    width: calc(100vw - 400px);
+  }
+  #game .district-focus b {
+    font-size: 9px;
+  }
+  #game .district-focus small {
+    font-size: 8px;
+  }
+}
+@media (max-width: 760px) {
+  #game #district-strip {
+    top: 218px;
+    width: min(480px, calc(100vw - 24px));
+  }
+}

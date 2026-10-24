@@ -33,7 +33,7 @@ export class CombatEffects {
     this.smoke = new ParticleBatch(world.scene, 1280, 0);
     this.glow = new ParticleBatch(world.scene, 1280, 1);
     this.rings = new ParticleBatch(world.scene, 64, 2);
-    this.streaks = new StreakBatch(world.scene, 3072);
+    this.streaks = new StreakBatch(world.scene, 4096);
     this.sparks = new StreakParticles(900);
     this.casings = new CasingPool(world.scene, 320);
     this.clock = 0;

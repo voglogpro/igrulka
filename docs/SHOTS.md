@@ -18,6 +18,12 @@
   `ground`), `shooter` и точку выстрела `fromX/fromZ`. Это нужно только для отрисовки.
 - Новые поля снаряда (`loft`, `originY`, `endY`, `arc`) проверяет `persistence/saves.js`.
 
+- Совместимость: снаряды с полем `gravity` из ранних сборок 8.5 (параллельная ветка) продолжают
+  лететь по своей гравитации в `projectiles.js` и рисоваться в `tracer-path.js`.
+- Сеть: `network/client.js` интерполирует высоту по той же параболе (`arc` или `loft` с `endY`);
+  `perspective.js` передаёт `loft` и `endY` и убирает `fromX/fromZ` из чужих попаданий, чтобы
+  не выдавать скрытого стрелка.
+
 ## Отрисовка
 
 - `src/rendering/effects/tracer-path.js`: `projectilePoint(p, ahead)` даёт точку на настоящей

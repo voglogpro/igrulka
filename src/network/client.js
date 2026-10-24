@@ -174,7 +174,7 @@ export class NetworkSession {
     if (span <= 0 || span > 1 || this.room?.phase !== 'playing') return;
     const t = Math.max(0, Math.min(1, (span - 0.1 + (now - this.latest.received) / 1000) / span));
     display.time = a.time + span * t;
-    for (const key of ['units', 'groundUnits', 'projectiles']) {
+    for (const key of ['units', 'groundUnits', 'serviceVehicles', 'projectiles']) {
       const before = new Map((a[key] || []).map((u) => [u.id, u]));
       const after = new Map((b[key] || []).map((u) => [u.id, u]));
       for (const u of display[key] || []) {
@@ -184,6 +184,32 @@ export class NetworkSession {
         for (const field of ['x', 'y', 'z', 'travelled', 'fallAge', 'setup'])
           if (Number.isFinite(start[field]) && Number.isFinite(end[field]))
             u[field] = start[field] + (end[field] - start[field]) * t;
+        if (key === 'projectiles') {
+          for (const field of ['life', 'vx', 'vy', 'vz'])
+            if (Number.isFinite(start[field]) && Number.isFinite(end[field]))
+              u[field] = start[field] + (end[field] - start[field]) * t;
+          // A linear blend of heights cuts through a parabola. Re-evaluate the
+          // same physical trajectory at the displayed age, including its tangent.
+          const peak = u.arc > 0 ? u.arc : u.loft > 0 ? u.loft : 0;
+          if (Number.isFinite(u.life) && peak && u.flight > 0) {
+            const age = Math.max(0, Math.min(1, u.life / u.flight));
+            const originY = u.originY ?? 6,
+              endY = u.endY ?? 2;
+            u.y = originY * (1 - age) + endY * age + 4 * peak * age * (1 - age);
+            u.vy = (4 * peak * (1 - 2 * age) + endY - originY) / u.flight;
+          } else if (
+            u.domain === 'ground' &&
+            Number.isFinite(u.life) &&
+            Number.isFinite(u.originY) &&
+            Number.isFinite(u.gravity) &&
+            Number.isFinite(end.vy) &&
+            Number.isFinite(end.life)
+          ) {
+            const initialVy = end.vy + u.gravity * end.life;
+            u.y = u.originY + initialVy * u.life - 0.5 * u.gravity * u.life * u.life;
+            u.vy = initialVy - u.gravity * u.life;
+          }
+        }
         if (Number.isFinite(start.yaw) && Number.isFinite(end.yaw)) {
           const delta = ((end.yaw - start.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
           u.yaw = start.yaw + delta * t;

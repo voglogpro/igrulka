@@ -104,7 +104,16 @@ const projectileFields = [
   'tx',
   'tz',
   'flight',
+  'originY',
+  'gravity',
+  'arc',
+  'loft',
+  'endY',
 ];
+
+// Civil service traffic has public positions like buildings and roads. Tasks, route
+// caches and station scheduling remain private even if new fleet fields are added.
+const serviceFields = ['id', 'side', 'x', 'z', 'yaw', 'state', 'stationId'];
 
 // The UI always calls its own faction 0. World coordinates and entity IDs stay unchanged.
 export function playerView(authority, side) {
@@ -135,6 +144,9 @@ export function playerView(authority, side) {
       publicUnit.tz = u.z + (u.vz || 0);
       return publicUnit;
     });
+  view.serviceVehicles = (view.serviceVehicles || []).map((v) =>
+    v.side === side ? v : publicFields(v, serviceFields),
+  );
   view.projectiles = view.projectiles
     .filter((p) => {
       if (p.side === side) return true;
@@ -166,7 +178,14 @@ export function playerView(authority, side) {
       return false;
     return true;
   });
-  for (const event of view.events) delete event.visibleTo;
+  for (const event of view.events) {
+    delete event.visibleTo;
+    // Impact debris direction would reveal where a hidden enemy shooter stands.
+    if (event.type === 'hit' && event.side === enemy) {
+      delete event.fromX;
+      delete event.fromZ;
+    }
+  }
   if (Array.isArray(view.contacts)) {
     view.contacts[side] = view.contacts[side].map((c) =>
       publicFields(c, ['x', 'z', 'radius', 'expires', 'time']),
@@ -207,6 +226,7 @@ export function playerView(authority, side) {
     'roads',
     'units',
     'groundUnits',
+    'serviceVehicles',
     'projectiles',
     'trenches',
     'events',
