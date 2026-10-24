@@ -52,11 +52,11 @@ try:
         }''')
         assert report['depthFog']['groundDelta'] >= 5, report['depthFog']
         assert 0 < report['depthFog']['roofDelta'] < report['depthFog']['groundDelta'] and report['depthFog']['skyDelta'] == 0, report['depthFog']
-        assert report['depthFog']['visionGround'] >= 5 and report['depthFog']['visionRoof'] >= 5, report['depthFog']
+        assert report['depthFog']['visionGround'] == 0 and report['depthFog']['visionRoof'] == 0, report['depthFog']
         assert report['depthFog']['visionSky'] == 0 and report['depthFog']['revealDelta'] == 0, report['depthFog']
         assert report['depthFog']['repeatDelta'] == 0, report['depthFog']
         assert report['depthFog']['resolves'] == [False, True, False], report['depthFog']
-        report['checks'].append('GPU fog fades ground and roofs smoothly; vision veils both heights, reveals both and leaves sky unchanged')
+        report['checks'].append('Atmospheric depth fog fades ground and roofs smoothly; retired map-vision masks cannot darken ground, roofs or sky')
         print(report['checks'][-1], flush=True)
 
         ids = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),s=w.state,next=E.createGame(2410);next.mode='multiplayer';next.rules.rear=false;
@@ -123,7 +123,8 @@ try:
           w.weatherFX.update(3,w.controls.target,s.weather);w.combatFX.emit(s,.1);w.combatFX.update(.1,w.battleTime,w.camera);w.post.render(w.scene,w.camera,w.battleTime);
           return {shots:s.stats.shots,...w.combatFX.diagnostics()};}''')
         assert report['tracers']['shots'] > 20 and report['tracers']['tracerHeads'] > 0, report['tracers']
-        assert report['tracers']['streaks'] >= report['tracers']['tracerHeads'] * 6, report['tracers']
+        # Halo, body and core are three ribbons per tracer head; sparks expire independently.
+        assert report['tracers']['streaks'] >= report['tracers']['tracerHeads'] * 3, report['tracers']
         page.screenshot(path=str(ARTIFACTS / 'tracers85-1440.png'), timeout=120000)
         report['checks'].append('actual static and mobile MOG fire renders layered ballistic tracers at 1440px')
         assert not report['errors'] and not report['consoleErrors'], report

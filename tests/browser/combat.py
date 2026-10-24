@@ -41,7 +41,23 @@ with sync_playwright() as p:
     print('Camouflaged shooter body is absent; uncertain return-fire marker is rendered',flush=True)
     report['mog']=page.evaluate("()=>{const w=skyfront.getWorld(),E=skyfront.engine,s=E.createGame(819);s.ai.nextBuild=s.ai.nextAttack=s.ai.nextResearch=s.ai.nextArmy=1e9;for(const f of s.sides){f.credits=50000;f.materials=5000;}const b=E.build(s,0,'gun',-850,0);b.progress=1;b.hp=b.maxHp;const m=E.makeGround(s,0,'mog',-820,50);m.setup=1;s.groundUnits.push(m);const site=E.build(s,1,'launcher',-665,175);site.progress=1;site.hp=site.maxHp;E.acceptLaunchDelivery(site,'heavy',1);E.launch(s,1,'heavy',{x:-1050,z:10});const u=s.units[0];Object.assign(u,{route:null,startX:-400,startZ:10,tx:-1050,tz:10,total:650,travelled:300,speed:.001,hp:100000,maxHp:100000,delay:0});E.advance(s,7);Object.assign(w.state,s);w.previousSimTime=s.time;w.controls.focus(-830,10,100);w.controls.update(3);w.sync();w.combatFX.emit(s,.1);w.combatFX.update(.1,w.elapsed,w.camera);w.post.render(w.scene,w.camera,w.elapsed);return {shots:s.stats.shots,staticHeat:b.heat,mobileHeat:m.heat,staticRounds:b.groundAmmo,mobileRounds:m.groundAmmo,tracers:w.combatFX.diagnostics().tracerSegments,heads:w.combatFX.diagnostics().tracerHeads,streaks:w.combatFX.diagnostics().streaks};}")
     assert report['mog']['shots']>20 and report['mog']['mobileHeat']>0
-    assert report['mog']['heads']>0 and report['mog']['streaks']>=report['mog']['heads']*6, report['mog']
+    # An ordinary head is halo/body/core (three ribbons); muzzle sparks are additional,
+    # short-lived particles and are not proportional to the number of live bullets.
+    assert report['mog']['heads']>0 and report['mog']['streaks']>=report['mog']['heads']*3, report['mog']
+    report['tracerPixels']=page.evaluate('''()=>{const w=skyfront.getWorld(),mesh=w.combatFX.streaks.mesh,a=mesh.instanceMatrix.array;
+      let chosen=-1;for(let i=0;i<mesh.count;i++)if(w.combatFX.streaks.opacity[i]>.5){chosen=i;break;}
+      if(chosen<0)throw Error('No luminous tracer ribbon');const o=chosen*16;
+      let q,zoom;for(zoom of [160,240,360,540,720]){w.focus(a[o+12],a[o+14],zoom);w.controls.update(3);w.scene.updateMatrixWorld(true);
+        q=w.camera.position.clone().set(a[o+12],a[o+13],a[o+14]).project(w.camera);if(Math.abs(q.y)<.8)break;}
+      const gl=w.renderer.getContext(),
+        width=gl.drawingBufferWidth,height=gl.drawingBufferHeight,before=new Uint8Array(width*height*4),after=new Uint8Array(before.length);
+      mesh.visible=false;w.post.render(w.scene,w.camera,w.elapsed);gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,before);
+      mesh.visible=true;w.post.render(w.scene,w.camera,w.elapsed);gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,after);
+      let changed=0,peak=0;for(let i=0;i<before.length;i+=4){const d=Math.abs(after[i]-before[i])+Math.abs(after[i+1]-before[i+1])+Math.abs(after[i+2]-before[i+2]);if(d>6)changed++;peak=Math.max(peak,d);}
+      return {changed,peak,clip:{x:q.x,y:q.y,z:q.z},zoom,instances:mesh.count};}''')
+    assert report['tracerPixels']['changed']>3 and report['tracerPixels']['peak']>10, report['tracerPixels']
+    assert all(abs(report['tracerPixels']['clip'][axis])<1 for axis in ('x','y','z')),report['tracerPixels']
+    page.evaluate('()=>{const w=skyfront.getWorld();w.focus(-830,10,100);w.controls.update(3)}')
     page.screenshot(path=str((ARTIFACTS/'infantry8-mog.png')),timeout=120000)
     before=page.evaluate('skyfront.diagnostics().memory')
     page.evaluate('''()=>{const w=skyfront.getWorld();for(let i=0;i<50;i++)w.explosion(-400+i%8,2,30,1);w.combatFX.update(.05,w.elapsed,w.camera);w.post.render(w.scene,w.camera,w.elapsed);}''')

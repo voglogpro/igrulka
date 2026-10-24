@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 folder = Path(__file__).resolve().parent
-scenarios=['smoke','camera','infantry','army_controls','deployment','combat','migrations','lighting','territory_routes','production','logistics89','multiplayer','audio','audio_missiles','atmosphere','grain','frontline']
+scenarios=['smoke','camera','infantry','army_controls','deployment','combat','migrations','lighting','territory_routes','production','logistics89','multiplayer','audio','audio_missiles','audio_ground','atmosphere','grain','frontline','audit891']
 requested=sys.argv[1:] or scenarios
 if any(name not in scenarios for name in requested):
     raise SystemExit('Unknown scenario. Choose: '+', '.join(scenarios))
