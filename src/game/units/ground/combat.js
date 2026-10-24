@@ -23,7 +23,7 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
   const hp = Math.max(0, u.hp - amount * vest * (1 - cover * (kind === 'blast' ? 0.4 : 1)));
   // Visibility must be captured while the victim is alive; corpses are removed before snapshots.
   const visibleTo =
-    hp === 0 && s.mode === 'multiplayer'
+    hp === 0 && (s.mode === 'multiplayer' || s.mode === 'coop')
       ? [0, 1].filter((side) => groundVisible(s, side, u))
       : undefined;
   // Soldiers who would die are sometimes only wounded and can be revived by a medic.

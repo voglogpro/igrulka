@@ -62,6 +62,7 @@ export class NetworkSession {
         this.sequence = Math.max(this.sequence, message.lastSequence || 0);
         this.token = message.token;
         this.side = message.side;
+        this.seat = message.seat ?? message.side;
         this.room = message.room;
         this.retries = 0;
         try {

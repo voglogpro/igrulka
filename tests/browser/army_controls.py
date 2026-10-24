@@ -13,7 +13,7 @@ with sync_playwright() as p:
     page.locator('[data-action="start"]').click()
     page.keyboard.press('Space')
     ids = page.evaluate('''() => {
-      const E=skyfront.engine, w=skyfront.getWorld(), s=E.createGame(1022);
+      const E=skyfront.engine, w=skyfront.getWorld(), s=E.createGame(1022);s.rules.rear=false;
       s.ai.nextBuild=s.ai.nextAttack=s.ai.nextResearch=s.ai.nextArmy=1e9;
       s.sides[0].credits=30000; s.sides[0].materials=4000; s.sides[0].tech=Object.keys(E.TECH);
       const b=E.build(s,0,'barracks',-680,-10); if(typeof b==='string') throw Error(b);

@@ -12,7 +12,7 @@ with sync_playwright() as p:
     page.goto(((root/'play/Skyfront.html')).as_uri(),wait_until='load',timeout=120000);page.wait_for_function('Boolean(window.skyfront)',timeout=60000)
     page.locator('[data-action="start"]').click();page.keyboard.press('Space')
     fixture=page.evaluate('''()=>{
-      const E=skyfront.engine,w=skyfront.getWorld(),s=E.createGame(815);s.ai.nextBuild=s.ai.nextAttack=s.ai.nextResearch=s.ai.nextArmy=1e9;
+      const E=skyfront.engine,w=skyfront.getWorld(),s=E.createGame(815);s.rules.rear=false;s.ai.nextBuild=s.ai.nextAttack=s.ai.nextResearch=s.ai.nextArmy=1e9;
       for(const f of s.sides){f.credits=30000;f.materials=3000;f.science=3000;f.tech=Object.keys(E.TECH);}
       for(const [key,x,z]of [['power',-670,-80],['housing',-615,-80],['barracks',-680,-10],['gun',-390,100],['sam',-450,120],['launcher',-400,-180]]){const b=E.build(s,0,key,x,z);if(typeof b==='string')throw Error(b);b.hp=b.maxHp;b.progress=1;}
       const keys=['infantry','infantry','machinegunner','sniper','engineer','operator','assault','mog','apc','gepard','shilka','leopard'];

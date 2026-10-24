@@ -175,7 +175,7 @@ let chosenDifficulty = E.DIFFICULTY[settings.difficulty] ? settings.difficulty :
 function renderWelcomeSetup() {
   const current = E.difficultyOf(state);
   $('#welcome-setup').innerHTML =
-    `<div class="welcome-modes"><button class="active" data-welcome-mode="solo"><b>Одиночная игра</b><small>против бота</small></button><button data-action="network"><b>Сетевая дуэль</b><small>два игрока</small></button></div>` +
+    `<div class="welcome-modes"><button class="active" data-welcome-mode="solo"><b>Одиночная игра</b><small>против бота</small></button><button data-action="network"><b>Сетевая игра</b><small>дуэль или команда</small></button></div>` +
     `<span class="welcome-label">${resumed ? 'Сложность новой игры' : 'Сложность бота'}</span><div class="difficulty-picker">${Object.entries(
       E.DIFFICULTY,
     )
@@ -295,7 +295,8 @@ function leaveNetwork(message) {
 }
 function ambientAudio() {
   if (!world) return;
-  audio.update?.(state, world.camera, paused || !started, network?.side ?? 0);
+  // A network view is always oriented so that the player's own side is 0.
+  audio.update?.(state, world.camera, paused || !started, 0);
 }
 function toast(text, danger = false) {
   clearTimeout(toastTimer);

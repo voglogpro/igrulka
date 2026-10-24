@@ -295,7 +295,7 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
 
 test('old protocols are explicitly refused and protocol three creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 3);
+  assert.equal(PROTOCOL_VERSION, 4);
   const host = await connect();
   host.send({ type: 'create', protocol: 1, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
@@ -533,4 +533,52 @@ test('both WebSocket players use private paid factory plans, preserve reserves a
     room.state.units.filter((u) => u.side === 1 && u.sourceId === launchers[1].id).length,
     1,
   );
+});
+
+test('team room: two humans command one side against the bot at the chosen difficulty', async (t) => {
+  const { server, connect } = await fixture(t);
+  const a = await connect();
+  a.send({
+    type: 'create',
+    protocol: PROTOCOL_VERSION,
+    name: 'Alpha',
+    mode: 'coop',
+    difficulty: 'ultra',
+  });
+  const host = await a.next((m) => m.type === 'joined');
+  assert.equal(host.room.mode, 'coop');
+  assert.equal(host.room.difficulty, 'ultra');
+  assert.equal(host.side, 0);
+  const b = await connect();
+  b.send({ type: 'join', protocol: PROTOCOL_VERSION, code: host.room.code, name: 'Bravo' });
+  const guest = await b.next((m) => m.type === 'joined');
+  assert.equal(guest.side, 0, 'the second human is on the same side');
+  assert.equal(guest.seat, 1);
+  const room = server.rooms.get(host.room.code);
+  assert.equal(room.state.mode, 'coop');
+  assert.equal(room.state.difficulty, 'ultra');
+  const pair = { server, connect, a, b, host, guest, room };
+  const { viewA, viewB } = await startPair(pair);
+  assert.equal(viewA.state.buildings.find((x) => x.key === 'hq' && x.side === 0).id, 1);
+  assert.equal(viewB.state.buildings.find((x) => x.key === 'hq' && x.side === 0).id, 1);
+  // Either human spends the shared treasury; the other sees the same building.
+  room.state.sides[0].credits = 20000;
+  room.state.sides[0].materials = 2000;
+  const placed = await command(b, 'build', { key: 'power', x: -670, z: -80 });
+  assert.equal(placed.error, undefined, placed.error);
+  server.tick();
+  server.tick();
+  const seenByHost = await a.next(
+    (m) =>
+      m.type === 'snapshot' && m.state.buildings.some((x) => x.key === 'power' && x.side === 0),
+  );
+  assert.ok(seenByHost);
+  // The bot runs and the economy bonus follows the difficulty.
+  for (let i = 0; i < 400; i++) server.tick();
+  assert.ok(room.state.buildings.filter((x) => x.side === 1).length > 2, 'the bot builds');
+  assert.equal(E.economy(room.state, 1).bonus, 1.45);
+  assert.equal(E.economy(room.state, 0).bonus, 1);
+  const bad = await connect();
+  bad.send({ type: 'create', protocol: PROTOCOL_VERSION, mode: 'coop', difficulty: 'nightmare' });
+  assert.match((await bad.next((m) => m.type === 'error')).message, /сложность/);
 });

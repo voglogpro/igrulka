@@ -254,12 +254,18 @@ export function autoRear(s) {
     const infantry = mine.filter((u) => isInfantry(u.key) && !isSupport(u)).length;
     const machines = mine.filter((u) => !isInfantry(u.key) && !isSupport(u)).length;
     const wants = [
-      ['medic', infantry >= 4 ? Math.min(6, 1 + Math.floor(infantry / 8)) : 0],
-      ['supplytruck', machines >= 2 ? Math.min(4, 1 + Math.floor(machines / 5)) : 0],
+      ['medic', infantry >= 6 ? Math.min(6, 1 + Math.floor(infantry / 8)) : 0],
+      ['supplytruck', machines >= 3 ? Math.min(4, 1 + Math.floor(machines / 5)) : 0],
     ];
-    for (const [key, target] of wants) {
+    // The rear never clogs the barracks: it only queues when the production lines are nearly idle.
+    if (queue.length >= 2) continue;
+    // Serve the role that is furthest from its target first, so medics and trucks alternate.
+    const order = wants
+      .filter(([key, target]) => have(key) < target)
+      .sort((p, q) => have(p[0]) / p[1] - have(q[0]) / q[1]);
+    for (const [key] of order) {
       const d = GROUND_UNITS[key];
-      if (have(key) >= target || (d.tech && !f.tech.includes(d.tech))) continue;
+      if (d.tech && !f.tech.includes(d.tech)) continue;
       // Never starve the front: the rear is only paid from comfortable reserves.
       if (f.credits < d.cost + 200 || f.materials < d.metal + 10) continue;
       recruit(s, side, key, null, 1);

@@ -95,6 +95,7 @@ test('each side trains medics and trucks in proportion to its army, unless switc
   for (let i = 0; i < 10; i++) unit(s, 0, 'infantry', -500, 100 + i * 6);
   unit(s, 0, 'leopard', -480, 40);
   unit(s, 0, 'leopard', -460, 40);
+  unit(s, 0, 'leopard', -440, 40);
   E.advance(s, 20);
   const queued = s.buildings.find((b) => b.key === 'barracks').armyQueue.map((q) => q.key);
   const total = (key) =>

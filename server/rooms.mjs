@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { WebSocket, WebSocketServer } from 'ws';
-import { createGame, step } from '../src/game/index.js';
+import { createGame, step, DIFFICULTY } from '../src/game/index.js';
 import { executeCommand, PROTOCOL_VERSION } from '../src/network/commands.js';
 import { playerView } from '../src/network/perspective.js';
 import { createGameServer } from '../scripts/dev-server.mjs';
@@ -8,6 +8,8 @@ import { createGameServer } from '../scripts/dev-server.mjs';
 const codePattern = /^[A-HJ-NP-Z2-9]{6}$/;
 const code = () =>
   [...randomBytes(6)].map((n) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n % 32]).join('');
+// A seat is a connection slot; in a team room both seats command side 0 against the bot.
+const sideOf = (room, seat) => (room.mode === 'coop' ? 0 : seat);
 const name = (value) =>
   typeof value === 'string' ? value.trim().slice(0, 24) || 'Командир' : 'Командир';
 const send = (socket, value) => {
@@ -41,6 +43,8 @@ export function createRoomServer({
       .every((p) => p.socket?.readyState === WebSocket.OPEN);
     return {
       code: room.code,
+      mode: room.mode,
+      difficulty: room.mode === 'coop' ? room.difficulty : null,
       phase: !room.started
         ? 'waiting'
         : room.state.result
@@ -56,31 +60,36 @@ export function createRoomServer({
     };
   }
   function broadcast(room, snapshots = false) {
-    const status = meta(room);
-    for (let side = 0; side < 2; side++) {
-      const p = room.players[side];
+    const status = meta(room),
+      views = new Map();
+    for (let seat = 0; seat < 2; seat++) {
+      const p = room.players[seat];
       if (!p?.socket) continue;
+      const side = sideOf(room, seat);
+      if (snapshots && room.started && !views.has(side))
+        views.set(side, playerView(room.state, side));
       send(p.socket, {
         type: snapshots ? 'snapshot' : 'room',
         room: status,
         tick: room.tick,
-        ...(snapshots && room.started ? { state: playerView(room.state, side) } : {}),
+        ...(snapshots && room.started ? { state: views.get(side) } : {}),
       });
     }
   }
-  function attach(socket, room, side, player) {
+  function attach(socket, room, seat, player) {
     socket.roomCode = room.code;
-    socket.playerSide = side;
+    socket.seat = seat;
     player.socket = socket;
     socket.lastSequence = player.lastSequence || 0;
     player.disconnectedAt = null;
-    room.players[side] = player;
+    room.players[seat] = player;
     send(socket, {
       type: 'joined',
       protocol: PROTOCOL_VERSION,
       lastSequence: socket.lastSequence,
       token: player.token,
-      side,
+      side: sideOf(room, seat),
+      seat,
       room: meta(room),
     });
     broadcast(room, room.started);
@@ -139,10 +148,21 @@ export function createRoomServer({
           do {
             roomCode = code();
           } while (rooms.has(roomCode));
-          const state = createGame(seed);
-          state.mode = 'multiplayer';
+          const coop = message.mode === 'coop',
+            difficulty = Object.hasOwn(DIFFICULTY, message.difficulty)
+              ? message.difficulty
+              : 'normal';
+          if (message.mode != null && !['pvp', 'coop'].includes(message.mode))
+            throw Error('Неизвестный режим комнаты');
+          if (message.difficulty != null && !Object.hasOwn(DIFFICULTY, message.difficulty))
+            throw Error('Неизвестная сложность');
+          const state = createGame(seed, { difficulty });
+          // Duel: two humans, no bot. Team: two humans share one side against the bot.
+          state.mode = coop ? 'coop' : 'multiplayer';
           room = {
             code: roomCode,
+            mode: coop ? 'coop' : 'pvp',
+            difficulty,
             state,
             players: [null, null],
             started: false,
@@ -163,13 +183,13 @@ export function createRoomServer({
           room = rooms.get(message.code);
           if (!room) throw Error('Комната не найдена');
           if (message.type === 'resume') {
-            const side = room.players.findIndex(
+            const seat = room.players.findIndex(
               (p) => p && typeof message.token === 'string' && p.token === message.token,
             );
-            if (side < 0) throw Error('Не удалось восстановить место игрока');
-            const p = room.players[side];
+            if (seat < 0) throw Error('Не удалось восстановить место игрока');
+            const p = room.players[seat];
             if (p.socket?.readyState === WebSocket.OPEN) throw Error('Это место уже подключено');
-            attach(socket, room, side, p);
+            attach(socket, room, seat, p);
           } else {
             if (room.started || room.players[1]) throw Error('Комната заполнена');
             attach(socket, room, 1, {
@@ -181,8 +201,9 @@ export function createRoomServer({
           return;
         }
         if (!room) throw Error('Сначала создайте комнату или присоединитесь');
-        const side = socket.playerSide,
-          player = room.players[side];
+        const seat = socket.seat,
+          side = sideOf(room, seat),
+          player = room.players[seat];
         if (!player || player.socket !== socket) throw Error('Подключение потеряло место');
         if (message.type === 'leave') {
           endRoom(room, 'Один из игроков завершил сессию');
@@ -197,7 +218,7 @@ export function createRoomServer({
         }
         if (message.type === 'start') {
           if (
-            side !== 0 ||
+            seat !== 0 ||
             room.started ||
             !room.players.every((p) => p?.ready && p.socket?.readyState === WebSocket.OPEN)
           )
@@ -238,7 +259,7 @@ export function createRoomServer({
     });
     socket.on('close', () => {
       const room = rooms.get(socket.roomCode),
-        player = room?.players[socket.playerSide];
+        player = room?.players[socket.seat];
       if (player?.socket === socket) {
         player.socket = null;
         player.disconnectedAt = now();
