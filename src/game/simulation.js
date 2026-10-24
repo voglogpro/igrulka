@@ -14,6 +14,7 @@ import { updateWeather } from './weather.js';
 import { updateServices } from './city/service.js';
 import { updateOil } from './city/oil.js';
 import { updatePorts } from './city/ports.js';
+import { updateDefense } from './defense/coordinator.js';
 export function step(s, dt) {
   if (s.result || !Number.isFinite(dt) || dt <= 0) return;
   dt = Math.min(0.1, dt);
@@ -47,6 +48,7 @@ export function step(s, dt) {
   updateServices(s, dt);
   updateOil(s, rates, dt);
   updatePorts(s, dt);
+  updateDefense(s);
   updateGround(s, rates, dt, { event, random });
   moveUnits(s, dt);
   fireDefenses(s, rates, dt);

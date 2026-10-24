@@ -1,0 +1,135 @@
+#frontline-hud {
+  position: absolute;
+  left: 12px;
+  bottom: 176px;
+  width: 184px;
+  z-index: 22;
+  color: #dbe5e2;
+  background: #152023ee;
+  border: 1px solid #82958e45;
+  border-radius: 8px;
+  font-size: 11px;
+  box-shadow: 0 8px 20px #0003;
+}
+#frontline-hud .frontline-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+}
+#frontline-hud .frontline-summary > span {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #9db3ad;
+  width: 100%;
+}
+#frontline-hud .frontline-summary > b {
+  font-size: 10px;
+  font-weight: 500;
+  flex: 1;
+}
+#frontline-hud .frontline-summary > i {
+  font-size: 15px;
+  color: #d9b983;
+}
+#frontline-hud.under-pressure {
+  border-color: #d9935b88;
+}
+#frontline-hud.under-pressure .frontline-summary > b {
+  color: #efba87;
+}
+#frontline-hud .frontline-detail {
+  position: absolute;
+  left: calc(100% + 8px);
+  bottom: 0;
+  width: 260px;
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+  padding: 12px;
+  background: #152023f5;
+  border: 1px solid #82958e45;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px #0003;
+}
+#frontline-hud .frontline-sectors button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid #82958e25;
+  border-radius: 0;
+  padding: 8px 2px;
+  background: none;
+  font-size: 11px;
+}
+#frontline-hud .frontline-sectors small {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  color: #9cb0aa;
+  margin-top: 3px;
+}
+#frontline-hud .frontline-sectors b {
+  text-align: right;
+  color: #bad9c9;
+}
+#frontline-hud .frontline-sectors .threat {
+  color: #efba87;
+}
+#frontline-hud label {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 10px;
+}
+#frontline-hud input {
+  accent-color: #d9b983;
+}
+#frontline-hud .frontline-detail > small {
+  display: block;
+  margin-top: 10px;
+  font-size: 9px;
+  color: #94aaa3;
+  line-height: 1.6;
+}
+#frontline-hud .frontline-reserve {
+  font-size: 9px;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+#game.army-selected #frontline-hud {
+  bottom: 226px;
+}
+#game.army-selected #frontline-hud .frontline-detail {
+  max-height: calc(100vh - 330px);
+}
+@media (max-height: 600px) {
+  #frontline-hud {
+    bottom: 146px;
+  }
+}
+@media (max-width: 550px) {
+  #frontline-hud {
+    width: 160px;
+  }
+  #frontline-hud .frontline-detail {
+    left: 0;
+    bottom: calc(100% + 8px);
+    width: 260px;
+    max-height: calc(100vh - 320px);
+  }
+  #game.army-selected #frontline-hud {
+    bottom: 412px;
+  }
+  #game.army-selected #frontline-hud .frontline-detail {
+    max-height: max(0px, calc(100vh - 560px));
+  }
+}

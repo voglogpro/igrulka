@@ -97,6 +97,27 @@ export function updateMinimap(canvas) {
         if (!vision.grid[row * g.cols + col])
           ctx.fillRect(px(g.ox + col * g.cell), pz(g.oz + row * g.cell), cw + 0.6, ch + 0.6);
   }
+  const frontline = this.frontlineView;
+  if (frontline?.enabled && frontline.report) {
+    const points = frontline.report.polyline;
+    ctx.lineWidth = 1.3;
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i],
+        b = points[i + 1];
+      const known = a.knowledge === 'observed' && b.knowledge === 'observed';
+      const pressure = Math.max(
+        frontline.report.sectors[i].pressure,
+        frontline.report.sectors[i + 1].pressure,
+      );
+      ctx.strokeStyle = pressure >= 1.15 ? '#efa565' : known ? '#75d8b8' : '#91a4a9aa';
+      ctx.setLineDash(known ? [] : [2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(px(a.x), pz(a.z));
+      ctx.lineTo(px(b.x), pz(b.z));
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
   for (const u of this.state.groundUnits || []) {
     if (!E.groundVisible(this.state, 0, u)) continue;
     ctx.fillStyle = u.side === 0 ? '#a6d7ff' : '#ffa48a';

@@ -1,13 +1,8 @@
 import { isInfantry } from '../../config.js';
+import { updateFortification } from '../../defense/fortifications.js';
 export function updateInfantrySupport(s, u, dt) {
   const foot = isInfantry(u.key);
-  if (u.digging && foot && !u.moving) {
-    const t = s.trenches.find((t) => t.id === u.trenchId);
-    if (t) {
-      t.progress = Math.min(1, t.progress + (dt * (u.key === 'engineer' ? 2 : 1)) / 12);
-      if (t.progress >= 1) u.digging = false;
-    } else u.digging = false;
-  }
+  updateFortification(s, u, dt);
   if (foot && !u.moving) {
     const base = s.buildings.find(
       (b) =>

@@ -3,16 +3,16 @@ const finite = (v, min = -Infinity, max = Infinity) => Number.isFinite(v) && v >
 const point = (p) =>
   !!p && typeof p === 'object' && finite(p.x, -FIELD.x, FIELD.x) && finite(p.z, -FIELD.z, FIELD.z);
 
-// Oil stocks, burning tanks and merchant ships (state version 12).
+// Oil stocks, burning tanks and merchant ships (state version 13).
 export function restoreOil(s) {
   for (const f of s.sides) {
-    if (s.version < 12) f.oil ??= 150;
+    if (s.version < 13) f.oil ??= 150;
     if (!finite(f.oil, 0, 1e7)) throw Error('Повреждён запас нефти');
     if (f.oilRate != null && !finite(f.oilRate)) throw Error('Повреждён запас нефти');
   }
   for (const b of s.buildings)
     if (b.fire != null && !finite(b.fire, 0, 1000)) throw Error('Повреждён пожар хранилища');
-  if (s.version < 12) s.ships ??= [];
+  if (s.version < 13) s.ships ??= [];
   if (!Array.isArray(s.ships) || s.ships.length > 200) throw Error('Повреждён флот');
   const ports = new Map(s.buildings.filter((b) => b.key === 'port').map((b) => [b.id, b])),
     ids = new Set();

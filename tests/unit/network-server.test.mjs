@@ -119,6 +119,21 @@ async function tickSnapshots(pair, count, beforeTick = () => {}) {
   );
 }
 
+test('internet WebSocket compression negotiates and keeps authoritative snapshots and commands intact', async (t) => {
+  const pair = await joinedPair(t, { compression: true });
+  assert.ok(pair.a.socket.extensions.includes('permessage-deflate'));
+  assert.ok(pair.b.socket.extensions.includes('permessage-deflate'));
+  const { viewA, viewB } = await startPair(pair);
+  assert.equal(viewA.state.mode, 'multiplayer');
+  assert.equal(viewB.state.buildings.find((b) => b.key === 'hq' && b.side === 0).x, 615);
+  const result = await command(pair.a, 'build', { key: 'power', x: -670, z: -80 });
+  assert.ok(result.result?.id);
+  const [updatedA, updatedB] = await tickSnapshots(pair, 20);
+  assert.equal(updatedA.state.time, updatedB.state.time);
+  assert.ok(updatedA.state.buildings.some((b) => b.id === result.result.id && b.side === 0));
+  assert.ok(updatedB.state.buildings.some((b) => b.id === result.result.id && b.side === 1));
+});
+
 function ground(pair, side, key, point) {
   const u = makeGround(pair.room.state, side, key, point.x, point.z);
   u.holdFire = true;
@@ -293,11 +308,11 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
   assert.equal((await rapid.closed()).code, 1008);
 });
 
-test('old protocols are explicitly refused and protocol five creates and joins a real room', async (t) => {
+test('old protocols are explicitly refused and protocol six creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 5);
+  assert.equal(PROTOCOL_VERSION, 6);
   const host = await connect();
-  host.send({ type: 'create', protocol: 4, name: 'Old host' });
+  host.send({ type: 'create', protocol: 5, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
   assert.equal(server.rooms.size, 0);
   host.send({ type: 'create', protocol: PROTOCOL_VERSION, name: 'Current host' });
@@ -312,6 +327,64 @@ test('old protocols are explicitly refused and protocol five creates and joins a
   const joinedGuest = await guest.next((m) => m.type === 'joined');
   assert.equal(joinedGuest.protocol, PROTOCOL_VERSION);
   assert.equal(joinedGuest.side, 1);
+});
+
+test('WebSocket auto-defense belongs to each owner and snapshots preserve only own observation and growing posts', async (t) => {
+  const pair = await joinedPair(t);
+  await startPair(pair);
+  const { a, b, room } = pair;
+  const peers = [a, b];
+  const defenders = [
+    ground(pair, 0, 'infantry', { x: -450, z: 380 }),
+    ground(pair, 1, 'infantry', { x: 450, z: 380 }),
+  ];
+  const observed = [
+    ground(pair, 0, 'infantry', { x: -450, z: -270 }),
+    ground(pair, 1, 'infantry', { x: -400, z: -270 }),
+  ];
+  for (const u of defenders) {
+    u.guard = { x: u.x, z: u.z };
+    u.order = { ...u.guard, mode: 'guard' };
+  }
+  for (const side of [0, 1]) {
+    const foreignBefore = defenders[1 - side].autoDefense;
+    assert.ok(
+      (await command(peers[side], 'auto-defense', { ids: [defenders[1 - side].id], enabled: true }))
+        .error,
+    );
+    assert.equal(defenders[1 - side].autoDefense, foreignBefore);
+    assert.equal(
+      (await command(peers[side], 'auto-defense', { ids: [defenders[side].id], enabled: true }))
+        .result,
+      1,
+    );
+  }
+  const snapshots = await tickSnapshots(pair, 280);
+  for (const side of [0, 1]) {
+    const view = snapshots[side].state;
+    const own = view.groundUnits.find((u) => u.id === defenders[side].id);
+    const enemy = view.groundUnits.find((u) => u.id === observed[1 - side].id);
+    assert.equal(own.autoDefense, true);
+    assert.ok(enemy, 'the observed enemy is present without future plans');
+    assert.equal(Object.hasOwn(enemy, 'autoDefense'), false);
+    assert.equal(Object.hasOwn(enemy, 'guard'), false);
+    assert.ok(view.frontlineMemory[0].seen.some((v) => v.id === observed[1 - side].id));
+    assert.deepEqual(view.frontlineMemory[1], { nextThink: 0, seen: [] });
+    assert.equal(E.fortificationStatus(view.trenches.find((v) => v.id === own.trenchId)).level, 1);
+    assert.equal(
+      view.trenches.some((v) => v.side === 1 && v.z === 380),
+      false,
+    );
+    assert.deepEqual(
+      E.frontlineReport(view, 0).polyline,
+      E.frontlineReport(room.state, side).polyline,
+    );
+    assert.equal(
+      (await command(peers[side], 'auto-defense', { ids: [own.id], enabled: false })).result,
+      1,
+    );
+    assert.equal(defenders[side].autoDefense, false);
+  }
 });
 
 test('WebSocket district commands capture for both sides, project control and pay for owner-only repair', async (t) => {

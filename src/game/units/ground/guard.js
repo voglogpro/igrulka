@@ -3,6 +3,8 @@ import { groundPath, walkable } from './navigation.js';
 import { coverInfo, groundVisible, lineOfSight } from '../infantry/cover.js';
 import { cancelTransportDelivery } from '../vehicles/transport.js';
 import { clearGroundRoute } from './route-queue.js';
+import { clearAutoDefense } from '../../defense/volunteers.js';
+import { invalidateFrontline } from '../../defense/cache.js';
 
 const GUARD_RADIUS = 95;
 const ALLY_RADIUS = 68;
@@ -28,7 +30,10 @@ function coveredPost(s, u, p) {
   const size = GROUND_UNITS[u.key].size;
   const occupied = s.groundUnits
     .filter((v) => v.id !== u.id && v.side === u.side && v.hp > 0 && !v.carrierId)
-    .map((v) => ({ unit: v, point: v.guard || (!v.path?.length ? v : null) }))
+    .flatMap((v) => [
+      { unit: v, point: v.guard || (!v.path?.length ? v : null) },
+      ...(v.defenseTask ? [{ unit: v, point: v.defenseTask.home }] : []),
+    ])
     .filter((entry) => entry.point);
   const free = (candidate) =>
     occupied.every(
@@ -89,7 +94,7 @@ function coveredPost(s, u, p) {
   return null;
 }
 
-function assignPost(s, u, p, snapToCover = false) {
+export function assignGuardPost(s, u, p, snapToCover = false, { preserveDefense = false } = {}) {
   if (!pointValid(s, u, p)) return false;
   const placement = snapToCover
     ? coveredPost(s, u, p)
@@ -98,9 +103,11 @@ function assignPost(s, u, p, snapToCover = false) {
         path: groundPath(s, u, p, GROUND_UNITS[u.key].size * 0.42),
       };
   if (!placement || (!placement.path.length && distance(u, placement.point) > 3)) return false;
+  if (placement.path.length && distance(placement.path.at(-1), placement.point) > 3) return false;
   const post = { x: placement.point.x, z: placement.point.z };
   clearGroundRoute(u);
   cancelTransportDelivery(u);
+  if (!preserveDefense) clearAutoDefense(u);
   u.guard = post;
   u.stance = null;
   u.guardTargetId = null;
@@ -121,7 +128,8 @@ export function guardGround(s, side, ids, point) {
   );
   if (!units.length) return 'Выберите доступные наземные отряды';
   let assigned = 0;
-  for (const u of units) if (assignPost(s, u, point, true)) assigned++;
+  for (const u of units) if (assignGuardPost(s, u, point, true)) assigned++;
+  if (assigned) invalidateFrontline(s);
   return assigned || 'Нет свободного доступного места для поста';
 }
 
@@ -135,8 +143,10 @@ export function defendLineGround(s, side, ids, a, b) {
   let assigned = 0;
   for (let i = 0; i < units.length; i++) {
     const t = units.length === 1 ? 0.5 : i / (units.length - 1);
-    if (assignPost(s, units[i], { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t })) assigned++;
+    if (assignGuardPost(s, units[i], { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }))
+      assigned++;
   }
+  if (assigned) invalidateFrontline(s);
   return assigned || 'Линия не проходит по доступной суше';
 }
 
@@ -178,7 +188,7 @@ export function updateGuard(s, u) {
         x: target.x + (u.x - target.x) * (firingDistance / distance(u, target)),
         z: target.z + (u.z - target.z) * (firingDistance / distance(u, target)),
       };
-      if (pointValid(s, u, toward)) {
+      if (pointValid(s, u, toward) && (isInfantry(u.key) || distance(toward, u.guard) <= 40)) {
         const path = groundPath(s, u, toward, d.size * 0.42);
         if (path.length) {
           u.path = path;

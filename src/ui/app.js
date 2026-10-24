@@ -1,3 +1,13 @@
+import { createCommandExecutor } from './session/command-executor.js';
+import { openMultiplayerEntry } from './session/multiplayer-entry.js';
+import { createAutoDefenseAction } from './controllers/army-actions.js';
+import { createStrikeController } from './controllers/strike-controller.js';
+import { createActionRouter } from './controllers/action-router.js';
+import { createCampaignActions, browserCampaignFiles } from './session/campaign-actions.js';
+import { createArmyNavigation } from './controllers/army-navigation.js';
+import { bindPointerActivity, bindMinimap, bindPageLifecycle } from './input/browser-events.js';
+import { createKeyboardController, bindKeyboard } from './input/keyboard.js';
+import { loadCampaign, loadSettings, createCampaignStore } from './session/campaign-store.js';
 import { setArmyContextVisible } from './army-controls.js';
 import { updateArmyRecruitment } from './army-recruitment.js';
 import { updateTechTree } from './tech-tree.js';
@@ -9,6 +19,7 @@ import {
 } from './factory-plans.js';
 import { MultiplayerUI } from './multiplayer.js';
 import { DistrictHUD } from './districts.js';
+import { FrontlineHUD } from './frontline.js';
 import { executeCommand } from '../network/commands.js';
 import { $, num, time, rate, escape } from './format.js';
 import { icon, short } from './icons.js';
@@ -18,69 +29,22 @@ import { renderInspector as renderInspectorView } from './inspector.js';
 import * as E from '../game/index.js';
 import { RTSWorld } from '../rendering/world.js';
 import { GameAudio } from '../audio/game-audio.js';
-const SAVE = 'skyfront-realtime-v3',
-  SETTINGS = 'skyfront-settings-v4';
-let state,
-  resumed = false,
-  loadNotice = '';
-try {
-  const raw = localStorage.getItem(SAVE);
-  if (raw) {
-    state = E.load(raw);
-    resumed = state.time > 0 || state.buildings.length > 2;
-    if (JSON.parse(raw).version < 10 && !localStorage.getItem(SAVE + '-before-deployment10')) {
-      localStorage.setItem(SAVE + '-before-deployment10', raw);
-      loadNotice = 'Пополнение обновлено: выберите тип бойца и укажите место назначения на карте.';
-    }
-    if (JSON.parse(raw).version < 9 && !localStorage.getItem(SAVE + '-before-districts9')) {
-      localStorage.setItem(SAVE + '-before-districts9', raw);
-      loadNotice =
-        'Открыты стратегические районы: захватывайте пехотой, защищайте доход и инфраструктуру.';
-    }
-    if (JSON.parse(raw).version < 8) {
-      localStorage.setItem(SAVE + '-before-infantry8', raw);
-      loadNotice = 'Пехота и группы обновлены. Старые пушки заменены на МОГ с компенсацией.';
-    }
-    if (JSON.parse(raw).version === 6) {
-      localStorage.setItem(SAVE + '-before-army7', raw);
-      loadNotice = 'Кампания обновлена: армия, маршруты, перегрев ПВО и смена суток.';
-    }
-    if (JSON.parse(raw).version < 6) {
-      localStorage.setItem(SAVE + '-before-combat6', raw);
-      loadNotice =
-        'Карта полностью открыта. Разведчики убраны, ресурсы возвращены. Сохранение обновлено.';
-    }
-    if (JSON.parse(raw).version === 4) {
-      localStorage.setItem(SAVE + '-before-recon', raw);
-    }
-    if (JSON.parse(raw).version === 3) {
-      localStorage.setItem(SAVE + '-before-roads', raw);
-      loadNotice = 'Дорожная система обновлена. Подведите улицы к старым предприятиям.';
-    }
-  }
-} catch {
-  loadNotice = 'Не удалось прочитать кампанию. Предыдущее сохранение оставлено в браузере.';
-}
-state ||= E.createGame();
-let settings = { sound: true, volume: 0.35, shake: 0.45 };
-try {
-  Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}'));
-} catch {}
+// Access storage lazily: disabled browser storage must still reach the load fallback.
+const storage = {
+  getItem: (key) => localStorage.getItem(key),
+  setItem: (key, value) => localStorage.setItem(key, value),
+};
+let { state, resumed, loadNotice } = loadCampaign(storage, E);
+const settings = loadSettings(storage);
 let world,
   lobby,
   started = false,
   paused = true,
-  replacingCampaign = false,
   tab = 'city',
   tool = null,
   selected = null,
   panel = null,
-  weapon = 'drone',
   target = 'point',
-  aimPoint = { x: 615, z: 0 },
-  launcherId = null,
-  count = 1,
-  aiming = false,
   acc = 0,
   saveTimer = 0,
   uiTimer = 0,
@@ -88,8 +52,6 @@ let world,
   lastResult = null,
   toastTimer,
   lastRaid = -10,
-  waypoints = [],
-  routeEditing = false,
   armySelection = [],
   troopMode = null,
   rallyId = null,
@@ -108,8 +70,55 @@ let world,
   interactionRevision = 0,
   campaignEpoch = 0;
 const audio = new GameAudio();
+const campaignStore = createCampaignStore({
+  storage,
+  game: E,
+  notify: toast,
+  reload: () => location.reload(),
+});
 audio.set(settings.sound, settings.volume);
+const armyNavigation = createArmyNavigation({
+  game: E,
+  getState: () => state,
+  getSelection: () => armySelection,
+  getWorld: () => world,
+  selectArmy,
+  toast,
+});
 
+const commandExecutor = createCommandExecutor({
+  getState: () => state,
+  getSession: () => network,
+  getEpoch: () => campaignEpoch,
+  executeLocal: executeCommand,
+});
+const strike = createStrikeController({
+  game: E,
+  getState: () => state,
+  getWorld: () => world,
+  getStarted: () => started,
+  getRevision: () => interactionRevision,
+  execute,
+  home,
+  persist,
+  updateHUD,
+  toast,
+  document,
+  query: $,
+  interaction: {
+    clearTroopTarget,
+    clearArmySelection,
+    openPanel,
+    chooseBuild,
+    getBuildTool: () => tool,
+    clearInspection: () => {
+      panel = null;
+      selected = null;
+      world.select(null);
+      $('#panel').hidden = $('#inspector').hidden = true;
+    },
+  },
+});
 $('#app').innerHTML = gameLayout(resumed);
 try {
   world = new RTSWorld($('#world'), state, {
@@ -149,7 +158,8 @@ lobby = new MultiplayerUI({
 });
 const networkStatus = document.createElement('div');
 const districtHUD = new DistrictHUD({
-  canInteract: () => started && !panel && !aiming && !troopMode && !tool && lobby.host.hidden,
+  canInteract: () =>
+    started && !panel && !strike.model.aiming && !troopMode && !tool && lobby.host.hidden,
   onFocus: (id) => {
     const d = E.DISTRICT_BY_ID[id];
     if (d) {
@@ -159,6 +169,13 @@ const districtHUD = new DistrictHUD({
   },
   onCapture: orderDistrict,
   onRepair: repairDistrict,
+});
+const frontlineHUD = new FrontlineHUD({
+  onFocus: (sector) => {
+    world.focus(sector.x, sector.z, 300);
+    world.controls.focusInput();
+  },
+  onVisibility: (visible) => world.setFrontlineVisible(visible),
 });
 networkStatus.id = 'network-status';
 networkStatus.hidden = true;
@@ -191,13 +208,8 @@ renderWelcomeSetup();
 document.querySelector('.topline > span:last-child').id = 'opponent-rule';
 renderOpponentRule();
 renderGroups();
-async function execute(type, args) {
-  const epoch = campaignEpoch,
-    session = network;
-  const result = session ? await session.command(type, args) : executeCommand(state, 0, type, args);
-  return epoch === campaignEpoch && session === network
-    ? result
-    : 'Команда относится к завершённой сессии';
+function execute(type, args) {
+  return commandExecutor(type, args);
 }
 function home(side = 0) {
   return (
@@ -234,7 +246,7 @@ function applyNetworkState(next, room) {
     const own = home(),
       enemy = home(1);
     world.focus(own.x, own.z);
-    aimPoint = { x: enemy.x, z: enemy.z };
+    strike.model.aimPoint = { x: enemy.x, z: enemy.z };
     networkApplied = true;
     started = true;
     buildList();
@@ -306,41 +318,17 @@ function toast(text, danger = false) {
   toastTimer = setTimeout(() => ($('#notice').hidden = true), 3600);
 }
 function persist() {
-  if (replacingCampaign || network) return;
-  try {
-    localStorage.setItem(SAVE, E.save(state));
-  } catch {
-    toast('Не удалось сохранить. Экспортируйте кампанию в настройках.', true);
-  }
+  campaignStore.persist(state, network);
 }
-// Store the replacement before navigation. The old unload/autosave handlers must not restore the outgoing game.
 function replaceCampaign(next) {
-  if (network) {
-    toast('Сначала завершите сетевую сессию');
-    return;
-  }
-  if (replacingCampaign) return;
-  try {
-    const previous = E.save(state),
-      replacement = E.save(next);
-    localStorage.setItem(SAVE + '-backup', previous);
-    localStorage.setItem(SAVE, replacement);
-  } catch {
-    toast(
-      'Не удалось записать новую кампанию. Экспортируйте сохранение и проверьте доступ к хранилищу.',
-      true,
-    );
-    return;
-  }
-  replacingCampaign = true;
-  started = false;
-  paused = true;
-  acc = 0;
-  location.reload();
+  campaignStore.replace(next, state, network, () => {
+    started = false;
+    paused = true;
+    acc = 0;
+  });
 }
 function saveSettings() {
-  localStorage.setItem(SETTINGS, JSON.stringify(settings));
-  audio.set(settings.sound, settings.volume);
+  campaignStore.saveSettings(settings, audio);
 }
 function pause(value) {
   if (network) return;
@@ -368,7 +356,7 @@ function begin() {
   if (loadNotice) toast(loadNotice);
 }
 function frame(dt) {
-  if (!world || replacingCampaign) return;
+  if (!world || campaignStore.replacing) return;
   if (network) {
     network.renderInto(state);
     world.simLead = 0;
@@ -392,7 +380,7 @@ function frame(dt) {
     uiTimer = 0;
     updateHUD();
     updateLivePanel();
-    if (aiming) updateStrikeHUD();
+    if (strike.model.aiming) updateStrikeHUD();
     if (troopMode === 'deploy') previewDeployment(deployPoint, true);
     if (
       !pointerBusy &&
@@ -478,10 +466,13 @@ function updateWeatherChip() {
 function updateHUD() {
   updateRadarChip();
   updateWeatherChip();
+  frontlineHUD.update(state, {
+    visible: started && !panel && !strike.model.aiming && !troopMode && !tool && lobby.host.hidden,
+  });
   districtHUD.update(
     state,
     armySelection,
-    started && !panel && !aiming && !troopMode && !tool && lobby.host.hidden,
+    started && !panel && !strike.model.aiming && !troopMode && !tool && lobby.host.hidden,
   );
   const f = state.sides[0],
     e = E.economy(state, 0);
@@ -583,7 +574,7 @@ function chooseBuild(key) {
   }
   tool = tool === key ? null : key;
   if (tool) districtHUD.host.hidden = true;
-  aiming = false;
+  strike.model.aiming = false;
   $('#strike-controls').hidden = true;
   world.setAiming(false);
   world.setOrderPreview(null);
@@ -614,7 +605,7 @@ function cancelTool(all = false) {
     const old = tool;
     chooseBuild(old);
   }
-  aiming = false;
+  strike.model.aiming = false;
   world.setAiming(false);
   world.setOrderPreview(null);
   $('#strike-controls').hidden = true;
@@ -622,7 +613,7 @@ function cancelTool(all = false) {
   $('#mode-status').textContent = 'WASD · ПКМ — убрать / вращать · колесо — масштаб';
   if (all) {
     clearArmySelection();
-    routeEditing = false;
+    strike.model.routeEditing = false;
     panel = null;
     selected = null;
     world.select(null);
@@ -667,129 +658,25 @@ async function placeRoad(a, b) {
   return true;
 }
 function attackAim() {
-  return { ...aimPoint, waypoints: weapon === 'ballistic' ? [] : waypoints };
+  return strike.attackAim();
 }
 function refreshOrderPreview() {
-  world.setOrderPreview(aiming ? { key: weapon, siteId: launcherId, aim: attackAim() } : null);
+  return strike.refreshOrderPreview();
 }
-function previewAimPoint(p) {
-  if (!aiming) return;
-  aimPoint = { x: p.x, z: p.z };
-  refreshOrderPreview();
+function previewAimPoint(point) {
+  return strike.previewAimPoint(point);
 }
 function updateSiteSelect(select) {
-  const sites = state.buildings.filter(
-      (b) => b.side === 0 && b.key === 'launcher' && b.hp > 0 && !b.demolished,
-    ),
-    sig = sites.map((b) => b.id).join(',');
-  if (select.dataset.signature !== sig) {
-    select.innerHTML =
-      '<option value="auto">Автовыбор площадки</option>' +
-      sites.map((b) => `<option value="${b.id}"></option>`).join('');
-    select.dataset.signature = sig;
-  }
-  for (const b of sites)
-    select.querySelector(`[value="${b.id}"]`).textContent =
-      `#${b.id} · ${Math.round(b.x)}, ${Math.round(b.z)} · ${b.progress < 1 ? 'строится' : `в очереди ${E.queuedLaunches(state, b)}/${E.COMBAT.queueLimit}`}`;
-  select.value = launcherId == null ? 'auto' : String(launcherId);
+  return strike.updateSiteSelect(select);
 }
 function updateStrikeHUD() {
-  const d = E.WEAPONS[weapon],
-    site = E.selectedLaunchSite(state, 0, launcherId),
-    available = state.sides[0].inventory[weapon],
-    error = E.launchStatus(state, 0, weapon, attackAim(), launcherId);
-  $('#strike-name').textContent = d.name;
-  $('#strike-stock').textContent = `На складе: ${available}`;
-  for (const b of document.querySelectorAll('[data-salvo]'))
-    b.classList.toggle('active', Number(b.dataset.salvo) === count);
-  updateSiteSelect($('#strike-site'));
-  const distance = site ? E.flightRoute(site, attackAim(), weapon).at(-1).d : 0;
-  const quickSignature =
-    weapon + JSON.stringify(state.sides[0].inventory) + state.sides[0].tech.join(',');
-  if ($('#quick-weapons').dataset.signature !== quickSignature) {
-    $('#quick-weapons').dataset.signature = quickSignature;
-    $('#quick-weapons').innerHTML = Object.entries(E.WEAPONS)
-      .map(
-        ([key, w], i) =>
-          `<button data-weapon="${key}" class="${key === weapon ? 'active' : ''}" ${w.tech && !state.sides[0].tech.includes(w.tech) ? 'disabled' : ''} title="${w.name} · ${['Z', 'X', 'C', 'V'][i]}">${['Лёгкие', 'Тяжёлые', 'Крылатые', 'Баллист.'][i]}<b>${state.sides[0].inventory[key]}</b></button>`,
-      )
-      .join('');
-  }
-  $('#route-toggle').textContent = routeEditing ? 'Готово · наводить' : 'Задать маршрут';
-  $('#route-toggle').disabled = weapon === 'ballistic';
-  $('#waypoint-status').textContent =
-    weapon === 'ballistic'
-      ? 'Баллистическая ракета летит по прямой дуге'
-      : routeEditing
-        ? `Кликайте точки пути: ${waypoints.length}/10. Затем «Готово» и цель.`
-        : `Точек: ${waypoints.length}/10 · Shift + ЛКМ — добавить точку`;
-  $('#strike-note').textContent =
-    error ||
-    `Радиус ${d.blast} · полёт ≈ ${Math.ceil(distance / d.speed)} с · за клик ×${Math.min(count, available, E.COMBAT.queueLimit - E.queuedLaunches(state, site))}`;
-  $('#strike-note').classList.toggle('warning', !!error);
+  return strike.updateStrikeHUD();
 }
-function armStrike(key = weapon) {
-  clearTroopTarget();
-  clearArmySelection();
-  const d = E.WEAPONS[key];
-  if (!d) return;
-  if (d.tech && !state.sides[0].tech.includes(d.tech)) {
-    openPanel('research', true);
-    return;
-  }
-  const wasAiming = aiming;
-  if (tool) chooseBuild(tool);
-  weapon = key;
-  if (key === 'ballistic') routeEditing = false;
-  panel = null;
-  selected = null;
-  world.select(null);
-  $('#panel').hidden = $('#inspector').hidden = true;
-  aiming = true;
-  world.setAiming(true);
-  $('#strike-controls').hidden = false;
-  $('#world').classList.add('aiming');
-  $('#mode-status').textContent = 'ЛКМ — отправить · ПКМ — убрать · зажать ПКМ — ракурс';
-  if (!wasAiming) {
-    const enemy = home(1);
-    world.focus(enemy.x, enemy.z);
-  }
-  refreshOrderPreview();
-  updateStrikeHUD();
+function armStrike(key = strike.model.weapon) {
+  return strike.armStrike(key);
 }
-async function chooseAimPoint(p, modifiers = {}) {
-  if (!started || !aiming) return;
-  const revision = interactionRevision;
-  if ((routeEditing || modifiers.shift) && weapon !== 'ballistic') {
-    if (waypoints.length >= 10) {
-      toast('До 10 точек маршрута', true);
-      return;
-    }
-    if (Math.abs(p.x) > E.MAP.width / 2 || Math.abs(p.z) > E.MAP.depth / 2) {
-      toast('Точка за картой', true);
-      return;
-    }
-    waypoints.push({ x: p.x, z: p.z });
-    refreshOrderPreview();
-    updateStrikeHUD();
-    return;
-  }
-  aimPoint = { x: p.x, z: p.z };
-  const site = E.selectedLaunchSite(state, 0, launcherId),
-    result = await execute('launch', { key: weapon, aim: attackAim(), count, siteId: launcherId });
-  if (revision !== interactionRevision) return;
-  if (typeof result === 'string') {
-    toast(result, true);
-    updateStrikeHUD();
-    return;
-  }
-  toast(
-    `Площадка #${site?.id ?? '…'}: в очередь ×${result} → ${Math.round(p.x)}, ${Math.round(p.z)}`,
-  );
-  persist();
-  updateHUD();
-  updateStrikeHUD();
-  refreshOrderPreview();
+function chooseAimPoint(point, modifiers = {}) {
+  return strike.chooseAimPoint(point, modifiers);
 }
 function selectArmy(ids, extend = false) {
   clearTroopTarget();
@@ -803,7 +690,7 @@ function selectArmy(ids, extend = false) {
     chooseBuild(old);
     armySelection = valid;
   }
-  aiming = false;
+  strike.model.aiming = false;
   world.setAiming(false);
   $('#strike-controls').hidden = true;
   world.setOrderPreview(null);
@@ -823,67 +710,18 @@ function selectArmy(ids, extend = false) {
 function renderGroups() {
   renderSquadRoster(state, armySelection);
 }
-// Quick unit switching: every field squad is one stop, units without a squad are their own stop.
-function armyStops() {
-  const field = state.groundUnits.filter(
-      (u) => u.side === 0 && u.hp > 0 && !u.carrierId && !u.civil,
-    ),
-    present = new Set(field.map((u) => u.id)),
-    stops = E.squadRoster(state, 0)
-      .map((g) => g.ids.filter((id) => present.has(id)))
-      .filter((ids) => ids.length);
-  const squadded = new Set(stops.flat());
-  for (const u of field) if (!squadded.has(u.id)) stops.push([u.id]);
-  return stops.sort((a, b) => a[0] - b[0]);
-}
 function focusUnits(ids, distance = null) {
-  const units = state.groundUnits.filter((u) => ids.includes(u.id) && u.hp > 0);
-  if (!units.length) return;
-  world.focus(
-    units.reduce((n, u) => n + u.x, 0) / units.length,
-    units.reduce((n, u) => n + u.z, 0) / units.length,
-    distance ?? Math.min(world.controls.zoomDistance, 320),
-  );
+  return armyNavigation.focusUnits(ids, distance);
 }
 function cycleArmy(step) {
-  const stops = armyStops();
-  if (!stops.length) return toast('Нет войск на поле', true);
-  const current = stops.findIndex((ids) => ids.includes(armySelection[0]));
-  const next = stops[(current + step + stops.length) % stops.length];
-  selectArmy(next);
-  focusUnits(next);
+  return armyNavigation.cycleArmy(step);
 }
-let idleCursor = 0;
 function nextIdleUnit() {
-  const idle = state.groundUnits
-    .filter(
-      (u) =>
-        u.side === 0 &&
-        u.hp > 0 &&
-        !u.carrierId &&
-        !u.path?.length &&
-        !u.guard &&
-        !u.digging &&
-        !u.delivery &&
-        !u.routeState &&
-        !['attack', 'attackmove', 'deliver'].includes(u.order?.mode),
-    )
-    .sort((a, b) => a.id - b.id);
-  if (!idle.length) return toast('Все войска заняты');
-  const u = idle.find((v) => v.id > idleCursor) || idle[0];
-  idleCursor = u.id;
-  selectArmy([u.id]);
-  focusUnits([u.id], 220);
-  toast(`Без приказа: ${idle.length}`);
+  return armyNavigation.nextIdleUnit();
 }
 function selectSimilar(id, extend = false) {
-  const t = state.groundUnits.find((u) => u.id === id && u.side === 0 && u.hp > 0);
-  if (!t) return;
-  const ids = world.unitsOnScreen((u) => u.key === t.key);
-  selectArmy(ids.length ? ids : [id], extend);
-  toast(`${E.GROUND_UNITS[t.key].name}: ${ids.length || 1} на экране`);
+  return armyNavigation.selectSimilar(id, extend);
 }
-let lastGroupTap = { n: 0, at: 0 };
 function beginDeployment(key) {
   if (!E.GROUND_UNITS[key]) return;
   cancelTool(true);
@@ -1144,7 +982,7 @@ function select(id, extend = false) {
   const passenger = state.groundUnits.find((u) => u.id === id && u.side === 0 && u.carrierId);
   if (passenger) id = passenger.carrierId;
   const t = E.observedTarget(state, 0, id);
-  if (aiming) {
+  if (strike.model.aiming) {
     if (t) chooseAimPoint(t);
     return;
   }
@@ -1172,7 +1010,7 @@ function select(id, extend = false) {
     return;
   }
   if (t.side === 1 && t.hp > 0) {
-    aimPoint = { x: t.x, z: t.z };
+    strike.model.aimPoint = { x: t.x, z: t.z };
     openPanel('attack', true);
     return;
   }
@@ -1189,7 +1027,7 @@ function openPanel(name, force = false) {
   clearTroopTarget();
   clearArmySelection();
   if (tool) chooseBuild(tool);
-  aiming = false;
+  strike.model.aiming = false;
   $('#strike-controls').hidden = true;
   world.setAiming(false);
   world.setOrderPreview(null);
@@ -1208,8 +1046,8 @@ function renderPanel() {
   $('#panel').classList.toggle('tree-panel', panel === 'research');
   $('#panel').innerHTML = panelHTML({
     panel,
-    weapon,
-    count,
+    weapon: strike.model.weapon,
+    count: strike.model.count,
     settings,
     state,
     armyCategory,
@@ -1259,7 +1097,7 @@ function updateLivePanel() {
       const stock = $(`[data-stock="${key}"]`);
       if (stock) stock.textContent = f.inventory[key];
       const row = $(`[data-row="${key}"]`);
-      row?.classList.toggle('chosen', weapon === key);
+      row?.classList.toggle('chosen', strike.model.weapon === key);
       const d = E.WEAPONS[key],
         locked = d.tech && !f.tech.includes(d.tech);
       $(`[data-produce="${key}"]`).disabled = !!locked;
@@ -1279,11 +1117,18 @@ function updateLivePanel() {
           )
           .join(' · ')
       : 'Для производства нужен сборочный завод';
-    const error = E.launchStatus(state, 0, weapon, attackAim(), launcherId);
-    $('#launch-button').textContent = 'Наводить: ' + E.WEAPONS[weapon].name.toLowerCase();
+    const error = E.launchStatus(
+      state,
+      0,
+      strike.model.weapon,
+      attackAim(),
+      strike.model.launcherId,
+    );
+    $('#launch-button').textContent =
+      'Наводить: ' + E.WEAPONS[strike.model.weapon].name.toLowerCase();
     $('#launch-button').disabled = false;
     $('#route-status').textContent =
-      `Радиус ${E.WEAPONS[weapon].blast} · ${count} за клик · очередь площадки до 12`;
+      `Радиус ${E.WEAPONS[strike.model.weapon].blast} · ${strike.model.count} за клик · очередь площадки до 12`;
     $('#launch-status').textContent =
       error || 'Выберите название вооружения — затем запускайте кликами по карте.';
     $('#launch-status').classList.toggle('warning', !!error);
@@ -1361,16 +1206,88 @@ function updateLivePanel() {
     }
   }
 }
-function send() {
-  armStrike(weapon);
-}
-document.addEventListener('pointerdown', () => {
-  pointerBusy = true;
-  audio.unlock();
+const campaignActions = createCampaignActions({
+  game: E,
+  getState: () => state,
+  isNetwork: () => !!network,
+  getDifficulty: () => chosenDifficulty,
+  persist,
+  replaceCampaign,
+  toast,
+  files: browserCampaignFiles({ document, input: $('#import-file') }),
 });
-document.addEventListener('pointerup', () => (pointerBusy = false));
-document.addEventListener('pointercancel', () => (pointerBusy = false));
-window.addEventListener('blur', () => (pointerBusy = false));
+// Add new data-action commands here; modules receive only their named ports.
+const actionRouter = createActionRouter({
+  ...campaignActions.actions,
+  ...strike.actions,
+  ...armyNavigation.actions,
+  'army-stop': () => {
+    troopCommand('stop');
+  },
+  network: () => {
+    lobby.open();
+  },
+  'network-leave': () => {
+    lobby.leave();
+  },
+  start: () => {
+    begin();
+  },
+  pause: () => {
+    if (started) {
+      pause(!paused);
+    }
+  },
+  sound: () => {
+    settings.sound = !settings.sound;
+    saveSettings();
+    updateHUD();
+  },
+  home: () => {
+    const own = home();
+    world.focus(own.x, own.z);
+  },
+  enemy: () => {
+    const enemy = home(1);
+    world.focus(enemy.x, enemy.z);
+  },
+  'close-panel': () => {
+    panel = null;
+    world.setOrderPreview(null);
+    $('#panel').hidden = true;
+    world.controls.focusInput();
+  },
+  deselect: () => {
+    clearTroopTarget();
+    clearArmySelection();
+    selected = null;
+    world.select(null);
+    $('#inspector').hidden = true;
+  },
+  'cancel-strike': () => {
+    cancelTool(true);
+  },
+});
+actionRouter.register(
+  'auto-defense',
+  createAutoDefenseAction({
+    getSelection: () => armySelection,
+    getEpoch: () => campaignEpoch,
+    getRevision: () => interactionRevision,
+    execute,
+    persist,
+    renderInspector,
+    toast,
+  }),
+);
+bindPointerActivity({
+  document,
+  window,
+  setBusy: (value) => {
+    pointerBusy = value;
+  },
+  unlockAudio: () => audio.unlock(),
+});
 document.addEventListener('click', async (ev) => {
   const b = ev.target.closest('button');
   if (!b || b.disabled) return;
@@ -1387,7 +1304,8 @@ document.addEventListener('click', async (ev) => {
   if (d.build) chooseBuild(d.build);
   if (d.panel) {
     const b = E.targetById(state, selected);
-    if (d.panel === 'attack' && b?.side === 0 && b.key === 'launcher') launcherId = b.id;
+    if (d.panel === 'attack' && b?.side === 0 && b.key === 'launcher')
+      strike.model.launcherId = b.id;
     openPanel(d.panel);
   }
   if (d.difficulty && E.DIFFICULTY[d.difficulty]) {
@@ -1507,7 +1425,7 @@ document.addEventListener('click', async (ev) => {
     }
   }
   if (d.salvo) {
-    count = Number(d.salvo);
+    strike.model.count = Number(d.salvo);
     updateStrikeHUD();
   }
   if (d.produce) {
@@ -1578,91 +1496,7 @@ document.addEventListener('click', async (ev) => {
     persist();
   }
   const a = d.action;
-  if (a === 'route') {
-    routeEditing = !routeEditing;
-    updateStrikeHUD();
-  }
-  if (a === 'route-undo') {
-    waypoints.pop();
-    refreshOrderPreview();
-    updateStrikeHUD();
-  }
-  if (a === 'route-clear') {
-    waypoints = [];
-    refreshOrderPreview();
-    updateStrikeHUD();
-  }
-  if (a === 'army-focus') {
-    const units = state.groundUnits.filter((u) => armySelection.includes(u.id));
-    if (units.length)
-      world.focus(
-        units.reduce((n, u) => n + u.x, 0) / units.length,
-        units.reduce((n, u) => n + u.z, 0) / units.length,
-        220,
-      );
-  }
-  if (a === 'army-stop') troopCommand('stop');
-  if (a === 'army-all') {
-    const units = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0 && !u.civil);
-    if (units.length) {
-      selectArmy(units.filter((u) => !u.carrierId).map((u) => u.id));
-    } else toast('Подготовьте отряды в казармах');
-  }
-  if (a === 'network') lobby.open();
-  if (a === 'network-leave') lobby.leave();
-  if (a === 'start') begin();
-  if (a === 'pause' && started) pause(!paused);
-  if (a === 'sound') {
-    settings.sound = !settings.sound;
-    saveSettings();
-    updateHUD();
-  }
-  if (a === 'home') {
-    const own = home();
-    world.focus(own.x, own.z);
-  }
-  if (a === 'enemy') {
-    const enemy = home(1);
-    world.focus(enemy.x, enemy.z);
-  }
-  if (a === 'close-panel') {
-    panel = null;
-    world.setOrderPreview(null);
-    $('#panel').hidden = true;
-    world.controls.focusInput();
-  }
-  if (a === 'deselect') {
-    clearTroopTarget();
-    clearArmySelection();
-    selected = null;
-    world.select(null);
-    $('#inspector').hidden = true;
-  }
-  if (a === 'launch') send();
-  if (a === 'aim') armStrike(weapon);
-  if (a === 'cancel-strike') cancelTool(true);
-  if (a === 'save') {
-    persist();
-    toast(network ? 'Матч хранится на сервере во время сессии' : 'Сохранено');
-  }
-  if (network && ['export', 'import', 'new-confirm', 'new'].includes(a)) {
-    toast('Сначала завершите сетевую сессию');
-    return;
-  }
-  if (a === 'export') {
-    const url = URL.createObjectURL(new Blob([E.save(state)], { type: 'application/json' })),
-      link = document.createElement('a');
-    link.href = url;
-    link.download = `skyfront-city-${Math.floor(state.time)}.json`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-  }
-  if (a === 'import') $('#import-file').click();
-  if (a === 'new-confirm') {
-    b.dataset.action = 'new';
-    b.textContent = 'Подтвердить новую игру';
-  }
-  if (a === 'new') replaceCampaign(E.createGame(undefined, { difficulty: chosenDifficulty }));
+  await actionRouter.dispatch(a, b, ev);
 });
 document.addEventListener('input', (ev) => {
   if (ev.target.id === 'shake') {
@@ -1677,7 +1511,7 @@ document.addEventListener('input', (ev) => {
     saveSettings();
   }
   if (ev.target.id === 'salvo-count') {
-    count = Math.max(1, Math.min(6, Number(ev.target.value) || 1));
+    strike.model.count = Math.max(1, Math.min(6, Number(ev.target.value) || 1));
     updateLivePanel();
   }
 });
@@ -1718,195 +1552,87 @@ document.addEventListener('change', async (ev) => {
     persist();
   }
   if (ev.target.id === 'strike-site') {
-    launcherId = ev.target.value === 'auto' ? null : Number(ev.target.value);
+    strike.model.launcherId = ev.target.value === 'auto' ? null : Number(ev.target.value);
     updateStrikeHUD();
     refreshOrderPreview();
   }
   if (ev.target.id === 'launch-site') {
-    launcherId = ev.target.value === 'auto' ? null : Number(ev.target.value);
+    strike.model.launcherId = ev.target.value === 'auto' ? null : Number(ev.target.value);
     updateLivePanel();
   }
   if (ev.target.id === 'attack-target') {
     const t = E.targetById(state, Number(ev.target.value));
-    if (t) aimPoint = { x: t.x, z: t.z };
-    armStrike(weapon);
+    if (t) strike.model.aimPoint = { x: t.x, z: t.z };
+    armStrike(strike.model.weapon);
   }
   if (ev.target.matches('select') && panel !== 'settings') world.controls.focusInput();
 });
-$('#import-file').addEventListener('change', async (ev) => {
-  const file = ev.target.files[0];
-  if (!file) return;
-  try {
-    if (file.size > 5e6) throw Error('Файл слишком большой');
-    const imported = E.load(await file.text());
-    replaceCampaign(imported);
-  } catch (e) {
-    toast(e.message, true);
-  }
-  ev.target.value = '';
+$('#import-file').addEventListener('change', campaignActions.importFile);
+bindMinimap($('#minimap'), {
+  focusInput: () => world.controls.focusInput(),
+  focus: (x, z) => world.focus(x, z),
+  map: E.MAP,
 });
-$('#minimap').addEventListener('click', (e) => {
-  world.controls.focusInput();
-  const r = e.currentTarget.getBoundingClientRect();
-  world.focus(
-    ((e.clientX - r.left) / r.width - 0.5) * E.MAP.width,
-    ((e.clientY - r.top) / r.height - 0.5) * E.MAP.depth,
-  );
-});
-window.addEventListener(
-  'keydown',
-  (e) => {
-    if (!started || e.repeat) return;
-    if (e.code === 'Escape') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      if (tool || aiming) cancelTool();
-      else {
-        panel = null;
-        selected = null;
-        world.setOrderPreview(null);
-        world.select(null);
-        $('#panel').hidden = $('#inspector').hidden = true;
-      }
-      clearArmySelection();
-      clearTroopTarget();
-      world.controls.focusInput();
-      return;
-    }
-    if (
-      e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')
-    ) {
-      if (e.code === 'Enter' && e.target.matches('input[type="number"]')) {
-        e.preventDefault();
-        e.target.dispatchEvent(new Event('change', { bubbles: true }));
-        world.controls.focusInput();
-      }
-      return;
-    }
-    if (!started || panel === 'settings' || lobby?.host.hidden === false) return;
-    const digit = /^Digit([1-9])$/.exec(e.code);
-    if (digit && (e.ctrlKey || E.getGroup(state, 0, Number(digit[1])).length)) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      const n = Number(digit[1]);
-      if (e.ctrlKey) {
-        if (armySelection.length) {
-          const ids = [
-            ...new Set(e.shiftKey ? [...E.getGroup(state, 0, n), ...armySelection] : armySelection),
-          ];
-          execute('group', { index: n, ids }).then((result) => {
-            if (typeof result === 'string') toast(result, true);
-            else {
-              persist();
-              renderGroups();
-              toast('Группа ' + n + ' сохранена');
-            }
-          });
+const keyboard = createKeyboardController({
+  getMode: () => ({
+    started,
+    panel,
+    lobbyOpen: lobby?.host.hidden === false,
+    tool,
+    aiming: strike.model.aiming,
+    armySelection,
+    paused,
+  }),
+  focusInput: () => world.controls.focusInput(),
+  army: {
+    getGroup: (n) => E.getGroup(state, 0, n),
+    saveGroup: (index, ids) =>
+      execute('group', { index, ids }).then((result) => {
+        if (typeof result === 'string') toast(result, true);
+        else {
+          persist();
+          renderGroups();
+          toast('Группа ' + index + ' сохранена');
         }
-      } else {
-        const ids = E.getGroup(state, 0, n),
-          now = performance.now();
-        // A second tap of the same group key centres the camera on it.
-        if (!e.shiftKey && lastGroupTap.n === n && now - lastGroupTap.at < 400) focusUnits(ids);
-        lastGroupTap = { n, at: now };
-        selectArmy(ids, e.shiftKey);
-      }
-      return;
-    }
-    if (e.code === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      cycleArmy(e.shiftKey ? -1 : 1);
-      return;
-    }
-    if (e.code === 'Period' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      nextIdleUnit();
-      return;
-    }
-    if (e.code === 'Home' && armySelection.length) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      focusUnits(armySelection);
-      return;
-    }
-    if (e.ctrlKey && e.code === 'KeyA') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      selectArmy(
-        state.groundUnits
-          .filter((u) => u.side === 0 && u.hp > 0 && !u.carrierId && !u.civil)
-          .map((u) => u.id),
-      );
-      return;
-    }
-    const command = {
-      KeyH: 'dig',
-      KeyK: 'camo',
-      KeyY: 'fire',
-      KeyT: 'retreat',
-      KeyU: 'unload',
-      KeyM: 'attackmove',
-      KeyQ: 'fpv',
-      KeyL: 'defendline',
-    }[e.code];
-    if (command && armySelection.length && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      troopCommand(command);
-    }
+      }),
+    clearArmySelection,
+    clearTroopTarget,
+    cycleArmy,
+    nextIdleUnit,
+    focusUnits,
+    selectArmy,
+    troopCommand,
+    selectAll: () => armyNavigation.selectAll(),
   },
-  true,
-);
-window.addEventListener('keydown', (e) => {
-  if (!started || panel === 'settings' || lobby?.host.hidden === false) return;
-  if (
-    e.ctrlKey ||
-    e.metaKey ||
-    e.altKey ||
-    e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])') ||
-    e.repeat
-  )
-    return;
-  if (e.code === 'Space') {
-    e.preventDefault();
-    if (started) pause(!paused);
-  }
-  if (aiming && e.code === 'Enter') {
-    routeEditing = false;
-    updateStrikeHUD();
-  }
-  if (aiming && e.code === 'Backspace') {
-    e.preventDefault();
-    waypoints.pop();
-    refreshOrderPreview();
-    updateStrikeHUD();
-  }
-  const quick = { KeyZ: 'drone', KeyX: 'heavy', KeyC: 'cruise', KeyV: 'ballistic' }[e.code];
-  if (quick && started) armStrike(quick);
-  if (e.code === 'KeyB' && started) openPanel('army');
-  // E — research tree, F — army recruitment, N — arsenal and raids.
-  if (e.code === 'KeyE') openPanel('research');
-  if (e.code === 'KeyF' && started) openPanel('army');
-  if (e.code === 'KeyN') openPanel('attack');
-  const key = {
-    KeyG: 'road',
-    Digit1: 'housing',
-    Digit2: 'industry',
-    Digit3: 'power',
-    Digit4: 'gun',
-    Digit5: 'launcher',
-  }[e.code];
-  if (key && started) chooseBuild(key);
+  tools: {
+    cancelTool,
+    pause,
+    openPanel,
+    chooseBuild,
+    clearInspection: () => {
+      panel = null;
+      selected = null;
+      world.setOrderPreview(null);
+      world.select(null);
+      $('#panel').hidden = $('#inspector').hidden = true;
+    },
+  },
+  strike: {
+    armStrike,
+    finishRoute: strike.finishRoute,
+    undoWaypoint: strike.undoWaypoint,
+  },
 });
-document.addEventListener('visibilitychange', () => {
-  acc = 0;
-  audio.focus(!document.hidden);
-  if (document.hidden && started) persist();
-});
-window.addEventListener('beforeunload', () => {
-  if (started) persist();
+bindKeyboard(window, keyboard);
+bindPageLifecycle({
+  document,
+  window,
+  resetAccumulator: () => {
+    acc = 0;
+  },
+  focusAudio: (visible) => audio.focus(visible),
+  hasStarted: () => started,
+  persist,
 });
 buildList();
 updateHUD();
@@ -1935,9 +1661,10 @@ window.skyfront = {
   troopCommand,
   getOrder: () => ({
     troopMode,
-    weapon,
-    waypoints: structuredClone(waypoints),
-    routeEditing,
+    weapon: strike.model.weapon,
+    waypoints: structuredClone(strike.model.waypoints),
+    routeEditing: strike.model.routeEditing,
     armySelection: [...armySelection],
   }),
 };
+openMultiplayerEntry({ pageURL: location.href, lobby, onError: (message) => toast(message, true) });

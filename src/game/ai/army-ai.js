@@ -7,6 +7,7 @@ import { unloadGround, boardGround } from '../units/vehicles/transport.js';
 import { launchFPV } from '../units/infantry/fpv.js';
 import { updateDistrictAI } from './district-ai.js';
 import { difficultyOf } from './difficulty.config.js';
+import { guardGround } from '../units/ground/guard.js';
 export function updateArmyAI(s, hooks) {
   if (s.mode === 'multiplayer') return;
   const { random } = hooks;
@@ -60,6 +61,12 @@ export function updateArmyAI(s, hooks) {
         !GROUND_UNITS[u.key].support &&
         !u.downed
       ) {
+        // Preserve the old emergency retreat of the bot's own defense detail.
+        // Pinned or manually assigned guards keep their explicit post.
+        if (u.guard && u.aiDefender && u.autoDefense && u.hp / u.maxHp < 0.25) {
+          commandUnits(s, 1, [u.id], 'retreat');
+          continue;
+        }
         if (u.guard) continue;
         if (u.delivery) continue;
         if (u.routeState) continue;
@@ -75,12 +82,8 @@ export function updateArmyAI(s, hooks) {
           ).sort(
             (a, b) => Math.hypot(a.x - u.x, a.z - u.z) - Math.hypot(b.x - u.x, b.z - u.z),
           )[0] || { x: own.x - 100, z: 100 };
-          if (Math.hypot(u.x - u.defensePoint.x, u.z - u.defensePoint.z) > 8) {
-            if (!u.path?.length) orderGround(s, 1, [u.id], u.defensePoint);
-          } else {
-            if (!u.trenchId) commandUnits(s, 1, [u.id], 'dig');
-            u.camouflaged = true;
-          }
+          if (typeof guardGround(s, 1, [u.id], u.defensePoint) === 'number') u.autoDefense = true;
+          u.camouflaged = true;
           continue;
         }
         if (GROUND_UNITS[u.key].capacity) {

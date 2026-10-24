@@ -1,6 +1,7 @@
 import * as E from '../game/index.js';
 import { $ } from './format.js';
 import { icon } from './icons.js';
+import { UNIT_PROFILES, unitIllustration } from './unit-profiles.js';
 
 export const ARMY_CATEGORIES = {
   infantry: {
@@ -25,22 +26,25 @@ export function recruitmentHTML({
   recruitPost = 'auto',
 }) {
   const category = ARMY_CATEGORIES[armyCategory] || ARMY_CATEGORIES.infantry;
-  return `<div class="army-category-tabs">${Object.entries(ARMY_CATEGORIES)
+  return `<div class="muster-overview"><div><h2>Соберите свой отряд</h2><p>Выберите роль и назначение пополнения.</p></div><div class="muster-capacity"><b id="army-capacity"></b><span>состав / лимит</span></div></div><nav class="army-category-tabs" aria-label="Роды войск">${Object.entries(
+    ARMY_CATEGORIES,
+  )
     .map(
       ([key, d]) =>
-        `<button data-army-category="${key}" class="${key === armyCategory ? 'active' : ''}">${d.name}</button>`,
+        `<button data-army-category="${key}" aria-pressed="${key === armyCategory}" class="${key === armyCategory ? 'active' : ''}">${d.name}<span>${d.keys.length}</span></button>`,
     )
     .join(
       '',
-    )}</div><div class="recruit-batch"><span>За клик</span><button data-recruit-count="1" class="${recruitCount === 1 ? 'active' : ''}">×1</button><button data-recruit-count="5" class="${recruitCount === 5 ? 'active' : ''}">×5</button><span id="army-capacity"></span></div><div class="recruit-mode"><span>Куда</span><div class="stance-switch" role="group" aria-label="Куда отправлять новых бойцов"><button data-recruit-mode="point" class="${recruitMode === 'point' ? 'active' : ''}" title="Выбрать точку на карте">${icon('hand')}В точку</button><button data-recruit-mode="attack" class="${recruitMode === 'attack' ? 'active' : ''}" title="Сразу идти на штаб противника">${icon('sword')}В атаку</button><button data-recruit-mode="defend" class="${recruitMode === 'defend' ? 'active' : ''}" title="Занять коридор и окопаться">${icon('shield')}Оборона</button></div><select id="recruit-post" aria-label="Коридор для обороны" ${recruitMode === 'defend' ? '' : 'hidden'}><option value="auto" ${recruitPost === 'auto' ? 'selected' : ''}>Коридор: авто</option><option value="north" ${recruitPost === 'north' ? 'selected' : ''}>Северный</option><option value="south" ${recruitPost === 'south' ? 'selected' : ''}>Южный</option></select></div><div class="army-recruit">${category.keys
+    )}</nav><div class="muster-orders"><div class="recruit-batch"><span>Партия</span><button data-recruit-count="1" aria-pressed="${recruitCount === 1}" class="${recruitCount === 1 ? 'active' : ''}">×1</button><button data-recruit-count="5" aria-pressed="${recruitCount === 5}" class="${recruitCount === 5 ? 'active' : ''}">×5</button></div><div class="recruit-mode"><span>Задача</span><div class="stance-switch" role="group" aria-label="Куда отправлять новых бойцов"><button data-recruit-mode="point" class="${recruitMode === 'point' ? 'active' : ''}" title="Выбрать точку на карте">${icon('hand')}В точку</button><button data-recruit-mode="attack" class="${recruitMode === 'attack' ? 'active' : ''}" title="Сразу идти на штаб противника">${icon('sword')}В атаку</button><button data-recruit-mode="defend" class="${recruitMode === 'defend' ? 'active' : ''}" title="Занять оборону">${icon('shield')}Оборона</button></div><select id="recruit-post" aria-label="Пост для обороны" ${recruitMode === 'defend' ? '' : 'hidden'}><option value="auto" ${recruitPost === 'auto' ? 'selected' : ''}>Пост: авто</option><option value="north" ${recruitPost === 'north' ? 'selected' : ''}>Северный</option><option value="south" ${recruitPost === 'south' ? 'selected' : ''}>Южный</option></select></div></div><p class="muster-destination" id="recruit-destination-note"></p><div class="army-recruit" aria-label="Выбор роли бойцов">${category.keys
     .map((key) => {
       const d = E.GROUND_UNITS[key],
-        locked = d.tech && !state.sides[0].tech.includes(d.tech);
-      return `<button data-recruit="${key}" title="${d.role}${locked ? ' Требуется: ' + E.TECH[d.tech].name : ''}"><b>${d.name}</b><small>${d.cost} ₡ · ${d.metal} спл. · ${d.time} с</small><span data-recruit-state="${key}">${locked ? 'Исследование' : 'Нанять +'}</span></button>`;
+        locked = d.tech && !state.sides[0].tech.includes(d.tech),
+        profile = UNIT_PROFILES[key];
+      return `<button class="recruit-card" data-recruit="${key}" title="${d.role}${locked ? ' Требуется: ' + E.TECH[d.tech].name : ''}"><span class="recruit-card-visual">${unitIllustration(key)}<span class="recruit-role">${profile?.[0] || category.name}</span></span><b>${d.name}</b><span class="recruit-specialty">${profile?.[1] || d.role}</span><small class="recruit-cost">${d.cost} ₡ · ${d.metal} спл. · ${d.time} с</small><span class="recruit-readiness" data-recruit-state="${key}">${locked ? 'Нужно исследование' : 'Выбрать роль ↗'}</span></button>`;
     })
     .join(
       '',
-    )}</div><label class="rear-toggle" title="Санитары поднимают раненых, грузовики чинят технику и пополняют боезапас. Всё делается само, пока в армии есть кого лечить и чинить."><input type="checkbox" id="rear-auto"> Тыловая служба: авто · санитары и грузовики</label><div id="army-queue" class="status-note"></div>${autoRecruitmentHTML(state, armyAutomation)}<details class="army-roster"><summary id="army-roster-label">На поле</summary><div id="army-list"></div></details><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-rally="auto" title="Назначить точку сбора новых бойцов">Точка сбора ↗</button><button data-action="army-all">Выбрать армию</button></div><p class="army-panel-hint">Рамка — выбрать · ПКМ — приказ · L — линия обороны</p>`;
+    )}</div><div class="muster-logistics"><details class="army-queue-details"><summary>Подготовка <span id="army-queue-count"></span></summary><div id="army-queue" class="status-note"></div></details>${autoRecruitmentHTML(state, armyAutomation)}<details class="army-roster"><summary id="army-roster-label">На поле</summary><div id="army-list"></div></details><label class="rear-toggle" title="Санитары поднимают раненых, грузовики чинят технику и пополняют боезапас."><input type="checkbox" id="rear-auto"><span>Автоматическая тыловая помощь<small>Санитары и грузовики снабжения</small></span></label></div><div class="quick-build"><button data-build="barracks">+ Казармы</button><button data-rally="auto" title="Назначить точку сбора новых бойцов">Точка сбора ↗</button><button data-action="army-all">Выбрать армию</button></div><p class="army-panel-hint">Рамка — выбрать · ПКМ — приказ · L — линия обороны</p>`;
 }
 
 function autoRecruitmentHTML(state, choice = { siteId: null, key: 'infantry' }) {
@@ -68,6 +72,15 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
   if (rearToggle && document.activeElement !== rearToggle)
     rearToggle.checked = faction.rearAuto !== false;
   $('#army-capacity').textContent = `${units.length + queue} / ${E.GROUND_LIMIT}`;
+  $('#army-queue-count').textContent = queue ? `${queue} в очереди` : 'свободно';
+  $('#recruit-destination-note').textContent =
+    recruitMode === 'attack'
+      ? 'Пополнение сразу выдвинется в атаку на штаб противника.'
+      : recruitMode === 'defend'
+        ? $('#recruit-post').value === 'auto'
+          ? 'Сам выбирает коридор и выделяет ограниченный резерв для усиления прорыва.'
+          : 'Пополнение закрепится за выбранным коридором и будет держать свой участок.'
+        : 'После выбора роли укажите точку назначения на карте.';
   $('#army-queue').textContent =
     sites
       .map((b) =>
@@ -128,8 +141,11 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
       units.length + queue + recruitCount > E.GROUND_LIMIT ||
       ready.reduce((n, b) => n + 8 - (b.armyQueue?.length || 0), 0) < recruitCount;
     button.disabled = !!locked || !ready.length || resources || full;
+    button.classList.toggle('recruit-locked', !!locked);
+    button.classList.toggle('recruit-ready', !button.disabled);
+    button.setAttribute('aria-label', `${d.name}. ${d.role}`);
     $(`[data-recruit-state="${key}"]`).textContent = locked
-      ? 'Исследование'
+      ? `Нужно: ${E.TECH[d.tech].name}`
       : !ready.length
         ? 'Нужны казармы'
         : resources

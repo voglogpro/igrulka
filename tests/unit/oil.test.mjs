@@ -128,7 +128,7 @@ test('a port ship sails to the island exchange, sells surplus oil and comes home
 
 test('old campaigns gain the starting oil stock and an empty fleet; corrupt values are refused', () => {
   const s = fresh();
-  s.version = 11;
+  s.version = 12;
   delete s.ships;
   for (const f of s.sides) delete f.oil;
   const copy = E.load(E.save(s));

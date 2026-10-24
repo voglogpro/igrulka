@@ -1,5 +1,6 @@
 import * as T from '../../../vendor/three/three.module.js';
 import { weatherStyle } from './weather-style.js';
+import { FILM_GRAIN_GLSL } from './film-grain.js';
 const vertexShader = 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
 export class EveningPost {
   constructor(renderer) {
@@ -49,6 +50,7 @@ export class EveningPost {
       fragmentShader: `
    uniform sampler2D frame;uniform sampler2D glow;uniform sampler2D depthFrame;uniform float time;
    uniform mat4 inverseProjection;uniform mat4 cameraWorld;uniform float groundFog;uniform vec3 fogTint;varying vec2 vUv;
+   ${FILM_GRAIN_GLSL}
    void main(){vec3 col=texture2D(frame,vUv).rgb;
     // Depth reconstructs the ground, so the veil never paints over the sky or high roofs.
     if(groundFog>.001){float depth=texture2D(depthFrame,vUv).x;if(depth<.999999){
@@ -64,9 +66,9 @@ export class EveningPost {
     gl_FragColor=vec4(col,1.);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
-    float grain=fract(sin(dot(gl_FragCoord.xy+floor(time*18.),vec2(12.9898,78.233)))*43758.5453)-.5;
+    float grain=filmGrain(gl_FragCoord.xy,time);
     float luminance=dot(gl_FragColor.rgb,vec3(.2126,.7152,.0722));
-    gl_FragColor.rgb+=grain*mix(.029,.015,smoothstep(.1,.85,luminance));
+    gl_FragColor.rgb+=grain*mix(.013,.006,smoothstep(.1,.85,luminance));
    }`,
     });
     this.scene.add(new T.Mesh(geometry, this.material));

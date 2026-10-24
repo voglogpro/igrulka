@@ -1,6 +1,7 @@
 import { walkable } from '../ground/navigation.js';
 import { GROUND_UNITS, isInfantry, groundHeight } from '../../config.js';
 import { orderGround } from '../ground/orders.js';
+import { clearAutoDefense } from '../../defense/volunteers.js';
 export function freeSpot(s, center, radius = 2, start = 0) {
   for (let i = 0; i < 64; i++) {
     const a = (i + start) * 2.399,
@@ -53,6 +54,7 @@ export function boardGround(s, side, ids, carrierId) {
         count++;
       }
     }
+  if (count) clearAutoDefense(vehicle);
   return count || 'Не хватает мест или нет доступных бойцов';
 }
 

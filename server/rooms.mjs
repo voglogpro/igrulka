@@ -26,13 +26,23 @@ export function createRoomServer({
   seed = 1022,
   maxRooms = 16,
   now = () => Date.now(),
+  serverInfo = () => ({ publicUrl: null }),
+  standalone = false,
+  compression = false,
 } = {}) {
-  const http = createGameServer();
+  const http = createGameServer({ serverInfo, standalone });
   const wss = new WebSocketServer({
     server: http,
     path: '/match',
     maxPayload: 16_384,
-    perMessageDeflate: false,
+    perMessageDeflate: compression
+      ? {
+          threshold: 1024,
+          concurrencyLimit: 2,
+          clientNoContextTakeover: true,
+          zlibDeflateOptions: { level: 1, memLevel: 7 },
+        }
+      : false,
   });
   const rooms = new Map();
   let closed = false;

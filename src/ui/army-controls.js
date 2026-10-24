@@ -47,13 +47,35 @@ export function renderArmyControls({ state, armySelection }, primary) {
   const d = E.GROUND_UNITS[primary.key];
   if (host.dataset.id !== signature) {
     host.dataset.id = signature;
-    host.innerHTML = `<div class="army-summary"><button class="army-name" data-action="army-focus" title="Показать выбранную группу"><b>${units.length > 1 ? `${units.length} единиц` : d.name}</b><small id="ground-info"></small></button><div class="health"><i id="inspect-health"></i></div><small id="ground-state"></small></div><div class="army-orders"><div class="stance-row"><span class="stance-label">РЕЖИМ</span><div class="stance-switch" role="group" aria-label="Режим выбранных бойцов"><button data-stance="attack" title="Сразу идти на штаб противника, останавливаясь для боя">${icon('sword')}Атака</button><button data-stance="defend" title="Занять коридор, окопаться и не подпускать врага">${icon('shield')}Оборона</button></div><select id="stance-post" aria-label="Какой коридор оборонять"><option value="auto">Коридор: авто</option><option value="north">Северный коридор</option><option value="south">Южный коридор</option></select><span id="stance-note" class="stance-note"></span></div><div class="army-primary-orders">${commands.map(([key, label, title], i) => `${i && GROUPS.has(key) ? '<i class="order-sep"></i>' : ''}<button data-troop="${key}" title="${title}">${label}</button>`).join('')}${units.some((u) => u.key === 'operator') ? '<button class="fpv-button" data-troop="fpv" title="Q · Навести FPV выбранного оператора">FPV ↗</button>' : ''}</div><div class="army-tools"><label>Строй <select id="formation" aria-label="Построение армии"><option value="line">Линия</option><option value="column">Колонна</option><option value="spread">Рассредоточить</option></select></label><button data-action="army-all" title="Ctrl+A · Все свои войска">Вся армия</button><button data-panel="army">Набор ↗</button><details class="army-details"><summary>Состояние</summary><div><p id="army-detail-text"></p><div id="defense-detail"></div></div></details><span class="army-mouse-hint">ПКМ — приказ · Esc — снять выбор</span></div></div><button class="army-close" data-action="deselect" aria-label="Снять выделение">×</button>`;
+    host.innerHTML = `<div class="army-summary"><button class="army-name" data-action="army-focus" title="Показать выбранную группу"><b>${units.length > 1 ? `${units.length} единиц` : d.name}</b><small id="ground-info"></small></button><div class="health"><i id="inspect-health"></i></div><small id="ground-state"></small></div><div class="army-orders"><div class="stance-row"><span class="stance-label">РЕЖИМ</span><div class="stance-switch" role="group" aria-label="Режим выбранных бойцов"><button data-stance="attack" title="Сразу идти на штаб противника, останавливаясь для боя">${icon('sword')}Атака</button><button data-stance="defend" title="Занять коридор, окопаться и не подпускать врага">${icon('shield')}Оборона</button></div><select id="stance-post" aria-label="Какой коридор оборонять"><option value="auto">Коридор: авто</option><option value="north">Северный коридор</option><option value="south">Южный коридор</option></select><span id="stance-note" class="stance-note"></span></div><div class="army-primary-orders">${commands.map(([key, label, title], i) => `${i && GROUPS.has(key) ? '<i class="order-sep"></i>' : ''}<button data-troop="${key}" title="${title}">${label}</button>`).join('')}${units.some((u) => u.key === 'operator') ? '<button class="fpv-button" data-troop="fpv" title="Q · Навести FPV выбранного оператора">FPV ↗</button>' : ''}</div><div class="army-tools"><label>Строй <select id="formation" aria-label="Построение армии"><option value="line">Линия</option><option value="column">Колонна</option><option value="spread">Рассредоточить</option></select></label><button data-action="army-all" title="Ctrl+A · Все свои войска">Вся армия</button><button data-panel="army">Набор ↗</button><button class="auto-defense-toggle" data-action="auto-defense" data-enabled="true" aria-pressed="false" title="Оборона сама усиливает прорывы; прямой приказ отменяет участие">Поддерживать фронт</button><details class="army-details"><summary>Состояние</summary><div><p id="army-detail-text"></p><p id="army-auto-defense-note"></p><div id="defense-detail"></div></div></details><span class="army-mouse-hint">ПКМ — приказ · Esc — снять выбор</span></div></div><button class="army-close" data-action="deselect" aria-label="Снять выделение">×</button>`;
     $('#formation').value = state.formations[0];
   }
   const hp = units.reduce((n, u) => n + u.hp, 0),
     maxHp = units.reduce((n, u) => n + u.maxHp, 0);
   $('#inspect-health').style.width = `${(hp / maxHp) * 100}%`;
   const moving = units.filter((u) => u.path?.length).length;
+  const candidates = units.filter(
+    (u) => !E.GROUND_UNITS[u.key]?.support && !u.civil && !u.downed && !u.carrierId,
+  );
+  const volunteers = candidates.filter((u) => u.autoDefense);
+  const autoButton = host.querySelector('[data-action="auto-defense"]');
+  const autoState = volunteers.length === candidates.length && volunteers.length > 0;
+  autoButton.dataset.enabled = String(!autoState);
+  autoButton.setAttribute(
+    'aria-pressed',
+    autoState ? 'true' : volunteers.length ? 'mixed' : 'false',
+  );
+  autoButton.disabled = !candidates.some((u) => u.guard && !u.boardingId && !u.delivery);
+  autoButton.title = !candidates.length
+    ? 'Поддержка фронта доступна боевым частям вне транспорта'
+    : autoButton.disabled
+      ? 'Сначала назначьте бойцам охрану или оборону поста'
+      : 'Оборона сама усиливает прорывы; прямой приказ отменяет участие';
+  const reinforcing = volunteers.filter((u) => u.defenseTask && !u.defenseTask.returning).length;
+  const returning = volunteers.filter((u) => u.defenseTask?.returning).length;
+  host.querySelector('#army-auto-defense-note').textContent = volunteers.length
+    ? `Поддержка фронта: ${volunteers.length - reinforcing - returning} в резерве · ${reinforcing} усиливают участок · ${returning} возвращаются. Прямой приказ отменяет участие.`
+    : 'Поддержка фронта отключена. Защитники держат назначенные позиции.';
   const reloading = units.filter((u) => (u.groundReload || u.reloadLeft) > 0).length;
   $('#ground-info').textContent =
     `${Math.ceil(hp)} / ${maxHp} · ${moving ? `${moving} в пути` : 'на позиции'}`;
@@ -70,6 +92,12 @@ export function renderArmyControls({ state, armySelection }, primary) {
       : `${rank ? '★'.repeat(rank) + ' · ' : ''}${primary.guard ? 'Охрана · ' : ''}${cover.kind} · ${Math.round((primary.suppression || 0) * 100)}% подавление${primary.digging ? ' · роет окоп' : ''}${primary.carrierId ? ' · в транспорте' : ''}`;
   $('#army-detail-text').textContent =
     `${d.role} Опыт ${Math.floor(primary.xp || 0)}/450 · ранг ${rank}. ${magazineText} ${primary.key === 'operator' ? `FPV ${primary.fpvAmmo ?? 3}/3, готов через ${Math.max(0, Math.ceil((primary.fpvReady || 0) - state.time))} с.` : ''}`;
+  const position = state.trenches.find((t) => t.id === primary.trenchId && t.side === primary.side);
+  if (position) {
+    const status = E.fortificationStatus(position);
+    $('#army-detail-text').textContent +=
+      ` ${status.label}: ${status.level}/3${status.level < 3 ? ` · следующий этап ${Math.round(status.nextProgress * 100)}%` : ''}. Защита позиции ${Math.round(status.cover * 100)}%. Улучшение требует времени, денег и сплавов.`;
+  }
   if (units.length === 1 && d.capacity) {
     const seats = (field) =>
       state.groundUnits

@@ -25,7 +25,7 @@ try:
                 page.on('response', lambda r: report['errors'].append(f'HTTP {r.status} {r.url}') if r.status>=400 else None)
             page.goto(target, wait_until='load', timeout=120000)
             page.wait_for_function('Boolean(window.skyfront)')
-            assert page.title().startswith('8.6.0')
+            assert page.title().startswith('8.7.0')
             page.locator('[data-action="start"]').click()
             page.keyboard.press('Space')
             assert page.evaluate('skyfront.isPaused()')
@@ -39,6 +39,11 @@ try:
             assert page.locator('#formation').is_visible()
             assert page.evaluate('skyfront.getWorld().groundModels.size')==6
             assert page.evaluate('skyfront.getWorld().renderer.info.render.calls')>0
+            page.evaluate('skyfront.openPanel("settings",true)')
+            page.locator('#panel [data-action="network"]').click()
+            assert page.evaluate('getComputedStyle(document.querySelector("#network-lobby")).zIndex')=='80'
+            assert page.evaluate('''()=>{const b=document.querySelector('[data-net="create"]'),r=b.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('[data-net="create"]')===b;}'''), 'world canvas must not intercept the lobby'
+            page.keyboard.press('Escape')
             report['checks'].append('offline bundle' if offline else 'source modules via HTTP')
             context.close()
         browser.close()

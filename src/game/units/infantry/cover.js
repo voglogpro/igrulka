@@ -9,6 +9,8 @@ import {
 import { COVER_PATCHES } from '../../map.js';
 import { segmentDistance } from '../../city/road-network.js';
 import { fogVisible } from '../../vision-grid.js';
+import { fortificationStatus } from '../../defense/fortifications.js';
+import { FORTIFICATION } from '../../defense/config.js';
 // Forests and thickets are generated with the terrain so hills and woods line up.
 export { COVER_PATCHES };
 const coverCache = new WeakMap();
@@ -101,9 +103,10 @@ export function coverInfo(s, u, from = null) {
     }
   }
   for (const t of s.trenches || [])
-    if (t.progress >= 1 && Math.hypot(t.x - u.x, t.z - u.z) < 5) {
-      cover = Math.max(cover, 0.72);
-      concealment = Math.max(concealment, 0.55);
+    if (t.progress >= 1 && Math.hypot(t.x - u.x, t.z - u.z) < FORTIFICATION.coverRadius) {
+      const fortification = fortificationStatus(t);
+      cover = Math.max(cover, fortification.cover);
+      concealment = Math.max(concealment, FORTIFICATION.concealment[fortification.level]);
       kind = 'Окоп';
     }
   const value = { cover, concealment, kind, wall };

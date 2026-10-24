@@ -2,7 +2,9 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['vendor/**', 'archive/**', 'play/**', 'artifacts/**', 'node_modules/**'] },
+  {
+    ignores: ['vendor/**', 'archive/**', 'play/**', 'artifacts/**', 'node_modules/**', '.tools/**'],
+  },
   {
     files: [
       'src/**/*.js',

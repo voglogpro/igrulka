@@ -3,6 +3,8 @@ import { clamp } from '../../shared/math.js';
 import { groundPath } from './navigation.js';
 import { unloadGround, cancelTransportDelivery } from '../vehicles/transport.js';
 import { clearGroundRoute } from './route-queue.js';
+import { clearAutoDefense } from '../../defense/volunteers.js';
+import { invalidateFrontline } from '../../defense/cache.js';
 export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
   if (s.result) return 'Кампания завершена';
   if (
@@ -23,6 +25,7 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
       path = groundPath(s, u, destination, GROUND_UNITS[u.key].size * 0.42);
     if (!path.length) continue;
     if (!preserveRoute) clearGroundRoute(u);
+    if (!preserveRoute) clearAutoDefense(u);
     cancelTransportDelivery(u);
     u.guard = null;
     u.guardTargetId = null;
@@ -40,6 +43,7 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
     u.navRevision = s.networkRevision;
     count++;
   }
+  if (count) invalidateFrontline(s);
   return count || 'Нет прохода. Пассажиров сначала высадите из машины';
 }
 
@@ -88,6 +92,7 @@ export function commandUnits(s, side, ids, command) {
   let changed = 0;
   for (const u of units) {
     if (command === 'stop') {
+      clearAutoDefense(u);
       u.stance = null;
       clearGroundRoute(u);
       cancelTransportDelivery(u);
@@ -109,6 +114,7 @@ export function commandUnits(s, side, ids, command) {
       changed++;
     }
     if (command === 'dig' && isInfantry(u.key) && !u.carrierId) {
+      clearAutoDefense(u);
       clearGroundRoute(u);
       u.guard = null;
       u.guardTargetId = null;
@@ -145,5 +151,6 @@ export function commandUnits(s, side, ids, command) {
     if (command === 'unload' && GROUND_UNITS[u.key].capacity)
       changed += unloadGround(s, side, u.id);
   }
+  if (changed) invalidateFrontline(s);
   return changed || 'Команда недоступна выбранным единицам';
 }

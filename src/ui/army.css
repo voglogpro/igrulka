@@ -140,144 +140,6 @@
   line-height: 1.5;
   margin: 0 0 8px;
 }
-#panel.army-panel {
-  width: 340px;
-  max-height: min(440px, calc(100% - 260px));
-}
-.army-category-tabs {
-  display: flex;
-  gap: 3px;
-  border-bottom: 1px solid #b7cdb322;
-  padding-bottom: 7px;
-}
-.army-category-tabs button {
-  flex: 1;
-  font-size: 11px;
-  padding: 7px 5px;
-  border-radius: 4px;
-  color: #9dbda7;
-}
-.army-category-tabs button.active {
-  background: #bbdab51c;
-  color: #e0eed8;
-}
-.army-panel .recruit-batch {
-  margin: 10px 0;
-}
-#army-capacity {
-  margin-left: auto;
-  font-size: 10px;
-}
-.army-panel .army-recruit {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-.army-panel .army-recruit button {
-  position: relative;
-  min-width: 0;
-  padding: 8px;
-  text-align: left;
-  border: 1px solid #b7cdb323;
-  border-radius: 4px;
-}
-.army-panel .army-recruit b {
-  font-size: 10px;
-  font-weight: 500;
-  display: block;
-}
-.army-panel .army-recruit small {
-  font-size: 8px;
-  display: block;
-  color: #a5bca9;
-  margin: 6px 0;
-}
-.army-panel .army-recruit span {
-  font-size: 9px;
-  display: block;
-  color: #bfd8bb;
-}
-.army-panel .army-recruit button:disabled {
-  opacity: 0.55;
-}
-.army-panel #army-queue {
-  font-size: 10px;
-  margin: 10px 0 8px;
-  line-height: 1.5;
-}
-.army-roster {
-  border-top: 1px solid #b7cdb31e;
-  padding-top: 8px;
-}
-.army-roster summary {
-  font-size: 10px;
-  color: #abc6ae;
-  cursor: pointer;
-}
-.army-roster #army-list {
-  max-height: 120px;
-  overflow: auto;
-  margin-top: 7px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-}
-.army-role {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 5px;
-  padding: 6px;
-  font-size: 9px;
-  text-align: left;
-}
-.army-role b {
-  color: #c6dbbb;
-  font-size: 11px;
-}
-.army-panel .quick-build {
-  gap: 4px;
-  margin-top: 10px;
-}
-.army-panel .quick-build button {
-  font-size: 9px;
-  padding: 6px 8px;
-}
-.army-panel-hint {
-  font-size: 8px;
-  line-height: 1.5;
-  color: #8fab98;
-  margin: 9px 0 0;
-}
-.army-automation {
-  border-top: 1px solid #a3bfad20;
-  padding: 9px 0;
-  font-size: 10px;
-  color: #b3c7b7;
-}
-.army-automation summary {
-  cursor: pointer;
-}
-.auto-recruit-fields {
-  display: flex;
-  gap: 8px;
-  margin: 10px 0;
-}
-.auto-recruit-fields label {
-  flex: 1;
-  min-width: 0;
-  font-size: 9px;
-}
-.auto-recruit-fields select {
-  font-size: 10px;
-  padding: 7px 4px;
-  width: 100%;
-}
-#repeat-toggle {
-  padding: 6px 12px;
-  border: 1px solid #a6c5a94a;
-  font-size: 10px;
-}
 .barracks-rally-mode {
   display: block;
   font-size: 10px;
@@ -472,12 +334,8 @@
   .army-tools select {
     width: 90px;
   }
-  #panel.army-panel {
-    width: 300px;
-  }
-}
+} /* Unit card: stance switch, grouped orders, clearer summary. */
 
-/* Unit card: stance switch, grouped orders, clearer summary. */
 #army-controls {
   border-top: 2px solid #8fb89a55;
   padding-top: 11px;
@@ -558,36 +416,8 @@
 }
 .army-summary .health i {
   background: linear-gradient(90deg, #7fbf86, #c3dc8a);
-}
-.recruit-mode {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 10px 0 8px;
-}
-.recruit-mode > span {
-  font-size: 9px;
-  color: #8eae98;
-}
-.recruit-mode .stance-switch button {
-  padding: 6px 9px;
-  font-size: 10px;
-}
-.rear-toggle {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 6px 0;
-  font-size: 9px;
-  color: #a9c2ae;
-  cursor: pointer;
-}
-.rear-toggle input {
-  margin: 0;
-}
+} /* Selected troops share the same command grammar as construction and research. */
 
-/* Selected troops share the same command grammar as construction and research. */
 #game #army-controls {
   min-height: 112px;
   padding: 10px 30px 8px 0;
@@ -717,82 +547,10 @@
 #game .army-details p {
   color: var(--muted);
 }
-#game #panel.army-panel {
-  width: 342px;
-  max-height: min(500px, calc(100% - 280px));
-}
-#game .army-category-tabs {
-  gap: 4px;
-  border-color: var(--line);
-}
-#game .army-category-tabs button {
-  border: 1px solid transparent;
-  border-radius: 2px;
-  color: var(--muted);
-  font-size: 11px;
-  min-height: 32px;
-}
-#game .army-category-tabs button.active {
-  border-color: #82958e60;
-  background: #9bbdb014;
-  color: #e4ece5;
-}
-#game .army-panel .army-recruit button {
-  padding: 10px;
-  border: 1px solid #82958e45;
-  border-radius: 2px;
-  background: linear-gradient(130deg, #9bbdb00b, transparent), #1c2729;
-  min-height: 82px;
-}
-#game .army-panel .army-recruit button:hover:not(:disabled) {
-  border-color: #e2b77990;
-  background-color: #2b3330;
-}
-#game .army-panel .army-recruit b {
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--text);
-}
-#game .army-panel .army-recruit small {
-  font-size: 9px;
-  color: var(--muted);
-  line-height: 1.4;
-  margin: 6px 0;
-}
-#game .army-panel .army-recruit span {
-  font-size: 9px;
-  color: #d6c39d;
-}
-#game
-  :is(
-    .recruit-mode > span,
-    .rear-toggle,
-    .army-panel-hint,
-    .army-roster summary,
-    .barracks-rally-mode
-  ) {
+#game :is(.barracks-rally-mode) {
   color: var(--muted);
   font-size: 10px;
   line-height: 1.5;
-}
-#game .army-roster,
-#game .army-automation {
-  border-color: var(--line);
-}
-#game .army-role {
-  border: 1px solid #82958e25;
-  border-radius: 2px;
-  color: #b7c7be;
-  min-height: 30px;
-}
-#game .army-role b {
-  color: var(--text);
-}
-#game #repeat-toggle {
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  min-height: 30px;
-  color: #c6d4ca;
 }
 #game #groups-bar {
   top: 116px;
@@ -884,13 +642,29 @@
   #game .stance-switch button {
     padding: 6px 8px;
   }
-  #game #panel.army-panel {
-    width: 310px;
-  }
   #game #groups-bar {
     max-width: calc(100% - 24px);
   }
   #game #army-controls {
     align-items: flex-start;
   }
+}
+#game .army-tools .auto-defense-toggle {
+  padding: 5px 7px;
+  border: 1px solid #82958e50;
+  border-radius: 3px;
+  font-size: 9px;
+}
+#game .army-tools .auto-defense-toggle[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: #e2b77980;
+  background: #e2b77918;
+}
+#game .army-tools .auto-defense-toggle[aria-pressed='mixed'] {
+  color: #d3c5a6;
+  border-style: dashed;
+}
+#army-auto-defense-note {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }

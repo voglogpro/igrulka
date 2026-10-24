@@ -10,6 +10,7 @@ import { RALLY_MODES } from '../units/ground/recruitment.js';
 import { isFactoryPlan } from '../units/aviation/factory-plans.js';
 import { validateSquadMetadata } from './squads.js';
 import { restoreServices } from './services.js';
+import { restoreDefense } from '../defense/persistence.js';
 import { restoreOil } from './oil.js';
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
@@ -21,7 +22,7 @@ export function save(s) {
 export function load(raw) {
   const s = JSON.parse(raw);
   if (
-    ![3, 4, 5, 6, 7, 8, 9, 10, 11, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, VERSION].includes(s.version) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
@@ -412,6 +413,7 @@ export function load(raw) {
     throw Error('Повреждена тыловая служба');
   restoreDistricts(s);
   restoreServices(s);
+  restoreDefense(s);
   restoreOil(s);
   s.version = VERSION;
   s.events = [];

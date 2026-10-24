@@ -42,10 +42,43 @@ export class NetworkSession {
       return;
     }
     this.socket = socket;
-    const timeout = setTimeout(() => socket.close(), 8000);
+    let disconnected = false,
+      lastReceived = null;
+    const handleDisconnect = () => {
+      clearTimeout(timeout);
+      if (this.socket !== socket || disconnected) return false;
+      disconnected = true;
+      // Native close can arrive much later. Detach first so callbacks and stale events
+      // cannot send commands or interfere with a replacement connection.
+      this.socket = null;
+      clearInterval(this.pingTimer);
+      this.resolvePending('Подключение прервано. Проверьте состояние после возврата.');
+      if (this.intentional) return true;
+      if (this.token && this.room) {
+        this.room = { ...this.room, phase: 'disconnected' };
+        this.onRoom?.(this.room);
+      }
+      if (this.intentional || this.socket) return true;
+      this.onStatus?.(this.token ? 'Связь потеряна. Матч приостановлен.' : 'Сервер недоступен');
+      if (this.intentional || this.socket) return true;
+      if (this.token && this.retries < 12) {
+        this.retries++;
+        this.reconnectTimer = setTimeout(() => this.open(), Math.min(6000, 750 * this.retries));
+      } else {
+        this.rejectJoin?.(Error('Не удалось подключиться к серверу'));
+        this.rejectJoin = null;
+        this.resolveJoin = null;
+        this.onClosed?.('Сервер недоступен. Место можно восстановить из меню сети.');
+      }
+      return true;
+    };
+    const timeout = setTimeout(() => {
+      if (handleDisconnect()) socket.close();
+    }, 8000);
     socket.addEventListener('open', () => {
       clearTimeout(timeout);
       if (this.socket !== socket || this.intentional) return;
+      lastReceived = performance.now();
       this.send(
         this.token ? { type: 'resume', code: this.room.code, token: this.token } : this.request,
       );
@@ -58,6 +91,8 @@ export class NetworkSession {
       } catch {
         return;
       }
+      if (!message || typeof message.type !== 'string') return;
+      lastReceived = performance.now();
       if (message.type === 'joined') {
         this.sequence = Math.max(this.sequence, message.lastSequence || 0);
         this.token = message.token;
@@ -104,6 +139,7 @@ export class NetworkSession {
         } else if (this.token && this.retries) {
           this.intentional = true;
           socket.close();
+          this.clearCredentials();
           this.onClosed?.(message.message);
         }
       }
@@ -116,33 +152,17 @@ export class NetworkSession {
       if (message.type === 'pong' && Number.isFinite(message.clientTime))
         this.latency = Math.max(0, performance.now() - message.clientTime);
     });
-    socket.addEventListener('close', () => {
-      clearTimeout(timeout);
-      if (this.socket !== socket) return;
-      clearInterval(this.pingTimer);
-      this.resolvePending('Подключение прервано. Проверьте состояние после возврата.');
-      if (this.intentional) return;
-      if (this.token && this.room) {
-        this.room = { ...this.room, phase: 'disconnected' };
-        this.onRoom?.(this.room);
-      }
-      this.onStatus?.(this.token ? 'Связь потеряна. Матч приостановлен.' : 'Сервер недоступен');
-      if (this.token && this.retries < 12) {
-        this.retries++;
-        this.reconnectTimer = setTimeout(() => this.open(), Math.min(6000, 750 * this.retries));
-      } else {
-        this.rejectJoin?.(Error('Не удалось подключиться к серверу'));
-        this.rejectJoin = null;
-        this.resolveJoin = null;
-        this.onClosed?.('Сервер недоступен. Место можно восстановить из меню сети.');
-      }
-    });
+    socket.addEventListener('close', handleDisconnect);
     socket.addEventListener('error', () => {});
     clearInterval(this.pingTimer);
-    this.pingTimer = setInterval(
-      () => this.send({ type: 'ping', clientTime: performance.now() }),
-      3000,
-    );
+    this.pingTimer = setInterval(() => {
+      if (this.socket !== socket || this.intentional) return;
+      if (lastReceived !== null && performance.now() - lastReceived >= 15_000) {
+        if (handleDisconnect()) socket.close();
+        return;
+      }
+      this.send({ type: 'ping', clientTime: performance.now() });
+    }, 3000);
   }
   send(message) {
     if (this.socket?.readyState !== WebSocket.OPEN) return false;
