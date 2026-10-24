@@ -1,5 +1,6 @@
 import { BUILDINGS, GROUND_UNITS, isInfantry, riverDistance, dayPhase } from '../../config.js';
 import { segmentDistance } from '../../city/road-network.js';
+import { fogVisible } from '../../vision-grid.js';
 let seed = 81273;
 const rnd = () => {
   seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -136,7 +137,9 @@ function observes(s, v, u, factor, flash, night) {
 }
 export function groundVisible(s, side, u) {
   if (!u || u.hp <= 0 || u.carrierId) return false;
-  if (u.side === side || !isInfantry(u.key)) return true;
+  if (u.side === side) return true;
+  if (!fogVisible(s, side, u.x, u.z)) return false;
+  if (!isInfantry(u.key)) return true;
   const c = coverInfo(s, u);
   if (!c.concealment || u.moving) return true;
   const factor = u.camouflaged ? 0.2 : 0.43,
@@ -150,22 +153,46 @@ export function groundVisible(s, side, u) {
       return true;
   return false;
 }
+// How far the sound of a shot carries, by weapon class.
+const HEARING = {
+  artillery: 800,
+  rocket: 800,
+  cannon: 620,
+  antiArmor: 440,
+  autocannon: 400,
+  machinegun: 380,
+};
+export const hearingRange = (key) => HEARING[GROUND_UNITS[key]?.groundWeapon] || 300;
 export function recordFire(s, u, random) {
   u.lastFire = s.time;
   s.contacts ||= [[], []];
+  const range = hearingRange(u.key);
   for (let side = 0; side < 2; side++) {
     if (side === u.side || groundVisible(s, side, u)) continue;
-    const heard = (s.groundUnits || []).some(
-      (v) => v.side === side && v.hp > 0 && !v.carrierId && Math.hypot(v.x - u.x, v.z - u.z) < 300,
-    );
+    const heard =
+      (s.groundUnits || []).some(
+        (v) =>
+          v.side === side &&
+          v.hp > 0 &&
+          !v.carrierId &&
+          (v.x - u.x) ** 2 + (v.z - u.z) ** 2 < range * range,
+      ) ||
+      s.buildings.some(
+        (b) =>
+          b.side === side &&
+          b.hp > 0 &&
+          b.progress >= 1 &&
+          (b.x - u.x) ** 2 + (b.z - u.z) ** 2 < range * range,
+      );
     if (!heard) continue;
     const old = s.contacts[side].find((c) => c.unitId === u.id);
     if (old && s.time - old.time < 2) continue;
+    const blur = Math.min(60, 20 + range / 40);
     const contact = {
       unitId: u.id,
-      x: u.x + (random(s) - 0.5) * 30,
-      z: u.z + (random(s) - 0.5) * 30,
-      radius: 20,
+      x: u.x + (random(s) - 0.5) * blur * 1.5,
+      z: u.z + (random(s) - 0.5) * blur * 1.5,
+      radius: blur,
       expires: s.time + 7,
       time: s.time,
     };

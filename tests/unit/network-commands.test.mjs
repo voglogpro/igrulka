@@ -129,6 +129,9 @@ test('projection hides concealed infantry, private effects and future enemy plan
   const hidden = unit(s, 1, 'mog', patch.x, patch.z);
   hidden.camouflaged = true;
   const visible = unit(s, 1, 'infantry', 500, 420);
+  // Friendly observers: one near the visible soldier, one near the drone below.
+  unit(s, 0, 'sniper', 470, 420);
+  unit(s, 0, 'sniper', 280, 20);
   visible.path = [{ x: -500, z: 420 }];
   visible.guard = { x: 510, z: 420 };
   visible.xp = 360;
@@ -258,13 +261,15 @@ test('visible enemy death effects survive removal while concealed casualties sta
   hidden.camouflaged = true;
   const visible = unit(s, 1, 'infantry', 500, 420);
   const tank = unit(s, 0, 'leopard', -500, 420);
+  unit(s, 0, 'sniper', 470, 420);
   assert.equal(game.groundVisible(s, 0, hidden), false);
   assert.equal(game.groundVisible(s, 0, visible), true);
   for (const u of [hidden, visible, tank]) damageGround(s, u, 100000);
   const deaths = s.events.filter((e) => e.type === 'groundDestroyed');
   assert.deepEqual(deaths.find((e) => e.unitId === hidden.id).visibleTo, [1]);
   assert.deepEqual(deaths.find((e) => e.unitId === visible.id).visibleTo, [0, 1]);
-  assert.deepEqual(deaths.find((e) => e.unitId === tank.id).visibleTo, [0, 1]);
+  // The far-away tank is outside every enemy observer's range.
+  assert.deepEqual(deaths.find((e) => e.unitId === tank.id).visibleTo, [0]);
   s.groundUnits = [];
   const one = playerView(s, 1);
   const zero = playerView(s, 0);
@@ -272,7 +277,7 @@ test('visible enemy death effects survive removal while concealed casualties sta
     zero.events.filter((e) => e.type === 'groundDestroyed').map((e) => e.unitId),
     [visible.id, tank.id],
   );
-  assert.equal(one.events.filter((e) => e.type === 'groundDestroyed').length, 3);
+  assert.equal(one.events.filter((e) => e.type === 'groundDestroyed').length, 2);
   assert.ok(one.events.every((e) => !Object.hasOwn(e, 'visibleTo')));
   assert.ok(zero.events.every((e) => !Object.hasOwn(e, 'visibleTo')));
   assert.ok(deaths.every((e) => Array.isArray(e.visibleTo)));

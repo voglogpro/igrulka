@@ -1,4 +1,5 @@
 import { groundVisible } from '../game/units/infantry/cover.js';
+import { unitVisible } from '../game/visibility.js';
 
 const publicFields = (item, fields) =>
   Object.fromEntries(
@@ -124,11 +125,7 @@ export function playerView(authority, side) {
     b.side === side ? b : publicFields(b, buildingFields),
   );
   view.units = view.units
-    .filter(
-      (u) =>
-        u.side === side ||
-        (u.delay <= 0 && u.launched !== false && (u.hp > 0 || u.status === 'falling')),
-    )
+    .filter((u) => u.side === side || (u.launched !== false && unitVisible(authority, side, u)))
     .map((u) => {
       if (u.side === side) return u;
       const publicUnit = publicFields(u, aircraftFields);

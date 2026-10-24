@@ -5,6 +5,7 @@ import { COMBAT } from '../../combat/config.js';
 import { applyBlast } from '../../combat/damage.js';
 import { clamp } from '../../shared/math.js';
 import { pointOnRoute } from './routes.js';
+import { fogVisible } from '../../vision-grid.js';
 export function damageAircraft(s, u, damage, attacker) {
   if (u.hp <= 0) return false;
   u.hp -= damage;
@@ -91,6 +92,22 @@ function basePosition(u, travelled) {
   return pos;
 }
 
+// A launch is heard across the valley even when the enemy cannot see it: a contact marks the area.
+function hearLaunch(s, u) {
+  s.contacts ||= [[], []];
+  const other = 1 - u.side;
+  if (fogVisible(s, other, u.x, u.z)) return;
+  s.contacts[other].push({
+    unitId: -u.id,
+    x: u.x + (random(s) - 0.5) * 90,
+    z: u.z + (random(s) - 0.5) * 90,
+    radius: 55,
+    expires: s.time + 9,
+    time: s.time,
+  });
+  if (s.contacts[other].length > 80) s.contacts[other].shift();
+}
+
 export function moveUnits(s, dt) {
   for (const u of s.units) {
     u.prevX = u.x;
@@ -139,6 +156,7 @@ export function moveUnits(s, dt) {
     if (u.delay > 0) continue;
     if (!u.launched) {
       u.launched = true;
+      hearLaunch(s, u);
       event(s, 'launch', {
         side: u.side,
         key: u.key,

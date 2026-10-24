@@ -257,15 +257,41 @@ test('bullet motion has vertical acceleration and never bends horizontally towar
   assert.equal(p.vz, 0);
   assert.equal(p.vx, 300);
 });
-test('full map visibility is independent of radar and no recon type is available', () => {
+test('fog of intelligence hides enemy units without an observer, but buildings stay known', () => {
   const s = fresh(),
     u = airborne(s, 700, 300);
   assert.equal(E.WEAPONS.scout, undefined);
-  assert.equal(E.unitVisible(s, 0, u), true);
+  assert.equal(E.unitVisible(s, 0, u), false);
+  assert.equal(E.unitVisible(s, 1, u), true);
   assert.ok(E.knownTargets(s, 0).some((t) => t.id === 2));
   assert.equal(E.observedTarget(s, 0, 2).hp, 1100);
-  assert.equal(E.pointVisible(s, 0, 700, 300), true);
-  assert.equal(s.intel, undefined);
+  assert.equal(E.pointVisible(s, 0, 700, 300), false);
+  const tank = E.makeGround(s, 1, 'leopard', 400, 100);
+  s.groundUnits.push(tank);
+  assert.equal(E.groundVisible(s, 0, tank), false);
+  const scout = E.makeGround(s, 0, 'sniper', 300, 100);
+  s.groundUnits.push(scout);
+  s.time += 1;
+  assert.equal(E.groundVisible(s, 0, tank), true);
+  // Losing the observer hides the target again after the grid refreshes.
+  scout.hp = 0;
+  s.time += 1;
+  assert.equal(E.groundVisible(s, 0, tank), false);
+});
+test('one working radar shows every enemy unit on the map, and an unpowered one does not', () => {
+  const s = fresh(),
+    u = airborne(s, 700, 300),
+    tank = E.makeGround(s, 1, 'leopard', 500, -300);
+  s.groundUnits.push(tank);
+  const radar = ready(s, 0, 'radar', -560, 120);
+  s.time += 1;
+  assert.equal(E.sensorSources(s, 0).length, 1);
+  assert.equal(E.unitVisible(s, 0, u), true);
+  assert.equal(E.groundVisible(s, 0, tank), true);
+  // Without the power plant the radar stays dark while the demand is unmet.
+  radar.hp = 0;
+  s.time += 1;
+  assert.equal(E.unitVisible(s, 0, u), false);
 });
 test('version 5 removes recon missions and production, refunds their exact costs and preserves the campaign', () => {
   const s = fresh(),

@@ -1,29 +1,13 @@
 import { groundVisible } from './units/infantry/cover.js';
-import { BUILDINGS } from './config.js';
-import { buildingConnected } from './city/road-network.js';
-// The whole battlefield is visible. Radar supplies fire-control assistance, never fog of war.
-
-export const VISION = { radar: 320 };
-export function sensorSources(s, side) {
-  const buildings = s.buildings.filter((b) => b.side === side && b.hp > 0 && b.progress >= 1);
-  let power = 10,
-    demand = 0;
-  for (const b of buildings) {
-    const d = BUILDINGS[b.key];
-    if (!d) continue;
-    if (d.power < 0)
-      power -=
-        d.power * (0.5 + (0.5 * b.hp) / b.maxHp) * (buildingConnected(s, b, d.size) ? 1 : 0.2);
-    else demand += d.power;
-  }
-  return power < demand * 0.5
-    ? []
-    : buildings
-        .filter((b) => b.key === 'radar')
-        .map((b) => ({ x: b.x, z: b.z, air: VISION.radar, kind: 'radar', id: b.id }));
-}
-export const pointVisible = () => true;
-export const unitVisible = (s, side, u) => u.delay <= 0 && (u.hp > 0 || u.status === 'falling');
+// Enemy buildings are always known; enemy units and launches need an observer or a radar.
+import { fogVisible, radarSources, VISION } from './vision-grid.js';
+export { VISION };
+export const sensorSources = radarSources;
+export const pointVisible = (s, side, x, z) => fogVisible(s, side, x, z);
+export const unitVisible = (s, side, u) =>
+  u.delay <= 0 &&
+  (u.hp > 0 || u.status === 'falling') &&
+  (u.side === side || fogVisible(s, side, u.x, u.z));
 export const eventVisible = () => true;
 export function observedTarget(s, side, id) {
   const u = (s.groundUnits || []).find((u) => u.id === Number(id) && u.hp > 0);

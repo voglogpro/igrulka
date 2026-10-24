@@ -49,7 +49,10 @@ test('an MLRS fires a twelve-rocket salvo and then reloads', () => {
     launcher = E.makeGround(s, 0, 'mlrs', -560, 250),
     target = E.makeGround(s, 1, 'heavytank', -60, 250);
   target.hp = target.maxHp = 1e6;
-  s.groundUnits.push(launcher, target);
+  target.holdFire = true;
+  // Rockets need a target that a friendly observer sees.
+  s.groundUnits.push(launcher, target, E.makeGround(s, 0, 'sniper', -100, 250));
+  s.groundUnits.at(-1).holdFire = true;
   E.advance(s, 8);
   const shots = s.events.filter((e) => e.type === 'shot' && e.shooter === 'mlrs').length;
   assert.equal(shots, 12);

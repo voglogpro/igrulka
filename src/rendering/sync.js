@@ -195,7 +195,7 @@ export function sync() {
       this.scene.add(m);
       this.unitModels.set(u.id, m);
     }
-    m.visible = u.delay <= 0;
+    m.visible = u.delay <= 0 && E.unitVisible(this.state, 0, u);
     m.position.set(u.x, u.y, u.z);
     const { yaw, pitch } = aircraftAttitude(u);
     let bank = Math.sin(u.phase + u.travelled * 0.018) * 0.07;

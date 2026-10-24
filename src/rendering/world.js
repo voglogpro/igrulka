@@ -25,6 +25,7 @@ import { updateMinimap as updateMinimapForWorld } from './minimap.js';
 import * as T from '../../vendor/three/three.module.js';
 import { InfantryBatch } from './models/infantry/soldiers.js';
 import { CombatEffects } from './effects/combat-effects.js';
+import { FogVeil } from './fog-veil.js';
 import { disposeTree } from './mesh-utils.js';
 import { aircraftModel } from './models/aircraft.js';
 import { FixedCamera } from './camera.js';
@@ -285,6 +286,7 @@ export class RTSWorld {
     this.resizeObserver.observe(host);
     this.infantry = new InfantryBatch(this);
     this.combatFX = new CombatEffects(this);
+    this.fogVeil = new FogVeil(this.scene);
     this.tactical = new TacticalView(this);
     this.deploymentPreview = new DeploymentPreview(this.scene);
     this.sync();
@@ -541,7 +543,8 @@ export class RTSWorld {
     }
     this.updateDaylight();
     this.sync();
-    this.combatFX.emit(this.state, this.visualDt);
+    this.fogVeil.update(this.state, wallDt);
+    this.combatFX.emit(this.state, this.visualDt, (u) => E.unitVisible(this.state, 0, u));
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);
     if (this.buildKey && this.lastPointer) this.updateGhost(this.lastPointer);
     if (this.aiming && this.lastPointer && !this.controls.rotating) {

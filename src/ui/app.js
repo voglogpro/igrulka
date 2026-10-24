@@ -441,7 +441,22 @@ function handleEvent(e) {
     if (panel === 'research' && !pointerBusy) renderPanel();
   }
 }
+function updateRadarChip() {
+  const chip = $('#radar-chip'),
+    online = E.sensorSources(state, 0).length > 0,
+    has = state.buildings.some((b) => b.side === 0 && b.key === 'radar' && b.hp > 0);
+  chip.textContent = online
+    ? 'РАДАР · вся карта'
+    : has
+      ? 'РАДАР без питания'
+      : 'ТУМАН · нужен радар';
+  chip.classList.toggle('online', online);
+  chip.title = online
+    ? 'Радар работает: видны все вражеские войска и пуски'
+    : 'Без радара видны только войска рядом с вашими бойцами и постройками. Пуски и стрельбу слышно.';
+}
 function updateHUD() {
+  updateRadarChip();
   districtHUD.update(
     state,
     armySelection,

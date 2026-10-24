@@ -545,7 +545,7 @@ export class CombatEffects {
       this.flash(e.x, 5, e.z, 1.4, 0.12);
     }
   }
-  emit(state, dt) {
+  emit(state, dt, visible = () => true) {
     if (dt <= 0) return;
     this.clock += dt;
     for (const b of state.buildings) {
@@ -572,7 +572,7 @@ export class CombatEffects {
       );
     }
     for (const u of state.units) {
-      if (u.delay > 0) continue;
+      if (u.delay > 0 || !visible(u)) continue;
       const burning = u.status === 'falling' || u.hp / u.maxHp < 0.45,
         missile = ['cruise', 'ballistic'].includes(u.key),
         interval = burning ? 0.055 : missile ? 0.055 : 0.18;

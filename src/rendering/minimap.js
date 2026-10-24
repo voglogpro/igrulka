@@ -46,6 +46,18 @@ export function updateMinimap(canvas) {
     );
     ctx.stroke();
   }
+  // Cells nobody observes are dimmed; a working radar clears the whole map.
+  const vision = E.visionOf(this.state, 0);
+  if (!vision.radar) {
+    const g = E.VISION_GRID,
+      cw = (g.cell / MAP.width) * w,
+      ch = (g.cell / MAP.depth) * h;
+    ctx.fillStyle = '#0a1418a8';
+    for (let row = 0; row < g.rows; row++)
+      for (let col = 0; col < g.cols; col++)
+        if (!vision.grid[row * g.cols + col])
+          ctx.fillRect(px(g.ox + col * g.cell), pz(g.oz + row * g.cell), cw + 0.6, ch + 0.6);
+  }
   for (const u of this.state.groundUnits || []) {
     if (!E.groundVisible(this.state, 0, u)) continue;
     ctx.fillStyle = u.side === 0 ? '#a6d7ff' : '#ffa48a';
