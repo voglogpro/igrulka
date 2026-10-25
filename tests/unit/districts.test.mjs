@@ -23,10 +23,10 @@ function owned(s, side = 0, index = 0) {
 
 test('district sites are neutral, mirrored, accessible and give no initial free income', () => {
   const s = fresh();
-  assert.equal(s.districts.length, 4);
-  for (let i = 0; i < 4; i++) {
+  assert.equal(s.districts.length, 2);
+  for (let i = 0; i < 2; i++) {
     const a = E.DISTRICTS[i],
-      b = E.DISTRICTS[3 - i];
+      b = E.DISTRICTS[1 - i];
     near(a.x, -b.x);
     near(a.z, -b.z);
     assert.equal(a.type, b.type);
@@ -37,6 +37,7 @@ test('district sites are neutral, mirrored, accessible and give no initial free 
     income: 0,
     materials: 0,
     science: 0,
+    outputBonus: 0,
     owned: 0,
     active: 0,
   });
@@ -152,8 +153,8 @@ test('abandoned partial neutral capture decays, while established ownership pers
 
 test('capture orders send real units to separate nearby posts and eventually take the site', () => {
   const s = fresh(),
-    a = soldier(s, 0, { x: -900, z: -200 });
-  const b = soldier(s, 0, { x: -910, z: -220 });
+    a = soldier(s, 0, { x: -500, z: E.CORRIDORS[0] });
+  const b = soldier(s, 0, { x: -510, z: E.CORRIDORS[0] - 20 });
   assert.equal(E.captureDistrict(s, 0, [a.id, b.id], E.DISTRICTS[0].id), 2);
   assert.notDeepEqual(a.guard, b.guard);
   assert.ok(a.path.length);
@@ -222,7 +223,7 @@ test('repair cannot overdraw an empty stockpile and destruction cancels it', () 
 test('only solo AI receives the same 25 percent bonus on district revenues', () => {
   const s = fresh();
   owned(s, 0, 0);
-  owned(s, 1, 3);
+  owned(s, 1, 1);
   near(E.economy(s, 0).districts.income, E.economy(s, 1).districts.income);
   delete s.mode;
   near(E.economy(s, 1).districts.materials, E.economy(s, 0).districts.materials * 1.25);
@@ -243,7 +244,7 @@ test('version eight imports neutral sites without altering troops, stockpiles or
     restored.groundUnits,
     s.groundUnits.map((u) => ({ ...u, x: u.x - 400 })),
   );
-  assert.equal(restored.districts.length, 4);
+  assert.equal(restored.districts.length, 2);
   assert.ok(restored.districts.every((d) => d.owner == null));
 });
 
@@ -304,7 +305,7 @@ test('imported district metadata cannot override configured income, shape, names
     assert.equal(status[key], config[key]);
   E.step(restored, 0.05);
   near(restored.sides[0].materials, 200 + config.materials * 0.05);
-  near(restored.sides[0].credits, 3200 + (1.8 + config.income) * 0.05);
+  near(restored.sides[0].credits, 3200 + (1.8 * (1 + config.outputBonus) + config.income) * 0.05);
   assert.doesNotThrow(() => E.load(E.save(restored)));
 });
 

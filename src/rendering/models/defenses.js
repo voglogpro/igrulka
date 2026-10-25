@@ -11,7 +11,7 @@ export function defenseModel(w, b, content, root) {
     steel = '#566b60',
     metal = '#34484a',
     olive = '#82917b',
-    trim = b.side === 0 ? '#a3c6ac' : '#c8a58d';
+    trim = ['#a3c6ac', '#c8a58d', '#88b3ce', '#d1b97e'][b.side];
   w.cyl(content, 0, 0.75, 0, sam ? 6 : 4.5, 0.9, metal);
   w.cyl(content, 0, 1.65, 0, sam ? 4.8 : 3.3, 1.4, steel);
   if (sam) {

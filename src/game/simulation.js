@@ -19,13 +19,15 @@ import { updateOil } from './city/oil.js';
 import { updateTraining } from './units/ground/training.js';
 import { updatePorts } from './city/ports.js';
 import { updateDefense } from './defense/coordinator.js';
+import { sideIds, aiSides, teamOf } from './factions.js';
+import { updateSettlements } from './territory/settlements.js';
 export function step(s, dt) {
   if (s.result || !Number.isFinite(dt) || dt <= 0) return;
   dt = Math.min(0.1, dt);
   s.time += dt;
   updateWeather(s, dt);
-  const rates = [economy(s, 0), economy(s, 1)];
-  for (let owner = 0; owner < 2; owner++) {
+  const rates = sideIds(s).map((side) => economy(s, side));
+  for (const owner of sideIds(s)) {
     const f = s.sides[owner],
       e = rates[owner];
     f.credits = Math.max(0, f.credits + e.net * dt);
@@ -50,10 +52,12 @@ export function step(s, dt) {
   s.units = s.units.filter((u) => u.hp > 0 || u.status === 'falling');
   s.projectiles = s.projectiles.filter((p) => !p.dead);
   updateDistricts(s, dt);
-  if (s.mode !== 'multiplayer') ai(s);
-  for (let owner = 0; owner < 2; owner++)
-    if (!s.buildings.some((b) => b.side === owner && b.key === 'hq' && b.hp > 0)) {
-      s.result = owner === 0 ? 'defeat' : 'victory';
+  updateSettlements(s, dt);
+  for (const owner of aiSides(s)) ai(s, owner);
+  for (const team of [0, 1])
+    if (!s.buildings.some((b) => teamOf(s, b.side) === team && b.key === 'hq' && b.hp > 0)) {
+      s.winnerTeam = 1 - team;
+      s.result = team === 0 ? 'defeat' : 'victory';
       event(s, 'result', { result: s.result });
       break;
     }

@@ -1,6 +1,7 @@
 import * as E from '../game/index.js';
 import { frontlineSegments } from './defense/frontline-segments.js';
 import { MAP } from '../game/index.js';
+import { factionHex } from './team-colors.js';
 
 // The land, the sea, hills and woods never change: paint them once per minimap size.
 const backgrounds = new Map();
@@ -57,7 +58,7 @@ export function updateMinimap(canvas) {
   for (const raw of this.state.roads) {
     const r = E.observedTarget(this.state, 0, raw.id, sensors);
     if (!r || r.removed) continue;
-    ctx.strokeStyle = E.passable(r) ? (r.side === 0 ? '#a4bdab' : '#ba9e8b') : '#ff6549';
+    ctx.strokeStyle = E.passable(r) ? factionHex(r.side) : '#ff6549';
     ctx.lineWidth = r.connectorTo ? 0.5 : 1.2;
     ctx.beginPath();
     ctx.moveTo(px(r.ax), pz(r.az));
@@ -68,7 +69,7 @@ export function updateMinimap(canvas) {
   for (const raw of this.state.buildings) {
     const b = E.observedTarget(this.state, 0, raw.id, sensors);
     if (!b || b.hp <= 0) continue;
-    ctx.fillStyle = b.side === 0 ? '#9addb5' : '#e69a80';
+    ctx.fillStyle = factionHex(b.side);
     ctx.fillRect(px(b.x) - 2, pz(b.z) - 2, b.key === 'hq' ? 6 : 3, b.key === 'hq' ? 6 : 3);
   }
   for (const p of sensors.filter((p) => p.kind === 'radar')) {
@@ -103,7 +104,7 @@ export function updateMinimap(canvas) {
   }
   for (const u of this.state.groundUnits || []) {
     if (!E.groundVisible(this.state, 0, u)) continue;
-    ctx.fillStyle = u.side === 0 ? '#a6d7ff' : '#ffa48a';
+    ctx.fillStyle = factionHex(u.side);
     ctx.fillRect(px(u.x) - 1.5, pz(u.z) - 1.5, 3, 3);
   }
   // Border posts of the two land corridors.
@@ -120,14 +121,7 @@ export function updateMinimap(canvas) {
   for (const d of E.DISTRICTS) {
     const value = E.districtStatus(this.state, d.id);
     if (!value) continue;
-    ctx.strokeStyle =
-      value.contested || value.blocked
-        ? '#f0bd80'
-        : value.owner === 0
-          ? '#b2e6bf'
-          : value.owner === 1
-            ? '#eea080'
-            : '#b9c4af';
+    ctx.strokeStyle = value.contested || value.blocked ? '#f0bd80' : factionHex(value.owner);
     ctx.fillStyle = value.hp > 0 ? '#293b34' : '#5f5145';
     ctx.lineWidth = 1.4;
     ctx.beginPath();
@@ -139,9 +133,25 @@ export function updateMinimap(canvas) {
     ctx.fill();
     ctx.stroke();
   }
+  for (const d of E.SETTLEMENTS) {
+    const value = E.settlementStatus(this.state, d.id);
+    if (!value) continue;
+    ctx.fillStyle = factionHex(value.owner);
+    ctx.strokeStyle = value.contested || value.blocked ? '#f0bd80' : '#d9dfcc';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(px(d.x) - 3, pz(d.z) + 2);
+    ctx.lineTo(px(d.x) - 3, pz(d.z) - 2);
+    ctx.lineTo(px(d.x), pz(d.z) - 4);
+    ctx.lineTo(px(d.x) + 3, pz(d.z) - 2);
+    ctx.lineTo(px(d.x) + 3, pz(d.z) + 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
   for (const u of this.state.units)
     if (E.unitVisible(this.state, 0, u, sensors)) {
-      ctx.fillStyle = u.side === 0 ? '#c8f4db' : '#ffb5a0';
+      ctx.fillStyle = factionHex(u.side);
       ctx.beginPath();
       ctx.arc(px(u.x), pz(u.z), 1.7, 0, Math.PI * 2);
       ctx.fill();

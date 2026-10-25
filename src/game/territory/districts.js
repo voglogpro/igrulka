@@ -3,10 +3,11 @@ import { guardGround } from '../units/ground/guard.js';
 import { event } from '../shared/events.js';
 import { DISTRICT_BY_ID, DISTRICT_RULES as R } from './districts.config.js';
 import { districtState } from './state.js';
+import { allied, hostile, sideIds, teamOf, validSide } from '../factions.js';
 
 export { DISTRICTS, DISTRICT_TYPES, DISTRICT_BY_ID, DISTRICT_RULES } from './districts.config.js';
 export { createDistricts } from './state.js';
-const direction = (side) => (side === 0 ? 1 : -1);
+const direction = (s, side) => (teamOf(s, side) === 0 ? 1 : -1);
 const definition = (id) =>
   typeof id === 'string' && Object.hasOwn(DISTRICT_BY_ID, id) ? DISTRICT_BY_ID[id] : null;
 
@@ -20,14 +21,15 @@ export function districtStatus(s, id) {
 }
 
 export function districtIncome(s, side) {
-  const income = { income: 0, materials: 0, science: 0, owned: 0, active: 0 };
+  const income = { income: 0, materials: 0, science: 0, outputBonus: 0, owned: 0, active: 0 };
   for (const value of s.districts || []) {
     if (value.owner !== side) continue;
     const d = districtStatus(s, value.id);
     if (!d) continue;
     income.owned++;
     if (d.factor > 0) income.active++;
-    for (const key of ['income', 'materials', 'science']) income[key] += d[key] * d.factor;
+    for (const key of ['income', 'materials', 'science', 'outputBonus'])
+      income[key] += d[key] * d.factor;
   }
   return income;
 }
@@ -35,12 +37,12 @@ export function districtIncome(s, side) {
 export function captureDistrict(s, side, ids, id) {
   if (s.result) return 'Кампания завершена';
   const d = districtStatus(s, id);
-  if (!d || ![0, 1].includes(side)) return 'Район не найден';
+  if (!d || !validSide(s, side)) return 'Район не найден';
   const units = s.groundUnits.filter(
     (u) => u.side === side && u.hp > 0 && !u.carrierId && ids.includes(u.id),
   );
   if (!units.length) return 'Выберите доступные войска';
-  if (d.owner !== side && !units.some((u) => isInfantry(u.key)))
+  if (!allied(s, d.owner, side) && !units.some((u) => isInfantry(u.key)))
     return 'Для захвата района нужна пехота вне транспорта';
   return guardGround(
     s,
@@ -88,17 +90,18 @@ export function updateDistricts(s, dt) {
     const d = definition(value.id);
     if (!d) continue;
     const present = [0, 0],
-      foot = [0, 0];
+      foot = s.sides.map(() => 0);
     for (const u of s.groundUnits) {
       if (
         u.hp <= 0 ||
+        !validSide(s, u.side) ||
         u.civil ||
         u.carrierId ||
         u.progress < 1 ||
         Math.hypot(u.x - d.x, u.z - d.z) > d.radius
       )
         continue;
-      present[u.side]++;
+      present[teamOf(s, u.side)]++;
       if (
         isInfantry(u.key) &&
         !u.downed &&
@@ -109,16 +112,33 @@ export function updateDistricts(s, dt) {
         foot[u.side]++;
     }
     value.contested = present[0] > 0 && present[1] > 0;
-    value.blocked = value.owner != null && present[1 - value.owner] > 0;
-    const side = !value.contested ? (foot[0] ? 0 : foot[1] ? 1 : null) : null;
-    value.capturing = side != null && side !== value.owner ? side : null;
+    value.blocked = value.owner != null && present[1 - teamOf(s, value.owner)] > 0;
+    const candidates = sideIds(s).filter((side) => foot[side] > 0);
+    const side = value.contested
+      ? null
+      : candidates.includes(value.owner)
+        ? value.owner
+        : candidates.includes(value.capturing)
+          ? value.capturing
+          : (candidates[0] ?? null);
+    value.capturing = side != null && !allied(s, side, value.owner) ? side : null;
     if (side != null) {
-      const sign = direction(side);
-      const strength = 1 + (Math.min(R.maxCaptureStrength, foot[side]) - 1) * R.extraCaptureSpeed;
+      const sign = direction(s, side);
+      const teamFoot = candidates.reduce(
+        (sum, id) => sum + (allied(s, id, side) ? foot[id] : 0),
+        0,
+      );
+      const strength = 1 + (Math.min(R.maxCaptureStrength, teamFoot) - 1) * R.extraCaptureSpeed;
       const seconds =
-        value.owner != null && value.owner !== side ? R.neutralizeSeconds : R.captureSeconds;
+        value.owner != null && hostile(s, value.owner, side)
+          ? R.neutralizeSeconds
+          : R.captureSeconds;
       const control = Math.max(-1, Math.min(1, value.control + (sign * dt * strength) / seconds));
-      if (value.owner != null && value.owner !== side && control * direction(value.owner) <= 0) {
+      if (
+        value.owner != null &&
+        hostile(s, value.owner, side) &&
+        control * direction(s, value.owner) <= 0
+      ) {
         const lost = value.owner;
         value.owner = null;
         value.control = 0;
@@ -136,7 +156,7 @@ export function updateDistricts(s, dt) {
         }
       }
     } else if (!present[0] && !present[1]) {
-      const target = value.owner == null ? 0 : direction(value.owner);
+      const target = value.owner == null ? 0 : direction(s, value.owner);
       value.control +=
         Math.sign(target - value.control) *
         Math.min(Math.abs(target - value.control), dt * R.decayPerSecond);

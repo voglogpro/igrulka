@@ -8,8 +8,8 @@ import { createGameServer } from '../scripts/dev-server.mjs';
 const codePattern = /^[A-HJ-NP-Z2-9]{6}$/;
 const code = () =>
   [...randomBytes(6)].map((n) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n % 32]).join('');
-// A seat is a connection slot; in a team room both seats command side 0 against the bot.
-const sideOf = (room, seat) => (room.mode === 'coop' ? 0 : seat);
+// A seat owns one independent city; cooperative humans command the two western factions.
+const sideOf = (room, seat) => (room.mode === 'coop' ? seat * 2 : seat);
 const name = (value) =>
   typeof value === 'string' ? value.trim().slice(0, 24) || 'Командир' : 'Командир';
 const send = (socket, value) => {
@@ -166,9 +166,7 @@ export function createRoomServer({
             throw Error('Неизвестный режим комнаты');
           if (message.difficulty != null && !Object.hasOwn(DIFFICULTY, message.difficulty))
             throw Error('Неизвестная сложность');
-          const state = createGame(seed, { difficulty });
-          // Duel: two humans, no bot. Team: two humans share one side against the bot.
-          state.mode = coop ? 'coop' : 'multiplayer';
+          const state = createGame(seed, { difficulty, mode: coop ? 'coop' : 'multiplayer' });
           room = {
             code: roomCode,
             mode: coop ? 'coop' : 'pvp',

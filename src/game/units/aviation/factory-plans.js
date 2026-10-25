@@ -1,3 +1,4 @@
+import { sideIds } from '../../factions.js';
 import { oilCost, hasOil } from '../../city/oil.js';
 import { WEAPONS } from '../../config.js';
 import { produce } from './production.js';
@@ -39,7 +40,7 @@ export function setFactoryPlan(s, side, id, plan) {
 }
 
 function counts(s) {
-  const sides = [0, 1].map(() => ({
+  const sides = sideIds(s).map(() => ({
     total: 0,
     weapons: Object.fromEntries(Object.keys(WEAPONS).map((key) => [key, 0])),
   }));

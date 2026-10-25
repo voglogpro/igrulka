@@ -1,5 +1,6 @@
 import { groundVisible } from '../game/units/infantry/cover.js';
 import { unitVisible } from '../game/visibility.js';
+import { sideIds, validSide, allied, teamOf } from '../game/factions.js';
 
 const publicFields = (item, fields) =>
   Object.fromEntries(
@@ -116,19 +117,21 @@ const projectileFields = [
 // caches and station scheduling remain private even if new fleet fields are added.
 const serviceFields = ['id', 'side', 'x', 'z', 'yaw', 'state', 'stationId'];
 // Merchant ships are seen on the water; their cargo and trade decisions are private.
-const shipFields = ['id', 'side', 'portId', 'x', 'z', 'yaw', 'state', 'path'];
+const shipFields = ['id', 'side', 'portId', 'x', 'z', 'yaw', 'state'];
 
 // The UI always calls its own faction 0. World coordinates and entity IDs stay unchanged.
 export function playerView(authority, side) {
-  if (side !== 0 && side !== 1) throw Error('Некорректная сторона игрока');
-  const enemy = 1 - side;
+  if (!validSide(authority, side)) throw Error('Некорректная сторона игрока');
+  const owners = sideIds(authority),
+    order = owners.length === 4 ? [side, side ^ 1, side ^ 2, side ^ 3] : [side, 1 - side],
+    remap = (owner) => (validSide(authority, owner) ? order.indexOf(owner) : owner);
   const view = structuredClone(authority);
-  view.frontlineDirections = side === 0 ? [1, -1] : [-1, 1];
+  view.frontlineDirections = order.map((owner) => (owner % 2 ? -1 : 1));
   const allGround = new Set(authority.groundUnits.map((u) => u.id));
   const buildings = new Set(authority.buildings.map((b) => b.id));
   const visible = new Set(
     authority.groundUnits
-      .filter((u) => u.side === side || groundVisible(authority, side, u))
+      .filter((u) => allied(authority, side, u.side) || groundVisible(authority, side, u))
       .map((u) => u.id),
   );
 
@@ -144,7 +147,7 @@ export function playerView(authority, side) {
       : publicFields(t, ['id', 'side', 'x', 'z', 'yaw', 'progress', 'fortificationWork']),
   );
   view.groundScars ||= [];
-  view.frontlineMemory = [0, 1].map((owner) => {
+  view.frontlineMemory = owners.map((owner) => {
     const memory = authority.frontlineMemory?.[owner];
     return owner === side && memory
       ? {
@@ -195,7 +198,7 @@ export function playerView(authority, side) {
     if (e.side === side) return true;
     if (e.type === 'groundDestroyed') return e.visibleTo?.includes(side) === true;
     if (
-      e.side === enemy &&
+      e.side !== side &&
       [
         'recruited',
         'produced',
@@ -210,7 +213,7 @@ export function playerView(authority, side) {
       return false;
     if (
       e.type === 'shot' &&
-      e.side === enemy &&
+      e.side !== side &&
       (e.ground || (e.buildingId != null && !buildings.has(e.buildingId))) &&
       !visible.has(e.buildingId)
     )
@@ -220,47 +223,60 @@ export function playerView(authority, side) {
   for (const event of view.events) {
     delete event.visibleTo;
     // Impact debris direction would reveal where a hidden enemy shooter stands.
-    if (event.type === 'hit' && event.side === enemy) {
+    if (event.type === 'hit' && event.side !== side) {
       delete event.fromX;
       delete event.fromZ;
     }
   }
   if (Array.isArray(view.contacts)) {
-    view.contacts[side] = view.contacts[side].map((c) =>
-      publicFields(c, ['x', 'z', 'radius', 'expires', 'time']),
+    view.contacts = owners.map((owner) =>
+      owner === side
+        ? (view.contacts[owner] || []).map((c) =>
+            publicFields(c, ['x', 'z', 'radius', 'expires', 'time']),
+          )
+        : [],
     );
-    view.contacts[enemy] = [];
   }
-  if (Array.isArray(view.groups)) view.groups[enemy] = {};
-  if (Array.isArray(view.formations)) view.formations[enemy] = 'line';
-  const opposingSide = view.sides[enemy];
-  view.sides[enemy] = {
-    credits: 0,
-    materials: 0,
-    science: 0,
-    tech: [],
-    research: null,
-    researchQueue: [],
-    inventory: Object.fromEntries(Object.keys(opposingSide.inventory || {}).map((key) => [key, 0])),
-    spentAmmo: 0,
-    kills: opposingSide.kills,
-    losses: opposingSide.losses,
-  };
+  if (Array.isArray(view.groups))
+    view.groups = owners.map((owner) => (owner === side ? view.groups[owner] : {}));
+  if (Array.isArray(view.formations))
+    view.formations = owners.map((owner) => (owner === side ? view.formations[owner] : 'line'));
+  for (const owner of owners) {
+    if (owner === side) continue;
+    const opposingSide = view.sides[owner];
+    view.sides[owner] = {
+      credits: 0,
+      materials: 0,
+      science: 0,
+      tech: [],
+      research: null,
+      researchQueue: [],
+      inventory: Object.fromEntries(
+        Object.keys(opposingSide.inventory || {}).map((key) => [key, 0]),
+      ),
+      spentAmmo: 0,
+      kills: opposingSide.kills,
+      losses: opposingSide.losses,
+    };
+  }
   view.stats = { roadsCut: view.stats?.roadsCut || 0 };
   delete view.ai;
+  delete view.aiBySide;
+  delete view.ais;
   delete view.rng;
   delete view.seed;
   delete view.nextId;
+  delete view.settlementClock;
   view.log = [];
 
-  if (side === 0) return view;
-  for (const d of view.districts || []) {
-    if (d.owner != null) d.owner = 1 - d.owner;
-    if (d.capturing != null) d.capturing = 1 - d.capturing;
-    d.control = -d.control;
+  for (const d of [...(view.districts || []), ...(view.settlements || [])]) {
+    if (d.owner != null) d.owner = remap(d.owner);
+    if (d.capturing != null) d.capturing = remap(d.capturing);
+    if (d.homeSide != null) d.homeSide = remap(d.homeSide);
   }
+  if (side % 2) for (const d of view.districts || []) d.control = -d.control;
   for (const key of ['sides', 'groups', 'formations', 'contacts', 'frontlineMemory'])
-    if (Array.isArray(view[key])) view[key].reverse();
+    if (Array.isArray(view[key])) view[key] = order.map((owner) => view[key][owner]);
   for (const list of [
     'buildings',
     'roads',
@@ -275,9 +291,13 @@ export function playerView(authority, side) {
     'events',
   ])
     for (const item of view[list] || [])
-      if (item.side === 0 || item.side === 1) item.side = 1 - item.side;
-  if (view.result) view.result = view.result === 'victory' ? 'defeat' : 'victory';
+      if (validSide(authority, item.side)) item.side = remap(item.side);
+  if (view.result && teamOf(authority, side) !== 0)
+    view.result = view.result === 'victory' ? 'defeat' : 'victory';
+  if ([0, 1].includes(view.winnerTeam) && teamOf(authority, side) !== 0)
+    view.winnerTeam = 1 - view.winnerTeam;
   for (const e of view.events)
-    if (e.type === 'result' && e.result) e.result = e.result === 'victory' ? 'defeat' : 'victory';
+    if (e.type === 'result' && e.result && teamOf(authority, side) !== 0)
+      e.result = e.result === 'victory' ? 'defeat' : 'victory';
   return view;
 }

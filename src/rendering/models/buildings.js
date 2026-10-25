@@ -4,6 +4,7 @@ import { radarModel, defenseModel } from './defenses.js';
 import { detailBuilding, batchStatic } from '../mesh-utils.js';
 import { serviceStationModel } from './city/service-station.js';
 import { oilWellModel, oilTankModel, portModel, trainingModel } from './city/oil.js';
+import { factionHex } from '../team-colors.js';
 const tierTemplates = new WeakMap();
 const tiered = new Set(['gun', 'sam', 'cannon', 'launcher', 'silo', 'ammofactory', 'factory']);
 function cloneTier(template, b, world) {
@@ -37,8 +38,7 @@ export function model(b) {
   root.add(content);
   const d = BUILDINGS[b.key],
     size = d?.size || 30,
-    own = b.side === 0,
-    accent = own ? '#87c6a4' : '#d58e76';
+    accent = factionHex(b.side);
   if (!['gun', 'port'].includes(b.key)) {
     this.box(root, 0, 0, 0, size + 7, 0.65, size + 7, '#6d706a');
     this.box(root, 0, 0.68, size / 2 + 2, size + 5, 0.15, 0.65, accent, {

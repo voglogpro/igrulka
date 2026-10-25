@@ -436,7 +436,8 @@ export class GameAudio {
   raidThreat(state, side) {
     const own = state.buildings.filter((b) => b.side === side && b.hp > 0 && !b.demolished);
     for (const u of state.units) {
-      if (u.side === side || u.hp <= 0 || u.delay > 0 || u.status === 'falling') continue;
+      if (!hostile(state, side, u.side) || u.hp <= 0 || u.delay > 0 || u.status === 'falling')
+        continue;
       for (const b of own) if ((b.x - u.x) ** 2 + (b.z - u.z) ** 2 < 420 * 420) return b;
     }
     return null;
@@ -610,3 +611,4 @@ export class GameAudio {
     };
   }
 }
+import { hostile } from '../game/factions.js';

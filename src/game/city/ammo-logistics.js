@@ -46,7 +46,7 @@ function reconcile(s) {
     .filter((b) => ['factory', 'ammofactory'].includes(b.key) && ammoDepotReady(b))
     .sort((a, b) => a.id - b.id);
   const quotas = new Map();
-  for (const side of [0, 1]) {
+  for (const side of sideIds(s)) {
     let count = 0;
     for (let slot = 0; slot < 4; slot++)
       for (const b of depots)
@@ -453,3 +453,4 @@ export function supplyNearbyAmmo(s, u) {
     u.ammoCargo[p.kind] -= receiveAmmunition(t, p.kind, u.ammoCargo[p.kind]);
   }
 }
+import { sideIds } from '../factions.js';

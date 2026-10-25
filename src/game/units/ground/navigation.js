@@ -1,4 +1,5 @@
 import { FIELD, BUILDINGS, riverDistance, CORRIDORS } from '../../config.js';
+import { activeSettlementFootprints } from '../../territory/settlements.config.js';
 // The ground crossings between the cities. The name stays for older code and saves: since the sea
 // map they are the two land corridors, not bridges.
 export const BRIDGES = CORRIDORS,
@@ -37,9 +38,9 @@ function compileMask(s, radius) {
   }
   const blocked = terrain.blocked.slice(),
     obstacles = new Map();
-  for (const b of s.buildings) {
+  for (const b of [...s.buildings, ...activeSettlementFootprints(s)]) {
     if (b.demolished) continue;
-    const reach = (BUILDINGS[b.key]?.size || 30) * 0.56 + radius;
+    const reach = (b.r ?? (BUILDINGS[b.key]?.size || 30) * 0.56) + radius;
     const firstX = Math.max(0, Math.ceil((b.x - reach - OX) / CELL));
     const lastX = Math.min(WIDTH - 1, Math.floor((b.x + reach - OX) / CELL));
     const firstZ = Math.max(0, Math.ceil((b.z - reach - OZ) / CELL));
@@ -116,6 +117,13 @@ function clearGridEdge(grid, a, b, size, current, bit) {
 export function walkable(s, x, z, radius = 3, ignore = null) {
   if (Math.abs(x) > FIELD.x || Math.abs(z) > FIELD.z) return false;
   if (riverDistance(x, z) < 77 + radius) return false;
+  if (
+    activeSettlementFootprints(s).some(
+      (house) =>
+        Math.abs(x - house.x) < house.r + radius && Math.abs(z - house.z) < house.r + radius,
+    )
+  )
+    return false;
   return !s.buildings.some(
     (b) =>
       b.id !== ignore &&
@@ -138,7 +146,8 @@ export function groundPath(s, from, to, radius = 3) {
   if (clear(from, to)) return [{ x: to.x, z: to.z }];
   const point = (i) => ({ x: OX + (i % WIDTH) * CELL, z: OZ + Math.floor(i / WIDTH) * CELL });
   let cache = masks.get(s);
-  const signature = s.networkRevision + ':' + s.buildings.length;
+  const signature =
+    s.networkRevision + ':' + s.buildings.length + ':' + (s.settlementHouseMask ?? 65535);
   if (!cache || cache.signature !== signature) {
     cache = { signature, grids: new Map() };
     masks.set(s, cache);

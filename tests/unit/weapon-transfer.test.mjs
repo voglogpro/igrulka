@@ -178,7 +178,7 @@ test('production expenses count actual paid batches and old saves acquire a zero
   old.version = 15;
   for (const f of old.sides) delete f.ammoProductionSpent;
   const loaded = E.load(JSON.stringify(old));
-  assert.equal(loaded.version, 16);
+  assert.equal(loaded.version, E.VERSION);
   assert.equal(loaded.sides[0].ammoProductionSpent, 0);
   for (const invalid of [-1, '24']) {
     const broken = structuredClone(s);

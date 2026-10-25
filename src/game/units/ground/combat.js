@@ -1,3 +1,5 @@
+import { sideIds, pairedEnemy } from '../../factions.js';
+import { hostile } from '../../factions.js';
 import { event as emit } from '../../shared/events.js';
 import { isInfantry, GROUND_UNITS, BUILDINGS } from '../../config.js';
 import { coverInfo, groundVisible, lineOfSight } from '../infantry/cover.js';
@@ -20,7 +22,7 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
   const cover = kind === 'blast' && c.kind === 'Стена' ? 0 : c.cover;
   const hp = Math.max(0, u.hp - amount * (1 - cover * (kind === 'blast' ? 0.4 : 1)));
   // Visibility must be captured while the victim is alive; corpses are removed before snapshots.
-  const observedBy = hp === 0 ? [0, 1].filter((side) => groundVisible(s, side, u)) : [];
+  const observedBy = hp === 0 ? sideIds(s).filter((side) => groundVisible(s, side, u)) : [];
   const visibleTo =
     hp === 0 && (s.mode === 'multiplayer' || s.mode === 'coop') ? observedBy : undefined;
   // Soldiers who would die are sometimes only wounded and can be revived by a medic.
@@ -38,8 +40,8 @@ export function damageGround(s, u, amount, event = emit, kind = 'bullet', from =
     s.sides[u.side].losses++;
     // A raided caravan drops part of its cargo to the other side.
     if (u.civil && u.trade) {
-      s.sides[1 - u.side].credits += 80;
-      s.sides[1 - u.side].materials += 2;
+      s.sides[hostile(s, from?.side, u.side) ? from.side : pairedEnemy(s, u.side)].credits += 80;
+      s.sides[hostile(s, from?.side, u.side) ? from.side : pairedEnemy(s, u.side)].materials += 2;
     }
     event(s, 'groundDestroyed', {
       x: u.x,
@@ -95,7 +97,7 @@ export function impactGround(s, p, event = emit) {
   let direct = null,
     directDistance = Infinity;
   for (const u of s.groundUnits)
-    if (u.hp > 0 && !u.carrierId && u.side !== p.side) {
+    if (u.hp > 0 && !u.carrierId && hostile(s, u.side, p.side)) {
       const dist = Math.hypot(u.x - p.tx, u.z - p.tz);
       const hitRadius = GROUND_UNITS[u.key].size * 0.55 + 0.8;
       if (dist >= Math.max(radius + 7, hitRadius)) continue;
@@ -128,8 +130,9 @@ export function impactGround(s, p, event = emit) {
       }
     }
   if (splash)
-    for (const vehicle of (s.ammoVehicles || []).slice(0, AMMUNITION.fleetLimit * 2)) {
-      if (vehicle.side === p.side || vehicle.hp <= 0 || vehicle.status === 'destroyed') continue;
+    for (const vehicle of (s.ammoVehicles || []).slice(0, AMMUNITION.fleetLimit * s.sides.length)) {
+      if (!hostile(s, vehicle.side, p.side) || vehicle.hp <= 0 || vehicle.status === 'destroyed')
+        continue;
       const dist = Math.hypot(vehicle.x - p.tx, vehicle.z - p.tz);
       if (dist >= radius) continue;
       const target = { id: vehicle.id, key: 'supplytruck', x: vehicle.x, z: vehicle.z };
@@ -157,7 +160,7 @@ export function impactGround(s, p, event = emit) {
   }
   let wall = false;
   for (const b of s.buildings)
-    if (b.id === p.targetId && b.side !== p.side && b.hp > 0) {
+    if (b.id === p.targetId && hostile(s, b.side, p.side) && b.hp > 0) {
       const half = (BUILDINGS[b.key]?.size || 30) * 0.55;
       const distance = Math.hypot(
         Math.max(0, Math.abs(p.tx - b.x) - half),

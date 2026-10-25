@@ -7,8 +7,10 @@ from support import ROOT, ARTIFACTS, launch_browser
 parser=argparse.ArgumentParser(description='Two isolated browser clients through LAN or a public internet game URL')
 parser.add_argument('--url',help='Existing public game server; the test closes only its own room')
 parser.add_argument('--silent-peer',action='store_true',help='Drop established guest messages to verify heartbeat recovery after the host ends the room')
+parser.add_argument('--coop',action='store_true',help='Two independent allied cities against two bots')
 args=parser.parse_args()
-suffix='-internet' if args.url else ''
+mode='coop' if args.coop else 'multiplayer'
+suffix=('-internet' if args.url else '')+('-coop810' if args.coop else '')
 report={'errors':[], 'responses':[], 'publicInternet':bool(args.url)}
 report['silentPeer']=args.silent_peer
 report['transfers']={}
@@ -68,6 +70,9 @@ try:
             page.locator('#net-name').fill('Commander '+str(i+1))
             print('Lobby opened for player '+str(i+1),flush=True)
         first,second=pages
+        if args.coop:
+            first.locator('[data-net-mode="coop"]').click()
+            assert 'свои ресурсы' in first.locator('#net-mode-note').inner_text()
         first.locator('[data-net="create"]').click()
         first.locator('.net-room-code').wait_for()
         print('Room created',flush=True)
@@ -89,26 +94,53 @@ try:
         print('Authoritative match started',flush=True)
         for page in pages:
             activate(page)
-            page.wait_for_function('skyfront.getState().mode==="multiplayer" && skyfront.network()?.room.phase==="playing"',polling=50)
+            page.wait_for_function('(mode)=>skyfront.getState().mode===mode && skyfront.network()?.room.phase==="playing"',arg=mode,polling=50)
             assert page.locator('#welcome').is_hidden()
             assert page.locator('#network-lobby').is_hidden()
             assert page.locator('#pause').is_disabled()
         assert first.evaluate('skyfront.network().side')==0
-        assert second.evaluate('skyfront.network().side')==1
+        assert second.evaluate('skyfront.network().side')==(2 if args.coop else 1)
         assert first.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).x')==-1015
-        assert second.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).x')==1015
+        assert second.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).x')==(-1015 if args.coop else 1015)
+        if args.coop:
+            assert first.evaluate('skyfront.getState().sides.length')==4
+            assert first.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).z')==-1015
+            assert second.evaluate('skyfront.getState().buildings.find(b=>b.key==="hq"&&b.side===0).z')==1015
         print('Two isolated browsers joined one authoritative match with opposite perspectives',flush=True)
         for side,page in enumerate(pages):
             activate(page)
+            page.wait_for_function('''()=>{const w=skyfront.getWorld(),hq=w.state.buildings.find(b=>b.key==='hq'&&b.side===0);return Math.hypot(w.controls.target.x-hq.x,w.controls.target.z-hq.z)<5;}''',polling=50)
             page.locator('[data-build="power"]').click()
             point=page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),hq=w.state.buildings.find(b=>b.key==='hq'&&b.side===0),x=hq.x+Math.sign(hq.x)*55,z=hq.z-80,error=E.canPlace(w.state,'power',x,z);if(error)throw Error(error);const v=w.camera.position.clone().set(x,0,z).project(w.camera),r=w.renderer.domElement.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}''')
+            hit=page.evaluate('p=>({canvas:document.elementFromPoint(p.x,p.y)===skyfront.getWorld().renderer.domElement,element:document.elementFromPoint(p.x,p.y)?.outerHTML.slice(0,200),camera:skyfront.getWorld().controls.diagnostics?.()})',point)
+            assert hit['canvas'],{'point':point,'hit':hit,'player':side}
             page.mouse.click(point['x'],point['y'])
             page.wait_for_function('skyfront.getState().buildings.some(b=>b.key==="power"&&b.side===0)',polling=50)
             page.keyboard.press('Escape')
         for page in pages:
             activate(page)
-            page.wait_for_function('skyfront.getState().buildings.filter(b=>b.key==="power").length===2',polling=50)
-        enemy=first.evaluate('skyfront.getState().buildings.find(b=>b.key==="power"&&b.side===1).id')
+            page.wait_for_function('(foreign)=>[0,foreign].every(side=>skyfront.getState().buildings.some(b=>b.key==="power"&&b.side===side))',arg=2 if args.coop else 1,polling=50)
+        enemy=first.evaluate('(side)=>skyfront.getState().buildings.find(b=>b.key==="power"&&b.side===side).id',2 if args.coop else 1)
+        if args.coop:
+            for page in pages:
+                assert page.evaluate('skyfront.getState().sides.slice(1).every(f=>f.credits===0&&Object.values(f.inventory).every(n=>n===0))')
+                assert page.evaluate('skyfront.getState().buildings.filter(b=>b.key==="hq").length')==4
+            report['fourIndependentCities']=True
+            activate(first)
+            ally=first.evaluate('''()=>{const E=skyfront.engine,s=skyfront.getState(),hq=E.hqOf(s,2),r=document.querySelector('#minimap').getBoundingClientRect();return{x:(hq.x/E.MAP.width+.5)*r.width,y:(hq.z/E.MAP.depth+.5)*r.height,hq:{x:hq.x,z:hq.z}};}''')
+            first.locator('#minimap').click(position={'x':ally['x'],'y':ally['y']})
+            movement=first.evaluate('''p=>{const w=skyfront.getWorld(),r=document.querySelector('#minimap').getBoundingClientRect(),v=w.controls.desired;return {x:v.x,z:v.z,error:Math.hypot(v.x-p.x,v.z-p.z),pixelDiagonal:Math.hypot(skyfront.engine.MAP.width/r.width,skyfront.engine.MAP.depth/r.height)};}''',ally['hq'])
+            report['minimapMove']=movement
+            assert movement['error']<=movement['pixelDiagonal'],movement
+            first.wait_for_function('p=>Math.hypot(skyfront.getWorld().controls.target.x-p.x,skyfront.getWorld().controls.target.z-p.z)<5',arg=movement,polling=50)
+            target=first.evaluate('''id=>{const w=skyfront.getWorld(),b=w.state.buildings.find(b=>b.id===id),v=w.camera.position.clone().set(b.x,4,b.z).project(w.camera),r=w.renderer.domElement.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}''',enemy)
+            first.mouse.click(target['x'],target['y'])
+            first.wait_for_function('document.querySelector("#inspector")?.textContent.includes("Союзный город")',polling=50)
+            assert first.locator('#inspector [data-repair],#inspector [data-upgrade],#inspector [data-demolish]').count()==0
+            first.screenshot(path=str(ARTIFACTS/'coop810-allied-readonly.png'),timeout=120000)
+            first.keyboard.press('Escape')
+            first.locator('.map [data-action="home"]').click()
+            report['alliedReadonlyClick']=True
         denied=first.evaluate('(id)=>skyfront.command("demolish",{id})',enemy)
         assert isinstance(denied,str) and 'принадлеж' in denied,denied
         assert second.evaluate('(id)=>skyfront.getState().buildings.find(b=>b.id===id).hp',enemy)>0
@@ -138,7 +170,7 @@ try:
         second.evaluate('window.__qaRenderEnabled=true')
         assert second.locator('#network-lobby').is_visible(), 'invite URL keeps reconnect controls available after reload'
         second.locator('[data-net="resume"]').click()
-        second.wait_for_function('skyfront.network()?.room.phase==="playing" && skyfront.getState().mode==="multiplayer"',polling=50)
+        second.wait_for_function('(mode)=>skyfront.network()?.room.phase==="playing" && skyfront.getState().mode===mode',arg=mode,polling=50)
         assert second.evaluate('skyfront.getState().formations[0]')=='column'
         for page in pages: assert page.evaluate('skyfront.network().room.code')==code
         report['reloadResume']=True

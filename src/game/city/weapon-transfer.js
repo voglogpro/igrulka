@@ -23,7 +23,7 @@ export function requestWeaponDelivery(s, side, siteId, key, amount = 1) {
   const site = s.buildings.find((b) => b.id === siteId && b.side === side);
   if (
     s.result ||
-    ![0, 1].includes(side) ||
+    !validSide(s, side) ||
     !site ||
     site.hp <= 0 ||
     site.demolished ||
@@ -98,3 +98,4 @@ export function deliverySpace(s, site, key) {
   );
   return Math.max(0, free - reserved);
 }
+import { validSide } from '../factions.js';

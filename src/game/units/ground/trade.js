@@ -26,7 +26,7 @@ export function tradeReport(s, side) {
 
 function pay(s, u) {
   const from = s.sides[u.side],
-    to = s.sides[1 - u.side];
+    to = s.sides[s.buildings.find((b) => b.id === u.trade.to)?.side ?? u.side ^ 1];
   const bonus = u.trade.bonus || 1;
   from.credits += TRADE.owner.credits * bonus;
   from.materials += TRADE.owner.materials * bonus;

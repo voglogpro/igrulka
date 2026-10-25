@@ -308,9 +308,9 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
   assert.equal((await rapid.closed()).code, 1008);
 });
 
-test('old protocols are explicitly refused and protocol eight creates and joins a real room', async (t) => {
+test('old protocols are explicitly refused and protocol ten creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 9);
+  assert.equal(PROTOCOL_VERSION, 10);
   const host = await connect();
   host.send({ type: 'create', protocol: 5, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
@@ -368,6 +368,7 @@ test('WebSocket auto-defense belongs to each owner and snapshots preserve only o
     );
   }
   const snapshots = await tickSnapshots(pair, 280);
+  const authorityAtSnapshot = structuredClone(room.state);
   for (const side of [0, 1]) {
     const view = snapshots[side].state;
     const own = view.groundUnits.find((u) => u.id === defenders[side].id);
@@ -385,7 +386,7 @@ test('WebSocket auto-defense belongs to each owner and snapshots preserve only o
     );
     assert.deepEqual(
       E.frontlineReport(view, 0).polyline,
-      E.frontlineReport(room.state, side).polyline,
+      E.frontlineReport(authorityAtSnapshot, side).polyline,
     );
     assert.equal(
       (await command(peers[side], 'auto-defense', { ids: [own.id], enabled: false })).result,
@@ -400,7 +401,7 @@ test('WebSocket district commands capture for both sides, project control and pa
   await startPair(pair);
   const { a, b, room } = pair;
   const left = E.DISTRICTS[0];
-  const right = E.DISTRICTS[3];
+  const right = E.DISTRICTS[1];
   const zero = ground(pair, 0, 'infantry', { x: left.x - 20, z: left.z });
   const one = ground(pair, 1, 'infantry', { x: right.x + 20, z: right.z });
   assert.ok((await command(a, 'district', { ids: [one.id], id: right.id })).error);
@@ -412,26 +413,26 @@ test('WebSocket district commands capture for both sides, project control and pa
 
   const [partialA, partialB] = await tickSnapshots(pair, 200);
   assert.equal(room.state.districts[0].owner, null);
-  assert.equal(room.state.districts[3].owner, null);
+  assert.equal(room.state.districts[1].owner, null);
   assert.ok(room.state.districts[0].control > 0 && room.state.districts[0].control < 1);
-  assert.ok(room.state.districts[3].control < 0 && room.state.districts[3].control > -1);
+  assert.ok(room.state.districts[1].control < 0 && room.state.districts[1].control > -1);
   for (let i = 0; i < E.DISTRICTS.length; i++)
     near(partialA.state.districts[i].control, -partialB.state.districts[i].control);
   assert.equal(partialA.state.districts[0].capturing, 0);
-  assert.equal(partialB.state.districts[3].capturing, 0);
+  assert.equal(partialB.state.districts[1].capturing, 0);
   near(E.economy(partialA.state, 0).districts.materials, 0);
   near(E.economy(partialB.state, 0).districts.materials, 0);
 
   const materialsBefore = room.state.sides.map((s) => s.materials);
   const [capturedA, capturedB] = await tickSnapshots(pair, 300);
   assert.equal(room.state.districts[0].owner, 0);
-  assert.equal(room.state.districts[3].owner, 1);
+  assert.equal(room.state.districts[1].owner, 1);
   assert.equal(capturedA.state.districts[0].owner, 0);
-  assert.equal(capturedA.state.districts[3].owner, 1);
+  assert.equal(capturedA.state.districts[1].owner, 1);
   assert.equal(capturedB.state.districts[0].owner, 1);
-  assert.equal(capturedB.state.districts[3].owner, 0);
+  assert.equal(capturedB.state.districts[1].owner, 0);
   assert.equal(capturedA.state.districts[0].control, 1);
-  assert.equal(capturedB.state.districts[3].control, 1);
+  assert.equal(capturedB.state.districts[1].control, 1);
   near(E.economy(capturedA.state, 0).districts.materials, left.materials);
   near(E.economy(capturedB.state, 0).districts.materials, right.materials);
   assert.ok(room.state.sides.every((s, i) => s.materials > materialsBefore[i]));
@@ -447,12 +448,12 @@ test('WebSocket district commands capture for both sides, project control and pa
 
   E.applyBlast(room.state, right.x, right.z, 10000, 20);
   const [destroyedA, destroyedB] = await tickSnapshots(pair, 2);
-  assert.equal(destroyedA.state.districts[3].hp, 0);
-  assert.equal(destroyedB.state.districts[3].hp, 0);
-  assert.equal(destroyedB.state.districts[3].owner, 0);
+  assert.equal(destroyedA.state.districts[1].hp, 0);
+  assert.equal(destroyedB.state.districts[1].hp, 0);
+  assert.equal(destroyedB.state.districts[1].owner, 0);
   near(E.economy(destroyedB.state, 0).districts.materials, 0);
   assert.ok((await command(a, 'district-repair', { id: right.id, enabled: true })).error);
-  assert.equal(room.state.districts[3].repairing, false);
+  assert.equal(room.state.districts[1].repairing, false);
   assert.equal((await command(b, 'district-repair', { id: right.id, enabled: true })).result, true);
   const before = { ...room.state.sides[1] };
   const earned = { credits: 0, materials: 0 };
@@ -461,7 +462,7 @@ test('WebSocket district commands capture for both sides, project control and pa
     earned.credits += rates.net * 0.05;
     earned.materials += rates.materials * 0.05;
   });
-  const hp = room.state.districts[3].hp;
+  const hp = room.state.districts[1].hp;
   assert.ok(hp > 0 && hp < right.hp);
   near(
     room.state.sides[1].credits,
@@ -471,9 +472,9 @@ test('WebSocket district commands capture for both sides, project control and pa
     room.state.sides[1].materials,
     before.materials + earned.materials - hp * E.DISTRICT_RULES.repairMaterialsPerHp,
   );
-  near(repairA.state.districts[3].hp, repairB.state.districts[3].hp);
+  near(repairA.state.districts[1].hp, repairB.state.districts[1].hp);
   near(repairB.state.sides[0].credits, room.state.sides[1].credits);
-  assert.equal(repairB.state.districts[3].repairing, true);
+  assert.equal(repairB.state.districts[1].repairing, true);
 });
 
 test('side one queues routes and delivers real passengers over WebSocket without exposing future paths', async (t) => {
@@ -620,7 +621,7 @@ test('both WebSocket players use private paid factory plans, preserve reserves a
   );
 });
 
-test('team room: two humans command one side against the bot at the chosen difficulty', async (t) => {
+test('cooperative room has four independent cities, private allied economies, two active bots and team victory', async (t) => {
   const { server, connect } = await fixture(t);
   const a = await connect();
   a.send({
@@ -637,32 +638,98 @@ test('team room: two humans command one side against the bot at the chosen diffi
   const b = await connect();
   b.send({ type: 'join', protocol: PROTOCOL_VERSION, code: host.room.code, name: 'Bravo' });
   const guest = await b.next((m) => m.type === 'joined');
-  assert.equal(guest.side, 0, 'the second human is on the same side');
+  assert.equal(guest.side, 2, 'the second human owns the southern allied city');
   assert.equal(guest.seat, 1);
   const room = server.rooms.get(host.room.code);
   assert.equal(room.state.mode, 'coop');
   assert.equal(room.state.difficulty, 'ultra');
   const pair = { server, connect, a, b, host, guest, room };
   const { viewA, viewB } = await startPair(pair);
-  assert.equal(viewA.state.buildings.find((x) => x.key === 'hq' && x.side === 0).id, 1);
-  assert.equal(viewB.state.buildings.find((x) => x.key === 'hq' && x.side === 0).id, 1);
-  // Either human spends the shared treasury; the other sees the same building.
-  room.state.sides[0].credits = 20000;
-  room.state.sides[0].materials = 2000;
-  const placed = await command(b, 'build', { key: 'power', x: -1070, z: -80 });
+  assert.equal(room.state.sides.length, 4);
+  assert.equal(room.state.buildings.filter((x) => x.key === 'hq').length, 4);
+  const hqs = [0, 1, 2, 3].map((side) => E.hqOf(room.state, side));
+  assert.equal(E.hqOf(viewA.state, 0).id, hqs[0].id);
+  assert.equal(E.hqOf(viewB.state, 0).id, hqs[2].id);
+  assert.deepEqual([E.hqOf(viewB.state, 0).x, E.hqOf(viewB.state, 0).z], [-1015, 1015]);
+  for (const side of [0, 2])
+    Object.assign(room.state.sides[side], { credits: 20000, materials: 2000 });
+  const firstBudget = structuredClone(room.state.sides[0]);
+  const placed = await command(b, 'build', { key: 'power', x: hqs[2].x - 55, z: hqs[2].z - 80 });
   assert.equal(placed.error, undefined, placed.error);
+  assert.deepEqual(
+    room.state.sides[0],
+    firstBudget,
+    'guest construction never spends the host treasury',
+  );
+  assert.ok(room.state.sides[2].credits < 20000);
+  assert.equal(placed.state.buildings.find((x) => x.id === placed.result.id).side, 0);
+  for (const side of [1, 2, 3])
+    assert.equal(placed.state.sides[side].credits, 0, 'every other city treasury is private');
+  assert.match((await command(a, 'demolish', { id: placed.result.id })).error, /принадлежит/);
+  assert.equal(room.state.buildings.find((x) => x.id === placed.result.id).demolished, undefined);
+  const alliedUnit = ground(pair, 2, 'infantry', { x: hqs[2].x, z: hqs[2].z + 60 });
+  alliedUnit.order = { mode: 'move', x: -800, z: 900 };
+  alliedUnit.path = [{ x: -900, z: 1000 }];
+  assert.ok(
+    (await command(a, 'order', { ids: [alliedUnit.id], aim: { x: -900, z: 900, mode: 'move' } }))
+      .error,
+  );
+  assert.equal(
+    (await command(b, 'order', { ids: [alliedUnit.id], aim: { x: -900, z: 900, mode: 'move' } }))
+      .error,
+    undefined,
+  );
   server.tick();
   server.tick();
   const seenByHost = await a.next(
     (m) =>
-      m.type === 'snapshot' && m.state.buildings.some((x) => x.key === 'power' && x.side === 0),
+      m.type === 'snapshot' &&
+      m.state.buildings.some((x) => x.id === placed.result.id && x.side === 2),
   );
-  assert.ok(seenByHost);
+  const publicAlly = seenByHost.state.groundUnits.find((u) => u.id === alliedUnit.id);
+  assert.ok(publicAlly);
+  assert.equal(publicAlly.path, undefined);
+  assert.equal(publicAlly.order, undefined);
+  assert.equal(seenByHost.state.sides[2].credits, 0);
   // The bot runs and the economy bonus follows the difficulty.
+  const initialBots = [1, 3].map(
+    (side) => room.state.buildings.filter((x) => x.side === side).length,
+  );
   for (let i = 0; i < 400; i++) server.tick();
-  assert.ok(room.state.buildings.filter((x) => x.side === 1).length > 2, 'the bot builds');
-  assert.equal(E.economy(room.state, 1).bonus, 1.45);
+  for (const [i, side] of [1, 3].entries()) {
+    assert.ok(
+      room.state.buildings.filter((x) => x.side === side).length > initialBots[i],
+      `bot ${side} builds`,
+    );
+    assert.equal(E.economy(room.state, side).bonus, 1.45);
+  }
   assert.equal(E.economy(room.state, 0).bonus, 1);
+  assert.equal(E.economy(room.state, 2).bonus, 1);
+  b.socket.terminate();
+  await b.closed();
+  await a.next((m) => m.type === 'snapshot' && m.room.phase === 'disconnected');
+  const frozen = room.state.time;
+  for (let i = 0; i < 20; i++) server.tick();
+  assert.equal(room.state.time, frozen);
+  const resumed = await connect();
+  resumed.send({
+    type: 'resume',
+    protocol: PROTOCOL_VERSION,
+    code: host.room.code,
+    token: guest.token,
+  });
+  const restored = await resumed.next((m) => m.type === 'joined');
+  assert.equal(restored.side, 2);
+  assert.equal(restored.lastSequence, b.sequence);
+  await resumed.next((m) => m.type === 'snapshot' && m.room.phase === 'playing');
+  hqs[1].hp = 0;
+  server.tick();
+  assert.equal(room.state.result, null, 'one enemy HQ is not team victory');
+  hqs[3].hp = 0;
+  server.tick();
+  assert.equal(room.state.result, 'victory');
+  const final = await resumed.next((m) => m.type === 'snapshot' && m.room.phase === 'finished');
+  assert.equal(final.state.result, 'victory', 'the southern ally shares team victory');
   const bad = await connect();
   bad.send({ type: 'create', protocol: PROTOCOL_VERSION, mode: 'coop', difficulty: 'nightmare' });
   assert.match((await bad.next((m) => m.type === 'error')).message, /сложность/);

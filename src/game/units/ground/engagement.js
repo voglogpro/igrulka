@@ -1,3 +1,4 @@
+import { hostile } from '../../factions.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry } from '../../config.js';
 import { groundVisible, lineOfSight } from '../infantry/cover.js';
 import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
@@ -292,11 +293,11 @@ function clearLine(s, cache, u, target) {
   return value;
 }
 
-function inRange(u, target, range, minRange = 0) {
+function inRange(s, u, target, range, minRange = 0) {
   return (
     target &&
     (target.x - u.x) ** 2 + (target.z - u.z) ** 2 >= minRange * minRange &&
-    target.side !== u.side &&
+    hostile(s, target.side, u.side) &&
     target.hp > 0 &&
     !target.carrierId &&
     !target.downed &&
@@ -387,7 +388,7 @@ export function groundEngagement(s, u) {
   const cache = prepareGroundEngagement(s);
   let target = cache.ids.get(u.enemyId);
   const valid =
-    inRange(u, target, range, minRange) &&
+    inRange(s, u, target, range, minRange) &&
     visible(s, cache, u.side, target) &&
     (indirect || clearLine(s, cache, u, target));
   if (!valid) target = null;
@@ -406,7 +407,7 @@ export function groundEngagement(s, u) {
         x++
       )
         for (const t of cache.buckets.get(`${x},${z}`) || [])
-          if (inRange(u, t, range, minRange))
+          if (inRange(s, u, t, range, minRange))
             candidates.push({ unit: t, score: rank(u, t, range, cache) });
     cache.metrics.candidates += candidates.length;
     candidates.sort((a, b) => b.score - a.score || a.unit.id - b.unit.id);

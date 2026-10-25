@@ -1,3 +1,4 @@
+import { validSide } from '../factions.js';
 import { GROUND_UNITS } from '../config.js';
 import { invalidateFrontline } from './cache.js';
 
@@ -9,7 +10,7 @@ export function clearAutoDefense(u) {
 }
 
 export function setAutoDefense(s, side, ids, enabled) {
-  if (s.result || ![0, 1].includes(side) || !Array.isArray(ids) || typeof enabled !== 'boolean')
+  if (s.result || !validSide(s, side) || !Array.isArray(ids) || typeof enabled !== 'boolean')
     return 'Неизвестная команда обороны';
   let changed = 0;
   for (const u of s.groundUnits)

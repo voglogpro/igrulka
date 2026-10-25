@@ -2,6 +2,7 @@ import { BUILDINGS, GROUND_UNITS, WEAPONS } from '../config.js';
 import { event } from '../shared/events.js';
 import { supplyFactor } from './economy.js';
 import { removeDriveways } from './road-network.js';
+import { sideIds } from '../factions.js';
 
 // Oil is the blood of the war machine: wells pump it, tanks store it, vehicles, drones and
 // missiles are assembled with it and engines burn it on the move. Without oil the armour stops.
@@ -58,11 +59,13 @@ export function oilBurn(s, side) {
 }
 
 export function updateOil(s, rates, dt) {
-  for (let side = 0; side < 2; side++) {
+  for (const side of sideIds(s)) {
     const f = s.sides[side];
     f.oil ??= OIL.start;
     const produced =
-        oilProduction(s, side, rates[side]?.productivity ?? 1) * (rates[side]?.bonus ?? 1),
+        oilProduction(s, side, rates[side]?.productivity ?? 1) *
+        (rates[side]?.bonus ?? 1) *
+        (rates[side]?.outputBonus ?? 1),
       burnt = oilBurn(s, side),
       storage = oilStorage(s, side);
     f.oil = Math.max(0, Math.min(storage, f.oil + (produced - burnt) * dt));

@@ -15,7 +15,7 @@ const TRACER = [
   [6.2, 1.5, 0.32],
   [1, 5.4, 1.2],
 ];
-const tracerColor = (p) => TRACER[p.side === 1 ? 1 : 0];
+const tracerColor = (p) => TRACER[p.side % 2 === 1 ? 1 : 0];
 const HOT_CORE = [4.6, 4, 3.1];
 const SHELL_HEAD = [7, 3, 0.7];
 const INTERCEPTOR_HEAD = [5, 3.4, 1.4];

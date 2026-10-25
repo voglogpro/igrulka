@@ -36,10 +36,14 @@ try {
     // Economy, construction, ammunition, fleet and army purchases use ordinary starting resources.
     s.buildings[0].hp = s.buildings[0].maxHp = 1e8;
     const cargoVehicles = new Set();
+    const completedWeapons = new Set();
     const previousCars = new Map(),
       previousSpend = [0, 0];
     for (let seconds = 0; seconds < 1200; seconds += 5) {
       E.advance(s, 5);
+      for (const key of Object.keys(E.WEAPONS))
+        if (E.weaponStock(s, 1, key) > 0 || s.units.some((u) => u.side === 1 && u.key === key))
+          completedWeapons.add(key);
       for (const v of s.ammoVehicles) {
         if (v.cargo) cargoVehicles.add(v.id);
         const last = previousCars.get(v.id);
@@ -142,10 +146,8 @@ try {
     }
     assert.ok(s.buildings.every((b) => b.key !== 'lab'));
     assert.ok(
-      E.weaponStock(s, 1, 'cruise') > 0 ||
-        s.units.some((u) => u.side === 1 && u.key === 'cruise') ||
-        s.buildings.some((b) => b.side === 1 && b.queue?.some((q) => q.key === 'cruise')),
-      `seed ${seed}: paid missile production must remain available without research`,
+      completedWeapons.has('cruise'),
+      `seed ${seed}: an actual paid cruise missile must complete without research during the campaign`,
     );
     assert.ok(s.stats.impacts > 10);
     assert.ok(s.buildings.filter((b) => b.side === 1 && b.key === 'housing').length >= 8);
@@ -174,6 +176,7 @@ try {
       fleet: s.ammoVehicles.filter((v) => v.side === 1 && v.hp > 0).length,
       cargoVehiclesObserved: cargoVehicles.size,
       cruiseStock: E.weaponStock(s, 1, 'cruise'),
+      completedWeaponsObserved: [...completedWeapons],
       ammoProductionSpent: s.sides[1].ammoProductionSpent,
     });
     report.campaigns = summaries.length;

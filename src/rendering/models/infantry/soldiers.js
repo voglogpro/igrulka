@@ -76,8 +76,8 @@ function weapon(w, root, key, dark) {
 }
 function bodyGeometry(w, key, side) {
   const root = new T.Group(),
-    paint = side === 0 ? '#75836b' : '#8f7966',
-    rig = side === 0 ? '#56654c' : '#6c5e4b',
+    paint = ['#75836b', '#8f7966', '#657d91', '#95815e'][side],
+    rig = ['#56654c', '#6c5e4b', '#485f73', '#6e6047'][side],
     skin = '#b6a085',
     dark = '#263c32';
   // Belt, torso and plate carrier with magazine pouches.
@@ -249,7 +249,7 @@ export class InfantryBatch {
       const body = new T.InstancedMesh(bodyGeometry(this.world, key, side), this.material, 512),
         legs = new T.InstancedMesh(
           this.world.boxGeo,
-          this.world.mat(side === 0 ? '#3c4d3f' : '#52483b'),
+          this.world.mat(['#3c4d3f', '#52483b', '#3e5162', '#5d513c'][side]),
           1024,
         );
       body.frustumCulled = legs.frustumCulled = false;

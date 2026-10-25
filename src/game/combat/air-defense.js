@@ -1,3 +1,4 @@
+import { hostile, sideIds } from '../factions.js';
 import { clamp } from '../shared/math.js';
 import {
   defenseStats,
@@ -65,7 +66,7 @@ export function defenseCycle(s, b, dt) {
 const timeToImpact = (u) => (u.total - u.travelled) / (u.speed || WEAPONS[u.key]?.speed || 40);
 
 export function fireDefenses(s, rates, dt) {
-  const sensors = [sensorSources(s, 0), sensorSources(s, 1)];
+  const sensors = sideIds(s).map((side) => sensorSources(s, side));
   // Shared fire control: each battery sees how many others already track a target and spreads out.
   const tracked = new Map();
   for (const b of [...s.buildings, ...(s.groundUnits || [])])
@@ -91,7 +92,7 @@ export function fireDefenses(s, rates, dt) {
       abm = missile,
       targets = s.units.filter(
         (u) =>
-          u.side !== b.side &&
+          hostile(s, u.side, b.side) &&
           u.hp > 0 &&
           u.launched &&
           unitVisible(s, b.side, u, sensors[b.side]) &&

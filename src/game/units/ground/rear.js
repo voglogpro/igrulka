@@ -1,3 +1,4 @@
+import { validSide, sideIds } from '../../factions.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry } from '../../config.js';
 import { event as emit } from '../../shared/events.js';
 import { random } from '../../shared/random.js';
@@ -70,7 +71,7 @@ const wounded = new WeakMap();
 function woundedBySide(s) {
   let cache = wounded.get(s);
   if (!cache || cache.time !== s.time) {
-    cache = { time: s.time, sides: [[], []] };
+    cache = { time: s.time, sides: sideIds(s).map(() => []) };
     for (const v of s.groundUnits)
       if (
         v.hp > 0 &&
@@ -151,7 +152,7 @@ function medicTick(s, u, dt) {
         ),
       );
       if (army)
-        walkTo(s, u, { x: army.x - (u.side === 0 ? 24 : -24), z: army.z + (u.id % 7) * 3 }, 30);
+        walkTo(s, u, { x: army.x - (u.side % 2 === 0 ? 24 : -24), z: army.z + (u.id % 7) * 3 }, 30);
     }
   }
   if (!patient) return;
@@ -278,7 +279,7 @@ function truckTick(s, u, dt) {
   );
   const base = s.buildings.find((b) => b.side === u.side && b.key === 'hq' && b.hp > 0);
   const rest = army || (base ? { x: base.x, z: base.z + 40 } : null);
-  if (rest) walkTo(s, u, { x: rest.x - (u.side === 0 ? 34 : -34), z: rest.z + 22 }, 40);
+  if (rest) walkTo(s, u, { x: rest.x - (u.side % 2 === 0 ? 34 : -34), z: rest.z + 22 }, 40);
 }
 
 export function updateRear(s, dt) {
@@ -296,7 +297,7 @@ export function autoRear() {}
 export function setSupportAutomatic(s, side, ids, enabled = true) {
   if (
     s.result ||
-    ![0, 1].includes(side) ||
+    !validSide(s, side) ||
     typeof enabled !== 'boolean' ||
     !Array.isArray(ids) ||
     !ids.length ||
@@ -339,7 +340,7 @@ export function setSupportAutomatic(s, side, ids, enabled = true) {
 }
 
 export function setRearAutomatic(s, side, enabled) {
-  if (s.result || ![0, 1].includes(side) || typeof enabled !== 'boolean')
+  if (s.result || !validSide(s, side) || typeof enabled !== 'boolean')
     return 'Недоступный режим поддержки';
   s.sides[side].rearAuto = enabled;
   const units = s.groundUnits.filter(

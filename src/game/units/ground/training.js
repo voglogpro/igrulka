@@ -1,3 +1,4 @@
+import { sideIds } from '../../factions.js';
 import { BUILDINGS } from '../../config.js';
 import { supplyFactor } from '../../city/economy.js';
 
@@ -21,7 +22,7 @@ export function trainRecruit(s, u) {
 
 export function updateTraining(s, dt) {
   const c = cfg();
-  for (const side of [0, 1]) {
+  for (const side of sideIds(s)) {
     const list = ranges(s, side);
     if (!list.length) continue;
     for (const u of s.groundUnits)

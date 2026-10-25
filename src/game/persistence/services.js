@@ -1,5 +1,6 @@
 import { FIELD } from '../map.js';
 import { BUILDINGS } from '../city/buildings.config.js';
+import { sideIds, validSide } from '../factions.js';
 const object = (v) => v && typeof v === 'object' && !Array.isArray(v);
 const id = (v) => Number.isSafeInteger(v) && v > 0;
 const point = (p) =>
@@ -18,7 +19,10 @@ export function restoreServices(s) {
       throw Error('Повреждена ремонтная станция');
   if (s.version < 11 && s.serviceVehicles == null) s.serviceVehicles = [];
   const cfg = BUILDINGS.service.service;
-  if (!Array.isArray(s.serviceVehicles) || s.serviceVehicles.length > cfg.sideLimit * 2)
+  if (
+    !Array.isArray(s.serviceVehicles) ||
+    s.serviceVehicles.length > cfg.sideLimit * s.sides.length
+  )
     throw Error('Повреждены ремонтные бригады');
   const ids = new Set(),
     counts = new Map();
@@ -30,7 +34,7 @@ export function restoreServices(s) {
       !object(v) ||
       !id(v.id) ||
       ids.has(v.id) ||
-      ![0, 1].includes(v.side) ||
+      !validSide(s, v.side) ||
       !id(v.stationId) ||
       !station ||
       !point(v) ||
@@ -89,7 +93,9 @@ export function restoreServices(s) {
     };
   });
   if (
-    [0, 1].some((side) => s.serviceVehicles.filter((v) => v.side === side).length > cfg.sideLimit)
+    sideIds(s).some(
+      (side) => s.serviceVehicles.filter((v) => v.side === side).length > cfg.sideLimit,
+    )
   )
     throw Error('Лимит ремонтных бригад');
   if (

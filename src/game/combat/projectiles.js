@@ -1,3 +1,4 @@
+import { hostile } from '../factions.js';
 import { clamp } from '../shared/math.js';
 import { impactGround, gainGroundExperience } from '../units/ground/index.js';
 import { event } from '../shared/events.js';
@@ -75,7 +76,7 @@ export function moveProjectiles(s, dt) {
     const radius = p.kind === 'bullet' ? 2.6 : p.kind === 'shell' ? 5 : 4;
     for (const u of s.units)
       if (
-        u.side !== p.side &&
+        hostile(s, u.side, p.side) &&
         u.hp > 0 &&
         u.delay <= 0 &&
         (p.kind === 'interceptor' || u.key === 'drone' || u.key === 'heavy') &&

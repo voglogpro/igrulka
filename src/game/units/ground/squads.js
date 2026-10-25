@@ -1,3 +1,4 @@
+import { validSide } from '../../factions.js';
 import { clamp } from '../../shared/math.js';
 import { FIELD, GROUND_UNITS, isInfantry } from '../../config.js';
 
@@ -44,7 +45,7 @@ export function squadDestination(point) {
 }
 
 export function squadRoster(s, side) {
-  if (![0, 1].includes(side)) return [];
+  if (!validSide(s, side)) return [];
   const roster = new Map();
   const get = (value, goal) => {
     if (!roster.has(value.squadId))
@@ -70,7 +71,7 @@ export function squadRoster(s, side) {
 // Only a complete selected field group can redirect its paid reinforcements.
 // Existing field orders are issued by the caller, not by this metadata operation.
 export function retargetSquadReserves(s, side, ids, point) {
-  if (s.result || ![0, 1].includes(side) || !Array.isArray(ids)) return 0;
+  if (s.result || !validSide(s, side) || !Array.isArray(ids)) return 0;
   const destination = squadDestination(point);
   if (destination === undefined) return 0;
   const selected = new Set(ids);

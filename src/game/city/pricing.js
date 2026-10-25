@@ -15,7 +15,7 @@ export function buildingPurchases(s, side, key) {
 export function purchaseQuote(s, side, kind, key, count = 1) {
   const table = typeof kind === 'string' && Object.hasOwn(tables, kind) ? tables[kind] : null;
   if (
-    ![0, 1].includes(side) ||
+    !validSide(s, side) ||
     !s.sides[side] ||
     !table ||
     typeof key !== 'string' ||
@@ -54,3 +54,4 @@ export function recordBuildingPurchase(s, side, key) {
   const ledger = (s.sides[side].purchases ||= {});
   (ledger.building ||= {})[key] = purchased + 1;
 }
+import { validSide } from '../factions.js';

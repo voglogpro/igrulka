@@ -17,6 +17,7 @@ import {
 } from './factory-plans.js';
 import { MultiplayerUI } from './multiplayer.js';
 import { DistrictHUD } from './districts.js';
+import { updateSettlementList } from './settlements.js';
 import { FrontlineHUD } from './frontline.js';
 import { executeCommand } from '../network/commands.js';
 import { $, num, time, rate, escape } from './format.js';
@@ -123,6 +124,7 @@ try {
     onFrame: frame,
     onAmbient: ambientAudio,
     onSelect: select,
+    onSettlementSelect: select,
     onBoxSelect: selectArmy,
     onSelectSimilar: selectSimilar,
     onGroundOrder: commandGround,
@@ -234,7 +236,7 @@ function enterNetwork(session) {
   $('#result').hidden = true;
   lastResult = null;
   $('#pause').disabled = true;
-  $('#opponent-rule').innerHTML = 'СЕТЕВАЯ ДУЭЛЬ · РАВНАЯ ЭКОНОМИКА <i>УЛЬТРА</i>';
+  $('#opponent-rule').textContent = 'СЕТЕВАЯ СЕССИЯ';
 }
 function applyNetworkState(next, room) {
   if (!network) return;
@@ -250,6 +252,7 @@ function applyNetworkState(next, room) {
     strike.model.aimPoint = { x: enemy.x, z: enemy.z };
     networkApplied = true;
     started = true;
+    renderOpponentRule();
     buildList();
   }
   networkRoom(room);
@@ -343,7 +346,7 @@ function renderOpponentRule() {
   const d =
     !started && !resumed && !network ? E.DIFFICULTY[chosenDifficulty] : E.difficultyOf(state);
   $('#opponent-rule').innerHTML =
-    `БОТ: ${d.name.toUpperCase()} <i>${d.bonus > 1 ? 'ДОХОД +' + Math.round((d.bonus - 1) * 100) + '%' : 'БЕЗ БОНУСА'}</i>`;
+    `${state.mode === 'multiplayer' ? 'ДУЭЛЬ · БЕЗ БОТОВ' : (state.sides.length === 4 ? 'ДВА БОТА: ' : 'БОТ: ') + d.name.toUpperCase()} <i>${state.mode !== 'multiplayer' && d.bonus > 1 ? 'ДОХОД +' + Math.round((d.bonus - 1) * 100) + '%' : 'БЕЗ БОНУСА'}</i>`;
 }
 function begin() {
   // A fresh, untouched campaign takes the difficulty chosen on the start screen.
@@ -400,7 +403,7 @@ function frame(dt) {
       persist();
       $('#result').hidden = false;
       $('#result').innerHTML =
-        `<span class="eyebrow">${network ? 'МАТЧ ЗАВЕРШЁН' : 'КАМПАНИЯ ЗАВЕРШЕНА'}</span><h2>${state.result === 'victory' ? 'Командный пункт врага уничтожен' : 'Ваш командный пункт потерян'}</h2><p>${time(state.time)} · Перехватов: ${state.sides[0].kills} · Дорог выведено из строя: ${state.stats.roadsCut}</p><button class="primary" data-action="${network ? 'network-leave' : 'new'}">${network ? 'Закрыть матч' : 'Новая кампания'}</button>`;
+        `<span class="eyebrow">${network ? 'МАТЧ ЗАВЕРШЁН' : 'КАМПАНИЯ ЗАВЕРШЕНА'}</span><h2>${state.result === 'victory' ? (state.sides.length === 4 ? 'Оба вражеских штаба уничтожены' : 'Командный пункт врага уничтожен') : state.sides.length === 4 ? 'Оба союзных штаба потеряны' : 'Ваш командный пункт потерян'}</h2><p>${time(state.time)} · Перехватов: ${state.sides[0].kills} · Дорог выведено из строя: ${state.stats.roadsCut}</p><button class="primary" data-action="${network ? 'network-leave' : 'new'}">${network ? 'Закрыть матч' : 'Новая кампания'}</button>`;
     }
   }
 }
@@ -418,7 +421,7 @@ function handleEvent(e) {
   if (e.type === 'districtCaptured')
     toast(
       `${e.side === 0 ? 'Район захвачен' : 'Противник занял район'}: ${E.DISTRICT_BY_ID[e.districtId]?.name || ''}`,
-      e.side === 1,
+      E.hostile(state, 0, e.side),
     );
   if (e.type === 'districtLost' && e.side === 0)
     toast('Контроль района потерян. Его доход остановлен.', true);
@@ -426,7 +429,7 @@ function handleEvent(e) {
     toast('Инфраструктура района разрушена. Для дохода нужно восстановление.', true);
   if (e.type === 'roadCut' && e.side === 0)
     toast('Дорога перебита. Проверьте снабжение и начните ремонт.', true);
-  if (e.type === 'salvo' && e.side === 1 && state.time - lastRaid > 10) {
+  if (e.type === 'salvo' && E.hostile(state, 0, e.side) && state.time - lastRaid > 10) {
     lastRaid = state.time;
     toast(`Налёт противника: ${e.count} целей`, true);
   }
@@ -481,14 +484,16 @@ function updateHUD() {
       day.daylight > 0.4 ? 'ДЕНЬ' : day.daylight > 0.05 ? 'СУМЕРКИ' : 'НОЧЬ';
   $('#stock').textContent = Object.values(f.inventory).reduce((a, b) => a + b, 0);
   $('#sound').style.opacity = settings.sound ? '1' : '.4';
-  const inbound = state.units.filter((u) => u.side === 1 && E.unitVisible(state, 0, u)).length;
+  const inbound = state.units.filter(
+    (u) => E.hostile(state, 0, u.side) && E.unitVisible(state, 0, u),
+  ).length;
   if (inbound && state.time - lastRaid > 12) {
     lastRaid = state.time;
     toast(`Обнаружены воздушные цели: ${inbound}`, true);
   }
   $('#mission').textContent = inbound
     ? `Воздушная тревога: ${inbound} целей. Прикройте снабжение и командный пункт.`
-    : `Уничтожьте штаб врага. Районы: ${e.districts.owned}/4 · работают ${e.districts.active}.`;
+    : `${state.sides.length === 4 ? 'Два союзных города против двух ботов. Уничтожьте оба вражеских штаба.' : 'Уничтожьте штаб врага.'} Склады: ${e.districts.owned}/${E.DISTRICTS.length} · работают ${e.districts.active}.`;
 }
 function updateBuildingPrices() {
   for (const button of document.querySelectorAll('[data-build]')) {
@@ -993,6 +998,20 @@ async function defendLine(a, b) {
 }
 
 function select(id, extend = false) {
+  const settlement = E.settlementStatus(state, id);
+  if (settlement) {
+    if (strike.model.aiming) {
+      chooseAimPoint({ x: settlement.x, z: settlement.z });
+      return;
+    }
+    clearArmySelection();
+    selected = selected === id ? null : id;
+    world.select(null);
+    panel = null;
+    $('#panel').hidden = true;
+    renderInspector();
+    return;
+  }
   const passenger = state.groundUnits.find((u) => u.id === id && u.side === 0 && u.carrierId);
   if (passenger) id = passenger.carrierId;
   const t = E.observedTarget(state, 0, id);
@@ -1023,7 +1042,7 @@ function select(id, extend = false) {
     $('#inspector').hidden = true;
     return;
   }
-  if (t.side === 1 && t.hp > 0) {
+  if (E.hostile(state, 0, t.side) && t.hp > 0) {
     strike.model.aimPoint = { x: t.x, z: t.z };
     openPanel('attack', true);
     return;
@@ -1222,6 +1241,7 @@ function updateLivePanel() {
             ? Math.round(-o.powerUse * o.road * o.health) + ' МВт'
             : '−' + Math.round(o.upkeep * 60) + ' ₡';
     }
+    updateSettlementList($('#economy-settlements'), state);
   }
 }
 const campaignActions = createCampaignActions({
@@ -1299,6 +1319,14 @@ document.addEventListener('click', async (ev) => {
   const b = ev.target.closest('button');
   if (!b || b.disabled) return;
   const d = b.dataset;
+  if (d.settlementFocus) {
+    const site = E.settlementStatus(state, d.settlementFocus);
+    if (site) {
+      world.focus(site.x, site.z, 220);
+      select(site.id);
+    }
+    return;
+  }
   if (d.tab) {
     clearArmySelection();
     selected = null;

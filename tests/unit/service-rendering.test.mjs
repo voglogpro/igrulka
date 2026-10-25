@@ -26,7 +26,7 @@ test('service fleet mirrors simulation coordinates, respects fog and caps each s
   assert.deepEqual(fleet.diagnostics(), {
     vehicles: 16,
     repairing: 8,
-    capacity: 16,
+    capacity: 32,
     drawCalls: 5,
     disposed: false,
   });
@@ -90,6 +90,22 @@ test('ammo fleet uses the same bounded batches and follows current-frame field p
   assert.equal(fleet.shadows.mesh.count, 0);
   fleet.dispose();
   assert.equal(scene.children.length, 0);
+});
+test('all four city fleets are visible and independently bounded in the same shared draw batches', () => {
+  const scene = new T.Scene(),
+    fleet = new ServiceFleet(scene);
+  const vehicles = Array.from({ length: 4 }, (_, side) =>
+    Array.from({ length: 10 }, (_, i) => vehicle(side * 100 + i, side)),
+  ).flat();
+  fleet.sync({ time: 0, serviceVehicles: vehicles });
+  assert.equal(fleet.diagnostics().vehicles, 32);
+  assert.equal(fleet.diagnostics().drawCalls, 4);
+  const matrix = new T.Matrix4();
+  for (const side of [0, 1, 2, 3]) {
+    fleet.body.getMatrixAt(side * 8, matrix);
+    assert.equal(matrix.elements[12], side * 100);
+  }
+  fleet.dispose();
 });
 
 test('service fleet retains shared buffers across snapshots and disposes every resource once', () => {

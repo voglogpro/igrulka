@@ -1,3 +1,4 @@
+import { allied } from '../factions.js';
 import { FIELD } from '../map.js';
 import { FRONTLINE as C, FRONT_SECTORS, FORTIFICATION } from './config.js';
 import { createFrontlineMemory } from './frontline.js';
@@ -13,8 +14,8 @@ const point = (v) =>
 const finite = (v) => Number.isFinite(v) && v >= 0;
 const id = (v) => Number.isSafeInteger(v) && v > 0;
 export function restoreDefense(s) {
-  if (s.version < 12) s.frontlineMemory = createFrontlineMemory();
-  if (!Array.isArray(s.frontlineMemory) || s.frontlineMemory.length !== 2)
+  if (s.version < 12) s.frontlineMemory = createFrontlineMemory(s.sides.length);
+  if (!Array.isArray(s.frontlineMemory) || s.frontlineMemory.length !== s.sides.length)
     throw Error('Повреждена память фронта');
   s.frontlineMemory = s.frontlineMemory.map((memory, side) => {
     if (
@@ -36,7 +37,7 @@ export function restoreDefense(s) {
         !Number.isFinite(v.strength) ||
         v.strength <= 0 ||
         v.strength > 4 ||
-        s.groundUnits.some((u) => u.id === v.id && u.side === side)
+        s.groundUnits.some((u) => u.id === v.id && allied(s, u.side, side))
       )
         throw Error('Повреждён контакт фронта');
       ids.add(v.id);

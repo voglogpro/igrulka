@@ -19,7 +19,7 @@ export function restoreRetiredResearch(s, sourceVersion = s.version) {
     )
   )
     throw Error('Повреждён уровень установки');
-  for (const side of [0, 1]) {
+  for (const side of sideIds(s)) {
     const f = s.sides[side];
     if (sourceVersion < 15) {
       const paid = new Set();
@@ -102,3 +102,4 @@ export function restoreRetiredResearch(s, sourceVersion = s.version) {
       throw Error('Исследования упразднены');
   }
 }
+import { sideIds } from '../factions.js';

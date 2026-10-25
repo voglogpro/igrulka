@@ -12,6 +12,7 @@ import { addRoad } from './roads.js';
 import { event } from '../shared/events.js';
 import { purchaseQuote, recordBuildingPurchase } from './pricing.js';
 import { initializeAmmunition } from '../units/ground/ammunition.js';
+import { activeSettlementFootprints } from '../territory/settlements.config.js';
 // The oil field under a point, if a well placed there would tap it.
 export const oilFieldAt = (x, z) =>
   OIL_FIELDS.find((f) => Math.hypot(x - f.x, z - f.z) <= f.r * 0.7) || null;
@@ -39,6 +40,12 @@ export function physicalPlacement(s, key, x, z) {
     ])
       if (groundHeight(x + dx * d.size * 0.55, z + dz * d.size * 0.55) > 1.2)
         return 'Здесь склон холма: нужна ровная земля';
+  if (
+    activeSettlementFootprints(s).some(
+      (house) => Math.hypot(house.x - x, house.z - z) < house.r + d.size * 0.6 + 3,
+    )
+  )
+    return 'Здесь дом заброшенного поселения';
   for (const b of s.buildings)
     if (
       !b.demolished &&

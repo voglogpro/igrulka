@@ -10,6 +10,8 @@ import {
 } from './terrain/environment.js';
 import { syncTrenches as syncTrenchesForWorld } from './terrain/trenches.js';
 import { DistrictView } from './terrain/districts.js';
+import { SettlementView } from './terrain/settlements.js';
+import { factionHex } from './team-colors.js';
 import { updateDaylight as updateDaylightForWorld } from './lighting.js';
 import { model as modelForWorld } from './models/buildings.js';
 import {
@@ -141,6 +143,7 @@ export class RTSWorld {
     this.landmarks();
     this.makeCover();
     this.districtView = new DistrictView(this);
+    this.settlementView = new SettlementView(this);
     this.selection = new T.Mesh(
       new T.RingGeometry(0.96, 1, 100),
       new T.MeshBasicMaterial({
@@ -453,7 +456,7 @@ export class RTSWorld {
     this.selection.scale.setScalar(
       b.key === 'road' ? 8 : ((BUILDINGS[b.key] || E.GROUND_UNITS[b.key])?.size || 30) * 0.8,
     );
-    this.selection.material.color.set(b.side === 0 ? '#a4ecc3' : '#f5ac8b');
+    this.selection.material.color.set(factionHex(b.side));
     if (b.ground && b.side === 0) this.selection.visible = false;
   }
   focus(x, z, distance = 570) {
@@ -471,6 +474,7 @@ export class RTSWorld {
     const result = syncForWorld.call(this, ...args);
     this.serviceFleet.sync(this.state);
     this.ammoFleet.sync(this.state);
+    this.settlementView.sync(this.state);
     return result;
   }
   aircraft(u) {
@@ -548,7 +552,7 @@ export class RTSWorld {
       frontline: this.frontlineView.diagnostics(),
       fortifications: this.fortifications.diagnostics(),
       detectedEnemies: this.state.units.filter(
-        (u) => u.side === 1 && E.unitVisible(this.state, 0, u),
+        (u) => E.hostile(this.state, 0, u.side) && E.unitVisible(this.state, 0, u),
       ).length,
       orderPreview: !!this.tactical.orderSignature,
       quality: 'ultra',

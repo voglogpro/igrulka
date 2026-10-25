@@ -1,3 +1,5 @@
+import { aiState } from './state.js';
+import { hqOf, pairedEnemy, validSide } from '../factions.js';
 import { BUILDINGS, WEAPONS, HQ_X, SEA, CORRIDORS } from '../config.js';
 import { demolish, repair, canPlace, build } from '../city/construction.js';
 import { passable, overlappingRoad } from '../city/road-network.js';
@@ -10,29 +12,33 @@ import { produce } from '../units/aviation/production.js';
 import { knownTargets } from '../visibility.js';
 import { launch } from '../units/aviation/launch.js';
 import { oilPlan } from './oil-ai.js';
-export function ai(s) {
-  const side = 1,
-    f = s.sides[1],
-    hq = s.buildings.find((b) => b.side === 1 && b.key === 'hq'),
-    active = (key) => s.buildings.filter((b) => b.side === 1 && b.key === key && b.hp > 0),
+import { settlementRoadPlan } from './settlement-ai.js';
+import { weaponStock } from '../units/aviation/launch-supply.js';
+export function ai(s, side = 1) {
+  if (!validSide(s, side)) return;
+  const memory = aiState(s, side);
+  const f = s.sides[side],
+    hq = hqOf(s, side),
+    active = (key) => s.buildings.filter((b) => b.side === side && b.key === key && b.hp > 0),
     ready = (key) => active(key).filter((b) => b.progress >= 1);
-  if (s.time >= s.ai.nextBuild) {
-    s.ai.nextBuild = s.time + 7;
+  if (!hq || hq.hp <= 0) return;
+  if (s.time >= memory.nextBuild) {
+    memory.nextBuild = s.time + 7;
     const ruin = s.buildings.find(
-      (b) => b.side === 1 && b.hp <= 0 && !b.demolished && b.key !== 'hq',
+      (b) => b.side === side && b.hp <= 0 && !b.demolished && b.key !== 'hq',
     );
-    if (ruin) demolish(s, ruin.id, 1);
+    if (ruin) demolish(s, ruin.id, side);
     for (const r of s.roads)
-      if (r.side === 1 && !r.removed && !passable(r) && !r.repairing) {
-        repair(s, r.id, 1);
+      if (r.side === side && !r.removed && !passable(r) && !r.repairing) {
+        repair(s, r.id, side);
         break;
       }
-    const e = economy(s, 1),
+    const e = economy(s, side),
       planned = s.buildings
-        .filter((b) => b.side === 1 && b.hp > 0 && b.progress < 1)
+        .filter((b) => b.side === side && b.hp > 0 && b.progress < 1)
         .reduce((n, b) => n - (BUILDINGS[b.key]?.power || 0), 0);
     // Oil comes before everything except power: without it no machine leaves the factory.
-    const oilBusy = e.power - e.demand + planned >= 7 && oilPlan(s, 1, hq, active);
+    const oilBusy = e.power - e.demand + planned >= 7 && oilPlan(s, side, hq, active);
     let key = oilBusy
       ? null
       : e.power - e.demand + planned < 7
@@ -66,7 +72,8 @@ export function ai(s) {
       ];
       key = goals.find(([k, n]) => active(k).length < n)?.[0] || null;
     }
-    s.ai.plannedBuild = key;
+    if (!key && !oilBusy) settlementRoadPlan(s, side);
+    memory.plannedBuild = key;
     if (key) {
       let placed = false,
         hasSite = false;
@@ -76,12 +83,12 @@ export function ai(s) {
         for (const dx of xs) {
           const x = hq.x + dx,
             z = hq.z + dz;
-          if (canPlace(s, key, x, z, 1)) continue;
+          if (canPlace(s, key, x, z, side)) continue;
           hasSite = true;
-          const b = build(s, 1, key, x, z);
+          const b = build(s, side, key, x, z);
           if (typeof b !== 'string') {
             placed = true;
-            s.ai.plannedBuild = null;
+            memory.plannedBuild = null;
             break;
           }
         }
@@ -98,44 +105,58 @@ export function ai(s) {
             [-200, -145, 200, -145],
             [-200, 255, 200, 255],
           ],
-          index = s.ai.roadPlan || 0;
+          index = memory.roadPlan || 0;
         if (index < plans.length) {
           const [ax, az, bx, bz] = plans[index],
-            r = buildRoad(s, 1, hq.x + ax, az, hq.x + bx, bz);
-          if (typeof r !== 'string' || overlappingRoad(s, hq.x + ax, az, hq.x + bx, bz))
-            s.ai.roadPlan = index + 1;
+            r = buildRoad(s, side, hq.x + ax, hq.z + az, hq.x + bx, hq.z + bz);
+          if (
+            typeof r !== 'string' ||
+            overlappingRoad(s, hq.x + ax, hq.z + az, hq.x + bx, hq.z + bz)
+          )
+            memory.roadPlan = index + 1;
         }
       }
     }
   }
   if (ready('factory').length) {
     const queued = ready('factory').reduce((n, b) => n + (b.queue?.length || 0), 0),
-      stock = Object.values(f.inventory).reduce((a, b) => a + b, 0),
-      reserve = purchaseQuote(s, side, 'building', s.ai.plannedBuild)?.cost ?? 150;
+      stock = Object.keys(WEAPONS).reduce((n, key) => n + weaponStock(s, side, key), 0),
+      reserve = purchaseQuote(s, side, 'building', memory.plannedBuild)?.cost ?? 150;
     if (queued < 3 && stock < 7 && f.credits > reserve + 90 && f.materials > 30) {
       let key = random(s) > 0.5 ? 'cruise' : random(s) > 0.5 ? 'heavy' : 'drone';
       if (random(s) > 0.75) key = 'ballistic';
       if (f.credits < reserve + WEAPONS[key].cost) key = 'drone';
-      if (f.credits >= reserve + WEAPONS[key].cost) produce(s, 1, key);
+      if (f.credits >= reserve + WEAPONS[key].cost) produce(s, side, key);
     }
   }
-  if (s.time >= s.ai.nextAttack) {
-    s.ai.nextAttack =
+  if (s.time >= memory.nextAttack) {
+    memory.nextAttack =
       s.time + difficultyOf(s).attackEvery + random(s) * difficultyOf(s).attackJitter;
-    let targets = knownTargets(s, 1).filter((b) => b.key !== 'road');
+    const enemies = knownTargets(s, side);
+    const local = enemies.filter((b) => b.side === pairedEnemy(s, side));
+    const front = local.length ? local : enemies;
+    let targets = front.filter((b) => b.key !== 'road');
     if (random(s) < 0.28) {
-      const roads = knownTargets(s, 1).filter((r) => r.key === 'road' && passable(r));
+      const roads = front.filter((r) => r.key === 'road' && passable(r));
       if (roads.length) targets = roads;
     }
     const weighted = targets.flatMap((b) =>
         Array(['hq', 'power', 'factory', 'launcher'].includes(b.key) ? 3 : 1).fill(b),
       ),
-      target = weighted[Math.floor(random(s) * weighted.length)] || { x: -HQ_X, z: 0 };
+      target = weighted[Math.floor(random(s) * weighted.length)] ||
+        hqOf(s, pairedEnemy(s, side)) || { x: -HQ_X, z: hq.z };
     if (target)
       for (const key of Object.keys(WEAPONS))
-        if (f.inventory[key]) {
+        if (weaponStock(s, side, key)) {
           const flank = ['drone', 'heavy', 'cruise'].includes(key) && random(s) < 0.45,
-            z = random(s) < 0.5 ? CORRIDORS[0] : CORRIDORS[1],
+            z =
+              s.sides.length > 2
+                ? hq.z < 0
+                  ? CORRIDORS[0]
+                  : CORRIDORS[1]
+                : random(s) < 0.5
+                  ? CORRIDORS[0]
+                  : CORRIDORS[1],
             aim = flank
               ? {
                   x: target.x,
@@ -146,7 +167,7 @@ export function ai(s) {
                   ],
                 }
               : (target.id ?? target);
-          const r = launch(s, 1, key, aim, 6);
+          const r = launch(s, side, key, aim, 6);
           if (typeof r === 'number') break;
         }
   }

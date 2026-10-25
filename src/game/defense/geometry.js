@@ -1,14 +1,19 @@
+import { allied, hqOf } from '../factions.js';
 import { FIELD, SEA, riverDistance, seaDistance } from '../map.js';
 import { DISTRICTS } from '../territory/districts.config.js';
 import { FRONTLINE as C } from './config.js';
 
-const directionOf = (side) => (side === 0 ? 1 : -1);
+const directionOf = (side) => (side % 2 === 0 ? 1 : -1);
 export function corridorGeometry(s, side, direction = directionOf(side)) {
-  return ['north', 'south'].map((id, index) => {
-    const sign = index === 0 ? -1 : 1;
-    const district = DISTRICTS.find((d) => Math.sign(d.z) === sign && d.x * direction < 0);
+  const ids = s.sides.length > 2 ? [hqOf(s, side).z < 0 ? 'north' : 'south'] : ['north', 'south'];
+  return ids.map((id) => {
+    const sign = id === 'north' ? -1 : 1;
+    const district = DISTRICTS.find(
+      (d) => Math.sign(d.z) === sign && (d.x === 0 || d.x * direction < 0),
+    );
     const owned =
-      district && s.districts?.some((d) => d.id === district.id && d.owner === side && d.hp > 0);
+      district &&
+      s.districts?.some((d) => d.id === district.id && allied(s, d.owner, side) && d.hp > 0);
     const x = owned
       ? district.x + direction * (district.radius + C.territoryAdvance)
       : -direction * C.homeLineX;

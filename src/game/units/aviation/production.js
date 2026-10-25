@@ -1,9 +1,10 @@
+import { validSide } from '../../factions.js';
 import { oilCost, hasOil, spendOil } from '../../city/oil.js';
 import { WEAPONS } from '../../config.js';
 import { clamp } from '../../shared/math.js';
 export function produce(s, owner, key, count = 1, factoryId = null) {
   if (s.result) return 'Кампания завершена';
-  if (![0, 1].includes(owner) || typeof key !== 'string' || !Object.hasOwn(WEAPONS, key))
+  if (!validSide(s, owner) || typeof key !== 'string' || !Object.hasOwn(WEAPONS, key))
     return 'Неизвестное вооружение';
   const f = s.sides[owner],
     d = WEAPONS[key];

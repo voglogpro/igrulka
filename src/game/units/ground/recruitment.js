@@ -1,3 +1,4 @@
+import { aiSides } from '../../factions.js';
 import { oilCost, hasOil, spendOil } from '../../city/oil.js';
 import { GROUND_UNITS, defenseStats } from '../../config.js';
 import { clamp } from '../../shared/math.js';
@@ -39,7 +40,7 @@ export function makeGround(s, side, key, x, z) {
     fpvAmmo: key === 'operator' ? 3 : 0,
     civil: !!d.civil,
     aiDefender:
-      side === 1 &&
+      aiSides(s).includes(side) &&
       ['mog', 'sniper', 'machinegunner'].includes(key) &&
       s.groundUnits.filter((u) => u.side === side && u.aiDefender).length < 3,
   };
@@ -115,7 +116,7 @@ export function setRally(s, side, id, point) {
 export const RALLY_MODES = ['guard', 'wait', 'attackmove', 'attack', 'defend'];
 
 export function defaultRallyMode(s, site) {
-  return site.rallyMode || (s.mode !== 'multiplayer' && site.side === 1 ? 'wait' : 'guard');
+  return site.rallyMode || (aiSides(s).includes(site.side) ? 'wait' : 'guard');
 }
 
 export function setRallyMode(s, side, id, mode) {

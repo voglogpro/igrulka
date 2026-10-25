@@ -83,7 +83,8 @@ export function updateDefenseReserves(s, side, own, report, memory) {
       const point = Array.from({ length: C.maxReinforcing }, (_, rank) => ({
         x:
           target.x -
-          (side === 0 ? 1 : -1) * (18 + Math.floor(rank / 2) * 20 + (isInfantry(u.key) ? 0 : 40)),
+          (side % 2 === 0 ? 1 : -1) *
+            (18 + Math.floor(rank / 2) * 20 + (isInfantry(u.key) ? 0 : 40)),
         z: target.z + (rank % 2 ? 12 : -12),
       })).find((candidate) =>
         own.every((v) => {

@@ -23,7 +23,7 @@ function buildTemplate(w, key, side) {
   const g = new T.Group(),
     heavy = key === 'heavy',
     scale = heavy ? 1.35 : 1,
-    color = side === 0 ? '#9daea2' : '#aca393',
+    color = ['#9daea2', '#aca393', '#8fa7b7', '#b8aa88'][side],
     dark = '#405351';
   g.userData.template = true;
   const details = new T.Group();

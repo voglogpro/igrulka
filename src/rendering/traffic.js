@@ -147,7 +147,7 @@ export class Traffic {
   }
   rebuild(state) {
     this.revision = state.networkRevision;
-    for (const side of [0, 1])
+    for (const side of E.sideIds(state))
       this.graphs[side] = buildGraph(state.roads.filter((r) => r.side === side && E.passable(r)));
     this.cars = this.cars.filter((c) => c.route);
   }
@@ -189,7 +189,7 @@ export class Traffic {
     this.timer += dt;
     if (this.timer > 0.6 && this.cars.length < MAX_CARS) {
       this.timer = 0;
-      for (const side of [0, 1]) {
+      for (const side of E.sideIds(state)) {
         const employed = E.economy(state, side).commute.employed,
           wanted = Math.min(PER_SIDE, Math.round(employed / 5));
         if (this.cars.filter((c) => c.side === side).length < wanted) this.spawn(state, side);

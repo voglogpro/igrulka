@@ -1,3 +1,4 @@
+import { sideIds } from '../factions.js';
 import { FRONTLINE as C } from './config.js';
 import {
   createFrontlineMemory,
@@ -11,9 +12,9 @@ import { updateDefenseReserves } from './reserves.js';
 
 export function updateDefense(s) {
   if (s.result) return;
-  s.frontlineMemory ||= createFrontlineMemory();
-  for (const side of [0, 1]) {
-    const memory = s.frontlineMemory[side];
+  s.frontlineMemory ||= createFrontlineMemory(s.sides.length);
+  for (const side of sideIds(s)) {
+    const memory = (s.frontlineMemory[side] ||= { nextThink: 0, nextReinforce: 0, seen: [] });
     if (memory.nextThink > s.time) continue;
     memory.nextThink = s.time + C.cadence;
     const observed = observedFrontline(s, side, memory.seen);

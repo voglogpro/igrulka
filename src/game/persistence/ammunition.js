@@ -113,7 +113,7 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
   s.ammoLogisticsAt ??= 0;
   if (
     !Array.isArray(s.ammoVehicles) ||
-    s.ammoVehicles.length > C.fleetLimit * 2 ||
+    s.ammoVehicles.length > C.fleetLimit * s.sides.length ||
     !Number.isFinite(s.ammoLogisticsAt) ||
     s.ammoLogisticsAt < 0 ||
     s.ammoLogisticsAt > s.time + 1
@@ -142,7 +142,7 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
     const identity = `${v.depotId}:${v.slot}`;
     if (
       !depot ||
-      ![0, 1].includes(v.side) ||
+      !validSide(s, v.side) ||
       !Number.isSafeInteger(v.id) ||
       v.id < 1 ||
       v.id >= s.nextId ||
@@ -231,3 +231,4 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
     slots.add(identity);
   }
 }
+import { validSide } from '../factions.js';

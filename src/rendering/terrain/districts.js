@@ -1,8 +1,8 @@
 import * as T from '../../../vendor/three/three.module.js';
 import { DISTRICTS, districtStatus } from '../../game/territory/districts.js';
 import { batchStatic } from '../mesh-utils.js';
+import { factionHex } from '../team-colors.js';
 
-const COLORS = ['#a9d6b4', '#db9c7d'];
 export class DistrictView {
   constructor(world) {
     this.world = world;
@@ -109,7 +109,7 @@ export class DistrictView {
       const d = districtStatus(state, id);
       m.root.visible = !!d;
       if (!d) continue;
-      const color = d.owner == null ? '#adb5a2' : COLORS[d.owner];
+      const color = factionHex(d.owner);
       m.body.visible = d.hp > 0;
       m.ruins.visible = d.hp <= 0;
       m.flag.material.color.set(color);
@@ -122,7 +122,7 @@ export class DistrictView {
         d.contested ||
         d.capturing != null;
       m.ring.material.opacity = d.contested ? 0.3 + Math.sin(state.time * 4) * 0.1 : 0.18;
-      m.progress.material.color.set(d.control >= 0 ? COLORS[0] : COLORS[1]);
+      m.progress.material.color.set(factionHex(d.capturing ?? d.owner ?? (d.control >= 0 ? 0 : 1)));
       m.progress.visible = d.capturing != null || d.contested;
       m.progress.material.opacity = Math.abs(d.control) < 0.999 ? 0.7 : 0.2;
       m.progress.geometry.setDrawRange(0, Math.floor(Math.abs(d.control) * 96) * 6);

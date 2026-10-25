@@ -53,7 +53,7 @@ export function applyBlast(s, x, z, damage, radius) {
     if (amount) damageGround(s, u, amount, event, 'blast');
   }
   // Driveways are not damaged on their own; they share the fate of their building.
-  for (const vehicle of (s.ammoVehicles || []).slice(0, AMMUNITION.fleetLimit * 2)) {
+  for (const vehicle of (s.ammoVehicles || []).slice(0, AMMUNITION.fleetLimit * s.sides.length)) {
     const amount = at(
       Math.max(0, Math.hypot(vehicle.x - x, vehicle.z - z) - AMMUNITION.vehicle.radius),
     );

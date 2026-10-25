@@ -1,3 +1,4 @@
+import { hostile } from '../../factions.js';
 import { groundHeight } from '../../map.js';
 import { groundVisible } from '../infantry/cover.js';
 
@@ -7,7 +8,12 @@ export function guidedFPVPosition(s, u, dt) {
   if (s.time >= (u.fpvSeekAt || 0) && u.travelled < 600) {
     u.fpvSeekAt = s.time + 0.15;
     const target = s.groundUnits.find((v) => v.id === u.fpvTargetId);
-    if (target && !target.downed && groundVisible(s, u.side, target)) {
+    if (
+      target &&
+      hostile(s, target.side, u.side) &&
+      !target.downed &&
+      groundVisible(s, u.side, target)
+    ) {
       u.tx = target.x;
       u.tz = target.z;
     }

@@ -5,8 +5,13 @@ import { unloadGround, cancelTransportDelivery } from '../vehicles/transport.js'
 import { clearGroundRoute } from './route-queue.js';
 import { clearAutoDefense } from '../../defense/volunteers.js';
 import { invalidateFrontline } from '../../defense/cache.js';
+import { hostile } from '../../factions.js';
 export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
   if (s.result) return 'Кампания завершена';
+  if (aim?.targetId != null) {
+    const target = [...s.groundUnits, ...s.buildings].find((v) => v.id === aim.targetId);
+    if (target && !hostile(s, side, target.side)) return 'Нельзя атаковать союзника';
+  }
   if (
     !aim ||
     ![aim.x, aim.z].every(Number.isFinite) ||

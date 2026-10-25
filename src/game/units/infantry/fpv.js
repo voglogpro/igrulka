@@ -1,3 +1,4 @@
+import { hostile } from '../../factions.js';
 import { FIELD, groundHeight } from '../../map.js';
 import { flightRoute } from '../aviation/routes.js';
 import { event as emit } from '../../shared/events.js';
@@ -31,7 +32,7 @@ export function launchFPV(s, side, ids, aim, targetId = null) {
       : s.groundUnits.find(
           (v) =>
             v.id === targetId &&
-            v.side !== side &&
+            hostile(s, v.side, side) &&
             v.hp > 0 &&
             !v.downed &&
             !v.carrierId &&
@@ -104,7 +105,7 @@ export function updateAutomaticFPV(s) {
       score = -Infinity;
     for (const target of s.groundUnits) {
       if (
-        target.side === u.side ||
+        !hostile(s, target.side, u.side) ||
         target.hp <= 0 ||
         target.downed ||
         target.carrierId ||

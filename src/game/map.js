@@ -1,6 +1,6 @@
-export const VERSION = 16;
+export const VERSION = 17;
 // A wide valley split by an inland sea. Two narrow land corridors at the northern and southern
-// ends are the only ground routes between the cities; drones and missiles cross the water.
+// ends are the only ground routes between the opposing banks; aircraft cross the water.
 export const MAP = { width: 4000, depth: 3200, riverWidth: 44 };
 // The playable field inside the map edge: orders, routes and saved points must stay inside it.
 export const FIELD = { x: MAP.width / 2 - 16, z: MAP.depth / 2 - 16 };
@@ -67,6 +67,9 @@ export const OIL_FIELDS = LEGACY_OIL_FIELDS.map(({ id, x, z, r }) => ({
   z: expandLegacyZ(z),
   r,
 }));
+// Identical nearby wells for each of the four co-op city positions. Legacy sites keep their IDs.
+for (const x of [-1280, 1280])
+  for (const z of [-HQ_X, HQ_X]) OIL_FIELDS.push({ id: OIL_FIELDS.length + 1, x, z, r: 22 });
 
 // Gentle meander of the sea's long axis.
 export const riverX = (z) => (Math.sin(z / 190) * 42 + Math.sin(z / 470) * 25) * 0.5;
@@ -96,6 +99,9 @@ function lcg(seed) {
   };
 }
 // City cores stay flat so streets and buildings never sit on a slope.
+const coreDistance = (x, z) =>
+  Math.min(Math.hypot(Math.abs(x) - HQ_X, z), Math.hypot(Math.abs(x) - HQ_X, Math.abs(z) - HQ_X));
+// Keep the seeded legacy hills/woods stable; extra city plains are flattened below.
 const flatCore = (x, z, r) => Math.hypot(Math.abs(x) - HQ_X, z) < r;
 
 // Hills are part of the rules: they block lines of sight, so the same heights drive the picture.
@@ -139,16 +145,20 @@ for (let row = 0; row < H_ROWS; row++)
       z = H_OZ + row * H_CELL,
       i = row * H_COLS + col,
       shore = Math.min(1, Math.max(0, seaDistance(x, z) / 60)),
-      core = Math.min(1, Math.max(0, (Math.hypot(Math.abs(x) - HQ_X, z) - 330) / 80)),
+      core = Math.min(1, Math.max(0, (coreDistance(x, z) - 330) / 80)),
       // District sites and oil fields sit on level ground.
       site = Math.min(
         1,
+        Math.max(0, (Math.hypot(x, Math.abs(z) - CORRIDORS[1]) - 80) / 50),
         Math.max(0, (Math.hypot(Math.abs(x) - DISTRICT_X, Math.abs(z) - CORRIDORS[1]) - 70) / 50),
       );
+    let village = 1;
+    for (const sx of [-1515, -515, 515, 1515])
+      village = Math.min(village, Math.max(0, (Math.hypot(x - sx, Math.abs(z) - 1415) - 130) / 70));
     let oil = 1;
     for (const f of OIL_FIELDS)
       oil = Math.min(oil, Math.max(0, (Math.hypot(x - f.x, z - f.z) - 50) / 50));
-    heights[i] *= shore * core * site * oil;
+    heights[i] *= shore * core * site * oil * village;
   }
 
 // Height of dry ground (0 on the plain, metres above it on hills). Water and the map edge are 0;
@@ -194,7 +204,7 @@ export const COVER_PATCHES = [];
       seaDistance(x, z) < r + 50 ||
       flatCore(x, z, 400 + r) ||
       !inField(x, z, r + 10) ||
-      OIL_FIELDS.some(
+      OIL_FIELDS.slice(0, LEGACY_OIL_FIELDS.length).some(
         (f) => Math.hypot(x - f.x, z - f.z) < r + 50 || Math.hypot(x + f.x, z + f.z) < r + 50,
       )
     )

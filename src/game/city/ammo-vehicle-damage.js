@@ -12,7 +12,7 @@ export function damageAmmoVehicle(s, vehicle, amount) {
   vehicle.maxHp ??= config.hp;
   vehicle.hp = Math.max(0, before - amount);
   if (vehicle.hp > 0) return before - vehicle.hp;
-  const visibleTo = [0, 1].filter(
+  const visibleTo = sideIds(s).filter(
     (side) => side === vehicle.side || fogVisible(s, side, vehicle.x, vehicle.z),
   );
   vehicle.cargo = null;
@@ -36,3 +36,4 @@ export function damageAmmoVehicle(s, vehicle, amount) {
   });
   return before;
 }
+import { sideIds } from '../factions.js';

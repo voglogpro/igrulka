@@ -1,3 +1,4 @@
+import { hostile } from './factions.js';
 import { groundVisible } from './units/infantry/cover.js';
 // The map and ordinary targets are open. Infantry concealment remains independent.
 import { radarSources, VISION } from './vision-grid.js';
@@ -16,7 +17,7 @@ export function observedTarget(s, side, id) {
 }
 export function knownTargets(s, side) {
   return [...s.buildings, ...s.roads]
-    .filter((b) => b.side !== side)
+    .filter((b) => hostile(s, b.side, side))
     .map((b) => observedTarget(s, side, b.id))
     .filter((b) => b && b.hp > 0);
 }

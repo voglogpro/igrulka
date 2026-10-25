@@ -25,7 +25,7 @@ function unit(s, side, x, z) {
 }
 
 test('protocol eight auto-defense validates either owner, complete ownership and boolean before mutating any selection', () => {
-  assert.equal(PROTOCOL_VERSION, 9);
+  assert.equal(PROTOCOL_VERSION, 10);
   const s = fresh(),
     troops = [unit(s, 0, -850, -270), unit(s, 1, 850, -270)];
   for (const side of [0, 1]) {
@@ -193,8 +193,7 @@ test('enemy fortification and reserve events never disclose planning while own n
 test('real server-side stepping upgrades the own fortification, and a gateway stop cancels auto without a deferred reassignment', () => {
   for (const side of [0, 1]) {
     const s = fresh();
-    for (const d of s.districts)
-      if (Math.sign(E.DISTRICTS.find((v) => v.id === d.id).x) === (side ? 1 : -1)) d.owner = side;
+    s.districts.find((d) => d.id === 'north-depot').owner = side;
     const point = E.frontlineReport(s, side).posts.find(
       (p) => p.corridorId === 'north' && p.slot === 2,
     );

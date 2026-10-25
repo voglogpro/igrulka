@@ -1,3 +1,5 @@
+import { aiSides } from '../../factions.js';
+import { sideIds } from '../../factions.js';
 import { trainRecruit } from './training.js';
 import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
 import { initializeAmmunition, reloadFromReserve } from './ammunition.js';
@@ -277,9 +279,9 @@ export function updateGround(s, rates, dt, hooks) {
   const { event, random } = hooks;
   s.groundUnits ||= [];
   s.trenches ||= [];
-  s.contacts ||= [[], []];
-  for (let side = 0; side < 2; side++)
-    s.contacts[side] = s.contacts[side].filter((c) => c.expires > s.time);
+  s.contacts ||= sideIds(s).map(() => []);
+  for (const side of sideIds(s))
+    s.contacts[side] = (s.contacts[side] || []).filter((c) => c.expires > s.time);
   updateRecruitRepeat(s);
   for (const b of s.buildings)
     if (
@@ -360,5 +362,5 @@ export function updateGround(s, rates, dt, hooks) {
   updateGroundRoutes(s);
   updateTransportDeliveries(s);
   s.groundUnits = s.groundUnits.filter((u) => u.hp > 0);
-  updateArmyAI(s, hooks);
+  for (const side of aiSides(s)) updateArmyAI(s, hooks, side);
 }

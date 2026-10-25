@@ -3,6 +3,8 @@ import { buildingConnected } from './road-network.js';
 import { BUILDINGS, GROUND_UNITS } from '../config.js';
 import { districtIncome } from '../territory/districts.js';
 import { difficultyOf } from '../ai/difficulty.config.js';
+import { aiSides } from '../factions.js';
+import { settlementIncome } from '../territory/settlements.js';
 export function supplyFactor(s, b) {
   return ROAD_REQUIRED.has(b.key) && !buildingConnected(s, b, BUILDINGS[b.key].size) ? 0.2 : 1;
 }
@@ -60,10 +62,17 @@ export function economy(s, owner) {
     .reduce((n, u) => n + GROUND_UNITS[u.key].upkeep, 0);
   upkeep += armyUpkeep;
   const districts = districtIncome(s, owner);
+  const outputBonus = 1 + (districts.outputBonus || 0);
+  income *= outputBonus;
+  materials *= outputBonus;
+  science *= outputBonus;
+  const settlements = settlementIncome(s, owner);
   income += districts.income;
   materials += districts.materials;
   science += districts.science;
-  const bonus = owner === 1 && s.mode !== 'multiplayer' ? difficultyOf(s).bonus : 1;
+  income += settlements.income;
+  materials += settlements.materials;
+  const bonus = aiSides(s).includes(owner) ? difficultyOf(s).bonus : 1;
   return {
     gross: income * bonus,
     upkeep,
@@ -75,6 +84,12 @@ export function economy(s, owner) {
     supply,
     productivity,
     bonus,
+    outputBonus,
+    settlements: {
+      ...settlements,
+      income: settlements.income * bonus,
+      materials: settlements.materials * bonus,
+    },
     connected,
     isolated,
     armyUpkeep,
@@ -82,7 +97,7 @@ export function economy(s, owner) {
       homes: Math.round(homes),
       jobs: Math.round(jobs),
       employed: Math.round(employed),
-      income: commute * bonus,
+      income: commute * bonus * outputBonus,
     },
     districts: {
       ...districts,
@@ -101,7 +116,7 @@ export function buildingOutput(s, b) {
   const road = supplyFactor(s, b),
     health = 0.5 + (0.5 * b.hp) / b.maxHp,
     factor = b.hp > 0 && b.progress >= 1 ? road * health * e.productivity : 0,
-    bonus = e.bonus,
+    bonus = e.bonus * e.outputBonus,
     efficient = 1;
   return {
     road,

@@ -19,6 +19,9 @@ import { restoreArmyComposition } from '../units/ground/composition.js';
 import { restoreGroundScars } from '../combat/ground-scars.js';
 import { restoreLaunchSupply } from '../units/aviation/launch-supply.js';
 import { restoreAmmunition } from './ammunition.js';
+import { sideIds, validSide } from '../factions.js';
+import { restoreSettlements } from '../territory/settlements.js';
+import { restoreAI } from './ai.js';
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
   const copy = structuredClone(s);
@@ -30,11 +33,12 @@ export function load(raw) {
   const s = JSON.parse(raw);
   const sourceVersion = s.version;
   if (
-    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, VERSION].includes(s.version) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
-    s.sides.length !== 2 ||
+    ![2, 4].includes(s.sides.length) ||
+    (s.sides.length === 4 && (s.version < 17 || s.mode !== 'coop')) ||
     !Number.isFinite(s.time) ||
     s.time < 0
   )
@@ -48,7 +52,7 @@ export function load(raw) {
   )
     throw Error('Повреждённая кампания');
   if (s.version < 6) {
-    for (let side = 0; side < 2; side++) {
+    for (const side of sideIds(s)) {
       const f = s.sides[side];
       let retired = Number.isFinite(f.inventory?.scout) ? Math.max(0, f.inventory.scout) : 0;
       retired += s.units.filter((u) => u.side === side && u.key === 'scout' && u.hp > 0).length;
@@ -103,6 +107,7 @@ export function load(raw) {
     }
     s.groundUnits = converted;
   }
+  restoreAI(s);
   delete s.intel;
   delete s.intelTime;
   delete s.ai.nextScout;
@@ -125,7 +130,7 @@ export function load(raw) {
     if (
       !['id', 'x', 'z', 'hp', 'maxHp', 'progress'].every((k) => Number.isFinite(b[k])) ||
       (b.key !== 'hq' && !configured(BUILDINGS, b.key)) ||
-      ![0, 1].includes(b.side) ||
+      !validSide(s, b.side) ||
       b.queue?.some((q) => !configured(WEAPONS, q.key) || !Number.isFinite(q.progress))
     )
       throw Error('Повреждены постройки');
@@ -145,7 +150,7 @@ export function load(raw) {
   for (const r of s.roads)
     if (
       !['id', 'ax', 'az', 'bx', 'bz', 'hp', 'maxHp'].every((k) => Number.isFinite(r[k])) ||
-      ![0, 1].includes(r.side)
+      !validSide(s, r.side)
     )
       throw Error('Повреждена дорога');
   if (s.version < 6) {
@@ -162,6 +167,7 @@ export function load(raw) {
   for (const u of s.units)
     if (
       !configured(WEAPONS, u.key) ||
+      !validSide(s, u.side) ||
       !['x', 'y', 'z', 'hp', 'startX', 'startZ', 'tx', 'tz', 'total', 'travelled', 'delay'].every(
         (k) => Number.isFinite(u[k]),
       )
@@ -200,7 +206,7 @@ export function load(raw) {
   for (const u of s.groundUnits)
     if (
       !configured(GROUND_UNITS, u.key) ||
-      ![0, 1].includes(u.side) ||
+      !validSide(s, u.side) ||
       !['id', 'x', 'z', 'hp', 'maxHp'].every((k) => Number.isFinite(u[k])) ||
       u.path?.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.z))
     )
@@ -333,9 +339,9 @@ export function load(raw) {
     )
       throw Error('Повреждён маршрут');
   s.trenches ||= [];
-  s.contacts ||= [[], []];
-  s.groups ||= [{}, {}];
-  s.formations ||= ['line', 'line'];
+  s.contacts ||= sideIds(s).map(() => []);
+  s.groups ||= sideIds(s).map(() => ({}));
+  s.formations ||= sideIds(s).map(() => 'line');
   if (
     !Array.isArray(s.trenches) ||
     s.trenches.length > 240 ||
@@ -349,7 +355,7 @@ export function load(raw) {
     throw Error('Повреждены окопы');
   if (
     !Array.isArray(s.contacts) ||
-    s.contacts.length !== 2 ||
+    s.contacts.length !== s.sides.length ||
     s.contacts.some(
       (list) =>
         !Array.isArray(list) ||
@@ -360,7 +366,7 @@ export function load(raw) {
     throw Error('Повреждены контакты');
   if (
     !Array.isArray(s.groups) ||
-    s.groups.length !== 2 ||
+    s.groups.length !== s.sides.length ||
     s.groups.some(
       (g) =>
         !g ||
@@ -374,7 +380,7 @@ export function load(raw) {
     throw Error('Повреждены группы');
   if (
     !Array.isArray(s.formations) ||
-    s.formations.length !== 2 ||
+    s.formations.length !== s.sides.length ||
     s.formations.some((v) => !['line', 'column', 'spread'].includes(v))
   )
     throw Error('Повреждено построение');
@@ -429,7 +435,8 @@ export function load(raw) {
   for (const f of s.sides) f.rearAuto ??= true;
   if (s.sides.some((f) => typeof f.rearAuto !== 'boolean'))
     throw Error('Повреждена тыловая служба');
-  restoreDistricts(s);
+  restoreDistricts(s, sourceVersion);
+  restoreSettlements(s, sourceVersion);
   restoreServices(s);
   restoreOil(s);
   migrateMapLayout(s, sourceVersion);

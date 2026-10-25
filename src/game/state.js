@@ -7,6 +7,7 @@ import { createWeather } from './weather.js';
 import { createFrontlineMemory } from './defense/frontline.js';
 import { createArmyComposition } from './units/ground/composition.js';
 import { createAmmoStock } from './units/ground/ammunition.js';
+import { createSettlements } from './territory/settlements.js';
 export const newSide = () => ({
   credits: 3200,
   materials: 200,
@@ -27,62 +28,57 @@ export const newSide = () => ({
   losses: 0,
 });
 
-export function createGame(seed = Date.now() >>> 0, { difficulty = DEFAULT_DIFFICULTY } = {}) {
+export function createGame(
+  seed = Date.now() >>> 0,
+  { difficulty = DEFAULT_DIFFICULTY, mode } = {},
+) {
+  const count = mode === 'coop' ? 4 : 2;
   const s = {
     version: VERSION,
+    ...(mode ? { mode } : {}),
     difficulty: DIFFICULTY[difficulty] ? difficulty : DEFAULT_DIFFICULTY,
     time: 0,
     seed,
     weather: createWeather(seed),
     rules: { rear: true, oil: true },
     rng: seed || 1,
-    nextId: 3,
+    nextId: count + 1,
     networkRevision: 0,
-    sides: [newSide(), newSide()],
-    buildings: [
-      {
-        id: 1,
-        side: 0,
-        key: 'hq',
-        x: -HQ_X,
-        z: 0,
-        hp: 1100,
-        maxHp: 1100,
-        progress: 1,
-        rotation: 0,
-        cooldown: 0,
-      },
-      {
-        id: 2,
-        side: 1,
-        key: 'hq',
-        x: HQ_X,
-        z: 0,
-        hp: 1100,
-        maxHp: 1100,
-        progress: 1,
-        rotation: Math.PI,
-        cooldown: 0,
-      },
-    ],
+    sides: Array.from({ length: count }, newSide),
+    buildings: Array.from({ length: count }, (_, side) => ({
+      id: side + 1,
+      side,
+      key: 'hq',
+      x: side % 2 ? HQ_X : -HQ_X,
+      z: count === 4 ? (side < 2 ? -HQ_X : HQ_X) : 0,
+      hp: 1100,
+      maxHp: 1100,
+      progress: 1,
+      rotation: side % 2 ? Math.PI : 0,
+      cooldown: 0,
+    })),
     roads: [],
     serviceVehicles: [],
     ammoVehicles: [],
     ammoLogisticsAt: 0,
     ships: [],
-    frontlineMemory: createFrontlineMemory(),
+    frontlineMemory: createFrontlineMemory(count),
     units: [],
     groundUnits: [],
     trenches: [],
     groundScars: [],
     districts: createDistricts(),
-    contacts: [[], []],
-    groups: [{}, {}],
-    formations: ['line', 'line'],
+    settlements: createSettlements(),
+    settlementHouseMask: 65535,
+    settlementClock: { next: 0, elapsed: 0 },
+    contacts: Array.from({ length: count }, () => []),
+    groups: Array.from({ length: count }, () => ({})),
+    formations: Array(count).fill('line'),
     projectiles: [],
     events: [],
     log: [],
     ai: { nextBuild: 7, nextAttack: 170, roadPlan: 0 },
+    ...(count === 4 ? { aiBySide: { 3: { nextBuild: 7, nextAttack: 170, roadPlan: 0 } } } : {}),
     result: null,
     stats: {
       shots: 0,

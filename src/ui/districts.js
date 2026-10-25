@@ -42,10 +42,24 @@ export class DistrictHUD {
       const focus = card.querySelector('.district-focus'),
         order = card.querySelector('.district-order'),
         repair = card.querySelector('.district-repair');
-      card.dataset.owner = d.owner == null ? 'neutral' : d.owner === 0 ? 'own' : 'enemy';
+      card.dataset.owner =
+        d.owner == null
+          ? 'neutral'
+          : d.owner === 0
+            ? 'own'
+            : E.allied(state, 0, d.owner)
+              ? 'ally'
+              : 'enemy';
       card.classList.toggle('contested', d.contested || d.blocked);
-      const label = d.owner === 0 ? 'Наш' : d.owner === 1 ? 'Противник' : 'Нейтральный';
-      const sign = d.capturing === 0 ? 1 : -1;
+      const label =
+        d.owner == null
+          ? 'Нейтральный'
+          : d.owner === 0
+            ? 'Наш'
+            : E.allied(state, 0, d.owner)
+              ? 'Союзник'
+              : 'Противник';
+      const sign = E.teamOf(state, d.capturing) === 0 ? 1 : -1;
       const neutralizing = d.owner != null || d.control * sign < 0;
       const percent = Math.round(
         (neutralizing ? 1 - Math.abs(d.control) : Math.abs(d.control)) * 100,
@@ -53,7 +67,7 @@ export class DistrictHUD {
       focus.querySelector('small').textContent = d.contested
         ? 'Оспаривается'
         : d.capturing != null
-          ? `${d.capturing === 0 ? (neutralizing ? 'Сброс' : 'Захват') : 'Враг'} ${percent}%`
+          ? `${d.capturing === 0 ? (neutralizing ? 'Сброс' : 'Захват') : E.allied(state, 0, d.capturing) ? 'Союзник' : 'Враг'} ${percent}%`
           : d.repairing
             ? `Ремонт ${Math.round((d.hp / d.maxHp) * 100)}%`
             : d.hp <= 0
@@ -62,12 +76,13 @@ export class DistrictHUD {
                 ? 'Доход остановлен'
                 : label;
       focus.title = `${E.DISTRICT_TYPES[d.type].name}. Полный доход: ${perMinute(d.income)} денег, ${perMinute(d.materials)} сплавов в минуту. Состояние ${Math.ceil(d.hp)}/${d.maxHp}. Пехота захватывает за 22 с; техника только оспаривает. Нажмите для перехода.`;
-      order.disabled = !units.length || (!foot && d.owner !== 0);
+      const friendly = E.allied(state, 0, d.owner);
+      order.disabled = !units.length || (!foot && !friendly);
       order.title = !units.length
         ? 'Сначала выделите пехоту или охрану района'
-        : !foot && d.owner !== 0
+        : !foot && !friendly
           ? 'Для захвата нужна пехота вне БТР'
-          : d.owner === 0
+          : friendly
             ? 'Направить выбранные войска охранять район'
             : 'Направить выбранную пехоту захватить район';
       repair.hidden = d.owner !== 0 || d.hp >= d.maxHp;

@@ -1,7 +1,7 @@
 import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -26,7 +26,7 @@ const configured = (table, key) => typeof key === 'string' && Object.hasOwn(tabl
 
 // One allowlist for local play and the authoritative server. Clients cannot set state or choose a side.
 export function executeCommand(s, side, type, a = {}) {
-  if (![0, 1].includes(side) || !object(a) || typeof type !== 'string') return invalid;
+  if (!E.validSide(s, side) || !object(a) || typeof type !== 'string') return invalid;
   if (s.result) return 'Матч завершён';
   switch (type) {
     case 'build':
@@ -150,7 +150,8 @@ export function executeCommand(s, side, type, a = {}) {
         return invalid;
       if (
         a.aim.targetId != null &&
-        (!validId(a.aim.targetId) || E.observedTarget(s, side, a.aim.targetId)?.side !== 1 - side)
+        (!validId(a.aim.targetId) ||
+          !E.hostile(s, side, E.observedTarget(s, side, a.aim.targetId)?.side))
       )
         return 'Недоступная цель';
       {
@@ -224,7 +225,8 @@ export function executeCommand(s, side, type, a = {}) {
       if (id != null && !validId(id)) return invalid;
       const target = id == null ? null : s.groundUnits.find((u) => u.id === id);
       if (id != null && !E.observedTarget(s, side, id)) return 'Недоступная цель FPV';
-      if (target && E.observedTarget(s, side, id)?.side !== 1 - side) return 'Недоступная цель FPV';
+      if (target && !E.hostile(s, side, E.observedTarget(s, side, id)?.side))
+        return 'Недоступная цель FPV';
       return E.launchFPV(s, side, a.ids, a.point, target?.id ?? null);
     }
     case 'rally':

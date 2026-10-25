@@ -9,6 +9,7 @@ import { mogModel } from './infantry/mog.js';
 import { buildArmoredCar, buildMLRS, buildSupplyTruck } from './vehicles/light-vehicles.js';
 import { addVehicleEquipment } from './equipment.js';
 import { upgradeable } from '../../game/combat/upgrades.js';
+import { factionHex } from '../team-colors.js';
 // Shared hulls are rescaled to tell the weight classes apart at a glance.
 const HULL_SCALE = { lighttank: 0.8, ifv: 0.9, heavytank: 1.14 };
 const templates = new Map();
@@ -21,9 +22,8 @@ export function groundModel(world, u) {
   const signature = u.key + ':' + u.side + ':' + (u.level || 0);
   if (!templates.has(signature)) {
     const root = new T.Group(),
-      own = u.side === 0,
-      paint = own ? '#74836b' : '#8d7965',
-      accent = own ? '#a4dfb1' : '#edab8d',
+      paint = ['#74836b', '#8d7965', '#627f96', '#96805a'][u.side],
+      accent = factionHex(u.side),
       dynamic = new Set();
     const box = (p, x, y, z, w, h, d, c) => world.box(p, x, y, z, w, h, d, c),
       cyl = (p, x, y, z, r, h, c) => world.cyl(p, x, y, z, r, h, c);

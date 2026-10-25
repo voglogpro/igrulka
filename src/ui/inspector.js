@@ -1,10 +1,20 @@
 import { renderArmyControls, setArmyContextVisible } from './army-controls.js';
 import { renderDefenseDetail } from './defense-inspector.js';
 import { updateEquipmentDetails } from './equipment-detail.js';
+import { settlementInspectorHTML } from './settlements.js';
 import * as E from '../game/index.js';
 import { $, rate } from './format.js';
 export function renderInspector(context) {
   const { state, selected, armySelection } = context;
+  const settlement = settlementInspectorHTML(state, selected);
+  if (settlement) {
+    const host = $('#inspector');
+    host.hidden = false;
+    host.innerHTML = settlement;
+    delete host.dataset.id;
+    setArmyContextVisible(false);
+    return;
+  }
   const b = E.observedTarget(state, 0, selected),
     host = $('#inspector');
   if (!b) {
@@ -23,6 +33,14 @@ export function renderInspector(context) {
   }
   setArmyContextVisible(false);
   host.hidden = false;
+  if (b.side !== 0) {
+    const label = E.allied(state, 0, b.side)
+      ? 'Союзный город · командует другой игрок'
+      : 'Противник';
+    host.innerHTML = `<div class="panel-head"><b>${E.targetName(b)}</b><button data-action="deselect" aria-label="Закрыть">×</button></div><div class="health"><i style="width:${Math.max(0, b.hp / b.maxHp) * 100}%"></i></div><p class="status-note">${label}<br>${Math.ceil(b.hp)} / ${b.maxHp}${b.level ? ' · оснащение ' + (b.level + 1) : ''}${b.ground ? '<br>' + E.GROUND_UNITS[b.key].role : ''}</p>`;
+    delete host.dataset.id;
+    return;
+  }
   if (b.ground) {
     host.innerHTML = `<div class="panel-head"><b>${E.targetName(b)}</b><button data-action="deselect" aria-label="Закрыть">×</button></div><div class="health"><i style="width:${Math.max(0, b.hp / b.maxHp) * 100}%"></i></div><p class="status-note">Противник · ${Math.ceil(b.hp)} / ${b.maxHp}<br>${E.GROUND_UNITS[b.key].role}</p>`;
     delete host.dataset.id;

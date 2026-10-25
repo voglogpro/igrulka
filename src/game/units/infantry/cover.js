@@ -1,3 +1,4 @@
+import { allied, sideIds } from '../../factions.js';
 import {
   BUILDINGS,
   GROUND_UNITS,
@@ -140,7 +141,7 @@ function observes(s, v, u, factor, flash, night) {
 }
 export function groundVisible(s, side, u) {
   if (!u || u.hp <= 0 || u.carrierId) return false;
-  if (u.side === side) return true;
+  if (allied(s, u.side, side)) return true;
   if (!isInfantry(u.key)) return true;
   const c = coverInfo(s, u);
   if (!c.concealment || u.moving) return true;
@@ -167,10 +168,10 @@ const HEARING = {
 export const hearingRange = (key) => HEARING[GROUND_UNITS[key]?.groundWeapon] || 300;
 export function recordFire(s, u, random) {
   u.lastFire = s.time;
-  s.contacts ||= [[], []];
+  s.contacts ||= sideIds(s).map(() => []);
   const range = hearingRange(u.key);
-  for (let side = 0; side < 2; side++) {
-    if (side === u.side || groundVisible(s, side, u)) continue;
+  for (const side of sideIds(s)) {
+    if (allied(s, side, u.side) || groundVisible(s, side, u)) continue;
     const heard =
       (s.groundUnits || []).some(
         (v) =>
@@ -187,6 +188,7 @@ export function recordFire(s, u, random) {
           (b.x - u.x) ** 2 + (b.z - u.z) ** 2 < range * range,
       );
     if (!heard) continue;
+    s.contacts[side] ||= [];
     const old = s.contacts[side].find((c) => c.unitId === u.id);
     if (old && s.time - old.time < 2) continue;
     const blur = Math.min(60, 20 + range / 40);

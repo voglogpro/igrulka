@@ -6,7 +6,7 @@ export function mogModel(w, b, content, root, crew = true) {
   position.userData.dynamic = true;
   content.add(position);
   const cloth = '#8b8266',
-    olive = b.side === 0 ? '#71836a' : '#8a7963',
+    olive = ['#71836a', '#8a7963', '#617e91', '#95805a'][b.side],
     level = Math.max(0, Math.min(2, b.level || 0));
   position.userData.equipmentLevel = level;
   for (let row = 0; row < level; row++)

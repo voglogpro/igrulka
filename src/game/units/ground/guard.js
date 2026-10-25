@@ -1,3 +1,4 @@
+import { hostile } from '../../factions.js';
 import { FIELD, GROUND_UNITS, isInfantry } from '../../config.js';
 import { groundPath, walkable } from './navigation.js';
 import { coverInfo, groundVisible, lineOfSight } from '../infantry/cover.js';
@@ -158,7 +159,7 @@ function threats(s, u) {
   return s.groundUnits
     .filter(
       (enemy) =>
-        enemy.side !== u.side &&
+        hostile(s, enemy.side, u.side) &&
         enemy.hp > 0 &&
         !enemy.carrierId &&
         distance(enemy, u.guard) <= MAX_LEASH &&

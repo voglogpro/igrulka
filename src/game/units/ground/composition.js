@@ -1,3 +1,4 @@
+import { sideIds, validSide } from '../../factions.js';
 import { BUILDINGS, GROUND_UNITS } from '../../config.js';
 import { buildingConnected } from '../../city/road-network.js';
 import { oilCost, oilEnabled } from '../../city/oil.js';
@@ -14,7 +15,7 @@ const record = (v) => v != null && typeof v === 'object' && !Array.isArray(v);
 export const createArmyComposition = () => ({ targets: {}, nextAt: 0, cursor: 0 });
 
 export function setArmyTarget(s, side, key, count) {
-  if (![0, 1].includes(side) || !s.sides[side]) return 'Неизвестная сторона';
+  if (!validSide(s, side) || !s.sides[side]) return 'Неизвестная сторона';
   if (s.result) return 'Кампания завершена';
   if (!recruitmentFacility(key)) return 'Неизвестный тип войск';
   if (!Number.isSafeInteger(count) || count < 0 || count > GROUND_LIMIT)
@@ -66,7 +67,7 @@ const reasons = {
 };
 
 export function armyCompositionStatus(s, side) {
-  if (![0, 1].includes(side) || !s.sides[side]) return null;
+  if (!validSide(s, side) || !s.sides[side]) return null;
   const f = s.sides[side],
     plan = f.armyComposition || createArmyComposition();
   const c = counts(s, side),
@@ -135,7 +136,7 @@ export function armyCompositionStatus(s, side) {
 
 export function updateArmyComposition(s) {
   if (s.result) return;
-  for (const side of [0, 1]) {
+  for (const side of sideIds(s)) {
     const plan = s.sides[side].armyComposition;
     if (!plan || s.time < plan.nextAt || !Object.keys(plan.targets).length) continue;
     plan.nextAt = s.time + ARMY_COMPOSITION.interval;
@@ -156,7 +157,7 @@ export function updateArmyComposition(s) {
 }
 
 export function restoreArmyComposition(s, sourceVersion = s.version) {
-  for (const side of [0, 1]) {
+  for (const side of sideIds(s)) {
     const f = s.sides[side];
     if (sourceVersion < 15) {
       f.armyComposition = createArmyComposition();

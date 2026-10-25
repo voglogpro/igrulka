@@ -1,3 +1,4 @@
+import { validSide } from '../factions.js';
 import { BUILDINGS, GROUND_UNITS } from '../config.js';
 import { equipmentModifiers } from './upgrade-tiers.js';
 import { event } from '../shared/events.js';
@@ -20,7 +21,7 @@ export function upgradeStatus(s, side, id) {
   const level = entity?.level || 0;
   const cost = Math.max(40, Math.round((d?.cost || 0) * (level === 0 ? 0.4 : 0.65)));
   let reason = '';
-  if (![0, 1].includes(side) || !entity || !upgradeable(entity))
+  if (!validSide(s, side) || !entity || !upgradeable(entity))
     reason = 'Этот объект нельзя улучшить';
   else if (s.result) reason = 'Кампания завершена';
   else if (entity.hp <= 0 || entity.demolished || entity.progress < 1 || entity.downed)

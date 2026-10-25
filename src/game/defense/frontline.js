@@ -1,3 +1,5 @@
+import { hostile } from '../factions.js';
+import { validSide } from '../factions.js';
 import { GROUND_UNITS, isInfantry } from '../config.js';
 import { groundVisible } from '../units/infantry/cover.js';
 import { corridorGeometry } from './geometry.js';
@@ -12,8 +14,8 @@ export function forgetObservedFrontlineTarget(s, id, sides) {
   }
   reports.delete(s);
 }
-export const createFrontlineMemory = () =>
-  [0, 1].map(() => ({ nextThink: 0, nextReinforce: 0, seen: [] }));
+export const createFrontlineMemory = (count = 2) =>
+  Array.from({ length: count }, () => ({ nextThink: 0, nextReinforce: 0, seen: [] }));
 export const military = (u) =>
   u.hp > 0 &&
   !u.carrierId &&
@@ -43,7 +45,7 @@ export function observedFrontline(s, side, previous = []) {
   );
   const visible = new Set();
   for (const u of s.groundUnits)
-    if (u.side !== side && military(u) && groundVisible(s, side, u)) {
+    if (hostile(s, u.side, side) && military(u) && groundVisible(s, side, u)) {
       seen.set(u.id, { id: u.id, x: u.x, z: u.z, strength: defenseStrength(u), time: s.time });
       visible.add(u.id);
     }
@@ -66,7 +68,7 @@ export function calculateFrontline(
   side,
   memory,
   visible = new Set(),
-  direction = side === 0 ? 1 : -1,
+  direction = side % 2 === 0 ? 1 : -1,
 ) {
   const own = s.groundUnits.filter((u) => u.side === side && military(u));
   const lines = corridorGeometry(s, side, direction);
@@ -228,7 +230,7 @@ export function cacheFrontline(s, side, report) {
 }
 
 export function frontlineReport(s, side) {
-  if (![0, 1].includes(side)) return null;
+  if (!validSide(s, side)) return null;
   const cached = reports.get(s)?.[side];
   if (
     cached &&
@@ -254,7 +256,7 @@ export function frontlineReport(s, side) {
       ? -1
       : s.frontlineDirections?.[side] === 1
         ? 1
-        : side === 0
+        : side % 2 === 0
           ? 1
           : -1;
   const report = calculateFrontline(s, side, seen, visible, direction);

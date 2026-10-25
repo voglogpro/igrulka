@@ -132,7 +132,7 @@ export async function pointerUp(e) {
         this.callbacks.onGroundOrder?.({ x: clicked.x, z: clicked.z, boardId: clicked.id });
         return;
       }
-      if (clicked.side === 1) {
+      if (E.hostile(this.state, 0, clicked.side)) {
         this.callbacks.onGroundOrder?.({ x: clicked.x, z: clicked.z, targetId: clicked.id });
         return;
       }
@@ -148,6 +148,11 @@ export async function pointerUp(e) {
       return;
     }
     this.callbacks.onSelect?.(clicked.id, e.shiftKey);
+    return;
+  }
+  const settlement = this.settlementView?.pick(this.ray);
+  if (settlement && !chosen?.ground) {
+    this.callbacks.onSettlementSelect?.(settlement);
     return;
   }
   const road = this.state.roads
@@ -203,7 +208,7 @@ export function groundCommandAt(e) {
     !e.shiftKey &&
     E.DISTRICTS.find((d) => d.id === pickedDistrict || Math.hypot(d.x - p.x, d.z - p.z) < 18);
   const order =
-    target?.side === 1
+    target && E.hostile(this.state, 0, target.side)
       ? { x: target.x, z: target.z, targetId: target.id }
       : canBoard
         ? { x: target.x, z: target.z, boardId: target.id }

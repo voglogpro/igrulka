@@ -1,6 +1,7 @@
 import * as T from '../../vendor/three/three.module.js';
 import { batchStatic } from './mesh-utils.js';
 import { shipModel } from './models/city/oil.js';
+import { factionHex } from './team-colors.js';
 
 const CAPACITY = 24;
 const WATER = -1;
@@ -11,7 +12,8 @@ export class Ships {
   constructor(world) {
     this.world = world;
     this.dummy = new T.Object3D();
-    this.meshes = ['#87c6a4', '#d58e76'].map((accent) => {
+    this.meshes = [0, 1, 2, 3].map((side) => {
+      const accent = factionHex(side);
       const group = new T.Group();
       shipModel(world, group, accent);
       batchStatic(group);
@@ -28,11 +30,11 @@ export class Ships {
     this.wakeAt = new Map();
   }
   update(state, time, visible) {
-    const counts = [0, 0];
+    const counts = [0, 0, 0, 0];
     for (const ship of state.ships || []) {
       if (!visible(ship)) continue;
-      const mesh = this.meshes[ship.side === 1 ? 1 : 0],
-        i = counts[ship.side === 1 ? 1 : 0]++;
+      const mesh = this.meshes[ship.side],
+        i = counts[ship.side]++;
       if (i >= CAPACITY) continue;
       const d = this.dummy,
         phase = time * 0.9 + ship.id;

@@ -29,7 +29,7 @@ export function assignDefensePost(s, u, point, snap = false) {
 
 // One bounded planning pulse, never a per-frame all-army repath.
 export function updateDefenseFormation(s, side, own) {
-  const direction = side === 0 ? 1 : -1,
+  const direction = side % 2 === 0 ? 1 : -1,
     lines = corridorGeometry(s, side);
   let attempts = 0,
     issued = 0;

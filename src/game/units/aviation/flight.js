@@ -1,3 +1,4 @@
+import { hostile, sideIds } from '../../factions.js';
 import { event } from '../../shared/events.js';
 import { random } from '../../shared/random.js';
 import { riverDistance, BUILDINGS, WEAPONS, MAP, groundHeight } from '../../config.js';
@@ -95,18 +96,20 @@ export function basePosition(u, travelled) {
 
 // A launch is heard across the valley even when the enemy cannot see it: a contact marks the area.
 function hearLaunch(s, u) {
-  s.contacts ||= [[], []];
-  const other = 1 - u.side;
-  if (fogVisible(s, other, u.x, u.z)) return;
-  s.contacts[other].push({
-    unitId: -u.id,
-    x: u.x + (random(s) - 0.5) * 90,
-    z: u.z + (random(s) - 0.5) * 90,
-    radius: 55,
-    expires: s.time + 9,
-    time: s.time,
-  });
-  if (s.contacts[other].length > 80) s.contacts[other].shift();
+  s.contacts ||= sideIds(s).map(() => []);
+  for (const other of sideIds(s)) {
+    if (!hostile(s, other, u.side) || fogVisible(s, other, u.x, u.z)) continue;
+    s.contacts[other] ||= [];
+    s.contacts[other].push({
+      unitId: -u.id,
+      x: u.x + (random(s) - 0.5) * 90,
+      z: u.z + (random(s) - 0.5) * 90,
+      radius: 55,
+      expires: s.time + 9,
+      time: s.time,
+    });
+    if (s.contacts[other].length > 80) s.contacts[other].shift();
+  }
 }
 
 export function moveUnits(s, dt) {

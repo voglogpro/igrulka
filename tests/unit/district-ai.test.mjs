@@ -21,10 +21,10 @@ test('solo district AI assigns a bounded set of real capture paths and leaves an
   soldiers(s, 7);
   updateDistrictAI(s);
   const guards = s.groundUnits.filter((u) => u.aiDistrict);
-  assert.equal(guards.length, AI_DISTRICT_GARRISON_LIMIT);
+  assert.equal(guards.length, Math.min(AI_DISTRICT_GARRISON_LIMIT, E.DISTRICTS.length));
   assert.equal(new Set(guards.map((u) => u.aiDistrict)).size, guards.length);
   assert.ok(guards.every((u) => u.path.length && u.guard));
-  assert.equal(s.groundUnits.filter((u) => !u.guard).length, 4);
+  assert.equal(s.groundUnits.filter((u) => !u.guard).length, 7 - guards.length);
   E.advance(s, 180);
   assert.ok(s.districts.some((d) => d.owner === 1));
   assert.ok(E.economy(s, 1).districts.active > 0);

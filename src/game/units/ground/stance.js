@@ -1,3 +1,4 @@
+import { hqOf, pairedEnemy, hostile } from '../../factions.js';
 import { GROUND_UNITS, isInfantry } from '../../config.js';
 import { BRIDGES, walkable } from './navigation.js';
 import { orderGround } from './orders.js';
@@ -28,7 +29,7 @@ export function validStance(stance) {
 
 export function bridgePoint(side, post) {
   const z = BRIDGE_Z[post];
-  const x = side === 0 ? -POST_OFFSET : POST_OFFSET;
+  const x = side % 2 === 0 ? -POST_OFFSET : POST_OFFSET;
   return { x, z };
 }
 
@@ -40,6 +41,7 @@ function defenders(s, side, post) {
 
 // "auto" sends the group to the bridge that currently has fewer defenders.
 export function chooseBridge(s, side) {
+  if (s.sides.length > 2) return hqOf(s, side).z < 0 ? 'north' : 'south';
   const north = defenders(s, side, 'north'),
     south = defenders(s, side, 'south');
   return north <= south ? 'north' : 'south';
@@ -60,7 +62,11 @@ export function applyStance(s, side, ids, stance) {
   );
   if (!units.length) return 'Выберите доступные наземные отряды';
   if (stance.mode === 'attack') {
-    const hq = s.buildings.find((b) => b.side !== side && b.key === 'hq' && b.hp > 0);
+    const pairedHQ = hqOf(s, pairedEnemy(s, side));
+    const hq =
+      pairedHQ?.hp > 0
+        ? pairedHQ
+        : s.buildings.find((b) => b.key === 'hq' && b.hp > 0 && hostile(s, b.side, side));
     if (!hq) return 'Нет цели для атаки';
     const previous = new Map(units.map((u) => [u.id, u.order]));
     const result = orderGround(s, side, ids, {

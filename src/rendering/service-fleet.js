@@ -3,7 +3,7 @@ import { batchStatic } from './mesh-utils.js';
 import { ContactShadows } from './performance/contact-shadows.js';
 
 const PER_SIDE = 8;
-const CAPACITY = PER_SIDE * 2;
+const CAPACITY = PER_SIDE * 4;
 // roads.js asphalt: base -0.05 plus 0.6 thickness; independent of legacy bridge heights.
 const ROAD_LEVEL = 0.55;
 const VAN_BASE = 0.5;
@@ -121,17 +121,15 @@ export class ServiceFleet {
   // Call on a new simulation snapshot, or once per frame if positions are interpolated elsewhere.
   sync(state) {
     if (this.disposed) return;
-    let own = 0,
-      enemy = 0,
-      count = 0;
+    const counts = [0, 0, 0, 0];
+    let count = 0;
     this.shadowIds.clear();
     for (const vehicle of state[this.collection] || EMPTY) {
       if (vehicle.hp != null && vehicle.hp <= 0) continue;
-      if (vehicle.side !== 0 && vehicle.side !== 1) continue;
+      if (!Number.isInteger(vehicle.side) || vehicle.side < 0 || vehicle.side > 3) continue;
       if (!Number.isFinite(vehicle.x) || !Number.isFinite(vehicle.z)) continue;
-      if ((vehicle.side === 0 ? own : enemy) >= PER_SIDE || !this.visible(state, vehicle)) continue;
-      if (vehicle.side === 0) own++;
-      else enemy++;
+      if (counts[vehicle.side] >= PER_SIDE || !this.visible(state, vehicle)) continue;
+      counts[vehicle.side]++;
       const offset = count * 4,
         level = Math.max(0, this.height(vehicle.x, vehicle.z)),
         yaw = Number.isFinite(vehicle.yaw) ? vehicle.yaw : 0,

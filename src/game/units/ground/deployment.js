@@ -1,3 +1,4 @@
+import { validSide } from '../../factions.js';
 import { oilCost, hasOil } from '../../city/oil.js';
 import { GROUND_UNITS, FIELD } from '../../config.js';
 import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
@@ -23,7 +24,7 @@ export function deploymentPlan(s, side, key, point, count = 1, siteId = null) {
   };
   const fail = (reason) => ({ ...result, reason });
   if (s.result) return fail('Кампания завершена');
-  if (![0, 1].includes(side)) return fail('Неизвестная сторона');
+  if (!validSide(s, side)) return fail('Неизвестная сторона');
   const facility = recruitmentFacility(key);
   if (!d || !facility) return fail('Неизвестный тип отряда');
   if (!Number.isInteger(count) || count < 1 || count > 5)

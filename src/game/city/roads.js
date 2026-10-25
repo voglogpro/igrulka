@@ -1,6 +1,8 @@
 import { ROAD_HP, dirtyNetwork, overlappingRoad, segmentDistance } from './road-network.js';
 import { riverDistance, BUILDINGS, FIELD, groundHeight } from '../config.js';
 import { event } from '../shared/events.js';
+import { sideIds, validSide } from '../factions.js';
+import { activeSettlementFootprints } from '../territory/settlements.config.js';
 export function addRoad(s, side, ax, az, bx, bz, extra = {}) {
   const r = { id: s.nextId++, side, ax, az, bx, bz, hp: ROAD_HP, maxHp: ROAD_HP, ...extra };
   s.roads.push(r);
@@ -9,14 +11,17 @@ export function addRoad(s, side, ax, az, bx, bz, extra = {}) {
 }
 
 export function campRoads(s) {
-  for (let side = 0; side < 2; side++) {
+  for (const side of sideIds(s)) {
     const hq = s.buildings.find((b) => b.key === 'hq' && b.side === side);
     for (let i = 0; i < 3; i++)
-      addRoad(s, side, hq.x - 90 + i * 60, -45, hq.x - 30 + i * 60, -45, { camp: true });
+      addRoad(s, side, hq.x - 90 + i * 60, hq.z - 45, hq.x - 30 + i * 60, hq.z - 45, {
+        camp: true,
+      });
   }
 }
 
 export function roadPreview(s, owner, ax, az, bx, bz) {
+  if (!validSide(s, owner)) return { error: 'Неизвестный город' };
   if (![ax, az, bx, bz].every(Number.isFinite)) return { error: 'Некорректная дорога' };
   const length = Math.hypot(bx - ax, bz - az),
     cost = Math.ceil(length * 0.8);
@@ -37,6 +42,12 @@ export function roadPreview(s, owner, ax, az, bx, bz) {
       length,
       cost,
     };
+  if (
+    activeSettlementFootprints(s).some(
+      (house) => segmentDistance(house.x, house.z, ax, az, bx, bz) < house.r + 6,
+    )
+  )
+    return { error: 'На пути дом поселения: проведите дорогу рядом', length, cost };
   if (
     s.buildings.some(
       (b) =>

@@ -1,3 +1,4 @@
+import { validSide } from '../factions.js';
 import { FIELD, seaDistance } from '../map.js';
 
 export const GROUND_SCARS = { capacity: 96, life: 1200 };
@@ -17,7 +18,7 @@ export function recordGroundScar(s, e) {
   if (
     !['impact', 'crash'].includes(e.type) ||
     !known(e.key) ||
-    ![0, 1].includes(e.side) ||
+    !validSide(s, e.side) ||
     !Number.isSafeInteger(e.id) ||
     e.id <= 0 ||
     ![e.x, e.z, e.time].every(Number.isFinite) ||
@@ -53,7 +54,7 @@ export function restoreGroundScars(s, sourceVersion = s.version) {
       scar.id <= 0 ||
       ids.has(scar.id) ||
       !known(scar.kind) ||
-      ![0, 1].includes(scar.side) ||
+      !validSide(s, scar.side) ||
       ![scar.x, scar.z, scar.radius, scar.time].every(Number.isFinite) ||
       Math.abs(scar.x) > FIELD.x ||
       Math.abs(scar.z) > FIELD.z ||

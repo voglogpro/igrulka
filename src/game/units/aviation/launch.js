@@ -1,3 +1,4 @@
+import { hostile } from '../../factions.js';
 import { MAP, WEAPONS, weaponStats } from '../../config.js';
 import { targetById } from '../../targets.js';
 import { COMBAT } from '../../combat/config.js';
@@ -37,7 +38,7 @@ export function resolveAim(s, owner, aim) {
         }
       : null;
   const target = targetById(s, aim);
-  return target && target.side !== owner && target.hp > 0 ? target : null;
+  return target && hostile(s, target.side, owner) && target.hp > 0 ? target : null;
 }
 
 export function launchSites(s, owner, key = null) {

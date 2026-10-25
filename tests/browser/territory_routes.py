@@ -30,7 +30,8 @@ with sync_playwright() as p:
     ids = page.evaluate('''()=>{const E=skyfront.engine,w=skyfront.getWorld(),s=E.createGame(822);s.ai.nextBuild=s.ai.nextAttack=s.ai.nextResearch=s.ai.nextArmy=1e9;s.sides[0].credits=10000;s.sides[0].materials=1000;const d=E.DISTRICTS[0],u=E.makeGround(s,0,'infantry',d.x-55,d.z);u.holdFire=true;s.groundUnits.push(u);Object.assign(w.state,s);w.focus(d.x,d.z,240);w.controls.update(3);w.sync();skyfront.selectArmy([u.id]);return{unit:u.id,district:d.id};}''')
     page.wait_for_function('!document.querySelector("#district-strip").hidden')
     cards = page.locator('.district-card')
-    assert cards.count() == 4
+    assert cards.count() == 2
+    assert page.evaluate('skyfront.engine.DISTRICTS.map(d=>d.id)') == ['north-depot','south-depot']
     strip = page.locator('#district-strip').bounding_box()
     groups = page.locator('#groups-bar').bounding_box()
     assert strip['x'] >= groups['x'] + groups['width'] + 4
@@ -109,12 +110,29 @@ with sync_playwright() as p:
     assert page.evaluate('(id)=>{const u=skyfront.getState().groundUnits.find(u=>u.id===id);return Math.hypot(u.x+760,u.z+160);}',unit)<4
     print('Shift-right-click starts from guard, queues a visible path, pauses, waits for a blocked point and resumes after demolition',flush=True)
 
+    page.keyboard.press('Escape')
+    page.evaluate('skyfront.openPanel("economy",true)')
+    page.wait_for_function('document.querySelectorAll("[data-settlement-focus]").length===8')
+    village = page.evaluate('skyfront.engine.SETTLEMENTS[0]')
+    page.locator(f'[data-settlement-focus="{village["id"]}"]').click()
+    page.wait_for_function('(name)=>document.querySelector("#inspector").textContent.includes(name)',arg=village['name'])
+    assert 'дорогу' in page.locator('#inspector').inner_text()
+    page.wait_for_function('()=>{const c=skyfront.getWorld().controls;return c.target.distanceTo(c.desired)<1;}',polling=50)
+    page.keyboard.press('Escape')
+    house = point(village['x']-20,village['z']+8+village['seed']%3,4)
+    assert page.evaluate('p=>document.elementFromPoint(p.x,p.y)===skyfront.getWorld().renderer.domElement',house),house
+    page.mouse.click(house['x'],house['y'])
+    page.wait_for_function('(name)=>!document.querySelector("#inspector").hidden&&document.querySelector("#inspector").textContent.includes(name)',arg=village['name'])
+    assert 'Поступления / мин' in page.locator('#inspector').inner_text()
+    page.screenshot(path=str(ARTIFACTS/'settlements-810-1024.png'),timeout=120000)
+    print('All eight economy focus buttons exist and clicking a real 3D village house opens its road and income status',flush=True)
+
     page.evaluate('skyfront.save()')
     page.reload(wait_until='load', timeout=120000)
     page.wait_for_function('Boolean(window.skyfront)')
     assert page.evaluate('skyfront.getState().districts[0].owner') == 0
     assert page.evaluate('skyfront.getState().districts[0].hp') == 360
     assert not report['errors'] and not report['consoleErrors'], report
-    report.update({'version8Migration':True,'compact1024':True,'capture':True,'ruinsAndRepair':True,'deliveryClicks':True,'shiftRoute':True,'blockedResume':True,'savePersisted':True})
+    report.update({'version8Migration':True,'compact1024':True,'twoCentralDepots':True,'capture':True,'ruinsAndRepair':True,'deliveryClicks':True,'shiftRoute':True,'blockedResume':True,'eightSettlementButtons':True,'settlement3DClick':True,'savePersisted':True})
     (ARTIFACTS/'territory-routes-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
     browser.close()

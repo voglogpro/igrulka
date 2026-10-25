@@ -85,7 +85,7 @@ with sync_playwright() as p:
             const air={id:s.nextId++,side:1,key:'drone',x:1500,y:80,z:700,hp:20,delay:0,launched:true,vx:-20,vz:0,route:[{x:0,z:0}],targetId:1,tx:0,tz:0};s.units.push(air);w.sync();
             const canvas=document.querySelector('#minimap');w.updateMinimap(canvas);
             const pixel=canvas.getContext('2d').getImageData(Math.floor((1500/E.MAP.width+.5)*canvas.width),Math.floor((700/E.MAP.depth+.5)*canvas.height),1,1).data;
-            return {tank:E.groundVisible(s,0,tank)&&w.groundModels.get(tank.id)?.visible,foot:E.groundVisible(s,0,foot)&&w.groundModels.get(foot.id)?.visible,air:E.unitVisible(s,0,air)&&w.unitModels.get(air.id)?.visible,hidden:!E.groundVisible(s,0,hidden)&&!w.groundModels.get(hidden.id)?.visible,mapOpen:E.pointVisible(s,0,1800,1400),minimapEnemy:pixel[0]>220&&pixel[1]>120&&pixel[2]>100};}''')
+            return {tank:E.groundVisible(s,0,tank)&&w.groundModels.get(tank.id)?.visible,foot:E.groundVisible(s,0,foot)&&w.groundModels.get(foot.id)?.visible,air:E.unitVisible(s,0,air)&&w.unitModels.get(air.id)?.visible,hidden:!E.groundVisible(s,0,hidden)&&!w.groundModels.get(hidden.id)?.visible,mapOpen:E.pointVisible(s,0,1800,1400),minimapEnemy:pixel[0]>150&&pixel[0]>pixel[1]+40&&pixel[0]>pixel[2]+60};}''')
         assert all(visibility.values()), visibility
         report['openMapAndConcealment'] = visibility
         for width in (1024, 1366):
