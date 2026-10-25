@@ -240,6 +240,7 @@ function enterNetwork(session) {
 }
 function applyNetworkState(next, room) {
   if (!network) return;
+  const firstSnapshot = !networkApplied;
   state = next;
   world.state = state;
   if (!networkApplied) {
@@ -256,7 +257,9 @@ function applyNetworkState(next, room) {
     buildList();
   }
   networkRoom(room);
-  world.sync();
+  // The render loop already synchronizes every visible frame. Network arrivals must not
+  // trigger additional complete world passes between frames during a busy air battle.
+  if (firstSnapshot) world.sync();
 }
 function networkRoom(room) {
   if (!network) return;

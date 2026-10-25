@@ -3,10 +3,16 @@ import { $ } from './format.js';
 import { renderDefenseDetail } from './defense-inspector.js';
 import { icon } from './icons.js';
 import { updateEquipmentDetails } from './equipment-detail.js';
+import {
+  rememberInspectorCard,
+  restoreInspectorCard,
+  compactEquipmentAction,
+} from './inspector-card.js';
 
 export function setArmyContextVisible(visible) {
   const host = $('#army-controls');
   if (!host) return;
+  rememberInspectorCard(host);
   host.hidden = !visible;
   $('#game').classList.toggle('army-selected', visible);
   if (!visible) {
@@ -44,7 +50,7 @@ export function renderArmyControls({ state, armySelection }, primary) {
     return;
   }
   setArmyContextVisible(true);
-  const signature = units.map((u) => u.id).join(',');
+  const signature = units.map((u) => `${u.id}:${u.key}`).join(',');
   const d = E.GROUND_UNITS[primary.key];
   if (host.dataset.id !== signature) {
     host.dataset.id = signature;
@@ -191,4 +197,11 @@ export function renderArmyControls({ state, armySelection }, primary) {
   updateEquipmentDetails(equipment, state, units.length === 1 ? primary : null);
   if (d.range && units.length === 1) renderDefenseDetail(state, primary);
   else $('#defense-detail').innerHTML = '';
+  compactEquipmentAction(
+    host,
+    state,
+    units.length === 1 ? primary : null,
+    host.querySelector('.army-summary'),
+  );
+  restoreInspectorCard(host, state, signature);
 }

@@ -143,3 +143,17 @@ test('interpolation follows the short turn across the angle boundary and stops d
   session.renderInto(display, 200);
   assert.ok(Math.abs(display.groundUnits[0].x - 5) < 1e-10);
 });
+
+test('a slower snapshot cadence interpolates its full interval while preserving both authoritative samples', () => {
+  const session = new NetworkSession({});
+  session.room = { phase: 'playing' };
+  session.previous = { state: { time: 1, units: [{ id: 7, x: 0, y: 80, z: 0 }] } };
+  session.latest = { received: 100, state: { time: 1.25, units: [{ id: 7, x: 25, y: 80, z: 0 }] } };
+  const display = structuredClone(session.latest.state);
+  const samples = structuredClone([session.previous, session.latest]);
+  session.renderInto(display, 225);
+  assert.ok(Math.abs(display.units[0].x - 12.5) < 1e-8);
+  session.renderInto(display, 250);
+  assert.ok(Math.abs(display.units[0].x - 15) < 1e-8);
+  assert.deepEqual([session.previous, session.latest], samples);
+});

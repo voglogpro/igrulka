@@ -2,8 +2,10 @@ import { randomBytes } from 'node:crypto';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createGame, step, DIFFICULTY } from '../src/game/index.js';
 import { executeCommand, PROTOCOL_VERSION } from '../src/network/commands.js';
-import { playerView } from '../src/network/perspective.js';
+import { snapshotPlayerView, playerView } from '../src/network/perspective.js';
+import { SNAPSHOT_ENCODING, createSnapshotEncoder } from '../src/network/snapshots.js';
 import { createGameServer } from '../scripts/dev-server.mjs';
+import { OutboundSnapshots } from './outbound-snapshots.mjs';
 
 const codePattern = /^[A-HJ-NP-Z2-9]{6}$/;
 const code = () =>
@@ -12,14 +14,7 @@ const code = () =>
 const sideOf = (room, seat) => (room.mode === 'coop' ? seat * 2 : seat);
 const name = (value) =>
   typeof value === 'string' ? value.trim().slice(0, 24) || 'Командир' : 'Командир';
-const send = (socket, value) => {
-  if (socket?.readyState !== WebSocket.OPEN) return;
-  if (socket.bufferedAmount >= 2_000_000) {
-    socket.close(1013, 'Connection too slow');
-    return;
-  }
-  socket.send(JSON.stringify(value));
-};
+const send = (socket, value, key = null) => socket?.outbound?.control(value, key);
 
 export function createRoomServer({
   autoTick = true,
@@ -69,30 +64,44 @@ export function createRoomServer({
       ),
     };
   }
+  function snapshot(socket, room) {
+    const side = sideOf(room, socket.seat);
+    socket.outbound.snapshot(() => {
+      const state = socket.snapshotEncoder
+        ? snapshotPlayerView(room.state, side)
+        : playerView(room.state, side);
+      return {
+        type: 'snapshot',
+        room: meta(room),
+        tick: room.tick,
+        ...(socket.snapshotEncoder ? socket.snapshotEncoder.encode(state) : { state }),
+      };
+    });
+  }
   function broadcast(room, snapshots = false) {
     const status = meta(room),
-      views = new Map();
+      signature = JSON.stringify(status);
     for (let seat = 0; seat < 2; seat++) {
       const p = room.players[seat];
       if (!p?.socket) continue;
-      const side = sideOf(room, seat);
-      if (snapshots && room.started && !views.has(side))
-        views.set(side, playerView(room.state, side));
-      send(p.socket, {
-        type: snapshots ? 'snapshot' : 'room',
-        room: status,
-        tick: room.tick,
-        ...(snapshots && room.started ? { state: views.get(side) } : {}),
-      });
+      // A phase change must not wait behind an application-level snapshot ACK.
+      if (p.socket.roomSignature !== signature) {
+        p.socket.roomSignature = signature;
+        send(p.socket, { type: 'room', room: status, tick: room.tick }, 'room');
+      }
+      if (snapshots && room.started) snapshot(p.socket, room);
     }
   }
-  function attach(socket, room, seat, player) {
+  function attach(socket, room, seat, player, encoding) {
     socket.roomCode = room.code;
     socket.seat = seat;
     player.socket = socket;
     socket.lastSequence = player.lastSequence || 0;
     player.disconnectedAt = null;
     room.players[seat] = player;
+    socket.snapshotEncoder = encoding === SNAPSHOT_ENCODING ? createSnapshotEncoder() : null;
+    socket.outbound.requireAck = !!socket.snapshotEncoder;
+    socket.roomSignature = JSON.stringify(meta(room));
     send(socket, {
       type: 'joined',
       protocol: PROTOCOL_VERSION,
@@ -100,6 +109,7 @@ export function createRoomServer({
       token: player.token,
       side: sideOf(room, seat),
       seat,
+      ...(socket.snapshotEncoder ? { snapshotEncoding: SNAPSHOT_ENCODING } : {}),
       room: meta(room),
     });
     broadcast(room, room.started);
@@ -107,6 +117,7 @@ export function createRoomServer({
   function endRoom(room, reason) {
     for (const p of room.players) {
       if (!p?.socket) continue;
+      p.socket.outbound.resetSnapshots();
       send(p.socket, { type: 'closed', message: reason });
       p.socket.roomCode = null;
     }
@@ -122,9 +133,12 @@ export function createRoomServer({
       return;
     }
     socket.alive = true;
+    socket.outbound = new OutboundSnapshots(socket, { now });
     socket.lastSequence = 0;
     socket.messageWindow = now();
     socket.messageCount = 0;
+    socket.pingCount = 0;
+    socket.syncCount = 0;
     socket.badMessages = 0;
     socket.on('pong', () => {
       socket.alive = true;
@@ -135,10 +149,8 @@ export function createRoomServer({
         if (now() - socket.messageWindow >= 1000) {
           socket.messageWindow = now();
           socket.messageCount = 0;
-        }
-        if (++socket.messageCount > 40) {
-          socket.close(1008, 'Rate limit');
-          return;
+          socket.pingCount = 0;
+          socket.syncCount = 0;
         }
         if (binary) throw Error('Требуется JSON');
         const message = JSON.parse(raw.toString());
@@ -146,8 +158,25 @@ export function createRoomServer({
           throw Error('Некорректное сообщение');
         if (message.protocol != null && message.protocol !== PROTOCOL_VERSION)
           throw Error('Версии игры не совпадают');
+        const counter =
+          message.type === 'snapshot-ack'
+            ? 'syncCount'
+            : message.type === 'ping'
+              ? 'pingCount'
+              : 'messageCount';
+        const limit = counter === 'syncCount' ? 120 : counter === 'pingCount' ? 8 : 40;
+        if (++socket[counter] > limit) {
+          socket.close(1008, 'Rate limit');
+          return;
+        }
         if (message.type === 'ping') {
-          send(socket, { type: 'pong', clientTime: message.clientTime });
+          send(socket, { type: 'pong', clientTime: message.clientTime }, 'pong');
+          return;
+        }
+        if (message.type === 'snapshot-ack') {
+          if (!socket.snapshotEncoder || !Number.isSafeInteger(message.seq) || message.seq < 1)
+            throw Error('Некорректное подтверждение снимка');
+          socket.outbound.acknowledge(message.seq);
           return;
         }
         let room = rooms.get(socket.roomCode);
@@ -178,11 +207,17 @@ export function createRoomServer({
             createdAt: now(),
           };
           rooms.set(roomCode, room);
-          attach(socket, room, 0, {
-            name: name(message.name),
-            token: randomBytes(24).toString('hex'),
-            ready: false,
-          });
+          attach(
+            socket,
+            room,
+            0,
+            {
+              name: name(message.name),
+              token: randomBytes(24).toString('hex'),
+              ready: false,
+            },
+            message.snapshotEncoding,
+          );
           return;
         }
         if (message.type === 'join' || message.type === 'resume') {
@@ -197,14 +232,20 @@ export function createRoomServer({
             if (seat < 0) throw Error('Не удалось восстановить место игрока');
             const p = room.players[seat];
             if (p.socket?.readyState === WebSocket.OPEN) throw Error('Это место уже подключено');
-            attach(socket, room, seat, p);
+            attach(socket, room, seat, p, message.snapshotEncoding);
           } else {
             if (room.started || room.players[1]) throw Error('Комната заполнена');
-            attach(socket, room, 1, {
-              name: name(message.name),
-              token: randomBytes(24).toString('hex'),
-              ready: false,
-            });
+            attach(
+              socket,
+              room,
+              1,
+              {
+                name: name(message.name),
+                token: randomBytes(24).toString('hex'),
+                ready: false,
+              },
+              message.snapshotEncoding,
+            );
           }
           return;
         }
@@ -213,6 +254,13 @@ export function createRoomServer({
           side = sideOf(room, seat),
           player = room.players[seat];
         if (!player || player.socket !== socket) throw Error('Подключение потеряло место');
+        if (message.type === 'resync') {
+          if (!socket.snapshotEncoder) throw Error('Сжатие снимков не согласовано');
+          socket.snapshotEncoder.reset();
+          socket.outbound.resetSnapshots();
+          if (room.started) snapshot(socket, room);
+          return;
+        }
         if (message.type === 'leave') {
           endRoom(room, 'Один из игроков завершил сессию');
           return;
@@ -249,14 +297,17 @@ export function createRoomServer({
             return;
           }
           const result = executeCommand(room.state, side, message.command, message.args);
-          send(socket, {
+          const acknowledgement = {
             type: 'ack',
             sequence: message.sequence,
             ...(typeof result === 'string' ? { error: result } : { result }),
             room: meta(room),
             tick: room.tick,
-            state: playerView(room.state, side),
-          });
+          };
+          if (socket.snapshotEncoder) {
+            send(socket, acknowledgement);
+            snapshot(socket, room);
+          } else send(socket, () => ({ ...acknowledgement, state: playerView(room.state, side) }));
           return;
         }
         throw Error('Неизвестный тип сообщения');

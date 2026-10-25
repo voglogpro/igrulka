@@ -146,7 +146,26 @@ test('context inspector makes allied cities read-only while own repair controls 
     dataset: {},
     style: {},
     classList: { toggle() {} },
-    append() {},
+    children: [],
+    append(...children) {
+      for (const child of children) {
+        child.parentElement = this;
+        this.children.push(child);
+      }
+    },
+    contains(child) {
+      return child === this || this.children.some((node) => node.contains(child));
+    },
+    remove() {
+      if (this.parentElement) {
+        const siblings = this.parentElement.children;
+        siblings.splice(siblings.indexOf(this), 1);
+        this.parentElement = null;
+      }
+    },
+    querySelectorAll() {
+      return [];
+    },
     querySelector(selector) {
       return get(selector);
     },

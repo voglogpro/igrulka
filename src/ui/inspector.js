@@ -4,8 +4,15 @@ import { updateEquipmentDetails } from './equipment-detail.js';
 import { settlementInspectorHTML } from './settlements.js';
 import * as E from '../game/index.js';
 import { $, rate } from './format.js';
+import {
+  rememberInspectorCard,
+  restoreInspectorCard,
+  compactEquipmentAction,
+  compactInspectorStatus,
+} from './inspector-card.js';
 export function renderInspector(context) {
   const { state, selected, armySelection } = context;
+  rememberInspectorCard($('#inspector'));
   const settlement = settlementInspectorHTML(state, selected);
   if (settlement) {
     const host = $('#inspector');
@@ -47,18 +54,21 @@ export function renderInspector(context) {
     return;
   }
   const ruin = b.hp <= 0 && b.key !== 'road',
-    sig = String(b.id) + ':' + ruin + ':' + (b.level || 0);
+    sig = String(b.id) + ':' + b.key + ':' + ruin;
   if (host.dataset.id !== sig) {
     host.dataset.id = sig;
-    host.innerHTML = `<div class="panel-head"><b>${E.targetName(b)}${ruin ? ' · руины' : ''}</b><button data-action="deselect" aria-label="Закрыть">×</button></div><div class="health"><i id="inspect-health"></i></div><div class="inspect-line"><span id="inspect-hp"></span><span id="inspect-status"></span></div><div class="inspect-buttons"><button id="repair-button" data-repair="${b.id}">Ремонт</button>${!ruin && ['factory', 'launcher', 'silo'].includes(b.key) ? '<button data-panel="attack">Арсенал →</button>' : ''}${['barracks', 'vehiclebase'].includes(b.key) && b.side === 0 && !ruin ? `<button data-panel="army">Отряды →</button><button data-rally="${b.id}">Сбор ↗</button>` : ''}${b.key === 'gun' && b.side === 0 && !ruin ? `<button data-redeploy="${b.id}">Свернуть МОГ</button>` : ''}${b.side === 0 && (b.key !== 'hq' || ruin) ? `<button data-demolish="${b.id}">${ruin ? 'Разобрать руины' : 'Снести'}</button>` : ''}</div><div id="building-detail"></div><div id="defense-detail"></div>`;
+    host.innerHTML = `<div class="panel-head"><b>${E.targetName(b)}${ruin ? ' · руины' : ''}</b><button data-action="deselect" aria-label="Закрыть">×</button></div><div class="health"><i id="inspect-health"></i></div><div class="inspect-line"><span id="inspect-hp"></span><span id="inspect-status"></span></div><div class="inspect-primary"><p class="inspect-key-status"></p><div class="inspect-buttons"><button id="repair-button" data-repair="${b.id}">Ремонт</button>${!ruin && ['factory', 'launcher', 'silo'].includes(b.key) ? '<button data-panel="attack">Арсенал →</button>' : ''}${['barracks', 'vehiclebase'].includes(b.key) && b.side === 0 && !ruin ? `<button data-panel="army">Отряды →</button><button data-rally="${b.id}">Сбор ↗</button>` : ''}${b.key === 'gun' && b.side === 0 && !ruin ? `<button data-redeploy="${b.id}">Свернуть МОГ</button>` : ''}${b.side === 0 && (b.key !== 'hq' || ruin) ? `<button data-demolish="${b.id}">${ruin ? 'Разобрать руины' : 'Снести'}</button>` : ''}</div></div><details class="inspector-more"><summary>Характеристики и снабжение</summary><div class="inspector-details-body"><div id="building-detail"></div><div id="defense-detail"></div><div id="equipment-detail"></div></div></details>`;
   }
   if (['barracks', 'vehiclebase'].includes(b.key) && b.side === 0 && !ruin) {
     if (!$('#rally-mode'))
-      host.insertAdjacentHTML(
-        'beforeend',
-        '<label class="barracks-rally-mode">Новобранцы<select id="rally-mode" aria-label="Приказы новым бойцам"><option value="guard">Охранять точку сбора</option><option value="wait">Ждать приказа у базы</option><option value="attackmove">С боем к точке сбора</option><option value="attack">В атаку на штаб врага</option><option value="defend">Оборонять коридор</option></select></label>',
-      );
-    $('#rally-mode').value = E.defaultRallyMode(state, b);
+      host
+        .querySelector('.inspect-primary')
+        .insertAdjacentHTML(
+          'beforeend',
+          '<label class="barracks-rally-mode">Новобранцы<select id="rally-mode" aria-label="Приказы новым бойцам"><option value="guard">Охранять точку сбора</option><option value="wait">Ждать приказа у базы</option><option value="attackmove">С боем к точке сбора</option><option value="attack">В атаку на штаб врага</option><option value="defend">Оборонять коридор</option></select></label>',
+        );
+    if (document.activeElement !== $('#rally-mode'))
+      $('#rally-mode').value = E.defaultRallyMode(state, b);
   }
   const serviceReport = b.key === 'service' ? E.serviceStatus(state, b.side, b.id) : null;
   const supply = ruin
@@ -146,4 +156,10 @@ export function renderInspector(context) {
   }
   updateEquipmentDetails(equipment, state, b);
   if (!ruin) renderDefenseDetail(state, b);
+  const primary = host.querySelector('.inspect-primary');
+  const toggle = host.querySelector('#service-toggle');
+  if (toggle && !primary.contains(toggle)) primary.querySelector('.inspect-buttons').append(toggle);
+  compactEquipmentAction(host, state, b, primary);
+  compactInspectorStatus(host, state, b);
+  restoreInspectorCard(host, state, String(b.id));
 }

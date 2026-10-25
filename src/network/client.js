@@ -1,6 +1,14 @@
 import { PROTOCOL_VERSION } from './commands.js';
+import { createSnapshotDecoder, SNAPSHOT_ENCODING } from './snapshots.js';
 
 export const SESSION_KEY = 'skyfront-room-v1';
+const interpolationIndices = new WeakMap();
+function sampleIndex(sample, key) {
+  if (!interpolationIndices.has(sample)) interpolationIndices.set(sample, new Map());
+  const indices = interpolationIndices.get(sample);
+  if (!indices.has(key)) indices.set(key, new Map((sample.state[key] || []).map((u) => [u.id, u])));
+  return indices.get(key);
+}
 export function serverAddress(value) {
   const url = new URL(value);
   if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol) || url.username || url.password)
@@ -19,6 +27,7 @@ export class NetworkSession {
     this.sequence = 0;
     this.retries = 0;
     this.intentional = false;
+    this.snapshotDecoder = createSnapshotDecoder();
   }
   connect(address, request) {
     this.address = serverAddress(address);
@@ -32,6 +41,8 @@ export class NetworkSession {
   }
   open() {
     clearTimeout(this.reconnectTimer);
+    this.snapshotDecoder.reset();
+    this.awaitingResync = false;
     this.onStatus?.(this.retries ? 'Восстановление подключения…' : 'Подключение…');
     let socket;
     try {
@@ -84,9 +95,12 @@ export class NetworkSession {
       clearTimeout(timeout);
       if (this.socket !== socket || this.intentional) return;
       lastReceived = performance.now();
-      this.send(
-        this.token ? { type: 'resume', code: this.room.code, token: this.token } : this.request,
-      );
+      this.send({
+        ...(this.token
+          ? { type: 'resume', code: this.room.code, token: this.token }
+          : this.request),
+        snapshotEncoding: SNAPSHOT_ENCODING,
+      });
     });
     socket.addEventListener('message', (event) => {
       if (this.socket !== socket || this.intentional) return;
@@ -120,11 +134,24 @@ export class NetworkSession {
         this.room = message.room;
         this.onRoom?.(this.room);
       }
+      if (message.sync) {
+        try {
+          message.state = this.snapshotDecoder.decode(message);
+          this.awaitingResync = false;
+        } catch {
+          if (!this.awaitingResync) {
+            this.awaitingResync = true;
+            this.send({ type: 'resync' });
+          }
+          return;
+        }
+      }
       if (message.state) {
         this.previous = this.latest;
         this.latest = { state: message.state, received: performance.now() };
         this.onState?.(structuredClone(message.state), this.room);
       }
+      if (message.sync) this.send({ type: 'snapshot-ack', seq: message.sync.seq });
       if (message.type === 'ack') {
         const pending = this.pending.get(message.sequence);
         if (pending) {
@@ -197,11 +224,12 @@ export class NetworkSession {
       b = this.latest.state,
       span = b.time - a.time;
     if (span <= 0 || span > 1 || this.room?.phase !== 'playing') return;
-    const t = Math.max(0, Math.min(1, (span - 0.1 + (now - this.latest.received) / 1000) / span));
+    const delay = Math.min(0.5, Math.max(0.1, span));
+    const t = Math.max(0, Math.min(1, (span - delay + (now - this.latest.received) / 1000) / span));
     display.time = a.time + span * t;
     for (const key of ['units', 'groundUnits', 'serviceVehicles', 'ships', 'projectiles']) {
-      const before = new Map((a[key] || []).map((u) => [u.id, u]));
-      const after = new Map((b[key] || []).map((u) => [u.id, u]));
+      const before = sampleIndex(this.previous, key);
+      const after = sampleIndex(this.latest, key);
       for (const u of display[key] || []) {
         const start = before.get(u.id),
           end = after.get(u.id);

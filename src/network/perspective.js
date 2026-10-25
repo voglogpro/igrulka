@@ -2,10 +2,11 @@ import { groundVisible } from '../game/units/infantry/cover.js';
 import { unitVisible } from '../game/visibility.js';
 import { sideIds, validSide, allied, teamOf } from '../game/factions.js';
 
-const publicFields = (item, fields) =>
-  Object.fromEntries(
-    fields.filter((key) => Object.hasOwn(item, key)).map((key) => [key, item[key]]),
-  );
+function publicFields(item, fields) {
+  const result = {};
+  for (const key of fields) if (Object.hasOwn(item, key)) result[key] = item[key];
+  return result;
+}
 
 const groundFields = [
   'id',
@@ -118,14 +119,35 @@ const projectileFields = [
 const serviceFields = ['id', 'side', 'x', 'z', 'yaw', 'state', 'stationId'];
 // Merchant ships are seen on the water; their cargo and trade decisions are private.
 const shipFields = ['id', 'side', 'portId', 'x', 'z', 'yaw', 'state'];
+const collisionHistory = new Set(['prevX', 'prevY', 'prevZ', 'px', 'py', 'pz']);
+const transportGroundFields = groundFields.filter((key) => !collisionHistory.has(key));
+const transportAircraftFields = aircraftFields.filter((key) => !collisionHistory.has(key));
+const transportProjectileFields = [
+  ...projectileFields.filter((key) => !collisionHistory.has(key)),
+  'originX',
+  'originZ',
+  'shooterKey',
+];
+function withoutCollisionHistory(item) {
+  for (const field of collisionHistory) {
+    if (!Object.hasOwn(item, field)) continue;
+    const value = { ...item };
+    for (const key of collisionHistory) delete value[key];
+    return value;
+  }
+  return item;
+}
 
 // The UI always calls its own faction 0. World coordinates and entity IDs stay unchanged.
-export function playerView(authority, side) {
+function projectView(authority, side, compact, detached = true) {
   if (!validSide(authority, side)) throw Error('Некорректная сторона игрока');
   const owners = sideIds(authority),
     order = owners.length === 4 ? [side, side ^ 1, side ^ 2, side ^ 3] : [side, 1 - side],
     remap = (owner) => (validSide(authority, owner) ? order.indexOf(owner) : owner);
-  const view = structuredClone(authority);
+  // Select/redact first: enemy routes, queues, AI and discarded caches must not
+  // be traversed just to throw them away. Detach the permitted tree once below,
+  // before ownership remapping or any mutation of its nested records.
+  let view = { ...authority };
   view.frontlineDirections = order.map((owner) => (owner % 2 ? -1 : 1));
   const allGround = new Set(authority.groundUnits.map((u) => u.id));
   const buildings = new Set(authority.buildings.map((b) => b.id));
@@ -137,7 +159,13 @@ export function playerView(authority, side) {
 
   view.groundUnits = view.groundUnits
     .filter((u) => visible.has(u.id))
-    .map((u) => (u.side === side ? u : publicFields(u, groundFields)));
+    .map((u) =>
+      u.side === side
+        ? compact
+          ? withoutCollisionHistory(u)
+          : u
+        : publicFields(u, compact ? transportGroundFields : groundFields),
+    );
   view.buildings = view.buildings.map((b) =>
     b.side === side ? b : publicFields(b, buildingFields),
   );
@@ -163,8 +191,8 @@ export function playerView(authority, side) {
   view.units = view.units
     .filter((u) => u.side === side || (u.launched !== false && unitVisible(authority, side, u)))
     .map((u) => {
-      if (u.side === side) return u;
-      const publicUnit = publicFields(u, aircraftFields);
+      if (u.side === side) return compact ? withoutCollisionHistory(u) : u;
+      const publicUnit = publicFields(u, compact ? transportAircraftFields : aircraftFields);
       // The aircraft heading is visible, but its future target and route are private.
       publicUnit.tx = u.x + (u.vx || 0);
       publicUnit.tz = u.z + (u.vz || 0);
@@ -193,33 +221,41 @@ export function playerView(authority, side) {
         return false;
       return true;
     })
-    .map((p) => (p.side === side ? p : publicFields(p, projectileFields)));
-  view.events = view.events.filter((e) => {
-    if (e.side === side) return true;
-    if (e.type === 'groundDestroyed') return e.visibleTo?.includes(side) === true;
-    if (
-      e.side !== side &&
-      [
-        'recruited',
-        'produced',
-        'research',
-        'reload',
-        'salvo',
-        'fortification',
-        'defenseRedeployed',
-        'defenseReturned',
-      ].includes(e.type)
-    )
-      return false;
-    if (
-      e.type === 'shot' &&
-      e.side !== side &&
-      (e.ground || (e.buildingId != null && !buildings.has(e.buildingId))) &&
-      !visible.has(e.buildingId)
-    )
-      return false;
-    return true;
-  });
+    .map((p) =>
+      compact
+        ? publicFields(p, transportProjectileFields)
+        : p.side === side
+          ? p
+          : publicFields(p, projectileFields),
+    );
+  view.events = view.events
+    .filter((e) => {
+      if (e.side === side) return true;
+      if (e.type === 'groundDestroyed') return e.visibleTo?.includes(side) === true;
+      if (
+        e.side !== side &&
+        [
+          'recruited',
+          'produced',
+          'research',
+          'reload',
+          'salvo',
+          'fortification',
+          'defenseRedeployed',
+          'defenseReturned',
+        ].includes(e.type)
+      )
+        return false;
+      if (
+        e.type === 'shot' &&
+        e.side !== side &&
+        (e.ground || (e.buildingId != null && !buildings.has(e.buildingId))) &&
+        !visible.has(e.buildingId)
+      )
+        return false;
+      return true;
+    })
+    .map((e) => ({ ...e }));
   for (const event of view.events) {
     delete event.visibleTo;
     // Impact debris direction would reveal where a hidden enemy shooter stands.
@@ -241,10 +277,10 @@ export function playerView(authority, side) {
     view.groups = owners.map((owner) => (owner === side ? view.groups[owner] : {}));
   if (Array.isArray(view.formations))
     view.formations = owners.map((owner) => (owner === side ? view.formations[owner] : 'line'));
-  for (const owner of owners) {
-    if (owner === side) continue;
-    const opposingSide = view.sides[owner];
-    view.sides[owner] = {
+  view.sides = owners.map((owner) => {
+    if (owner === side) return authority.sides[owner];
+    const opposingSide = authority.sides[owner];
+    return {
       credits: 0,
       materials: 0,
       science: 0,
@@ -258,7 +294,7 @@ export function playerView(authority, side) {
       kills: opposingSide.kills,
       losses: opposingSide.losses,
     };
-  }
+  });
   view.stats = { roadsCut: view.stats?.roadsCut || 0 };
   delete view.ai;
   delete view.aiBySide;
@@ -268,6 +304,28 @@ export function playerView(authority, side) {
   delete view.nextId;
   delete view.settlementClock;
   view.log = [];
+
+  if (detached) view = structuredClone(view);
+  else {
+    // This view may only be synchronously consumed by an encoder which makes a
+    // complete detached copy. Copy every record remapped below, while borrowing
+    // untouched own paths, paid queues, side ledgers and other nested data.
+    for (const key of [
+      'districts',
+      'settlements',
+      'buildings',
+      'roads',
+      'units',
+      'groundUnits',
+      'serviceVehicles',
+      'ammoVehicles',
+      'ships',
+      'projectiles',
+      'trenches',
+      'groundScars',
+    ])
+      if (Array.isArray(view[key])) view[key] = view[key].map((item) => ({ ...item }));
+  }
 
   for (const d of [...(view.districts || []), ...(view.settlements || [])]) {
     if (d.owner != null) d.owner = remap(d.owner);
@@ -301,3 +359,11 @@ export function playerView(authority, side) {
       e.result = e.result === 'victory' ? 'defeat' : 'victory';
   return view;
 }
+
+// Full compatibility view for callers/tests that expect simulation-shaped records.
+export const playerView = (authority, side) => projectView(authority, side, false);
+// Opt-in transport view for delta-capable clients; no numerical quantization here.
+export const compactPlayerView = (authority, side) => projectView(authority, side, true);
+// Server-only borrowed view. Do not retain or send it raw; call encoder.encode
+// immediately, synchronously, before authority advances or any await occurs.
+export const snapshotPlayerView = (authority, side) => projectView(authority, side, true, false);
