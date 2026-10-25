@@ -76,7 +76,7 @@ function loopback(url) {
 // publicURL is metadata from the selected game server. For a localhost host using
 // a tunnel it replaces BOTH the shareable page and its server endpoint, while the
 // actual live session continues using its original address.
-export function roomInviteUrl({ pageURL, address, code, publicURL = null }) {
+export function roomInviteUrl({ pageURL, address, code, publicURL = null, clientURL = null }) {
   const page = pageAddress(pageURL),
     normalizedCode = roomCode(code);
   let server = normalizeServerAddress(address);
@@ -92,6 +92,10 @@ export function roomInviteUrl({ pageURL, address, code, publicURL = null }) {
       page.protocol === 'file:' || (loopback(page) && !loopback(serverPage))
         ? serverPage
         : new globalThis.URL(page.href);
+  }
+  if (clientURL) {
+    sharePage = pageAddress(clientURL);
+    if (sharePage.protocol !== 'https:') throw Error('Страница игры должна использовать HTTPS');
   }
   normalizeServerAddress(server, sharePage.href);
   sharePage.search = '';

@@ -62,8 +62,8 @@ const licenses = await Promise.all(
 );
 html +=
   '\n<!-- Included third-party licenses\n' + licenses.join('\n\n').replace(/--/g, '—') + '\n-->\n';
-const inline = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
-await transform(inline, { loader: 'js', target: 'es2022' });
+for (const inline of html.matchAll(/<script>([\s\S]*?)<\/script>/g))
+  await transform(inline[1], { loader: 'js', target: 'es2022' });
 await mkdir(path.dirname(output), { recursive: true });
 await writeFile(output, html, 'utf8');
 console.log(JSON.stringify({ file: output, bytes: Buffer.byteLength(html), externalResources: 0 }));

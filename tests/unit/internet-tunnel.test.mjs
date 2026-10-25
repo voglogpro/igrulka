@@ -138,6 +138,12 @@ test('server-info publishes only the current public URL, does not trust Host and
   assert.equal(probe.headers.get('x-skyfront-probe'), '32k-v1');
   assert.equal(probe.headers.get('content-length'), '32768');
   assert.equal((await probe.arrayBuffer()).byteLength, 32768);
+  const small = await fetch(base + '/api/tunnel-probe?size=2048');
+  assert.equal(small.headers.get('x-skyfront-probe'), 'tunnel-v1');
+  assert.equal(small.headers.get('content-length'), '2048');
+  assert.equal((await small.arrayBuffer()).byteLength, 2048);
+  for (const size of ['0', '2047', '32769', 'bad', '2048.5'])
+    assert.equal((await fetch(base + '/api/tunnel-probe?size=' + size)).status, 400);
   assert.equal((await fetch(base + '/api/connection-check', { method: 'POST' })).status, 405);
   assert.equal(
     (await fetch(base + '/api/server-info', { method: 'POST', body: '{}' })).status,

@@ -142,7 +142,7 @@ export function publicTunnelUrl(text) {
   );
 }
 
-async function publicServerResponds(origin, signal) {
+async function publicServerResponds(origin, signal, probeBytes = 32768) {
   const agent = await internetAgent(origin);
   const metadata = await new Promise((resolve, reject) => {
     const request = https.get(
@@ -164,7 +164,14 @@ async function publicServerResponds(origin, signal) {
         response.on('close', () => resolve(false));
         response.on('end', () => {
           try {
-            resolve(JSON.parse(body).publicUrl === origin);
+            const info = JSON.parse(body);
+            resolve(
+              info.publicUrl === origin ||
+                (probeBytes < 32768 &&
+                  info.publicUrl === null &&
+                  info.status === 'recovering' &&
+                  Number.isSafeInteger(info.retryCount)),
+            );
           } catch {
             resolve(false);
           }
@@ -179,7 +186,10 @@ async function publicServerResponds(origin, signal) {
   // game and snapshots cannot. Verify a complete larger response as well.
   return new Promise((resolve, reject) => {
     const request = https.get(
-      new URL('/api/connection-check', origin),
+      new URL(
+        probeBytes === 32768 ? '/api/connection-check' : `/api/tunnel-probe?size=${probeBytes}`,
+        origin,
+      ),
       { rejectUnauthorized: true, signal, agent },
       (response) => {
         if (response.statusCode !== 200) {
@@ -190,12 +200,16 @@ async function publicServerResponds(origin, signal) {
         let bytes = 0;
         response.on('data', (chunk) => {
           bytes += chunk.length;
-          if (bytes > 32768) response.destroy();
+          if (bytes > probeBytes) response.destroy();
         });
         response.on('error', () => resolve(false));
         response.on('close', () => resolve(false));
         response.on('end', () => {
-          resolve(bytes === 32768 && response.headers['x-skyfront-probe'] === '32k-v1');
+          resolve(
+            bytes === probeBytes &&
+              response.headers['x-skyfront-probe'] ===
+                (probeBytes === 32768 ? '32k-v1' : 'tunnel-v1'),
+          );
         });
       },
     );
@@ -208,13 +222,22 @@ async function publicServerResponds(origin, signal) {
 // an invitation until the public route reaches this exact game server.
 export async function waitForPublicServer(
   origin,
-  { signal, timeoutMs = 45_000, check = publicServerResponds, retryMs = 1500, successes = 1 } = {},
+  {
+    signal,
+    timeoutMs = 45_000,
+    check = publicServerResponds,
+    retryMs = 1500,
+    successes = 1,
+    probeBytes = 32768,
+  } = {},
 ) {
+  if (!Number.isInteger(probeBytes) || probeBytes < 2048 || probeBytes > 32768)
+    throw Error('Invalid probe size');
   const started = Date.now();
   let consecutive = 0;
   do {
     signal?.throwIfAborted();
-    consecutive = (await check(origin, signal)) ? consecutive + 1 : 0;
+    consecutive = (await check(origin, signal, probeBytes)) ? consecutive + 1 : 0;
     if (consecutive >= successes) return;
     if (Date.now() - started >= timeoutMs) break;
     await delay(retryMs, undefined, { signal });

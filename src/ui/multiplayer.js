@@ -183,12 +183,16 @@ export class MultiplayerUI {
   }
 
   async connect(action) {
+    clearTimeout(this.inviteRefreshTimer);
     this.rememberDraft();
     const saved = savedSession();
     let address, request;
     try {
       address = normalizeServerAddress(
-        action === 'resume' ? saved?.address || this.draft.address : this.draft.address,
+        action === 'resume'
+          ? (this.invite?.code === saved?.code ? this.invite.address : saved?.address) ||
+              this.draft.address
+          : this.draft.address,
         location.href,
       );
       const name = this.draft.name.trim().slice(0, 24) || 'Командир';
@@ -251,6 +255,7 @@ export class MultiplayerUI {
     this.session = session;
     this.hasGameView = false;
     this.publicURL = null;
+    this.clientURL = null;
     this.invitePending = true;
     for (const button of this.host.querySelectorAll('button'))
       if (button.dataset.net !== 'close') button.disabled = true;
@@ -271,16 +276,28 @@ export class MultiplayerUI {
   }
 
   async resolvePublicInvite(session) {
+    clearTimeout(this.inviteRefreshTimer);
     try {
       const info = await this.serverInfo(session.address);
       if (this.session !== session) return;
       this.publicURL = info?.publicUrl || null;
+      this.clientURL = info?.clientUrl || null;
+      this.publicStatus = info?.status || null;
     } catch {
       /* A hosted server can share its own origin even without this optional endpoint. */
     }
     if (this.session !== session) return;
     this.invitePending = false;
     if (!this.host.hidden) this.renderRoom();
+    if (!this.host.hidden && this.clientURL) {
+      this.inviteRefreshTimer = setTimeout(
+        () => {
+          if (this.session === session && !this.host.hidden) this.resolvePublicInvite(session);
+        },
+        this.publicStatus === 'recovering' ? 2000 : 5000,
+      );
+      this.inviteRefreshTimer?.unref?.();
+    }
   }
 
   async copyInvite() {
@@ -309,6 +326,7 @@ export class MultiplayerUI {
   }
 
   dismiss() {
+    clearTimeout(this.inviteRefreshTimer);
     if (this.session?.room?.phase === 'waiting') {
       this.leave();
       return;
@@ -342,7 +360,13 @@ export class MultiplayerUI {
     const session = this.session,
       room = session?.room;
     if (!room) return;
-    const signature = JSON.stringify([room, this.publicURL, this.invitePending]);
+    const signature = JSON.stringify([
+      room,
+      this.publicURL,
+      this.clientURL,
+      this.publicStatus,
+      this.invitePending,
+    ]);
     if (this.host.dataset.roomSignature === signature) return;
     this.host.dataset.roomSignature = signature;
     const self = room.players[session.seat],
@@ -353,11 +377,16 @@ export class MultiplayerUI {
     let invite = '',
       inviteError = '';
     try {
+      if (this.clientURL && this.publicStatus === 'recovering')
+        throw Error(
+          'Восстанавливаем интернет-подключение. Комната сохранена, ссылка появится автоматически.',
+        );
       invite = roomInviteUrl({
         pageURL: location.href,
         address: session.address,
         code: room.code,
         publicURL: this.publicURL,
+        clientURL: this.clientURL,
       });
     } catch (error) {
       inviteError = error.message;
@@ -370,6 +399,7 @@ export class MultiplayerUI {
   }
 
   leave() {
+    clearTimeout(this.inviteRefreshTimer);
     this.session?.leave();
     this.session = null;
     this.host.hidden = true;

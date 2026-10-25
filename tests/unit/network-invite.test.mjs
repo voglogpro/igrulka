@@ -13,6 +13,31 @@ import {
 } from '../../src/network/invite.js';
 import { openMultiplayerEntry } from '../../src/ui/session/multiplayer-entry.js';
 
+test('a CDN invitation loads the static client separately while retaining the real public WSS endpoint', () => {
+  const link = roomInviteUrl({
+    pageURL: 'http://127.0.0.1:52375/',
+    address: 'ws://127.0.0.1:52375/match',
+    publicURL: 'https://relay.example',
+    clientURL: 'https://voglogpro.github.io/igrulka/?discard=1#private',
+    code: 'ABC234',
+  });
+  const url = new URL(link);
+  assert.equal(url.origin, 'https://voglogpro.github.io');
+  assert.equal(url.pathname, '/igrulka/');
+  assert.equal(url.searchParams.has('discard'), false);
+  assert.equal(url.hash, '');
+  assert.deepEqual(parseRoomInvite(link), { code: 'ABC234', address: 'wss://relay.example/match' });
+  assert.throws(() =>
+    roomInviteUrl({
+      pageURL: 'http://localhost/',
+      address: 'http://localhost',
+      publicURL: 'https://relay.example',
+      clientURL: 'file:///C:/private',
+      code: 'ABC234',
+    }),
+  );
+});
+
 test('hosted games select their own server and secure scheme; file games preserve the local fallback', () => {
   assert.equal(
     defaultServerAddress('https://friends.example/play/?other=1'),

@@ -74,3 +74,77 @@ test('hosted entry does not tell a friend opening HTTPS to launch another local 
   assert.doesNotMatch(ui.host.innerHTML, /id="net-file-guide"/);
   assert.match(ui.host.innerHTML, /data-net="join"/);
 });
+
+test('saved seat recovery uses the refreshed invitation endpoint only for the same room', async (t) => {
+  const ui = fixture(t, 'https://voglogpro.github.io/igrulka/'),
+    old = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    configurable: true,
+    value: {
+      getItem: () =>
+        JSON.stringify({
+          code: 'ABC234',
+          token: 'private-seat',
+          address: 'wss://old.example/match',
+        }),
+    },
+  });
+  t.after(() => {
+    if (old) Object.defineProperty(globalThis, 'sessionStorage', old);
+    else delete globalThis.sessionStorage;
+  });
+  const attempts = [];
+  ui.status = () => {};
+  ui.renderRoom = () => {};
+  ui.resolvePublicInvite = () => {};
+  ui.createSession = () => ({
+    disconnect() {},
+    async connect(address, request) {
+      attempts.push({ address, request });
+    },
+  });
+  ui.rememberDraft = () => {
+    ui.draft = { name: 'Friend', address: 'wss://new.example/match', code: 'ABC234' };
+  };
+  ui.invite = { code: 'ABC234', address: 'wss://new.example/match' };
+  await ui.connect('resume');
+  assert.equal(attempts[0].address, 'wss://new.example/match');
+  assert.equal(attempts[0].request.token, 'private-seat');
+  ui.invite = { code: 'XYZ789', address: 'wss://unrelated.example/match' };
+  await ui.connect('resume');
+  assert.equal(attempts[1].address, 'wss://old.example/match');
+});
+
+test('a visible room refreshes a recovered invitation without recreating the room or exposing a local link', async (t) => {
+  const ui = fixture(t),
+    session = { address: 'ws://127.0.0.1:1234/match' };
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const answers = [
+    { publicUrl: null, status: 'recovering', clientUrl: 'https://voglogpro.github.io/igrulka/' },
+    {
+      publicUrl: 'https://new.example',
+      status: 'ready',
+      clientUrl: 'https://voglogpro.github.io/igrulka/',
+    },
+  ];
+  let reads = 0;
+  ui.session = session;
+  ui.host.hidden = false;
+  ui.renderRoom = () => {};
+  ui.serverInfo = async () => {
+    reads++;
+    return answers.shift();
+  };
+  await ui.resolvePublicInvite(session);
+  assert.equal(ui.publicStatus, 'recovering');
+  assert.equal(ui.publicURL, null);
+  t.mock.timers.tick(2000);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(ui.publicURL, 'https://new.example');
+  assert.equal(ui.publicStatus, 'ready');
+  ui.host.hidden = true;
+  t.mock.timers.tick(5000);
+  await Promise.resolve();
+  assert.equal(reads, 2);
+});

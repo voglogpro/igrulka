@@ -1,5 +1,6 @@
 import { createRoomServer } from './rooms.mjs';
-import { startInternetTunnel } from './internet.mjs';
+import { createInternetSession } from './internet-session.mjs';
+import { clientPageUrl } from './client-page.mjs';
 import { networkInterfaces } from 'node:os';
 import { spawn } from 'node:child_process';
 
@@ -11,12 +12,21 @@ const port = Number(
   process.argv.find((a) => a.startsWith('--port='))?.slice(7) || (internet ? 0 : 8788),
 );
 if (!Number.isInteger(port) || port < 0 || port > 65535) throw Error('Invalid port');
-let publicUrl = null,
-  tunnel = null,
+const clientUrl = internet
+  ? clientPageUrl(process.argv.find((a) => a.startsWith('--client-url='))?.slice(13))
+  : null;
+let internetSession = null,
   closing = false;
 const startup = new AbortController();
 const server = createRoomServer({
-  serverInfo: () => ({ publicUrl }),
+  serverInfo: () => ({
+    ...(internetSession?.state || {
+      publicUrl: null,
+      status: internet ? 'recovering' : 'local',
+      retryCount: 0,
+    }),
+    clientUrl,
+  }),
   standalone: internet,
   compression: internet,
 });
@@ -24,8 +34,7 @@ async function close(code = 0) {
   if (closing) return;
   closing = true;
   startup.abort();
-  publicUrl = null;
-  tunnel?.stop();
+  await internetSession?.stop();
   await server.close();
   process.exitCode = code;
 }
@@ -45,27 +54,22 @@ try {
   console.log(`Skyfront multiplayer: ${localUrl}`);
   if (internet) {
     console.log('Подключаю интернет-игру. Окно сервера нужно оставить открытым.');
-    tunnel = await startInternetTunnel({
+    let previousUrl = null;
+    internetSession = createInternetSession({
       localUrl,
       signal: startup.signal,
       onProgress: console.log,
-      onPublicUrl: (value) => {
-        if (publicUrl && value && publicUrl !== value)
+      onChange: ({ publicUrl: value, status }) => {
+        if (status !== 'ready' || !value) return;
+        if (previousUrl && value !== previousUrl)
           console.log('Интернет-адрес обновился. Скопируйте новое приглашение в меню комнаты.');
-        publicUrl = value;
-      },
-      onExit: () => {
-        console.error(
-          'Интернет-соединение сервера закрыто. Перезапустите «Играть через интернет» и отправьте новое приглашение.',
-        );
-        close(1);
+        if (value !== previousUrl) console.log(`\nИНТЕРНЕТ-ИГРА: ${value}/?multiplayer=1`);
+        previousUrl = value;
       },
     });
-    if (closing) tunnel.stop();
+    if (closing) await internetSession.stop();
     else {
-      const entry = `${publicUrl}/?multiplayer=1`;
       const hostEntry = `${localUrl}/?multiplayer=1`;
-      console.log(`\nИНТЕРНЕТ-ИГРА: ${entry}`);
       console.log(`ХОЗЯИН ИГРАЕТ ЗДЕСЬ: ${hostEntry}`);
       console.log('Создайте комнату → «Копировать приглашение» → отправьте ссылку другу.');
       console.log(

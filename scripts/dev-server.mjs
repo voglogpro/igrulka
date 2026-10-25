@@ -25,6 +25,25 @@ export function createGameServer({ serverInfo, standalone = false } = {}) {
   return http.createServer(async (req, res) => {
     try {
       const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+      if (pathname === '/api/tunnel-probe' && serverInfo) {
+        if (!['GET', 'HEAD'].includes(req.method)) {
+          res.writeHead(405, { Allow: 'GET, HEAD' }).end();
+          return;
+        }
+        const size = Number(new URL(req.url, 'http://localhost').searchParams.get('size'));
+        if (!Number.isInteger(size) || size < 2048 || size > 32768) {
+          res.writeHead(400).end();
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'application/octet-stream',
+          'Cache-Control': 'no-store',
+          'Content-Length': size,
+          'X-Skyfront-Probe': 'tunnel-v1',
+        });
+        res.end(req.method === 'HEAD' ? undefined : connectionProbe.subarray(0, size));
+        return;
+      }
       if (pathname === '/api/connection-check' && serverInfo) {
         if (!['GET', 'HEAD'].includes(req.method)) {
           res.writeHead(405, { Allow: 'GET, HEAD' }).end();
