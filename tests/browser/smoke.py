@@ -25,7 +25,7 @@ try:
                 page.on('response', lambda r: report['errors'].append(f'HTTP {r.status} {r.url}') if r.status>=400 else None)
             page.goto(target, wait_until='load', timeout=120000)
             page.wait_for_function('Boolean(window.skyfront)')
-            assert page.title().startswith('8.10.0')
+            assert page.title().startswith('8.10.1')
             page.locator('[data-action="start"]').click()
             page.keyboard.press('Space')
             assert page.evaluate('skyfront.isPaused()')
@@ -42,6 +42,12 @@ try:
             page.evaluate('skyfront.openPanel("settings",true)')
             page.locator('#panel [data-action="network"]').click()
             assert page.evaluate('getComputedStyle(document.querySelector("#network-lobby")).zIndex')=='80'
+            if offline:
+                assert page.locator('#net-file-guide').is_visible()
+                assert 'Небесный рубеж — по сети' in page.locator('#net-file-guide').inner_text()
+                page.screenshot(path=str(ARTIFACTS / 'network-launch-file-guide-final.png'))
+            else:
+                assert page.locator('#net-file-guide').count()==0
             assert page.evaluate('''()=>{const b=document.querySelector('[data-net="create"]'),r=b.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('[data-net="create"]')===b;}'''), 'world canvas must not intercept the lobby'
             page.keyboard.press('Escape')
             report['checks'].append('offline bundle' if offline else 'source modules via HTTP')

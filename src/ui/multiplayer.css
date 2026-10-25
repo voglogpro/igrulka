@@ -40,6 +40,20 @@
 .net-intro {
   margin-bottom: 17px;
 }
+.net-launch-help {
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid var(--accent);
+  background: #b58b3220;
+}
+#network-lobby .net-launch-help p {
+  color: var(--text);
+  margin: 7px 0 0;
+}
+.net-launch-help b {
+  color: var(--accent);
+  font-size: 12px;
+}
 #game #network-lobby label {
   display: block;
   color: #b5c8ba;

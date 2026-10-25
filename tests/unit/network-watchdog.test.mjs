@@ -195,11 +195,40 @@ test('an opened socket without a join handshake and a never-opened socket both s
   assert.equal(f.session.socket, null);
   assert.equal(f.sockets[0].closes, 1);
   assert.equal(closed.length, 1);
+  assert.match(closed[0], /сервер запущен/);
+  assert.doesNotMatch(closed[0], /восстанов|место/i);
   const next = f.session.connect('http://127.0.0.1:8788', { type: 'create' });
   f.advance(8000);
   await assert.rejects(next, /подключиться/);
   assert.equal(f.session.socket, null);
   assert.equal(f.sockets[1].closes, 1);
+  assert.equal(closed.length, 2);
+  assert.doesNotMatch(closed[1], /восстанов|место/i);
+});
+
+test('an explicit resume failure preserves the saved-seat recovery guidance before joined arrives', async (t) => {
+  const closed = [],
+    f = fixture(t, { onClosed: (message) => closed.push(message) });
+  const attempt = f.session.connect('http://127.0.0.1:8788', {
+    type: 'resume',
+    code: 'ABC234',
+    token: 'existing-seat',
+  });
+  f.advance(8000);
+  await assert.rejects(attempt, /подключиться/);
+  assert.equal(closed.length, 1);
+  assert.match(closed[0], /Место можно восстановить/);
+});
+
+test('an established seat retains recovery guidance after reconnection attempts are exhausted', async (t) => {
+  const closed = [],
+    f = fixture(t, { onClosed: (message) => closed.push(message) }),
+    socket = await f.join();
+  f.session.retries = 12;
+  socket.closed();
+  assert.equal(closed.length, 1);
+  assert.match(closed[0], /Место можно восстановить/);
+  assert.ok(f.storage.has(SESSION_KEY));
 });
 
 test('intentional disconnect and leave never restart a socket; a disconnect callback can cancel recovery', async (t) => {

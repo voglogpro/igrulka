@@ -68,7 +68,12 @@ export class NetworkSession {
         this.rejectJoin?.(Error('Не удалось подключиться к серверу'));
         this.rejectJoin = null;
         this.resolveJoin = null;
-        this.onClosed?.('Сервер недоступен. Место можно восстановить из меню сети.');
+        const hasSeat = this.token || (this.request?.type === 'resume' && this.request.token);
+        this.onClosed?.(
+          hasSeat
+            ? 'Сервер недоступен. Место можно восстановить из меню сети.'
+            : 'Сервер недоступен. Проверьте, что игровой сервер запущен, или укажите адрес работающего сервера.',
+        );
       }
       return true;
     };
