@@ -5,10 +5,12 @@ import * as E from '../../src/game/index.js';
 import { SettlementView } from '../../src/rendering/terrain/settlements.js';
 import { DistrictView } from '../../src/rendering/terrain/districts.js';
 import { factionHex } from '../../src/rendering/team-colors.js';
+import { RTSWorld } from '../../src/rendering/world.js';
 import {
   SETTLEMENTS,
   SETTLEMENT_FOOTPRINTS,
   settlementHouseOffsets,
+  settlementLayout,
 } from '../../src/game/territory/settlements.config.js';
 
 function world() {
@@ -17,6 +19,16 @@ function world() {
     materials = new Map();
   const w = {
     scene: new T.Scene(),
+    facade: new T.Texture(),
+    emission: new T.Texture(),
+    glowTexture: new T.Texture(),
+    sharedGeometries: new Set([box, cylinder]),
+    sharedMaterials: new Set(),
+    height: () => 0,
+    boxGeo: box,
+    cylGeo: cylinder,
+    sphereGeo: new T.IcosahedronGeometry(1, 1),
+    model: RTSWorld.prototype.model,
     armySelection: [],
     groundTargeting: null,
     clearTrees() {},
@@ -46,16 +58,17 @@ function world() {
   };
   return w;
 }
-test('eight settlement models batch houses, keep geometry stable and display all four owner colors', () => {
+test('eight neutral cities reuse ordinary housing and industry, keep stable meshes and show four owner colors', () => {
   const w = world(),
     view = new SettlementView(w),
     s = E.createGame(810, { mode: 'coop' });
   assert.equal(view.sites.size, 8);
+  view.sync(s);
   const before = [];
   w.scene.traverse((o) => {
     if (o.isMesh) before.push(o);
   });
-  assert.ok(before.length <= 24, `too many static village draws: ${before.length}`);
+  assert.ok(before.length < 220, `too many neutral city meshes: ${before.length}`);
   for (let i = 0; i < 8; i++) Object.assign(s.settlements[i], { owner: i % 4, control: 1 });
   for (let i = 0; i < 40; i++) view.sync(s);
   const after = [];
@@ -67,7 +80,13 @@ test('eight settlement models batch houses, keep geometry stable and display all
     const model = view.sites.get(s.settlements[i].id);
     assert.equal(model.sign.material.color.getHexString(), factionHex(i % 4).slice(1));
     assert.equal(model.root.userData.settlementId, s.settlements[i].id);
-    assert.equal(model.body.children.length, 1);
+    const keys = model.body.children
+      .filter((o) => o.userData.buildingKey)
+      .map((o) => o.userData.buildingKey);
+    assert.deepEqual(
+      keys,
+      settlementLayout(SETTLEMENTS[i]).components.map((c) => c.key),
+    );
   }
   const ray = new T.Raycaster(new T.Vector3(-1515, 150, -1415), new T.Vector3(0, -1, 0));
   w.scene.updateMatrixWorld(true);
@@ -102,7 +121,7 @@ test('both central depots use distinct third/fourth city colors and bounded capt
     assert.equal(model.progress.geometry.drawRange.count, 48 * 6);
   }
 });
-test('changing house mask rebuilds only the affected village once, disposes its batch and preserves all signs', () => {
+test('changing component mask rebuilds only its city and claiming removes previews without disposing shared models', () => {
   const w = world(),
     view = new SettlementView(w),
     s = E.createGame(810);
@@ -112,25 +131,35 @@ test('changing house mask rebuilds only the affected village once, disposes its 
     old = first.body,
     sign = first.sign,
     otherBody = other.body;
-  const geometry = old.children[0].geometry;
-  const count = geometry.attributes.position.count;
+  const geometry = old.children.find((o) => o.geometry?.userData.owned).geometry;
   let disposed = 0;
   geometry.addEventListener('dispose', () => disposed++);
-  s.settlementHouseMask &= ~3;
+  s.settlementLayoutMask &= ~3;
   view.sync(s);
   assert.notEqual(first.body, old);
   assert.equal(disposed, 1);
   assert.equal(first.sign, sign);
   assert.equal(other.body, otherBody);
-  assert.ok(first.body.children[0].geometry.attributes.position.count < count);
+  assert.equal(first.body.children.filter((o) => o.userData.buildingKey).length, 0);
   const replacement = first.body;
   for (let i = 0; i < 30; i++) view.sync(s);
   assert.equal(first.body, replacement);
   assert.equal(disposed, 1);
   assert.equal(view.sites.size, 8);
-  s.settlementHouseMask = 65535;
+  s.settlementLayoutMask = 16777215;
   view.sync(s);
   assert.notEqual(first.body, replacement);
-  assert.equal(first.body.children[0].geometry.attributes.position.count, count);
+  assert.equal(first.body.children.filter((o) => o.userData.buildingKey).length, 2);
   assert.equal(other.body, otherBody);
+  const shared = [];
+  first.body.traverse((o) => {
+    if (o.geometry && w.sharedGeometries.has(o.geometry)) shared.push(o.geometry);
+  });
+  let sharedDisposed = 0;
+  for (const g of new Set(shared)) g.addEventListener('dispose', () => sharedDisposed++);
+  s.settlements[0].materialized = true;
+  view.sync(s);
+  assert.equal(first.body, null);
+  assert.equal(first.sign, sign);
+  assert.equal(sharedDisposed, 0);
 });

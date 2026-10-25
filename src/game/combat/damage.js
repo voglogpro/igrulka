@@ -6,6 +6,7 @@ import { damageGround } from '../units/ground/index.js';
 import { damageDistricts } from '../territory/districts.js';
 import { damageAmmoVehicle } from '../city/ammo-vehicle-damage.js';
 import { AMMUNITION } from '../units/ground/ammunition.js';
+import { damageAmmoCrates } from '../city/field-ammo.js';
 export function damageRoad(s, r, amount) {
   const before = passable(r);
   r.hp = Math.max(0, r.hp - amount);
@@ -36,6 +37,7 @@ export function damageBuilding(s, b, amount) {
 }
 
 export function applyBlast(s, x, z, damage, radius) {
+  damageAmmoCrates(s, x, z, damage, radius);
   damageDistricts(s, x, z, damage, radius);
   const at = (distance) =>
     distance > radius

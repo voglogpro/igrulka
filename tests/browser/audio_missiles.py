@@ -10,6 +10,7 @@ RENDER=r'''async url=>{
  const {GameAudio}=await import(url),result={};const rate=44100;
  for(const mode of ['rocket','ballistic','dive','stress']){
   const context=new OfflineAudioContext(2,rate*6,rate),audio=new GameAudio();audio.unlock(context);
+  await audio.ready;
   for(let i=0;i<800&&!audio.buffers.missileDive;i++)await new Promise(r=>setTimeout(r,5));
   if(!audio.buffers.missileDive)throw Error('Missile synthesis timeout');
   if(mode==='rocket')audio.play({type:'shot',key:'cannon',shooter:'mlrs',ground:true},120,.4);

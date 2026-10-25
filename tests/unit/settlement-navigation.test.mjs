@@ -2,20 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
 import { groundPath, walkable } from '../../src/game/units/ground/navigation.js';
-import { SETTLEMENTS, SETTLEMENT_FOOTPRINTS } from '../../src/game/territory/settlements.config.js';
+import {
+  SETTLEMENTS,
+  SETTLEMENT_FOOTPRINTS,
+  SETTLEMENT_COMPONENTS,
+  settlementLayout,
+} from '../../src/game/territory/settlements.config.js';
 
 test('real paths go around village houses, while every settlement centre remains a traversable destination', () => {
   const s = E.createGame(810, { mode: 'coop' }),
     radius = 2;
-  for (const house of SETTLEMENT_FOOTPRINTS)
+  for (const house of SETTLEMENT_COMPONENTS)
     assert.equal(walkable(s, house.x, house.z, radius), false);
   for (const site of SETTLEMENTS) {
     assert.equal(walkable(s, site.x, site.z, radius), true, site.id);
-    const centrePath = groundPath(s, { x: site.x, z: site.z - 60 }, site, radius);
+    const centrePath = groundPath(s, settlementLayout(site).entrance, site, radius);
     assert.ok(centrePath.length, site.id);
     assert.deepEqual(centrePath.at(-1), { x: site.x, z: site.z });
   }
-  const house = SETTLEMENT_FOOTPRINTS[0];
+  const house = SETTLEMENT_COMPONENTS[0];
   const start = { x: house.x - 45, z: house.z },
     end = { x: house.x + 45, z: house.z };
   const path = groundPath(s, start, end, radius);

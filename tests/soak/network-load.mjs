@@ -88,7 +88,14 @@ async function run(air, delay) {
     const start = performance.now(),
       tick = room.tick,
       rtts = [],
-      peaks = { bufferedBytes: 0, pendingSnapshots: 0, controls: 0, projectiles: 0, air: 0 };
+      peaks = {
+        bufferedBytes: 0,
+        pendingSnapshots: 0,
+        controls: 0,
+        projectiles: 0,
+        air: 0,
+        processRssMiB: process.memoryUsage().rss / 1048576,
+      };
     let nextCommand = start;
     const observedProjectiles = new Set(),
       observedAirProjectiles = new Set();
@@ -115,6 +122,7 @@ async function run(air, delay) {
       }
       peaks.projectiles = Math.max(peaks.projectiles, room.state.projectiles.length);
       peaks.air = Math.max(peaks.air, room.state.units.length);
+      peaks.processRssMiB = Math.max(peaks.processRssMiB, process.memoryUsage().rss / 1048576);
       for (const p of room.state.projectiles) {
         observedProjectiles.add(p.id);
         if (p.domain !== 'ground') observedAirProjectiles.add(p.id);
@@ -180,7 +188,7 @@ try {
 } finally {
   await mkdir('artifacts/qa', { recursive: true });
   await writeFile(
-    'artifacts/qa/network-load8102.json',
+    'artifacts/qa/network-load811.json',
     JSON.stringify(
       {
         transport: 'real loopback TCP WebSocket; NetworkSession decoder; delayed application ACK',

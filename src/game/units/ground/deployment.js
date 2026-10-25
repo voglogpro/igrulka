@@ -1,7 +1,7 @@
 import { validSide } from '../../factions.js';
 import { oilCost, hasOil } from '../../city/oil.js';
 import { GROUND_UNITS, FIELD } from '../../config.js';
-import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
+import { groundPath, walkable } from './navigation.js';
 import { freeSpot } from '../vehicles/transport.js';
 import { recruit, recruitmentFacility } from './recruitment.js';
 import { squadDestination, squadArrivalPoint } from './squads.js';
@@ -47,14 +47,6 @@ export function deploymentPlan(s, side, key, point, count = 1, siteId = null) {
         ? 'Сначала постройте свои казармы'
         : 'Сначала постройте свой бронезавод',
     );
-  const queued = s.buildings
-    .filter((b) => b.side === side && b.hp > 0)
-    .reduce((n, b) => n + (b.armyQueue?.length || 0), 0);
-  if (
-    s.groundUnits.filter((u) => u.side === side && u.hp > 0).length + queued + count >
-    GROUND_LIMIT
-  )
-    return fail('Лимит армии: 120 единиц на сторону');
   const available = sites.filter((b) => (b.armyQueue?.length || 0) + count <= 8);
   if (!available.length) return fail('Очередь казарм заполнена');
   const f = s.sides[side];

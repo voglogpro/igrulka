@@ -9,6 +9,7 @@ const collections = new Set([
   'events',
   'serviceVehicles',
   'ammoVehicles',
+  'ammoCrates',
   'ships',
   'trenches',
   'groundScars',

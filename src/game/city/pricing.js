@@ -7,7 +7,7 @@ export const purchaseFactor = (purchased) => Math.min(1.5, 0.5 + purchased * 0.2
 export function buildingPurchases(s, side, key) {
   return (
     s.sides[side]?.purchases?.building?.[key] ??
-    s.buildings.filter((b) => b.side === side && b.key === key).length
+    s.buildings.filter((b) => b.side === side && b.key === key && b.settlementSlot == null).length
   );
 }
 

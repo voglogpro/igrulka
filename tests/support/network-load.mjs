@@ -1,7 +1,7 @@
 import * as E from '../../src/game/index.js';
-import { GROUND_LIMIT } from '../../src/game/units/ground/navigation.js';
 import { flightRoute } from '../../src/game/units/aviation/routes.js';
 import { addRoad } from '../../src/game/city/roads.js';
+export const NETWORK_GROUND_PER_CITY = 120;
 
 export function loadFixture(airCount = 100, { airHp = null } = {}) {
   const s = E.createGame(8102, { mode: 'coop' });
@@ -19,7 +19,7 @@ export function loadFixture(airCount = 100, { airHp = null } = {}) {
       z = side < 2 ? -1360 : 1360;
     s.sides[side].credits = 100000;
     s.sides[side].materials = 5000;
-    for (let i = 0; i < GROUND_LIMIT; i++) {
+    for (let i = 0; i < NETWORK_GROUND_PER_CITY; i++) {
       const key = roster[i % roster.length],
         u = E.makeGround(
           s,
@@ -56,7 +56,7 @@ export function loadFixture(airCount = 100, { airHp = null } = {}) {
         queue: [],
         armyQueue: [],
       };
-      // 120 live troops already fill the legal cap; no additional paid ground queue.
+      // Keep the historical 480-troop measurement stable independently of army caps.
       if (i === 2) b.queue = Array.from({ length: 4 }, () => ({ key: 'drone', progress: 0 }));
       s.buildings.push(b);
       addRoad(s, side, hq.x, hq.z - 45, b.x, b.z + 20);

@@ -171,11 +171,16 @@ function pickTarget() {
   this.ray.setFromCamera(this.pointer, this.camera);
   const roots = [...this.models.values()]
     .map((m) => m.root)
-    .concat([...this.groundModels.values()], this.infantry.meshes)
+    .concat(
+      [...this.groundModels.values()],
+      this.infantry.meshes,
+      this.ammoCrates?.pickTargets || [],
+    )
     .filter((root) => root.visible);
   for (const hit of this.ray.intersectObjects(roots, true)) {
     let id;
-    if (hit.object.userData.infantryBatch) id = hit.object.userData.unitIds[hit.instanceId];
+    if (hit.object.userData.crateIds) id = hit.object.userData.crateIds[hit.instanceId];
+    else if (hit.object.userData.infantryBatch) id = hit.object.userData.unitIds[hit.instanceId];
     else {
       let obj = hit.object;
       while (obj && !obj.userData.buildingId && !obj.userData.groundId) obj = obj.parent;

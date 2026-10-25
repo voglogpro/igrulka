@@ -20,6 +20,8 @@ jobs:
       pages: read
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -28,8 +30,13 @@ jobs:
       - run: npm run build
       - name: Prepare standalone game
         run: |
-          mkdir -p _site
-          cp play/Skyfront.html _site/index.html
+          version=$(node -p "require('./package.json').version")
+          mkdir -p "_site/releases/$version" _site/releases/8.10.3
+          cp play/Skyfront.html "_site/releases/$version/index.html"
+          # The old running servers advertise the root URL with protocol 10.
+          # Keep their client stable while new invitations use a versioned path.
+          git show 4b084d422ba54c0845371ebddbabc2c0cb2c0f88:play/Skyfront.html > _site/index.html
+          cp _site/index.html _site/releases/8.10.3/index.html
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4

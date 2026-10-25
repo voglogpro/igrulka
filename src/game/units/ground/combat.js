@@ -15,6 +15,7 @@ import { recordThreat } from './tactics.js';
 import { tryDown } from './rear.js';
 import { forgetObservedFrontlineTarget } from '../../defense/frontline.js';
 import { damageAmmoVehicle } from '../../city/ammo-vehicle-damage.js';
+import { damageAmmoCrates } from '../../city/field-ammo.js';
 import { AMMUNITION } from './ammunition.js';
 export function damageGround(s, u, amount, event = emit, kind = 'bullet', from = null) {
   if (u.hp <= 0 || u.carrierId || !Number.isFinite(amount) || amount <= 0) return;
@@ -129,6 +130,17 @@ export function impactGround(s, p, event = emit) {
         if (before > u.hp) gainGroundExperience(s, p.source, before - u.hp, u.hp <= 0);
       }
     }
+  if (splash)
+    damageAmmoCrates(
+      s,
+      p.tx,
+      p.tz,
+      p.damage,
+      radius,
+      (c) =>
+        hostile(s, c.side, p.side) &&
+        lineOfSight(s, artillery ? { x: p.tx, z: p.tz, id: p.source } : from, c),
+    );
   if (splash)
     for (const vehicle of (s.ammoVehicles || []).slice(0, AMMUNITION.fleetLimit * s.sides.length)) {
       if (!hostile(s, vehicle.side, p.side) || vehicle.hp <= 0 || vehicle.status === 'destroyed')

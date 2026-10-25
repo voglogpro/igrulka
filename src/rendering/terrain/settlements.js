@@ -1,65 +1,96 @@
 import * as T from '../../../vendor/three/three.module.js';
-import { SETTLEMENTS, settlementStatus } from '../../game/territory/settlements.js';
-import { settlementHouseOffsets } from '../../game/territory/settlements.config.js';
+import { SETTLEMENTS } from '../../game/territory/settlements.js';
+import {
+  settlementLayout,
+  settlementComponentEnabled,
+} from '../../game/territory/settlements.config.js';
+import { BUILDINGS } from '../../game/index.js';
 import { groundHeight } from '../../game/map.js';
-import { batchStatic } from '../mesh-utils.js';
+import { batchStatic, disposeTree } from '../mesh-utils.js';
 import { factionHex } from '../team-colors.js';
 
-function villageBody(world, d, houseMask) {
-  const body = new T.Group();
-  const paint = d.variant ? '#a79a7e' : '#939c8a';
-  const roofs = d.variant ? '#686458' : '#6d7971';
-  for (const [index, { x, z }] of settlementHouseOffsets(d).entries()) {
-    if (!(houseMask & (1 << index))) continue;
-    const height = 7 + (d.seed % 2);
-    world.box(body, x, 0, z, 15, height, 14, paint);
-    world.box(body, x, height, z, 17, 1.4, 16, roofs);
-    world.box(body, x - 4, height + 1.4, z - 3, 1.5, 2, 1.5, '#585e55');
-    world.box(body, x, 0.1, z + 7.2, 2.4, 4, 0.3, '#4b554c');
-    for (const dx of [-5, 5]) world.box(body, x + dx, 3.2, z + 7.15, 2, 2.3, 0.25, '#596f72');
-    for (const dx of [-7, 7]) world.box(body, x + dx, 0, z + 13, 1, 1.8, 1, '#7c8272');
-    world.box(body, x, 0.7, z + 13, 14, 0.6, 0.4, '#7c8272');
+function neutralCity(world, site, state) {
+  const body = new T.Group(),
+    layout = settlementLayout(site);
+  for (const component of layout.components) {
+    if (!settlementComponentEnabled(state, site, component.slot)) continue;
+    const d = BUILDINGS[component.key];
+    const model = world.model({
+      ...component,
+      id: `neutral-${site.id}-${component.slot}`,
+      side: null,
+      hp: d.hp,
+      maxHp: d.hp,
+      level: 0,
+      progress: 1,
+    });
+    model.root.removeFromParent();
+    delete model.root.userData.buildingId;
+    model.root.position.x -= site.x;
+    model.root.position.z -= site.z;
+    model.root.position.y -= groundHeight(site.x, site.z);
+    model.scaffold.visible = false;
+    body.add(model.root);
   }
-  world.box(body, 0, 0, 0, 7, 1, 6, '#818b79');
-  world.cyl(body, 0, 1, 0, 1.3, 2, '#727a6e');
-  world.cyl(body, 0, 0, 19, 0.35, 6, '#909783');
+  for (const road of layout.roads) {
+    if (road.slot != null && !settlementComponentEnabled(state, site, road.slot)) continue;
+    const mesh = world.box(
+      body,
+      (road.ax + road.bx) / 2 - site.x,
+      0.56,
+      (road.az + road.bz) / 2 - site.z,
+      7,
+      0.12,
+      Math.hypot(road.bx - road.ax, road.bz - road.az),
+      '#626b65',
+    );
+    mesh.rotation.y = Math.atan2(road.bx - road.ax, road.bz - road.az);
+  }
   batchStatic(body);
   return body;
 }
-function removeBody(body) {
-  body.traverse((object) => {
-    if (object.geometry?.userData.owned) {
-      object.geometry.dispose();
-      for (const material of Array.isArray(object.material) ? object.material : [object.material])
-        material?.dispose();
-    }
-  });
-  body.removeFromParent();
-}
 
-// Eight small abandoned villages, with static batched houses. They are map sites,
-// not neutral buildings in the combat/economy registries.
+// Neutral previews disappear on claim; normal building/road models own the city.
 export class SettlementView {
   constructor(world) {
     this.world = world;
     this.sites = new Map();
     const signGeometry = new T.BoxGeometry(6, 3, 0.5);
-    for (const [index, d] of SETTLEMENTS.entries()) {
+    world.sharedGeometries.add(signGeometry);
+    for (const site of SETTLEMENTS) {
       const root = new T.Group(),
-        body = villageBody(world, d, 3);
-      root.userData.settlementId = d.id;
-      root.position.set(d.x, groundHeight(d.x, d.z), d.z);
-      root.add(body);
+        layout = settlementLayout(site);
+      root.userData.settlementId = site.id;
+      root.position.set(site.x, groundHeight(site.x, site.z), site.z);
       const sign = new T.Mesh(
         signGeometry,
         new T.MeshStandardMaterial({ color: factionHex(null), roughness: 0.9 }),
       );
-      sign.position.set(0, 4.5, 19);
+      sign.position.set(layout.entrance.x - site.x + 10, 4.5, layout.entrance.z - site.z);
       sign.castShadow = true;
       root.add(sign);
+      const entry = new T.Mesh(
+        new T.RingGeometry(6, 7.2, 24),
+        new T.MeshBasicMaterial({
+          color: '#d5bc83',
+          side: T.DoubleSide,
+          transparent: true,
+          opacity: 0.8,
+          depthWrite: false,
+        }),
+      );
+      entry.rotation.x = -Math.PI / 2;
+      entry.position.set(layout.entrance.x - site.x, 0.75, layout.entrance.z - site.z);
+      root.add(entry);
       world.scene.add(root);
-      world.clearTrees(d.x, d.z, 48);
-      this.sites.set(d.id, { root, body, sign, index, houseMask: 3, signature: null });
+      this.sites.set(site.id, {
+        root,
+        sign,
+        entry,
+        body: null,
+        layoutSignature: null,
+        config: site,
+      });
     }
   }
   pick(ray) {
@@ -73,22 +104,24 @@ export class SettlementView {
   }
   sync(state) {
     for (const [id, model] of this.sites) {
-      const d = settlementStatus(state, id);
-      model.root.visible = !!d;
-      if (!d) continue;
-      const houseMask = ((state.settlementHouseMask ?? 65535) >>> (model.index * 2)) & 3;
-      if (houseMask !== model.houseMask) {
-        removeBody(model.body);
-        model.body = villageBody(this.world, d, houseMask);
-        model.root.add(model.body);
-        model.houseMask = houseMask;
+      const value = state.settlements?.find((site) => site.id === id);
+      model.root.visible = !!value;
+      if (!value) continue;
+      const site = { ...model.config, ...value };
+      const signature = `${site.materialized}:${settlementLayout(site)
+        .components.map((c) => Number(settlementComponentEnabled(state, site, c.slot)))
+        .join('')}`;
+      if (signature !== model.layoutSignature) {
+        if (model.body)
+          disposeTree(model.body, this.world.sharedGeometries, this.world.sharedMaterials);
+        model.body = site.materialized ? null : neutralCity(this.world, site, state);
+        if (model.body) model.root.add(model.body);
+        model.layoutSignature = signature;
+        if (this.world.renderer) this.world.renderer.shadowMap.needsUpdate = true;
       }
-      const signature = `${d.owner}:${d.active}:${d.contested}:${d.blocked}`;
-      if (signature === model.signature) continue;
-      model.signature = signature;
-      model.sign.material.color.set(d.contested || d.blocked ? '#dec083' : factionHex(d.owner));
-      model.sign.material.emissive.set(d.active ? factionHex(d.owner) : '#000000');
-      model.sign.material.emissiveIntensity = d.active ? 0.18 : 0;
+      const color = site.contested || site.blocked ? '#dec083' : factionHex(site.owner);
+      model.sign.material.color.set(color);
+      model.entry.material.color.set(site.owner == null ? '#d5bc83' : color);
     }
   }
 }

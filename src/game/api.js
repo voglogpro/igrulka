@@ -1,4 +1,6 @@
 export { ROAD_REQUIRED } from './city/rules.js';
+export { FIELD_SUPPLY, fieldCrateStatus, damageAmmoCrates } from './city/field-ammo.js';
+export { updateFieldSupply } from './units/ground/field-supply.js';
 export {
   AMMUNITION,
   ammunitionStatus,
@@ -115,6 +117,8 @@ export {
   walkable,
   BRIDGES,
   GROUND_LIMIT,
+  GROUND_COMMAND_LIMIT,
+  ARMY_TARGET_MAX,
   makeGround,
   commandUnits,
   boardGround,

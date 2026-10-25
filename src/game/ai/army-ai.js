@@ -127,6 +127,7 @@ export function updateArmyAI(s, hooks, side = 1) {
         }
         if (u.guard) continue;
         if (u.delivery) continue;
+        if (u.supplyTrip) continue;
         if (u.routeState) continue;
         if (u.aiDefender && u.hp / u.maxHp > 0.35 && !u.order && !u.path?.length) {
           const own = hqOf(s, side);

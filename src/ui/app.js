@@ -1,4 +1,6 @@
 import { createCommandExecutor } from './session/command-executor.js';
+import { resolveArmySelection } from './selection.js';
+import { advanceSimulationFrame } from './session/simulation-budget.js';
 import { openMultiplayerEntry } from './session/multiplayer-entry.js';
 import { createStrikeController } from './controllers/strike-controller.js';
 import { createActionRouter } from './controllers/action-router.js';
@@ -369,13 +371,9 @@ function frame(dt) {
     world.simLead = 0;
   }
   if (!network && started && !paused && !state.result) {
-    acc = Math.min(0.25, acc + dt);
-    while (acc >= 0.05) {
-      E.step(state, 0.05);
-      acc -= 0.05;
-    }
+    acc = advanceSimulationFrame(state, acc, dt, E.step).remainder;
     // Time already passed since the last step: effects draw moving rounds this far ahead.
-    world.simLead = acc;
+    world.simLead = Math.min(acc, 0.05);
     saveTimer += dt;
     if (saveTimer >= 10) {
       persist();
@@ -389,15 +387,16 @@ function frame(dt) {
     updateLivePanel();
     if (strike.model.aiming) updateStrikeHUD();
     if (troopMode === 'deploy') previewDeployment(deployPoint, true);
-    if (
-      !pointerBusy &&
-      armySelection.some(
-        (id) => !state.groundUnits.some((u) => u.id === id && u.hp > 0 && !u.carrierId),
+    if (!pointerBusy && armySelection.length) {
+      const unitsById = new Map(state.groundUnits.map((u) => [u.id, u]));
+      if (
+        armySelection.some((id) => {
+          const u = unitsById.get(id);
+          return !u || u.hp <= 0 || u.carrierId;
+        })
       )
-    )
-      selectArmy(
-        armySelection.filter((id) => state.groundUnits.some((u) => u.id === id && u.hp > 0)),
-      );
+        selectArmy(armySelection.filter((id) => unitsById.get(id)?.hp > 0));
+    }
     if (selected && !pointerBusy) renderInspector();
     world.updateMinimap($('#minimap'));
     renderGroups();
@@ -689,10 +688,7 @@ function chooseAimPoint(point, modifiers = {}) {
 }
 function selectArmy(ids, extend = false) {
   clearTroopTarget();
-  const resolved = ids.map((id) => state.groundUnits.find((u) => u.id === id)?.carrierId || id),
-    valid = [...new Set(resolved)].filter((id) =>
-      state.groundUnits.some((u) => u.id === id && u.side === 0 && u.hp > 0),
-    );
+  const valid = resolveArmySelection(state, ids);
   armySelection = extend ? [...new Set([...armySelection, ...valid])] : valid;
   if (tool) {
     const old = tool;
@@ -1045,7 +1041,7 @@ function select(id, extend = false) {
     $('#inspector').hidden = true;
     return;
   }
-  if (E.hostile(state, 0, t.side) && t.hp > 0) {
+  if (E.hostile(state, 0, t.side) && t.hp > 0 && !t.fieldCrate) {
     strike.model.aimPoint = { x: t.x, z: t.z };
     openPanel('attack', true);
     return;
@@ -1552,7 +1548,7 @@ document.addEventListener('change', async (ev) => {
       key = input.dataset.armyTarget;
     const request = armyTargetRequest(key, input.value);
     if (!request) {
-      toast('Цель состава — целое число от 0 до 120', true);
+      toast(`Цель состава — целое число от 0 до ${E.ARMY_TARGET_MAX}`, true);
       input.value = E.armyCompositionStatus(state, 0).targets[key] || 0;
       return;
     }

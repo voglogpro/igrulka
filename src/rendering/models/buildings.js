@@ -6,12 +6,23 @@ import { serviceStationModel } from './city/service-station.js';
 import { oilWellModel, oilTankModel, portModel, trainingModel } from './city/oil.js';
 import { factionHex } from '../team-colors.js';
 const tierTemplates = new WeakMap();
+export const STATIC_BUILDING_KEYS = new Set([
+  'housing',
+  'industry',
+  'power',
+  'factory',
+  'barracks',
+  'vehiclebase',
+  'market',
+  'ammofactory',
+]);
 const tiered = new Set(['gun', 'sam', 'cannon', 'launcher', 'silo', 'ammofactory', 'factory']);
 function cloneTier(template, b, world) {
   const root = template.clone(true);
   root.position.set(b.x, Math.max(0, world.height(b.x, b.z)), b.z);
   root.rotation.y = b.rotation || 0;
   root.userData.buildingId = b.id;
+  root.userData.buildingKey = b.key;
   root.userData.turret = root.getObjectByName('building-turret');
   root.userData.pitch = root.getObjectByName('building-pitch');
   world.clearTrees(b.x, b.z, (BUILDINGS[b.key]?.size || 30) + 10);
@@ -28,11 +39,13 @@ export function model(b) {
   let cache = tierTemplates.get(this);
   if (!cache) tierTemplates.set(this, (cache = new Map()));
   const tierKey = `${b.key}/${b.side}/${b.level || 0}`;
-  if (tiered.has(b.key) && cache.has(tierKey)) return cloneTier(cache.get(tierKey), b, this);
+  if ((tiered.has(b.key) || STATIC_BUILDING_KEYS.has(b.key)) && cache.has(tierKey))
+    return cloneTier(cache.get(tierKey), b, this);
   const root = new T.Group();
   root.position.set(b.x, Math.max(0, this.height(b.x, b.z)), b.z);
   root.rotation.y = b.rotation || 0;
   root.userData.buildingId = b.id;
+  root.userData.buildingKey = b.key;
   const content = new T.Group();
   content.name = 'building-content';
   root.add(content);
@@ -302,7 +315,7 @@ export function model(b) {
   const dynamic = new Set([root.userData.turret, root.userData.pump].filter(Boolean));
   batchStatic(content, dynamic);
   batchStatic(scaffold);
-  if (tiered.has(b.key)) {
+  if (tiered.has(b.key) || STATIC_BUILDING_KEYS.has(b.key)) {
     for (const [key, name] of [
       ['turret', 'building-turret'],
       ['pitch', 'building-pitch'],

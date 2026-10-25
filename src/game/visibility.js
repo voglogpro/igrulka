@@ -8,6 +8,22 @@ export const pointVisible = () => true;
 export const unitVisible = (_s, _side, u) => u.delay <= 0 && (u.hp > 0 || u.status === 'falling');
 export const eventVisible = () => true;
 export function observedTarget(s, side, id) {
+  const crate = s.ammoCrates?.find((c) => c.id === Number(id) && c.hp > 0);
+  if (crate) {
+    const publicCrate = {
+      id: crate.id,
+      side: crate.side,
+      key: crate.key,
+      x: crate.x,
+      z: crate.z,
+      hp: crate.hp,
+      maxHp: crate.maxHp,
+      fieldCrate: true,
+      ground: false,
+      progress: 1,
+    };
+    return crate.side === side ? { ...publicCrate, stock: { ...crate.stock } } : publicCrate;
+  }
   const u = (s.groundUnits || []).find((u) => u.id === Number(id) && u.hp > 0);
   if (u) return groundVisible(s, side, u) ? { ...u, ground: true } : null;
   const b = s.buildings.find((b) => b.id === Number(id));

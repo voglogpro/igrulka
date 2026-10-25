@@ -1,5 +1,7 @@
 import { GROUND_UNITS, BUILDINGS } from './config.js';
 export function targetById(s, id) {
+  const crate = s.ammoCrates?.find((c) => c.id === Number(id) && c.hp > 0);
+  if (crate) return { ...crate, fieldCrate: true, ground: false, progress: 1 };
   const u = (s.groundUnits || []).find((u) => u.id === Number(id) && u.hp > 0);
   if (u) return { ...u, ground: true };
   const b = s.buildings.find((b) => b.id === Number(id));
@@ -9,6 +11,7 @@ export function targetById(s, id) {
 }
 
 export function targetName(t) {
+  if (t?.key === 'ammo-crate') return 'Полевой склад боеприпасов';
   return t?.key === 'road'
     ? `Участок дороги #${t.id}`
     : GROUND_UNITS[t?.key]?.name || BUILDINGS[t?.key]?.name || 'Командный пункт';

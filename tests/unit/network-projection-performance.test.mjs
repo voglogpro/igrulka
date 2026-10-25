@@ -209,7 +209,7 @@ test('synchronous encoding detaches borrowed routes and budgets before authority
     'previous interpolation sample must be immutable',
   );
 });
-test('the reproducible network battle respects the 120-per-city cap and fires real AA with normal drone HP', () => {
+test('the reproducible network battle keeps its historical 120-per-city sample and fires real AA with normal drone HP', () => {
   const s = loadFixture(10);
   assert.equal(s.groundUnits.length, 480);
   for (let side = 0; side < 4; side++)

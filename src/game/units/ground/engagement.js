@@ -1,4 +1,4 @@
-import { hostile } from '../../factions.js';
+import { hostile, sideIds } from '../../factions.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry } from '../../config.js';
 import { groundVisible, lineOfSight } from '../infantry/cover.js';
 import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
@@ -230,6 +230,9 @@ export function prepareGroundEngagement(s) {
   cache.unitCount = s.groundUnits.length;
   cache.buildingCount = s.buildings.length;
   cache.buckets = new Map();
+  const owners = sideIds(s);
+  cache.sideBuckets = owners.map(() => new Map());
+  cache.enemies = owners.map((side) => owners.filter((other) => hostile(s, side, other)));
   cache.ids = new Map();
   cache.visible = new Map();
   cache.pending = new Map();
@@ -240,6 +243,11 @@ export function prepareGroundEngagement(s) {
     const cell = `${Math.floor(u.x / ENGAGEMENT_CELL)},${Math.floor(u.z / ENGAGEMENT_CELL)}`;
     if (!cache.buckets.has(cell)) cache.buckets.set(cell, []);
     cache.buckets.get(cell).push(u);
+    const sideBucket = cache.sideBuckets[u.side];
+    if (sideBucket) {
+      if (!sideBucket.has(cell)) sideBucket.set(cell, []);
+      sideBucket.get(cell).push(u);
+    }
   }
   // Damage already in flight lets slow, expensive weapons avoid overkill on a doomed target.
   for (const p of s.projectiles || []) {
@@ -406,9 +414,10 @@ export function groundEngagement(s, u) {
         x <= Math.floor((u.x + margin) / ENGAGEMENT_CELL);
         x++
       )
-        for (const t of cache.buckets.get(`${x},${z}`) || [])
-          if (inRange(s, u, t, range, minRange))
-            candidates.push({ unit: t, score: rank(u, t, range, cache) });
+        for (const side of cache.enemies[u.side] || [])
+          for (const t of cache.sideBuckets[side].get(`${x},${z}`) || [])
+            if (inRange(s, u, t, range, minRange))
+              candidates.push({ unit: t, score: rank(u, t, range, cache) });
     cache.metrics.candidates += candidates.length;
     candidates.sort((a, b) => b.score - a.score || a.unit.id - b.unit.id);
     const head = candidates.slice(0, 2);

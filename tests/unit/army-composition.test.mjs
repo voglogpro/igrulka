@@ -85,20 +85,22 @@ test('all noncivil roles use their proper facility; old paid vehicle queues stay
   assert.equal(v.armyQueue[0].key, 'leopard');
 });
 
-test('targets are explicit, strict, atomic and share the 120-place cap', () => {
+test('targets are explicit, strict and independently bounded without a shared population cap', () => {
   const s = fresh(),
     before = money(s);
-  for (const count of [-1, 121, 1.5, NaN, Infinity, '2'])
+  for (const count of [-1, E.ARMY_TARGET_MAX + 1, 1.5, NaN, Infinity, '2'])
     assert.equal(typeof setArmyTarget(s, 0, 'infantry', count), 'string');
   for (const key of ['constructor', '__proto__', 'tradetruck'])
     assert.equal(typeof setArmyTarget(s, 0, key, 2), 'string');
   assert.equal(setArmyTarget(s, 0, 'infantry', 110), true);
   assert.equal(setArmyTarget(s, 0, 'leopard', 10), true);
   const original = structuredClone(s.sides[0].armyComposition);
-  assert.equal(typeof setArmyTarget(s, 0, 'medic', 1), 'string');
+  assert.equal(typeof setArmyTarget(s, 0, 'medic', E.ARMY_TARGET_MAX + 1), 'string');
   assert.deepEqual(s.sides[0].armyComposition, original);
+  assert.equal(setArmyTarget(s, 0, 'medic', 500), true);
+  assert.equal(armyCompositionStatus(s, 0).totals.limit, null);
   assert.equal(setArmyTarget(s, 0, 'infantry', 0), true);
-  assert.equal(armyCompositionStatus(s, 0).totals.desired, 10);
+  assert.equal(armyCompositionStatus(s, 0).totals.desired, 510);
   assert.deepEqual(money(s), before);
   assert.equal(
     armyCompositionStatus(s, 0).types.length,
@@ -262,7 +264,7 @@ test('legacy explicit garrisons merge by maximum, retire infinite repeats, and n
   for (const invalid of [
     { targets: { constructor: 1 }, nextAt: 0, cursor: 0 },
     { targets: JSON.parse('{"__proto__":1}'), nextAt: 0, cursor: 0 },
-    { targets: { infantry: 100, leopard: 21 }, nextAt: 0, cursor: 0 },
+    { targets: { infantry: 100, leopard: E.ARMY_TARGET_MAX + 1 }, nextAt: 0, cursor: 0 },
     { targets: { infantry: 1 }, nextAt: Infinity, cursor: 0 },
     { targets: { infantry: 0 }, nextAt: 0, cursor: 0 },
   ]) {

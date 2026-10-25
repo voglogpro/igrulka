@@ -29,6 +29,7 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
       destination = destinations[index],
       path = groundPath(s, u, destination, GROUND_UNITS[u.key].size * 0.42);
     if (!path.length) continue;
+    delete u.supplyTrip;
     if (['medic', 'supply'].includes(GROUND_UNITS[u.key].support)) u.supportManual = true;
     if (!preserveRoute) clearGroundRoute(u);
     if (!preserveRoute) clearAutoDefense(u);
@@ -98,6 +99,7 @@ export function commandUnits(s, side, ids, command) {
   let changed = 0;
   for (const u of units) {
     if (command === 'stop') {
+      delete u.supplyTrip;
       if (['medic', 'supply'].includes(GROUND_UNITS[u.key].support)) u.supportManual = true;
       clearAutoDefense(u);
       u.stance = null;
@@ -121,6 +123,7 @@ export function commandUnits(s, side, ids, command) {
       changed++;
     }
     if (command === 'dig' && isInfantry(u.key) && !u.carrierId) {
+      delete u.supplyTrip;
       clearAutoDefense(u);
       clearGroundRoute(u);
       u.guard = null;

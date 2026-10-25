@@ -1,7 +1,7 @@
 import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -14,7 +14,7 @@ const point = (p) =>
 const ids = (list) =>
   Array.isArray(list) &&
   list.length > 0 &&
-  list.length <= E.GROUND_LIMIT &&
+  list.length <= E.GROUND_COMMAND_LIMIT &&
   list.every(validId) &&
   new Set(list).size === list.length;
 const unitsOwned = (s, side, list) =>
@@ -86,7 +86,7 @@ export function executeCommand(s, side, type, a = {}) {
       return configured(E.GROUND_UNITS, a.key) &&
         Number.isInteger(a.count) &&
         a.count >= 0 &&
-        a.count <= E.GROUND_LIMIT
+        a.count <= E.ARMY_TARGET_MAX
         ? E.setArmyTarget(s, side, a.key, a.count)
         : invalid;
     case 'ammo-factory':
@@ -241,7 +241,7 @@ export function executeCommand(s, side, type, a = {}) {
       return typeof a.enabled === 'boolean' &&
         configured(E.GROUND_UNITS, a.key) &&
         (a.target == null ||
-          (Number.isInteger(a.target) && a.target >= 1 && a.target <= E.GROUND_LIMIT))
+          (Number.isInteger(a.target) && a.target >= 1 && a.target <= E.ARMY_TARGET_MAX))
         ? E.setRecruitRepeat(
             s,
             side,

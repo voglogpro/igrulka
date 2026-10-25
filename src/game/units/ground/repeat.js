@@ -1,6 +1,5 @@
 import { oilCost, hasOil, oilEnabled } from '../../city/oil.js';
 import { GROUND_UNITS } from '../../config.js';
-import { GROUND_LIMIT } from './navigation.js';
 
 const barracks = (s, side, siteId) =>
   s.buildings.find((b) => b.id === Number(siteId) && b.side === side && b.key === 'barracks');
@@ -13,10 +12,6 @@ export function recruitRepeatStatus(s, side, siteId) {
   const key = plan?.key || null;
   const d = GROUND_UNITS[key];
   const queued = b.armyQueue?.length || 0;
-  const alive = (s.groundUnits || []).filter((u) => u.side === side && u.hp > 0).length;
-  const sideQueued = s.buildings
-    .filter((site) => site.side === side && site.hp > 0)
-    .reduce((n, site) => n + (site.armyQueue?.length || 0), 0);
   const f = s.sides[side];
   const target = plan?.target ?? null;
   const reserves = target == null ? { credits: 0, materials: 0, oil: 0 } : plan.reserves;
@@ -34,7 +29,6 @@ export function recruitRepeatStatus(s, side, siteId) {
     else if (!d) status = 'research';
     else if (remaining === 0) status = 'target-met';
     else if (queued) status = 'queued';
-    else if (alive + sideQueued >= GROUND_LIMIT) status = 'unit-limit';
     else if (f.credits < d.cost || f.materials < d.metal) status = 'resources';
     else if (!hasOil(s, side, oilCost(key))) status = 'oil';
     else if (
@@ -56,7 +50,7 @@ export function recruitRepeatStatus(s, side, siteId) {
     remaining,
     reserves: { ...reserves },
     reason: status,
-    limit: GROUND_LIMIT,
+    limit: null,
     affordable: !!d && f.credits >= d.cost && f.materials >= d.metal,
   };
 }

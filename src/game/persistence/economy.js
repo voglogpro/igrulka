@@ -27,7 +27,9 @@ export function restoreEconomy(s, sourceVersion = s.version) {
     )
       throw Error('Повреждена история покупок');
     for (const key of Object.keys(BUILDINGS)) {
-      const existing = s.buildings.filter((b) => b.side === side && b.key === key).length;
+      const existing = s.buildings.filter(
+        (b) => b.side === side && b.key === key && b.settlementSlot == null,
+      ).length;
       if (ledger[key] == null && existing > 0) ledger[key] = existing;
       else if (ledger[key] < existing) throw Error('Повреждена история покупок');
     }

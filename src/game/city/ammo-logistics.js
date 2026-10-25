@@ -6,7 +6,6 @@ import {
   AMMUNITION as C,
   createAmmoStock,
   ammunitionProfile,
-  ammunitionStatus,
   receiveAmmunition,
 } from '../units/ground/ammunition.js';
 import { ammoDepotReady } from './ammo-production.js';
@@ -18,14 +17,18 @@ import {
   availableLaunchStock,
 } from '../units/aviation/launch-supply.js';
 import { collectionRequest, collectWeapon, deliverySpace } from './weapon-transfer.js';
+import { fieldSupplyJobs, depositFieldAmmo } from './field-ammo.js';
 export { requestWeaponDelivery } from './weapon-transfer.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const depotActive = (s, b) => ammoDepotReady(b) && b.ammoEnabled !== false;
 const targetOf = (s, v) =>
-  (v.targetKind === 'ground' ? s.groundUnits : s.buildings).find(
-    (t) => t.id === v.targetId && t.side === v.side && t.hp > 0 && !t.demolished && !t.carrierId,
-  );
+  v.targetKind === 'field' && v.fieldPoint
+    ? { id: null, side: v.side, key: 'ammo-crate', ...v.fieldPoint }
+    : (v.targetKind === 'ground' ? s.groundUnits : s.buildings).find(
+        (t) =>
+          t.id === v.targetId && t.side === v.side && t.hp > 0 && !t.demolished && !t.carrierId,
+      );
 const incoming = (s, id, kind, key) =>
   (s.ammoVehicles || []).reduce(
     (n, v) =>
@@ -58,7 +61,8 @@ function reconcile(s) {
   s.ammoVehicles = s.ammoVehicles.filter((v) => {
     const b = depots.find((t) => t.id === v.depotId && t.side === v.side);
     return (
-      b && (v.slot < (quotas.get(b.id) || 0) || (v.hp > 0 && (v.cargo || v.status !== 'idle')))
+      (v.hp > 0 && v.cargo) ||
+      (b && (v.slot < (quotas.get(b.id) || 0) || (v.hp > 0 && v.status !== 'idle')))
     );
   });
   for (const b of depots)
@@ -126,6 +130,28 @@ function returnHome(s, v) {
   v.pickup = null;
   v.targetId = null;
   v.targetKind = null;
+  v.fieldPoint = null;
+  const original = s.buildings.find(
+    (b) => b.id === v.depotId && b.side === v.side && ammoDepotReady(b),
+  );
+  if (!original && v.cargo) {
+    const replacement = s.buildings.find(
+      (b) =>
+        b.side === v.side &&
+        ammoDepotReady(b) &&
+        b.key === (v.cargo.kind === 'ammo' ? 'ammofactory' : 'factory'),
+    );
+    if (replacement) {
+      const parking = freeSpot(s, replacement, 3);
+      if (parking) v.home = parking;
+    } else {
+      v.path = [];
+      v.status = 'blocked';
+      v.retryAt = s.time + 2;
+      v.goal = null;
+      return;
+    }
+  }
   if (!route(s, v, v.home, 'returning')) {
     v.path = [];
     v.status = 'blocked';
@@ -202,24 +228,7 @@ function jobs(s, v, depot) {
         });
     }
   } else {
-    for (const t of [...s.groundUnits, ...s.buildings]) {
-      if (t.side !== v.side || t.hp <= 0 || t.demolished || t.carrierId || t.progress < 1) continue;
-      const p = ammunitionProfile(t);
-      if (!p) continue;
-      const report = ammunitionStatus(s, t);
-      const amount = Math.min(
-        C.cargo[p.kind],
-        (f.ammoStock || {})[p.kind] || 0,
-        p.capacity - report.reserve - incoming(s, t.id, 'ammo', p.kind),
-      );
-      if (amount > 0)
-        result.push({
-          target: t,
-          targetKind: s.groundUnits.includes(t) ? 'ground' : 'building',
-          cargo: { kind: 'ammo', key: p.kind, amount },
-          urgency: report.total === 0 ? 1 : 0,
-        });
-    }
+    result.push(...fieldSupplyJobs(s, v.side));
   }
   return result.sort(
     (a, b) =>
@@ -230,6 +239,14 @@ function jobs(s, v, depot) {
 }
 
 function unload(s, v) {
+  if (v.targetKind === 'field') {
+    const accepted = depositFieldAmmo(s, v);
+    if (!accepted) return false;
+    v.cargo.amount -= accepted;
+    if (!v.cargo.amount) v.cargo = null;
+    returnHome(s, v);
+    return true;
+  }
   const target = targetOf(s, v);
   if (!target || distance(v, target) > C.reach + (BUILDINGS[target.key]?.size || 0) * 0.5)
     return false;
@@ -292,13 +309,13 @@ export function updateAmmoLogistics(s, dt) {
     const depot = s.buildings.find(
       (b) => b.id === v.depotId && b.side === v.side && ammoDepotReady(b),
     );
-    if (!depot) continue;
+    if (!depot && !v.cargo) continue;
     const target = targetOf(s, v);
     if (
       thinking &&
       v.status !== 'idle' &&
-      v.targetId != null &&
-      (!target || !depotActive(s, depot))
+      (v.targetId != null || v.targetKind === 'field') &&
+      (!target || (depot && !depotActive(s, depot)))
     ) {
       if (searches++ < 4) returnHome(s, v);
     }
@@ -308,11 +325,14 @@ export function updateAmmoLogistics(s, dt) {
         const goal = destination(s, v, job.target);
         if (!goal || !route(s, v, goal, 'outbound')) {
           job.target.ammoSupplyBlocked = true;
+          for (const member of job.members || []) member.ammoSupplyBlocked = true;
           continue;
         }
         job.target.ammoSupplyBlocked = false;
+        for (const member of job.members || []) member.ammoSupplyBlocked = false;
         v.targetId = job.target.id;
         v.targetKind = job.targetKind;
+        v.fieldPoint = job.targetKind === 'field' ? { x: job.target.x, z: job.target.z } : null;
         v.cargo = job.cargo;
         v.pickup = job.pickup || null;
         const f = s.sides[v.side];
@@ -391,7 +411,11 @@ export function ammoLogisticsStatus(s, side, targetId) {
   );
   if (!target) return null;
   const fleet = (s.ammoVehicles || []).filter(
-    (v) => v.hp > 0 && v.side === side && v.targetId === targetId,
+    (v) =>
+      v.hp > 0 &&
+      v.side === side &&
+      (v.targetId === targetId ||
+        (v.targetKind === 'field' && v.fieldPoint && distance(v.fieldPoint, target) <= 120)),
   );
   const pending = Object.entries(target.weaponDemand || {}).reduce(
     (n, [key, count]) => n + Math.max(0, count - availableLaunchStock(target, key)),

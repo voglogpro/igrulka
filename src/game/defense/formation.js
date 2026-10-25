@@ -14,6 +14,7 @@ export function defenseAvailable(s, u) {
     !u.carrierId &&
     !u.boardingId &&
     !u.delivery &&
+    !u.supplyTrip &&
     !u.routeState &&
     !GROUND_UNITS[u.key]?.support &&
     !u.civil &&

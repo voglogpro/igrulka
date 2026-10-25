@@ -2,7 +2,7 @@ import { aiSides } from '../../factions.js';
 import { oilCost, hasOil, spendOil } from '../../city/oil.js';
 import { GROUND_UNITS, defenseStats } from '../../config.js';
 import { clamp } from '../../shared/math.js';
-import { GROUND_LIMIT, walkable } from './navigation.js';
+import { walkable } from './navigation.js';
 import { validStance } from './stance.js';
 import { initializeAmmunition } from './ammunition.js';
 export function recruitmentFacility(key) {
@@ -70,14 +70,6 @@ export function recruit(s, side, key, siteId = null, count = 1, stance = null) {
   );
   if (!sites.length)
     return facility === 'barracks' ? 'Постройте казармы у дороги' : 'Постройте бронезавод у дороги';
-  const queued = s.buildings
-    .filter((b) => b.side === side && b.hp > 0)
-    .reduce((n, b) => n + (b.armyQueue?.length || 0), 0);
-  if (
-    (s.groundUnits || []).filter((u) => u.side === side && u.hp > 0).length + queued + count >
-    GROUND_LIMIT
-  )
-    return 'Лимит армии: 120 единиц на сторону';
   if (sites.reduce((n, b) => n + 8 - (b.armyQueue?.length || 0), 0) < count)
     return 'Очередь казарм заполнена';
   if (f.credits < d.cost * count || f.materials < d.metal * count)

@@ -44,7 +44,8 @@ const commands = [
 export function renderArmyControls({ state, armySelection }, primary) {
   const host = $('#army-controls');
   if (!host) return;
-  const units = state.groundUnits.filter((u) => armySelection.includes(u.id) && u.hp > 0);
+  const selection = new Set(armySelection);
+  const units = state.groundUnits.filter((u) => selection.has(u.id) && u.hp > 0);
   if (!units.length) {
     setArmyContextVisible(false);
     return;

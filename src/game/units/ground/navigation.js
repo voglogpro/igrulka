@@ -1,9 +1,11 @@
 import { FIELD, BUILDINGS, riverDistance, CORRIDORS } from '../../config.js';
 import { activeSettlementFootprints } from '../../territory/settlements.config.js';
+import { GROUND_COMMAND_LIMIT } from './limits.js';
 // The ground crossings between the cities. The name stays for older code and saves: since the sea
 // map they are the two land corridors, not bridges.
 export const BRIDGES = CORRIDORS,
-  GROUND_LIMIT = 120;
+  // Compatibility export: only a maximum number of IDs in one command.
+  GROUND_LIMIT = GROUND_COMMAND_LIMIT;
 const CELL = 24,
   // The lattice keeps the alignment of the original valley grid (origin -864, -576).
   OX = -864 - Math.floor((FIELD.x - 864) / CELL) * CELL,
@@ -11,10 +13,43 @@ const CELL = 24,
   WIDTH = Math.floor((FIELD.x - OX) / CELL) + 1,
   DEPTH = Math.floor((FIELD.z - OZ) / CELL) + 1;
 const masks = new WeakMap();
+const movementObstacles = new WeakMap();
 const OBSTACLE_CELL = 64,
   OBSTACLE_STRIDE = Math.ceil((FIELD.x * 2) / OBSTACLE_CELL) + 1;
 const obstacleColumn = (x) => Math.floor((x + FIELD.x) / OBSTACLE_CELL);
 const obstacleRow = (z) => Math.floor((z + FIELD.z) / OBSTACLE_CELL);
+function movementBuckets(s) {
+  const footprints = activeSettlementFootprints(s);
+  let cache = movementObstacles.get(s);
+  if (
+    cache &&
+    cache.revision === s.networkRevision &&
+    cache.buildings === s.buildings &&
+    cache.count === s.buildings.length &&
+    cache.footprints === footprints
+  )
+    return cache.buckets;
+  const buckets = new Map();
+  for (const object of [...s.buildings, ...footprints]) {
+    const half = object.r ?? (BUILDINGS[object.key]?.size || 30) * 0.56;
+    const record = { object, half };
+    for (let z = obstacleRow(object.z - half); z <= obstacleRow(object.z + half); z++)
+      for (let x = obstacleColumn(object.x - half); x <= obstacleColumn(object.x + half); x++) {
+        const key = z * OBSTACLE_STRIDE + x;
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(record);
+      }
+  }
+  cache = {
+    revision: s.networkRevision,
+    buildings: s.buildings,
+    count: s.buildings.length,
+    footprints,
+    buckets,
+  };
+  movementObstacles.set(s, cache);
+  return buckets;
+}
 // Terrain does not change during a campaign. Reuse it across factions and campaigns;
 // new buildings only stamp their small bounding rectangles onto a copied mask.
 const terrainMasks = new Map();
@@ -117,20 +152,18 @@ function clearGridEdge(grid, a, b, size, current, bit) {
 export function walkable(s, x, z, radius = 3, ignore = null) {
   if (Math.abs(x) > FIELD.x || Math.abs(z) > FIELD.z) return false;
   if (riverDistance(x, z) < 77 + radius) return false;
-  if (
-    activeSettlementFootprints(s).some(
-      (house) =>
-        Math.abs(x - house.x) < house.r + radius && Math.abs(z - house.z) < house.r + radius,
-    )
-  )
-    return false;
-  return !s.buildings.some(
-    (b) =>
-      b.id !== ignore &&
-      !b.demolished &&
-      Math.abs(x - b.x) < (BUILDINGS[b.key]?.size || 30) * 0.56 + radius &&
-      Math.abs(z - b.z) < (BUILDINGS[b.key]?.size || 30) * 0.56 + radius,
-  );
+  const buckets = movementBuckets(s);
+  for (let row = obstacleRow(z - radius); row <= obstacleRow(z + radius); row++)
+    for (let col = obstacleColumn(x - radius); col <= obstacleColumn(x + radius); col++)
+      for (const { object, half } of buckets.get(row * OBSTACLE_STRIDE + col) || [])
+        if (
+          object.id !== ignore &&
+          !object.demolished &&
+          Math.abs(x - object.x) < half + radius &&
+          Math.abs(z - object.z) < half + radius
+        )
+          return false;
+  return true;
 }
 // Bounded A* over the whole field with a binary heap, no diagonal corner cutting.
 export function groundPath(s, from, to, radius = 3) {
@@ -147,7 +180,13 @@ export function groundPath(s, from, to, radius = 3) {
   const point = (i) => ({ x: OX + (i % WIDTH) * CELL, z: OZ + Math.floor(i / WIDTH) * CELL });
   let cache = masks.get(s);
   const signature =
-    s.networkRevision + ':' + s.buildings.length + ':' + (s.settlementHouseMask ?? 65535);
+    s.networkRevision +
+    ':' +
+    s.buildings.length +
+    ':' +
+    (s.settlementHouseMask ?? 65535) +
+    ':' +
+    (s.settlementLayoutMask ?? 16777215);
   if (!cache || cache.signature !== signature) {
     cache = { signature, grids: new Map() };
     masks.set(s, cache);

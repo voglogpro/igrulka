@@ -7,18 +7,18 @@ import { event } from '../../src/game/shared/events.js';
 
 test('army composition commands are bounded, atomic and apply only to the authenticated side', () => {
   const s = E.createGame(89);
-  assert.equal(PROTOCOL_VERSION, 10);
+  assert.equal(PROTOCOL_VERSION, 11);
   assert.equal(executeCommand(s, 1, 'army-target', { key: 'infantry', count: 50, side: 0 }), true);
   assert.deepEqual(s.sides[0].armyComposition.targets, {});
   assert.deepEqual(s.sides[1].armyComposition.targets, { infantry: 50 });
   for (const args of [
     { key: 'infantry', count: -1 },
-    { key: 'infantry', count: 121 },
+    { key: 'infantry', count: E.ARMY_TARGET_MAX + 1 },
     { key: 'infantry', count: 0.5 },
     { key: 'infantry', count: '5' },
     { key: 'constructor', count: 1 },
     { key: '__proto__', count: 1 },
-    { key: 'leopard', count: 80 },
+    { key: 'leopard', count: Infinity },
   ]) {
     const before = E.save(s);
     assert.equal(typeof executeCommand(s, 1, 'army-target', args), 'string');

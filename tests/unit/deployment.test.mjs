@@ -92,8 +92,8 @@ test('automatic deployment chooses an available reachable barracks and preserves
   assert.equal(a.armyQueue.length, 2);
 });
 
-test('resource, facility, queue and army limits are checked before payment', () => {
-  for (const condition of ['credits', 'materials', 'facility', 'queue', 'army', 'finished']) {
+test('resource, facility and queue limits are checked before payment', () => {
+  for (const condition of ['credits', 'materials', 'facility', 'queue', 'finished']) {
     const s = fresh(),
       b = barracks(s);
     let key = 'infantry';
@@ -102,8 +102,6 @@ test('resource, facility, queue and army limits are checked before payment', () 
     if (condition === 'facility') key = 'leopard';
     if (condition === 'queue')
       b.armyQueue = Array.from({ length: 8 }, () => ({ key, progress: 0 }));
-    if (condition === 'army')
-      for (let i = 0; i < 120; i++) s.groundUnits.push(E.makeGround(s, 0, key, -900, 450));
     if (condition === 'finished') s.result = 'victory';
     const before = E.save(s);
     assert.equal(deployGround(s, 0, key, goal, 1, b.id), false, condition);

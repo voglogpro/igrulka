@@ -19,6 +19,8 @@ import {
   SETTLEMENT_FOOTPRINTS,
   activeSettlementFootprints,
   settlementHouseEnabled,
+  settlementLayout,
+  SETTLEMENT_COMPONENTS,
 } from '../../src/game/territory/settlements.config.js';
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
@@ -35,7 +37,8 @@ function fresh(coop = false) {
 }
 function link(s, side, d) {
   const hq = s.buildings.find((b) => b.side === side && b.key === 'hq');
-  return addRoad(s, side, hq.x, hq.z - 45, d.x, d.z + 20);
+  const entrance = settlementLayout(d).entrance;
+  return addRoad(s, side, hq.x, hq.z - 45, entrance.x, entrance.z);
 }
 function foot(s, side, d, key = 'infantry') {
   const u = E.makeGround(s, side, key, d.x, d.z);
@@ -51,7 +54,7 @@ function tick(s, seconds) {
 function paidRoadPath(s, side, d) {
   const camp = s.roads.filter((r) => r.side === side && !r.connectorTo).at(-1);
   const start = { x: camp.bx, z: camp.bz },
-    goal = { x: d.x, z: d.z + 20 };
+    goal = settlementLayout(d).entrance;
   const nodes = [{ ...start, parent: -1 }],
     seen = new Set(['0,0']);
   for (let cursor = 0; cursor < nodes.length && nodes.length < 6000; cursor++) {
@@ -124,7 +127,8 @@ test('two central depots and eight balanced road villages are dry and initially 
 test('a disconnected road near a village pays nothing; its actual HQ link activates without infantry', () => {
   const s = fresh(),
     d = SETTLEMENTS[0];
-  const endpoint = addRoad(s, 0, d.x - 40, d.z + 20, d.x + 40, d.z + 20);
+  const entrance = settlementLayout(d).entrance;
+  const endpoint = addRoad(s, 0, entrance.x - 40, entrance.z, entrance.x + 40, entrance.z);
   tick(s, 1.1);
   assert.equal(settlementStatus(s, d.id).owner, null);
   const hq = s.buildings.find((b) => b.side === 0);
@@ -133,12 +137,13 @@ test('a disconnected road near a village pays nothing; its actual HQ link activa
   const status = settlementStatus(s, d.id);
   assert.equal(status.owner, 0);
   assert.equal(status.reason, 'active');
-  near(settlementIncome(s, 0).income, 0.6);
-  near(settlementIncome(s, 0).materials, 0.05);
+  const rate = E.economy(s, 0);
+  assert.ok(rate.settlements.income > 0);
+  assert.ok(rate.settlements.materials > 0);
   const before = structuredClone(s.sides[0]);
   tick(s, 4);
   assert.ok(s.sides[0].credits > before.credits);
-  near(s.sides[0].materials - before.materials, 0.2);
+  near(s.sides[0].materials - before.materials, rate.materials * 4);
   assert.equal(s.events.filter((e) => e.type === 'settlementConnected').length, 1);
 });
 test('all eight villages can be reached using real legal paid road segments from the proper solo city', () => {
@@ -182,8 +187,9 @@ test('road destruction stops income immediately, retains ownership and restoring
   r.hp = r.maxHp;
   dirtyNetwork(s);
   assert.equal(settlementIncome(s, 0).active, 1);
+  const resumed = E.economy(s, 0).materials;
   tick(s, 2);
-  near(s.sides[0].materials - metal, 0.1);
+  near(s.sides[0].materials - metal, resumed * 2);
 });
 test('all four cities get their nearest two villages; allied roads cannot steal a live owner even after a break', () => {
   const s = fresh(true);
@@ -192,7 +198,11 @@ test('all four cities get their nearest two villages; allied roads cannot steal 
   tick(s, 0.1);
   for (let side = 0; side < 4; side++) {
     assert.equal(settlementIncome(s, side).active, 2);
-    near(settlementIncome(s, side).income, 1.2);
+    assert.ok(settlementIncome(s, side).income > 0);
+    near(
+      settlementIncome(s, side).income,
+      (settlementIncome(s, 0).income / E.economy(s, 0).bonus) * E.economy(s, side).bonus,
+    );
   }
   const d = SETTLEMENTS[0],
     value = s.settlements.find((v) => v.id === d.id);
@@ -623,18 +633,18 @@ test('v16 imports suppress houses over the paid city, road, troops and pending d
   assert.deepEqual(again.serviceVehicles, loaded.serviceVehicles);
   assert.deepEqual(again.ammoVehicles, loaded.ammoVehicles);
 });
-test('house mask is strict in current saves and cached footprint arrays change only with its value', () => {
+test('legacy house mask remains strict while current component masks cache ordinary town footprints', () => {
   const s = fresh();
   assert.equal(s.settlementHouseMask, 65535);
   const all = activeSettlementFootprints(s);
-  assert.equal(all.length, 16);
+  assert.equal(all.length, 20);
   assert.equal(activeSettlementFootprints(s), all);
-  s.settlementHouseMask &= ~1;
+  s.settlementLayoutMask &= ~1;
   const partial = activeSettlementFootprints(s);
-  assert.equal(partial.length, 15);
+  assert.equal(partial.length, 19);
   assert.notEqual(partial, all);
   assert.equal(activeSettlementFootprints(s), partial);
-  assert.equal(partial.includes(SETTLEMENT_FOOTPRINTS[0]), false);
+  assert.equal(partial.includes(SETTLEMENT_COMPONENTS[0]), false);
   for (const value of [undefined, null, -1, 65536, 1.5, '65535']) {
     const bad = fresh();
     bad.settlementHouseMask = value;
@@ -643,5 +653,6 @@ test('house mask is strict in current saves and cached footprint arrays change o
   const empty = fresh();
   empty.settlementHouseMask = 0;
   assert.equal(E.load(E.save(empty)).settlementHouseMask, 0);
+  empty.settlementLayoutMask = 0;
   assert.deepEqual(activeSettlementFootprints(empty), []);
 });

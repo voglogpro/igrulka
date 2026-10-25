@@ -58,6 +58,27 @@ test('entity additions, deaths, reorder, changed route, deleted fields and new d
   assert.deepEqual(next, s);
 });
 
+test('field supply crate additions, finite stock changes and removal round trip as entity deltas', () => {
+  const encoder = createSnapshotEncoder(),
+    decoder = createSnapshotDecoder(),
+    state = { ...fixture(), ammoCrates: [] };
+  decoder.decode(wire(encoder.encode(state)));
+  state.ammoCrates.push({
+    id: 50,
+    side: 0,
+    key: 'ammo-crate',
+    x: 120,
+    z: -140,
+    hp: 100,
+    stock: { small: 360, shell: 0, rocket: 0, sam: 0 },
+  });
+  assert.deepEqual(decoder.decode(wire(encoder.encode(state))), state);
+  state.ammoCrates[0].stock.small -= 120;
+  assert.deepEqual(decoder.decode(wire(encoder.encode(state))), state);
+  state.ammoCrates = [];
+  assert.deepEqual(decoder.decode(wire(encoder.encode(state))), state);
+});
+
 test('a missing delta baseline is rejected and resync uses a fresh monotonically numbered full snapshot', () => {
   const encoder = createSnapshotEncoder(),
     decoder = createSnapshotDecoder(),

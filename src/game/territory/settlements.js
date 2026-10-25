@@ -1,18 +1,36 @@
-import { network, projectPoint, segmentDistance } from '../city/road-network.js';
+import { buildingConnected, segmentDistance } from '../city/road-network.js';
 import { BUILDINGS } from '../city/buildings.config.js';
 import { expandLegacyX, expandLegacyZ } from '../map.js';
 import { allied, hostile, hqOf, sideIds, teamOf, validSide } from '../factions.js';
 import { GROUND_UNITS, isInfantry } from '../units/ground/types.js';
 import { event } from '../shared/events.js';
 import {
+  materializeSettlement,
+  settlementRoadApproach,
+  validateSettlementCities,
+} from './settlement-cities.js';
+import { economy } from '../city/economy.js';
+import {
   SETTLEMENTS,
   SETTLEMENT_BY_ID,
   SETTLEMENT_FOOTPRINTS,
+  SETTLEMENT_COMPONENTS,
+  settlementLayout,
   SETTLEMENT_RULES as R,
 } from './settlements.config.js';
 
 export { SETTLEMENTS, SETTLEMENT_RULES } from './settlements.config.js';
-const fields = ['id', 'owner', 'capturing', 'control', 'contested', 'blocked'];
+const fields = [
+  'id',
+  'owner',
+  'capturing',
+  'control',
+  'contested',
+  'blocked',
+  'materialized',
+  'componentIds',
+  'roadIds',
+];
 const canonical = (value) => Object.fromEntries(fields.map((key) => [key, value[key]]));
 const cache = new WeakMap();
 export const createSettlementClock = () => ({ next: 0, elapsed: 0 });
@@ -24,8 +42,16 @@ export const createSettlements = () =>
     control: 0,
     contested: false,
     blocked: false,
+    materialized: false,
+    componentIds: [],
+    roadIds: [],
   }));
-function legacyHouseMask(s, sourceVersion) {
+function legacyHouseMask(
+  s,
+  sourceVersion,
+  footprints = SETTLEMENT_FOOTPRINTS,
+  initialMask = 65535,
+) {
   const point = (p) =>
     p && Number.isFinite(p.x) && Number.isFinite(p.z)
       ? {
@@ -45,9 +71,9 @@ function legacyHouseMask(s, sourceVersion) {
     for (const queued of b.armyQueue || []) positions.push(queued.destination);
   }
   const projected = positions.map(point).filter(Boolean);
-  let mask = 65535;
-  for (let index = 0; index < SETTLEMENT_FOOTPRINTS.length; index++) {
-    const house = SETTLEMENT_FOOTPRINTS[index];
+  let mask = initialMask;
+  for (let index = 0; index < footprints.length; index++) {
+    const house = footprints[index];
     const unitOverlap = projected.some(
       (p) => Math.hypot(p.x - house.x, p.z - house.z) < house.r + 5,
     );
@@ -66,7 +92,7 @@ function legacyHouseMask(s, sourceVersion) {
         b = point({ x: r.bx, z: r.bz });
       return a && b && segmentDistance(house.x, house.z, a.x, a.z, b.x, b.z) < house.r + 6;
     });
-    if (unitOverlap || buildingOverlap || roadOverlap) mask &= ~(1 << index);
+    if (unitOverlap || buildingOverlap || roadOverlap) mask &= ~(1 << (house.index ?? index));
   }
   return mask;
 }
@@ -80,6 +106,33 @@ export function restoreSettlements(s, sourceVersion = s.version) {
     throw Error('Повреждена геометрия поселений');
   if (sourceVersion < 17 && s.settlements == null) s.settlements = createSettlements();
   if (sourceVersion < 17 && s.settlementClock == null) s.settlementClock = createSettlementClock();
+  if (sourceVersion < 18) {
+    s.settlementLayoutMask = legacyHouseMask(s, sourceVersion, SETTLEMENT_COMPONENTS, 16777215);
+    for (let site = 0; site < SETTLEMENTS.length; site++)
+      for (let slot = 0; slot < 2; slot++)
+        if (!(s.settlementHouseMask & (1 << (site * 2 + slot))))
+          s.settlementLayoutMask &= ~(1 << (site * 3 + slot));
+    for (const value of s.settlements || []) {
+      value.materialized = false;
+      value.componentIds = [];
+      value.roadIds = [];
+    }
+    // Old files cannot import forged ownership markers on paid city assets.
+    for (const b of s.buildings) {
+      delete b.settlementId;
+      delete b.settlementSlot;
+    }
+    for (const r of s.roads) {
+      delete r.settlementId;
+      delete r.settlementRoadSlot;
+    }
+  }
+  if (
+    !Number.isInteger(s.settlementLayoutMask) ||
+    s.settlementLayoutMask < 0 ||
+    s.settlementLayoutMask > 16777215
+  )
+    throw Error('Повреждена геометрия городков');
   const clock = s.settlementClock;
   if (
     !clock ||
@@ -119,6 +172,7 @@ export function restoreSettlements(s, sourceVersion = s.version) {
   s.settlements = SETTLEMENTS.map((d) =>
     canonical(s.settlements.find((value) => value.id === d.id)),
   );
+  validateSettlementCities(s);
   cache.delete(s);
 }
 export function settlementHomeSide(s, site) {
@@ -145,26 +199,79 @@ function connected(s, side, site) {
   return (
     validSide(s, side) &&
     !!liveHQ(s, side) &&
-    network(s, side).connected.some(
-      (road) => projectPoint(site.x, site.z, road).distance <= R.roadReach,
-    )
+    (settlementRoadApproach(s, side, site)?.distance ?? Infinity) <= R.roadReach
   );
 }
-export function settlementStatus(s, id) {
+export function settlementOperational(s, id, side) {
+  const config = Object.hasOwn(SETTLEMENT_BY_ID, id) && SETTLEMENT_BY_ID[id];
+  const value = config && s.settlements?.find((site) => site.id === id);
+  return (
+    !!value &&
+    value.owner === side &&
+    !value.blocked &&
+    !value.contested &&
+    connected(s, side, config)
+  );
+}
+export function settlementStatus(s, id, economies = null) {
   const config =
     typeof id === 'string' && Object.hasOwn(SETTLEMENT_BY_ID, id) ? SETTLEMENT_BY_ID[id] : null;
   const value = config && s.settlements?.find((site) => site.id === id);
   if (!value) return null;
   const linked = value.owner !== null && connected(s, value.owner, config);
   const active = !!linked && !value.blocked && !value.contested;
+  const components = (value.componentIds || [])
+    .map((id) => s.buildings.find((b) => b.id === id))
+    .filter(Boolean);
+  const townBuildings = s.buildings.filter(
+    (b) => b.settlementId === value.id && b.side === value.owner,
+  );
+  let e = null;
+  if (active && components.some((b) => b.hp > 0 && b.progress >= 1 && !b.demolished)) {
+    const side = value.owner ?? settlementHomeSide(s, config);
+    e = economies?.get(side);
+    if (!e) {
+      e = economy(s, side);
+      economies?.set(side, e);
+    }
+  }
+  const output = (key) =>
+    townBuildings.reduce(
+      (sum, b) =>
+        sum +
+        (b.hp > 0 &&
+        b.progress >= 1 &&
+        !b.demolished &&
+        active &&
+        buildingConnected(s, b, BUILDINGS[b.key].size)
+          ? (BUILDINGS[b.key][key] || 0) *
+            e.productivity *
+            (0.5 + (0.5 * b.hp) / b.maxHp) *
+            e.bonus *
+            e.outputBonus
+          : 0),
+      0,
+    );
   return {
     ...config,
     ...canonical(value),
     homeSide: settlementHomeSide(s, config),
     connected: !!linked,
     active,
-    income: active ? R.income : 0,
-    materials: active ? R.materials : 0,
+    entrance: settlementLayout(config).entrance,
+    components: components.map((b) => ({
+      id: b.id,
+      key: b.key,
+      x: b.x,
+      z: b.z,
+      hp: b.hp,
+      maxHp: b.maxHp,
+      demolished: !!b.demolished,
+      slot: b.settlementSlot,
+    })),
+    expansionIds: townBuildings.filter((b) => b.settlementSlot == null).map((b) => b.id),
+    income: output('income'),
+    materials: output('materials'),
     reason: value.contested
       ? 'contested'
       : value.blocked
@@ -176,20 +283,39 @@ export function settlementStatus(s, id) {
             : 'active',
   };
 }
-export function settlementIncome(s, side) {
+export function settlementIncome(s, side, context = null) {
+  if (!context) return economy(s, side).settlements;
   const result = { income: 0, materials: 0, owned: 0, active: 0, isolated: 0, blocked: 0 };
   for (const value of s.settlements || []) {
     if (value.owner !== side) continue;
-    const d = settlementStatus(s, value.id);
-    if (!d) continue;
+    const linked = connected(s, side, SETTLEMENT_BY_ID[value.id]);
+    const d = {
+      connected: linked,
+      blocked: value.blocked,
+      contested: value.contested,
+      active: linked && !value.blocked && !value.contested,
+    };
     result.owned++;
     if (d.blocked || d.contested) result.blocked++;
     if (!d.connected) result.isolated++;
     if (d.active) {
       result.active++;
-      result.income += R.income;
-      result.materials += R.materials;
     }
+  }
+  for (const b of s.buildings) {
+    if (
+      b.side !== side ||
+      !b.settlementId ||
+      b.hp <= 0 ||
+      b.progress < 1 ||
+      b.demolished ||
+      !settlementOperational(s, b.settlementId, side) ||
+      !buildingConnected(s, b, BUILDINGS[b.key].size)
+    )
+      continue;
+    const factor = context.productivity * (0.5 + (0.5 * b.hp) / b.maxHp) * context.outputBonus;
+    result.income += (BUILDINGS[b.key].income || 0) * factor;
+    result.materials += (BUILDINGS[b.key].materials || 0) * factor;
   }
   return result;
 }
@@ -223,6 +349,7 @@ function claim(s, value, side, d) {
   value.control = 1;
   value.capturing = null;
   value.blocked = false;
+  materializeSettlement(s, value, side);
   event(s, 'settlementConnected', { side, settlementId: d.id, x: d.x, z: d.z });
 }
 function updateOne(s, value, d, dt) {
@@ -265,6 +392,8 @@ function updateOne(s, value, d, dt) {
     return;
   }
   if (value.owner !== null) {
+    if (!value.materialized && connected(s, value.owner, d))
+      materializeSettlement(s, value, value.owner);
     value.capturing = null;
     value.control = Math.min(1, value.control + dt * R.decayPerSecond);
     if (liveHQ(s, value.owner) || value.contested) return;

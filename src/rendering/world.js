@@ -11,6 +11,7 @@ import {
 import { syncTrenches as syncTrenchesForWorld } from './terrain/trenches.js';
 import { DistrictView } from './terrain/districts.js';
 import { SettlementView } from './terrain/settlements.js';
+import { AmmoCrateView } from './terrain/ammo-crates.js';
 import { factionHex } from './team-colors.js';
 import { updateDaylight as updateDaylightForWorld } from './lighting.js';
 import { model as modelForWorld } from './models/buildings.js';
@@ -43,6 +44,7 @@ import { RenderBudget, renderPixelRatio } from './performance/render-budget.js';
 import { GroundVisibility } from './performance/ground-visibility.js';
 import { RoadVisualCache } from './performance/road-visual-cache.js';
 import { VehicleBatch } from './performance/vehicle-batch.js';
+import { BuildingBatch } from './performance/building-batch.js';
 import { ContactShadows } from './performance/contact-shadows.js';
 import { ShadowBudget } from './performance/shadow-budget.js';
 import { DeploymentPreview } from './deployment-preview.js';
@@ -301,6 +303,7 @@ export class RTSWorld {
     this.resizeObserver.observe(host);
     this.infantry = new InfantryBatch(this);
     this.vehicleBatch = new VehicleBatch(this.scene);
+    this.buildingBatch = new BuildingBatch(this.scene);
     this.roadBatch = new VehicleBatch(this.scene);
     this.contactShadows = new ContactShadows(this.scene);
     this.combatFX = new CombatEffects(this);
@@ -316,6 +319,7 @@ export class RTSWorld {
       height: (x, z) => this.height(x, z),
       visible: (s, v) => v.side === 0 || E.fogVisible(s, 0, v.x, v.z),
     });
+    this.ammoCrates = new AmmoCrateView(this.scene, { height: (x, z) => this.height(x, z) });
     this.ships = new Ships(this);
     this.tactical = new TacticalView(this);
     this.deploymentPreview = new DeploymentPreview(this.scene);
@@ -454,7 +458,11 @@ export class RTSWorld {
     }
     this.selection.position.set(b.x, 0.9, b.z);
     this.selection.scale.setScalar(
-      b.key === 'road' ? 8 : ((BUILDINGS[b.key] || E.GROUND_UNITS[b.key])?.size || 30) * 0.8,
+      b.key === 'road'
+        ? 8
+        : b.key === 'ammo-crate'
+          ? 6
+          : ((BUILDINGS[b.key] || E.GROUND_UNITS[b.key])?.size || 30) * 0.8,
     );
     this.selection.material.color.set(factionHex(b.side));
     if (b.ground && b.side === 0) this.selection.visible = false;
@@ -474,7 +482,9 @@ export class RTSWorld {
     const result = syncForWorld.call(this, ...args);
     this.serviceFleet.sync(this.state);
     this.ammoFleet.sync(this.state);
+    this.ammoCrates.sync(this.state);
     this.settlementView.sync(this.state);
+    this.buildingBatch.sync(this.models, this.camera, this.sun);
     return result;
   }
   aircraft(u) {
@@ -514,7 +524,7 @@ export class RTSWorld {
       renderPixelRatio(width, height, devicePixelRatio, this.renderBudget.scale),
     );
     this.renderer.setSize(width, height);
-    this.post.resize(width, height);
+    this.post.resize(width, height, this.renderBudget.scale);
   }
   updateMinimap(...args) {
     return updateMinimapForWorld.call(this, ...args);
@@ -536,6 +546,7 @@ export class RTSWorld {
       units: this.unitModels.size,
       groundUnits: this.groundModels.size,
       groundBatches: this.vehicleBatch.diagnostics(),
+      buildingBatches: this.buildingBatch.diagnostics(),
       roadBatches: this.roadBatch.diagnostics(),
       contactShadows: this.contactShadows.mesh.count,
       day: E.dayPhase(this.state.time),
@@ -548,6 +559,7 @@ export class RTSWorld {
       traffic: this.traffic.diagnostics(),
       serviceFleet: this.serviceFleet.diagnostics(),
       ammoFleet: this.ammoFleet.diagnostics(),
+      ammoCrates: this.ammoCrates.diagnostics(),
       ships: this.ships.diagnostics(),
       frontline: this.frontlineView.diagnostics(),
       fortifications: this.fortifications.diagnostics(),

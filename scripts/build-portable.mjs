@@ -5,6 +5,16 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = path.resolve(process.argv[2] || path.join(root, 'play/Skyfront.html'));
+const audioWorker = await build({
+  entryPoints: [path.join(root, 'src/audio/pcm-worker.js')],
+  bundle: true,
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2022',
+  minify: true,
+  charset: 'utf8',
+  write: false,
+});
 const bundle = await build({
   entryPoints: [path.join(root, 'src/main.js')],
   bundle: true,
@@ -15,6 +25,7 @@ const bundle = await build({
   charset: 'utf8',
   legalComments: 'inline',
   write: false,
+  define: { __SKYFRONT_AUDIO_WORKER_SOURCE__: JSON.stringify(audioWorker.outputFiles[0].text) },
 });
 
 let fonts = (await readFile(path.join(root, 'src/ui/fonts.css'), 'utf8')).replace(/^\uFEFF/, '');

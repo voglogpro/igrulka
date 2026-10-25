@@ -27,21 +27,8 @@ const pointValid = (s, u, p) =>
   Math.abs(p.z) <= FIELD.z &&
   walkable(s, p.x, p.z, GROUND_UNITS[u.key].size * 0.42);
 
-function coveredPost(s, u, p) {
+function guardCandidates(s, u, p) {
   const size = GROUND_UNITS[u.key].size;
-  const occupied = s.groundUnits
-    .filter((v) => v.id !== u.id && v.side === u.side && v.hp > 0 && !v.carrierId)
-    .flatMap((v) => [
-      { unit: v, point: v.guard || (!v.path?.length ? v : null) },
-      ...(v.defenseTask ? [{ unit: v, point: v.defenseTask.home }] : []),
-    ])
-    .filter((entry) => entry.point);
-  const free = (candidate) =>
-    occupied.every(
-      ({ unit, point }) =>
-        distance(candidate, point) >=
-        (size + GROUND_UNITS[unit.key].size) * 0.5 + GUARD_POST_CLEARANCE - 1e-6,
-    );
   const candidates = [{ x: p.x, z: p.z, distance: 0, nearby: true }];
   if (isInfantry(u.key))
     for (const radius of [10, 18, GUARD_COVER_RADIUS])
@@ -76,8 +63,8 @@ function coveredPost(s, u, p) {
     seen.add(key);
     candidates.push(slot);
   }
-  const ranked = candidates
-    .filter((candidate) => pointValid(s, u, candidate) && free(candidate))
+  return candidates
+    .filter((candidate) => pointValid(s, u, candidate))
     .map((candidate) => ({
       ...candidate,
       score:
@@ -87,6 +74,31 @@ function coveredPost(s, u, p) {
     .sort(
       (a, b) => Number(b.nearby) - Number(a.nearby) || b.score - a.score || a.distance - b.distance,
     );
+}
+function coveredPost(s, u, p, candidateCache = null) {
+  // Static terrain/cover scores are shared only within this one group order.
+  // Occupied posts are rechecked after every assignment, preserving separation.
+  const key = `${u.key}:${p.x}:${p.z}`;
+  let candidates = candidateCache?.get(key);
+  if (!candidates) {
+    candidates = guardCandidates(s, u, p);
+    candidateCache?.set(key, candidates);
+  }
+  const size = GROUND_UNITS[u.key].size,
+    occupied = s.groundUnits
+      .filter((v) => v.id !== u.id && v.side === u.side && v.hp > 0 && !v.carrierId)
+      .flatMap((v) => [
+        { unit: v, point: v.guard || (!v.path?.length ? v : null) },
+        ...(v.defenseTask ? [{ unit: v, point: v.defenseTask.home }] : []),
+      ])
+      .filter((entry) => entry.point);
+  const ranked = candidates.filter((candidate) =>
+    occupied.every(
+      ({ unit, point }) =>
+        distance(candidate, point) >=
+        (size + GROUND_UNITS[unit.key].size) * 0.5 + GUARD_POST_CLEARANCE - 1e-6,
+    ),
+  );
   for (const candidate of ranked.slice(0, GUARD_PATH_ATTEMPTS)) {
     if (distance(u, candidate) <= 3) return { point: candidate, path: [] };
     const path = groundPath(s, u, candidate, GROUND_UNITS[u.key].size * 0.42);
@@ -95,10 +107,16 @@ function coveredPost(s, u, p) {
   return null;
 }
 
-export function assignGuardPost(s, u, p, snapToCover = false, { preserveDefense = false } = {}) {
+export function assignGuardPost(
+  s,
+  u,
+  p,
+  snapToCover = false,
+  { preserveDefense = false, candidateCache = null } = {},
+) {
   if (!pointValid(s, u, p)) return false;
   const placement = snapToCover
-    ? coveredPost(s, u, p)
+    ? coveredPost(s, u, p, candidateCache)
     : {
         point: p,
         path: groundPath(s, u, p, GROUND_UNITS[u.key].size * 0.42),
@@ -106,6 +124,7 @@ export function assignGuardPost(s, u, p, snapToCover = false, { preserveDefense 
   if (!placement || (!placement.path.length && distance(u, placement.point) > 3)) return false;
   if (placement.path.length && distance(placement.path.at(-1), placement.point) > 3) return false;
   const post = { x: placement.point.x, z: placement.point.z };
+  delete u.supplyTrip;
   clearGroundRoute(u);
   cancelTransportDelivery(u);
   if (!preserveDefense) clearAutoDefense(u);
@@ -130,7 +149,8 @@ export function guardGround(s, side, ids, point) {
   );
   if (!units.length) return 'Выберите доступные наземные отряды';
   let assigned = 0;
-  for (const u of units) if (assignGuardPost(s, u, point, true)) assigned++;
+  const candidateCache = new Map();
+  for (const u of units) if (assignGuardPost(s, u, point, true, { candidateCache })) assigned++;
   if (assigned) invalidateFrontline(s);
   return assigned || 'Нет свободного доступного места для поста';
 }
@@ -174,6 +194,7 @@ function threats(s, u) {
 }
 
 export function updateGuard(s, u) {
+  if (u.supplyTrip) return;
   if (!u.guard || !GROUND_UNITS[u.key] || u.carrierId || u.boardingId) return;
   if ((u.guardNextThink || 0) > s.time) return;
   u.guardNextThink = s.time + 0.4;

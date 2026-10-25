@@ -5,11 +5,17 @@ import { PassThrough, Writable } from 'node:stream';
 import { once } from 'node:events';
 import { bridgeSshProxy } from '../../server/ssh-proxy.mjs';
 
-async function fixture(t, handler) {
+async function fixture(t, handler, { allowPeerReset = false } = {}) {
   const sockets = new Set();
   const server = http.createServer();
   server.on('connection', (socket) => {
     sockets.add(socket);
+    if (allowPeerReset)
+      socket.on('error', (error) => {
+        // These rejection/timeout scenarios deliberately destroy the CONNECT
+        // client. Windows may report its abort as a reset on the fixture peer.
+        assert.equal(error.code, 'ECONNRESET', 'unexpected proxy-fixture socket error');
+      });
     socket.once('close', () => sockets.delete(socket));
   });
   server.on('connect', handler);
@@ -55,19 +61,25 @@ test('CONNECT fixes allowed target, forwards Basic auth privately, preserves hea
 
 test('CONNECT rejection and timeout fail with sanitized errors and close sockets', async (t) => {
   for (const mode of ['reject', 'timeout']) {
-    const proxy = await fixture(t, (request, socket) => {
-      if (mode === 'reject')
-        socket.end('HTTP/1.1 407 Authentication Required\r\n\r\nprivate-proxy-detail');
+    await t.test(mode, async (t) => {
+      const proxy = await fixture(
+        t,
+        (request, socket) => {
+          if (mode === 'reject')
+            socket.end('HTTP/1.1 407 Authentication Required\r\n\r\nprivate-proxy-detail');
+        },
+        { allowPeerReset: true },
+      );
+      await assert.rejects(
+        bridgeSshProxy({
+          input: new PassThrough(),
+          output: new PassThrough(),
+          proxyLookup: async () => new URL(proxy),
+          timeoutMs: 30,
+        }),
+        { message: 'SSH proxy connection failed' },
+      );
     });
-    await assert.rejects(
-      bridgeSshProxy({
-        input: new PassThrough(),
-        output: new PassThrough(),
-        proxyLookup: async () => new URL(proxy),
-        timeoutMs: 30,
-      }),
-      { message: 'SSH proxy connection failed' },
-    );
   }
 });
 

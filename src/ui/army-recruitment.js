@@ -93,7 +93,10 @@ export function armyTargetRequest(key, value) {
   if (typeof value !== 'string' && typeof value !== 'number') return null;
   const count = Number(value);
   if (typeof value === 'string' && !value.trim()) return null;
-  return E.recruitmentFacility(key) && Number.isInteger(count) && count >= 0 && count <= 120
+  return E.recruitmentFacility(key) &&
+    Number.isInteger(count) &&
+    count >= 0 &&
+    count <= E.ARMY_TARGET_MAX
     ? { key, count }
     : null;
 }
@@ -104,7 +107,7 @@ function compositionHTML(state, category) {
     .filter((key) => E.recruitmentFacility(key))
     .map((key) => {
       const row = report.types.find((t) => t.key === key);
-      return `<label class="composition-row"><span><b>${E.GROUND_UNITS[key].name}</b><small data-composition-status="${key}"></small></span><span data-composition-count="${key}"></span><input type="number" inputmode="numeric" min="0" max="120" step="1" value="${row?.target || 0}" data-army-target="${key}" aria-label="Цель обороны: ${E.GROUND_UNITS[key].name}"></label>`;
+      return `<label class="composition-row"><span><b>${E.GROUND_UNITS[key].name}</b><small data-composition-status="${key}"></small></span><span data-composition-count="${key}"></span><input type="number" inputmode="numeric" min="0" max="${E.ARMY_TARGET_MAX}" title="Цель пополнения; 0 — выключить. Общего лимита армии нет." step="1" value="${row?.target || 0}" data-army-target="${key}" aria-label="Цель обороны: ${E.GROUND_UNITS[key].name}"></label>`;
     })
     .join(
       '',
@@ -113,7 +116,7 @@ function compositionHTML(state, category) {
 
 function updateComposition(state) {
   const report = E.armyCompositionStatus(state, 0);
-  $('#composition-total').textContent = `${report.totals.desired} / ${report.totals.limit}`;
+  $('#composition-total').textContent = `Цель: ${report.totals.desired}`;
   for (const row of report.types) {
     const input = $(`[data-army-target="${row.key}"]`);
     if (!input) continue;
@@ -125,7 +128,6 @@ function updateComposition(state) {
         disabled: 'Цель не задана',
         met: 'Состав укомплектован',
         queued: 'Пополнение в очереди',
-        limit: 'Достигнут лимит армии',
         facility: `Нужна база: ${E.BUILDINGS[E.recruitmentFacility(row.key)].name}`,
         credits: 'Ожидание денег',
         materials: 'Ожидание сплавов',
@@ -149,7 +151,7 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
   const rearToggle = $('#rear-auto');
   if (rearToggle && document.activeElement !== rearToggle)
     rearToggle.checked = faction.rearAuto !== false;
-  $('#army-capacity').textContent = `${units.length + queue} / ${E.GROUND_LIMIT}`;
+  $('#army-capacity').textContent = `${units.length} в строю · ${queue} в очереди`;
   $('#army-queue-count').textContent = queue ? `${queue} в очереди` : 'свободно';
   $('#recruit-destination-note').textContent =
     recruitMode === 'attack'
@@ -193,7 +195,6 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
       faction.materials < quote.metal ||
       (faction.oil || 0) < quote.oil;
     const full =
-      units.length + queue + recruitCount > E.GROUND_LIMIT ||
       ready
         .filter((b) => b.key === E.recruitmentFacility(key))
         .reduce((n, b) => n + 8 - (b.armyQueue?.length || 0), 0) < recruitCount;
@@ -201,7 +202,7 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
     button.hidden = !facilityReady;
     button.disabled =
       recruitMode === 'defend'
-        ? E.armyCompositionStatus(state, 0).totals.desired + recruitCount > E.GROUND_LIMIT
+        ? (E.armyCompositionStatus(state, 0).targets[key] || 0) + recruitCount > E.ARMY_TARGET_MAX
         : !facilityReady || resources || full;
     button.classList.toggle('recruit-ready', !button.disabled);
     button.setAttribute('aria-label', `${d.name}. ${d.role}`);

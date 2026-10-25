@@ -134,7 +134,8 @@ export function updateMinimap(canvas) {
     ctx.stroke();
   }
   for (const d of E.SETTLEMENTS) {
-    const value = E.settlementStatus(this.state, d.id);
+    // Map markers need ownership flags, not eight repeated economy reports.
+    const value = this.state.settlements?.find((site) => site.id === d.id);
     if (!value) continue;
     ctx.fillStyle = factionHex(value.owner);
     ctx.strokeStyle = value.contested || value.blocked ? '#f0bd80' : '#d9dfcc';
@@ -148,6 +149,12 @@ export function updateMinimap(canvas) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+  }
+  for (const crate of this.state.ammoCrates || []) {
+    if (crate.hp <= 0) continue;
+    ctx.strokeStyle = factionHex(crate.side);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px(crate.x) - 2, pz(crate.z) - 2, 4, 4);
   }
   for (const u of this.state.units)
     if (E.unitVisible(this.state, 0, u, sensors)) {

@@ -6,7 +6,8 @@ import { armyTargetRequest, recruitmentHTML } from '../../src/ui/army-recruitmen
 test('composition input accepts explicit integer goals including zero and refuses invalid roles/counts', () => {
   assert.deepEqual(armyTargetRequest('infantry', '50'), { key: 'infantry', count: 50 });
   assert.deepEqual(armyTargetRequest('leopard', '0'), { key: 'leopard', count: 0 });
-  for (const value of ['', -1, 121, 1.5, 'not a count'])
+  assert.deepEqual(armyTargetRequest('infantry', '500'), { key: 'infantry', count: 500 });
+  for (const value of ['', -1, E.ARMY_TARGET_MAX + 1, 1.5, 'not a count'])
     assert.equal(armyTargetRequest('infantry', value), null);
   assert.equal(armyTargetRequest('unknown', 5), null);
 });
@@ -17,6 +18,7 @@ test('composition editor reflects per-type persistent goals without an enable to
   assert.equal(E.setArmyTarget(state, 0, 'leopard', 5), true);
   assert.equal(E.setArmyTarget(state, 0, 'heavytank', 2), true);
   const infantry = recruitmentHTML({ state, armyCategory: 'infantry' });
+  assert.match(infantry, new RegExp(`min="0" max="${E.ARMY_TARGET_MAX}"`));
   const vehicles = recruitmentHTML({ state, armyCategory: 'vehicles' });
   assert.match(infantry, /value="50" data-army-target="infantry"/);
   assert.match(vehicles, /value="5" data-army-target="leopard"/);

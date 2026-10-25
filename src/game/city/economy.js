@@ -4,8 +4,13 @@ import { BUILDINGS, GROUND_UNITS } from '../config.js';
 import { districtIncome } from '../territory/districts.js';
 import { difficultyOf } from '../ai/difficulty.config.js';
 import { aiSides } from '../factions.js';
-import { settlementIncome } from '../territory/settlements.js';
+import { settlementIncome, settlementOperational } from '../territory/settlements.js';
 export function supplyFactor(s, b) {
+  if (b.settlementId)
+    return settlementOperational(s, b.settlementId, b.side) &&
+      buildingConnected(s, b, BUILDINGS[b.key].size)
+      ? 1
+      : 0;
   return ROAD_REQUIRED.has(b.key) && !buildingConnected(s, b, BUILDINGS[b.key].size) ? 0.2 : 1;
 }
 
@@ -66,12 +71,10 @@ export function economy(s, owner) {
   income *= outputBonus;
   materials *= outputBonus;
   science *= outputBonus;
-  const settlements = settlementIncome(s, owner);
+  const settlements = settlementIncome(s, owner, { productivity, outputBonus });
   income += districts.income;
   materials += districts.materials;
   science += districts.science;
-  income += settlements.income;
-  materials += settlements.materials;
   const bonus = aiSides(s).includes(owner) ? difficultyOf(s).bonus : 1;
   return {
     gross: income * bonus,
@@ -105,7 +108,7 @@ export function economy(s, owner) {
       materials: districts.materials * bonus,
       science: districts.science * bonus,
     },
-    population: alive.filter((b) => b.key === 'housing').length * 120,
+    population: alive.filter((b) => b.key === 'housing' && supplyFactor(s, b) > 0).length * 120,
   };
 }
 

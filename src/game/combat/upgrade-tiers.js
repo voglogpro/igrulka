@@ -6,9 +6,12 @@ export const UPGRADE_TIERS = {
   production: [1, 1.25, 1.5],
   fleet: [2, 3, 4],
 };
+const modifiersByLevel = [0, 1, 2].map((level) =>
+  Object.freeze(
+    Object.fromEntries(Object.entries(UPGRADE_TIERS).map(([key, values]) => [key, values[level]])),
+  ),
+);
 export function equipmentModifiers(entity) {
   const level = Number.isInteger(entity?.level) ? Math.max(0, Math.min(2, entity.level)) : 0;
-  return Object.fromEntries(
-    Object.entries(UPGRADE_TIERS).map(([key, values]) => [key, values[level]]),
-  );
+  return modifiersByLevel[level];
 }

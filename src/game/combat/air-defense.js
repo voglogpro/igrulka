@@ -66,12 +66,23 @@ export function defenseCycle(s, b, dt) {
 const timeToImpact = (u) => (u.total - u.travelled) / (u.speed || WEAPONS[u.key]?.speed || 40);
 
 export function fireDefenses(s, rates, dt) {
-  const sensors = sideIds(s).map((side) => sensorSources(s, side));
+  const owners = sideIds(s),
+    sensors = owners.map((side) => sensorSources(s, side)),
+    defenders = [...s.buildings, ...(s.groundUnits || [])],
+    threats = owners.map((side) =>
+      s.units.filter(
+        (u) =>
+          hostile(s, u.side, side) &&
+          u.hp > 0 &&
+          u.launched &&
+          unitVisible(s, side, u, sensors[side]),
+      ),
+    );
   // Shared fire control: each battery sees how many others already track a target and spreads out.
   const tracked = new Map();
-  for (const b of [...s.buildings, ...(s.groundUnits || [])])
+  for (const b of defenders)
     if (b.trackId != null && b.hp > 0) tracked.set(b.trackId, (tracked.get(b.trackId) || 0) + 1);
-  for (const b of [...s.buildings, ...(s.groundUnits || [])]) {
+  for (const b of defenders) {
     const base = BUILDINGS[b.key] || GROUND_UNITS[b.key];
     if (!base?.range || b.hp <= 0 || b.progress < 1) continue;
     const d = defenseCycle(s, b, dt);
@@ -89,30 +100,33 @@ export function fireDefenses(s, rates, dt) {
         (r) => r.kind === 'radar' && Math.hypot(r.x - b.x, r.z - b.z) < 320,
       ),
       range = d.range * (radar ? 1.2 : 1),
-      abm = missile,
-      targets = s.units.filter(
-        (u) =>
-          hostile(s, u.side, b.side) &&
-          u.hp > 0 &&
-          u.launched &&
-          unitVisible(s, b.side, u, sensors[b.side]) &&
-          Math.hypot(u.x - b.x, u.z - b.z) < range &&
-          canEngageAir(b.key, u.key, abm),
-      );
-    const score = (u) => {
-      const others = (tracked.get(u.id) || 0) - (b.trackId === u.id ? 1 : 0);
-      const toughness = missile ? 0 : Math.min(3, u.hp / Math.max(1, d.damage * 6));
-      return (
-        timeToImpact(u) +
-        others * 3.5 * (u.hp / (u.maxHp || u.hp || 1)) +
-        toughness +
-        (Math.hypot(u.x - b.x, u.z - b.z) / range) * 2 -
-        (b.trackId === u.id ? 1.5 : 0)
-      );
-    };
-    const scored = targets.map((u) => ({ u, score: score(u) }));
-    scored.sort((a, c) => a.score - c.score || a.u.id - c.u.id);
-    const u = scored[0]?.u;
+      abm = missile;
+    let u = null,
+      bestScore = Infinity;
+    for (const candidate of threats[b.side]) {
+      // Most aircraft are far from this city. Avoid allocating/sorting a target
+      // array for every rifleman and reuse the exact original distance score.
+      if (
+        Math.abs(candidate.x - b.x) >= range ||
+        Math.abs(candidate.z - b.z) >= range ||
+        !canEngageAir(b.key, candidate.key, abm)
+      )
+        continue;
+      const distance = Math.hypot(candidate.x - b.x, candidate.z - b.z);
+      if (distance >= range) continue;
+      const others = (tracked.get(candidate.id) || 0) - (b.trackId === candidate.id ? 1 : 0),
+        toughness = missile ? 0 : Math.min(3, candidate.hp / Math.max(1, d.damage * 6)),
+        score =
+          timeToImpact(candidate) +
+          others * 3.5 * (candidate.hp / (candidate.maxHp || candidate.hp || 1)) +
+          toughness +
+          (distance / range) * 2 -
+          (b.trackId === candidate.id ? 1.5 : 0);
+      if (!u || score < bestScore || (!(score - bestScore) && candidate.id < u.id)) {
+        u = candidate;
+        bestScore = score;
+      }
+    }
     if (!u) {
       if (b.trackId != null) tracked.set(b.trackId, (tracked.get(b.trackId) || 1) - 1);
       b.tracking = 0;

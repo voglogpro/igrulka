@@ -226,6 +226,32 @@ test('a peaceful city does not build a ground target index, while a legacy stati
   assert.equal(groundEngagementMetrics(s).indexBuilds, 1);
 });
 
+test('a target search does not rescan hundreds of nearby friendly or allied soldiers', () => {
+  const s = E.createGame(811, { mode: 'coop' }),
+    shooter = E.makeGround(s, 0, 'infantry', -1100, -1050);
+  s.groundUnits.push(shooter);
+  let friendlyCoordinateReads = 0;
+  for (let i = 0; i < 500; i++) {
+    const x = -1100 + (i % 10),
+      u = E.makeGround(s, i % 2 ? 2 : 0, 'infantry', x, -1050);
+    Object.defineProperty(u, 'x', {
+      get() {
+        friendlyCoordinateReads++;
+        return x;
+      },
+    });
+    s.groundUnits.push(u);
+  }
+  prepareGroundEngagement(s);
+  friendlyCoordinateReads = 0;
+  assert.equal(groundEngagement(s, shooter).target, null);
+  assert.equal(
+    friendlyCoordinateReads,
+    0,
+    'the friendly army is indexed once, not scanned per shooter',
+  );
+});
+
 test('direct-fire rounds rise slightly and drop onto the target instead of flying flat', () => {
   const s = fresh(),
     u = unit(s, 0, 'machinegunner', -850),

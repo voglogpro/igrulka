@@ -5,7 +5,7 @@ import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
 import { initializeAmmunition, reloadFromReserve } from './ammunition.js';
 import { fuelFactor } from '../../city/oil.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry, defenseStats, groundHeight } from '../../config.js';
-import { groundPath, walkable, GROUND_LIMIT } from './navigation.js';
+import { groundPath, walkable } from './navigation.js';
 import { lineOfSight, recordFire } from '../infantry/cover.js';
 import { updateInfantrySupport } from '../infantry/support.js';
 import { updateAutomaticFPV } from '../infantry/fpv.js';
@@ -297,10 +297,7 @@ export function updateGround(s, rates, dt, hooks) {
           rates[b.side].productivity *
           (buildingConnected(s, b, BUILDINGS[b.key].size) ? 1 : 0.2)) /
         d.time;
-      if (
-        q.progress >= 1 &&
-        s.groundUnits.filter((u) => u.side === b.side && u.hp > 0).length < GROUND_LIMIT
-      ) {
+      if (q.progress >= 1) {
         const p = freeSpot(s, b, d.size * 0.5);
         if (p) {
           b.armyQueue.shift();

@@ -13,6 +13,7 @@ import { event } from '../shared/events.js';
 import { purchaseQuote, recordBuildingPurchase } from './pricing.js';
 import { initializeAmmunition } from '../units/ground/ammunition.js';
 import { activeSettlementFootprints } from '../territory/settlements.config.js';
+import { SETTLEMENTS } from '../territory/settlements.config.js';
 // The oil field under a point, if a well placed there would tap it.
 export const oilFieldAt = (x, z) =>
   OIL_FIELDS.find((f) => Math.hypot(x - f.x, z - f.z) <= f.r * 0.7) || null;
@@ -117,6 +118,14 @@ export function build(s, owner, key, x, z, rotation = null) {
     cooldown: 0,
     queue: [],
   };
+  const town = SETTLEMENTS.find(
+    (site) =>
+      Math.hypot(site.x - x, site.z - z) <= 130 &&
+      s.settlements?.some(
+        (value) => value.id === site.id && value.owner === owner && value.materialized,
+      ),
+  );
+  if (town) b.settlementId = town.id;
   initializeAmmunition(b);
   s.buildings.push(b);
   if (p.near) {

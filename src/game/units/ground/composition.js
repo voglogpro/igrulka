@@ -3,11 +3,12 @@ import { BUILDINGS, GROUND_UNITS } from '../../config.js';
 import { buildingConnected } from '../../city/road-network.js';
 import { oilCost, oilEnabled } from '../../city/oil.js';
 import { recruit, recruitmentFacility } from './recruitment.js';
-import { GROUND_LIMIT } from './navigation.js';
+import { ARMY_TARGET_MAX } from './limits.js';
 
 export const ARMY_COMPOSITION = {
   interval: 4,
-  limit: GROUND_LIMIT,
+  limit: null,
+  targetMax: ARMY_TARGET_MAX,
   reserves: { credits: 250, materials: 5, oil: 5 },
 };
 const keys = Object.keys(GROUND_UNITS).filter((key) => !GROUND_UNITS[key].civil);
@@ -18,14 +19,9 @@ export function setArmyTarget(s, side, key, count) {
   if (!validSide(s, side) || !s.sides[side]) return 'Неизвестная сторона';
   if (s.result) return 'Кампания завершена';
   if (!recruitmentFacility(key)) return 'Неизвестный тип войск';
-  if (!Number.isSafeInteger(count) || count < 0 || count > GROUND_LIMIT)
-    return 'Численность типа: от 0 до 120';
+  if (!Number.isSafeInteger(count) || count < 0 || count > ARMY_TARGET_MAX)
+    return `Численность типа: от 0 до ${ARMY_TARGET_MAX}`;
   const plan = s.sides[side].armyComposition || createArmyComposition();
-  const total = Object.entries(plan.targets).reduce(
-    (n, [type, target]) => n + (type === key ? 0 : target),
-    count,
-  );
-  if (total > GROUND_LIMIT) return 'Общий состав: не более 120 единиц';
   s.sides[side].armyComposition = plan;
   if (count === 0) delete plan.targets[key];
   else plan.targets[key] = count;
@@ -57,7 +53,6 @@ const reasons = {
   met: 'Состав укомплектован',
   queued: 'Производство занято',
   finished: 'Кампания завершена',
-  limit: 'Достигнут предел армии',
   facility: 'Нужна готовая база со связанной дорогой',
   credits: 'Не хватает денег',
   materials: 'Не хватает сплавов',
@@ -97,7 +92,6 @@ export function armyCompositionStatus(s, side) {
     if (!target) status = 'disabled';
     else if (s.result) status = 'finished';
     else if (!remaining) status = 'met';
-    else if (c.liveTotal + c.queueTotal >= GROUND_LIMIT) status = 'limit';
     else if (!matching.length) status = 'facility';
     else if (!site) status = 'queued';
     else if (f.credits < d.cost) status = 'credits';
@@ -129,7 +123,8 @@ export function armyCompositionStatus(s, side) {
       desired: Object.values(plan.targets).reduce((a, b) => a + b, 0),
       alive: c.liveTotal,
       queued: c.queueTotal,
-      limit: GROUND_LIMIT,
+      limit: null,
+      targetMax: ARMY_TARGET_MAX,
     },
   };
 }
@@ -161,7 +156,6 @@ export function restoreArmyComposition(s, sourceVersion = s.version) {
     const f = s.sides[side];
     if (sourceVersion < 15) {
       f.armyComposition = createArmyComposition();
-      let available = GROUND_LIMIT;
       for (const key of keys) {
         const targets = s.buildings
           .filter(
@@ -172,10 +166,9 @@ export function restoreArmyComposition(s, sourceVersion = s.version) {
               Number.isSafeInteger(b.recruitRepeat.target),
           )
           .map((b) => b.recruitRepeat.target);
-        const target = Math.min(available, Math.max(0, ...targets));
+        const target = Math.min(ARMY_TARGET_MAX, Math.max(0, ...targets));
         if (target > 0) {
           f.armyComposition.targets[key] = target;
-          available -= target;
         }
       }
     }
@@ -188,9 +181,8 @@ export function restoreArmyComposition(s, sourceVersion = s.version) {
           !recruitmentFacility(key) ||
           !Number.isSafeInteger(value) ||
           value < 1 ||
-          value > GROUND_LIMIT,
+          value > ARMY_TARGET_MAX,
       ) ||
-      Object.values(p.targets).reduce((a, b) => a + b, 0) > GROUND_LIMIT ||
       !Number.isFinite(p.nextAt) ||
       p.nextAt < 0 ||
       p.nextAt > s.time + ARMY_COMPOSITION.interval ||

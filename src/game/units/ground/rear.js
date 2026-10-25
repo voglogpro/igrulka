@@ -6,6 +6,7 @@ import { groundPath } from './navigation.js';
 import { loadSupplyTruck, supplyNearbyAmmo } from '../../city/ammo-logistics.js';
 import { createAmmoStock, ammunitionProfile, ammunitionStatus } from './ammunition.js';
 import { clearGroundRoute } from './route-queue.js';
+import { GROUND_COMMAND_LIMIT } from './limits.js';
 
 // Everything in this file happens without orders: soldiers who would die are sometimes only
 // wounded, medics find and revive them, supply trucks mend machines and refill magazines, and each
@@ -301,7 +302,7 @@ export function setSupportAutomatic(s, side, ids, enabled = true) {
     typeof enabled !== 'boolean' ||
     !Array.isArray(ids) ||
     !ids.length ||
-    ids.length > 120 ||
+    ids.length > GROUND_COMMAND_LIMIT ||
     ids.some((id) => !Number.isSafeInteger(id) || id < 1) ||
     new Set(ids).size !== ids.length
   )

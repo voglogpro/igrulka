@@ -277,10 +277,10 @@ export function sync() {
   this.districtView?.sync(this.state);
   this.syncTrenches();
   this.tactical?.previewGround(this.state.groundUnits?.find((u) => u.id === this.selected));
-  if (this.groundTargeting !== 'defendline')
-    this.tactical?.showGuardPosts(
-      this.state.groundUnits.filter((u) => this.armySelection.includes(u.id)),
-    );
+  if (this.groundTargeting !== 'defendline') {
+    const selected = new Set(this.armySelection);
+    this.tactical?.showGuardPosts(this.state.groundUnits.filter((u) => selected.has(u.id)));
+  }
   this.combatFX.updateTracers(this.state.projectiles);
   let shooters = null;
   const shooter = (id) => {

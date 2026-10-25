@@ -22,18 +22,20 @@ import { restoreAmmunition } from './ammunition.js';
 import { sideIds, validSide } from '../factions.js';
 import { restoreSettlements } from '../territory/settlements.js';
 import { restoreAI } from './ai.js';
+import { restoreFieldSupply } from './field-supply.js';
+export const SAVE_GROUND_MAX = 20000;
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
-  const copy = structuredClone(s);
-  copy.events = [];
-  return JSON.stringify(copy);
+  // JSON serialization already copies the persisted data. Cloning the entire
+  // army first doubles the work and allocation during synchronous autosaves.
+  return JSON.stringify({ ...s, events: [] });
 }
 
 export function load(raw) {
   const s = JSON.parse(raw);
   const sourceVersion = s.version;
   if (
-    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, VERSION].includes(s.version) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
@@ -202,7 +204,8 @@ export function load(raw) {
     )
       throw Error('Повреждены снаряды');
   s.groundUnits ||= [];
-  if (!Array.isArray(s.groundUnits) || s.groundUnits.length > 600) throw Error('Повреждена армия');
+  if (!Array.isArray(s.groundUnits) || s.groundUnits.length > SAVE_GROUND_MAX)
+    throw Error('Повреждена армия');
   for (const u of s.groundUnits)
     if (
       !configured(GROUND_UNITS, u.key) ||
@@ -373,7 +376,9 @@ export function load(raw) {
         typeof g !== 'object' ||
         Object.values(g).some(
           (ids) =>
-            !Array.isArray(ids) || ids.length > 600 || ids.some((id) => !Number.isFinite(id)),
+            !Array.isArray(ids) ||
+            ids.length > SAVE_GROUND_MAX ||
+            ids.some((id) => !Number.isFinite(id)),
         ),
     )
   )
@@ -447,6 +452,7 @@ export function load(raw) {
   restoreGroundScars(s, sourceVersion);
   restoreLaunchSupply(s, sourceVersion);
   restoreAmmunition(s, sourceVersion);
+  restoreFieldSupply(s, sourceVersion);
   delete s.ai.nextResearch;
   s.version = VERSION;
   s.events = [];

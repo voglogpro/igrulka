@@ -45,7 +45,7 @@ test('network army targets bind to the commanding owner and malformed commands a
   for (const side of [0, 1]) {
     for (const args of [
       { key: 'infantry', count: -1 },
-      { key: 'infantry', count: 121 },
+      { key: 'infantry', count: E.ARMY_TARGET_MAX + 1 },
       { key: 'infantry', count: 1.5 },
       { key: 'infantry', count: '6' },
       { key: 'infantry', count: NaN },
@@ -100,12 +100,12 @@ test('existing targets survive real casualty replacement; setting zero keeps the
   assert.equal(row(s).status, 'disabled');
 });
 
-test('the side limit includes wounded, passengers and civilian ground vehicles just like ordinary recruitment', () => {
+test('wounded, passengers and civilian ground vehicles do not impose a population stop', () => {
   const {
     s,
     barracks: [b],
   } = fresh();
-  for (let i = 0; i < E.GROUND_LIMIT; i++) {
+  for (let i = 0; i < 500; i++) {
     const u = E.makeGround(s, 0, i === 0 ? 'tradetruck' : 'engineer', -1000, 200 + i);
     if (i === 1) u.downed = { t: 0, revive: 0 };
     if (i === 2) u.carrierId = 999;
@@ -113,10 +113,10 @@ test('the side limit includes wounded, passengers and civilian ground vehicles j
   }
   E.setArmyTarget(s, 0, 'infantry', 1);
   const funds = s.sides[0].credits;
-  assert.equal(row(s).status, 'limit');
+  assert.equal(row(s).status, 'active');
   updateArmyComposition(s);
-  assert.equal(b.armyQueue.length, 0);
-  assert.equal(s.sides[0].credits, funds);
+  assert.equal(b.armyQueue.length, 1);
+  assert.equal(s.sides[0].credits, funds - E.GROUND_UNITS.infantry.cost);
 });
 
 test('legacy explicitly chosen garrisons migrate by maximum per type while infinite repeats stay off', () => {
@@ -144,8 +144,8 @@ test('new composition imports preserve paid defense metadata and reject forged t
   assert.deepEqual(restored.sides[0].armyComposition, s.sides[0].armyComposition);
   assert.deepEqual(restored.buildings.find((v) => v.id === b.id).armyQueue, b.armyQueue);
   for (const mutate of [
-    (p) => (p.targets.infantry = 121),
-    (p) => (p.targets.leopard = 120),
+    (p) => (p.targets.infantry = E.ARMY_TARGET_MAX + 1),
+    (p) => (p.targets.leopard = -1),
     (p) => (p.nextAt = s.time + 20),
     (p) => (p.cursor = -1),
   ]) {

@@ -1,20 +1,6 @@
-import {
-  GUNS,
-  gunshot,
-  explosion,
-  whoosh,
-  whistle,
-  clicks,
-  dieselLoop,
-  jetLoop,
-  impulseResponse,
-  sirenLoop,
-  mopedLoop,
-  rainLoop,
-} from './synth.js';
-import { recordedEngineLoop, uavEngineMix } from './engines.js';
-import { rocketIgnition, missileDive } from './missiles.js';
-import { FootstepScheduler, recordedGroundSample } from './footsteps.js';
+import { uavEngineMix } from './engines.js';
+import { FootstepScheduler } from './footsteps.js';
+import { audioBufferBank, warmAudioPCM, audioBankDiagnostics } from './sample-bank.js';
 
 // How loud each weapon is and how often the same class may start a new sound.
 const WEAPON_SOUND = {
@@ -90,6 +76,7 @@ export class GameAudio {
     this.whistled = new Set();
     this.listener = null;
     this.footsteps = new FootstepScheduler();
+    if (typeof window !== 'undefined') warmAudioPCM();
   }
   // An OfflineAudioContext may be passed to render the mix to a file for listening tests.
   unlock(context = null) {
@@ -126,11 +113,6 @@ export class GameAudio {
       this.dry.connect(this.master);
       // Shared outdoor reverb and a slap-back echo from the valley sides.
       this.reverb = c.createConvolver();
-      const ir = impulseResponse(c.sampleRate),
-        irBuffer = c.createBuffer(2, ir[0].length, c.sampleRate);
-      irBuffer.copyToChannel(ir[0], 0);
-      irBuffer.copyToChannel(ir[1], 1);
-      this.reverb.buffer = irBuffer;
       this.reverbIn = c.createGain();
       this.reverbIn.gain.value = 0.9;
       this.reverbIn.connect(this.reverb);
@@ -150,55 +132,19 @@ export class GameAudio {
       tone.connect(this.master);
       tone.connect(this.reverbIn);
       this.buffers = this.renderBuffers();
-      this.createEngines();
     }
     if (!context) this.context.resume().catch(() => {});
   }
-  buffer(data) {
-    const b = this.context.createBuffer(1, data.length, this.context.sampleRate);
-    b.copyToChannel(data, 0);
-    return b;
-  }
-  // Engine loops are needed at once; weapon sounds are rendered one per task so starting
-  // the game never stalls a frame. A sound that is not ready yet is simply skipped.
   renderBuffers() {
-    const rate = this.context.sampleRate,
-      out = {
-        diesel: this.buffer(dieselLoop(rate)),
-        truck: this.buffer(recordedGroundSample(rate, 'truck')),
-        rotor: this.buffer(recordedEngineLoop(rate, 'rotor')),
-        jet: this.buffer(jetLoop(rate)),
-        moped: this.buffer(recordedEngineLoop(rate, 'prop', mopedLoop(rate))),
-        siren: this.buffer(sirenLoop(rate)),
-        rain: this.buffer(rainLoop(rate)),
-      },
-      jobs = [];
-    const add = (name, make) => jobs.push(() => (out[name] ||= []).push(this.buffer(make())));
-    for (let i = 0; i < 3; i++) add('footstep', () => recordedGroundSample(rate, 'footstep', i));
-    for (const key of ['rifle', 'mg', 'hmg', 'shilka', 'autocannon', 'blast', 'tank'])
-      if (GUNS[key]) add(key, () => gunshot(rate, GUNS[key]));
-    add('blast', () => explosion(rate, 1.2));
-    add('blastSmall', () => explosion(rate, 0.75));
-    add('whoosh', () => whoosh(rate, 1.4));
-    for (const key of Object.keys(GUNS)) add(key, () => gunshot(rate, GUNS[key]));
-    for (const key of ['rifle', 'mg', 'hmg', 'shilka']) add(key, () => gunshot(rate, GUNS[key]));
-    add('blastLarge', () => explosion(rate, 2.2));
-    add('blastSmall', () => explosion(rate, 0.85));
-    add('blast', () => explosion(rate, 1.35));
-    add('atgm', () => whoosh(rate, 0.9));
-    add('whistle', () => whistle(rate, 1.3));
-    add('reload', () => clicks(rate));
-    add('rocketLaunch', () => rocketIgnition(rate));
-    add('ballisticLaunch', () => rocketIgnition(rate, true));
-    add('missileDive', () => missileDive(rate));
-    const next = () => {
-      const job = jobs.shift();
-      if (!job) return;
-      job();
-      setTimeout(next, 0);
-    };
-    setTimeout(next, 0);
-    return out;
+    const context = this.context,
+      bank = audioBufferBank(context);
+    const enginesReady = bank.loopsReady.then(() => {
+      if (context.state === 'closed') return;
+      this.reverb.buffer = bank.buffers.impulse;
+      this.createEngines();
+    });
+    this.ready = Promise.all([bank.ready, enginesReady]);
+    return bank.buffers;
   }
   set(enabled, volume = this.volume) {
     this.enabled = enabled;
@@ -607,6 +553,7 @@ export class GameAudio {
       enginePool: this.engines.length,
       activeEngines: this.activeEngines,
       siren: !!this.siren?.on,
+      bank: audioBankDiagnostics(),
       rain: this.rain?.level.gain.value ?? 0,
     };
   }

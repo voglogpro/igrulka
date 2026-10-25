@@ -2,6 +2,7 @@ import { renderArmyControls, setArmyContextVisible } from './army-controls.js';
 import { renderDefenseDetail } from './defense-inspector.js';
 import { updateEquipmentDetails } from './equipment-detail.js';
 import { settlementInspectorHTML } from './settlements.js';
+import { ammoCrateInspectorHTML, ammoCrateDetailHTML } from './ammo-crate.js';
 import * as E from '../game/index.js';
 import { $, rate } from './format.js';
 import {
@@ -10,6 +11,7 @@ import {
   compactEquipmentAction,
   compactInspectorStatus,
 } from './inspector-card.js';
+const crateMarkup = new WeakMap();
 export function renderInspector(context) {
   const { state, selected, armySelection } = context;
   rememberInspectorCard($('#inspector'));
@@ -28,6 +30,18 @@ export function renderInspector(context) {
     host.hidden = true;
     host.innerHTML = '';
     delete host.dataset.id;
+    setArmyContextVisible(false);
+    return;
+  }
+  if (b.key === 'ammo-crate') {
+    host.hidden = false;
+    const html = ammoCrateDetailHTML(state, b),
+      id = `crate:${b.id}`;
+    if (host.dataset.id !== id) host.innerHTML = ammoCrateInspectorHTML(state, b, html);
+    else if (crateMarkup.get(host) !== html)
+      host.querySelector('[data-crate-detail]').innerHTML = html;
+    crateMarkup.set(host, html);
+    host.dataset.id = id;
     setArmyContextVisible(false);
     return;
   }

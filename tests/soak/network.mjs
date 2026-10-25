@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { gzipSync, deflateRawSync } from 'node:zlib';
 import * as E from '../../src/game/index.js';
-import { GROUND_LIMIT } from '../../src/game/units/ground/navigation.js';
+import { NETWORK_GROUND_PER_CITY as GROUND_LIMIT } from '../support/network-load.mjs';
 import {
   playerView,
   compactPlayerView,

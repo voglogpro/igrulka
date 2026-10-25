@@ -6,6 +6,7 @@ import {
   initializeAmmunition,
 } from '../units/ground/ammunition.js';
 import { launchStoreCapacity } from '../units/aviation/launch-supply.js';
+import { FIELD_SUPPLY } from '../city/field-ammo.js';
 
 const record = (v) => v != null && typeof v === 'object' && !Array.isArray(v);
 const whole = (v, max) => Number.isSafeInteger(v) && v >= 0 && v <= max;
@@ -128,6 +129,7 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
       ...(s.serviceVehicles || []),
       ...(s.ships || []),
       ...(s.trenches || []),
+      ...(sourceVersion >= 19 && Array.isArray(s.ammoCrates) ? s.ammoCrates : []),
     ].map((v) => v.id),
   );
   const slots = new Set();
@@ -182,11 +184,18 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
       !Number.isSafeInteger(v.revision) ||
       v.revision < 0 ||
       v.revision > s.networkRevision ||
-      (v.targetId == null
-        ? v.targetKind != null
-        : !Number.isSafeInteger(v.targetId) ||
-          v.targetId < 1 ||
-          !['ground', 'building'].includes(v.targetKind)) ||
+      (v.fieldPoint != null && (!point(v.fieldPoint) || v.targetKind !== 'field')) ||
+      (v.targetKind === 'field'
+        ? v.targetId != null ||
+          !point(v.fieldPoint) ||
+          v.cargo?.kind !== 'ammo' ||
+          v.pickup != null ||
+          !['outbound', 'unloading', 'blocked'].includes(v.status)
+        : v.targetId == null
+          ? v.targetKind != null
+          : !Number.isSafeInteger(v.targetId) ||
+            v.targetId < 1 ||
+            !['ground', 'building'].includes(v.targetKind)) ||
       (v.cargo != null &&
         (!record(v.cargo) ||
           !['ammo', 'weapon'].includes(v.cargo.kind) ||
@@ -195,7 +204,7 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
           (v.cargo.kind === 'ammo'
             ? depot.key !== 'ammofactory' ||
               !Object.hasOwn(C.cargo, v.cargo.key) ||
-              v.cargo.amount > C.cargo[v.cargo.key]
+              v.cargo.amount > FIELD_SUPPLY.load[v.cargo.key]
             : depot.key !== 'factory' ||
               !['drone', 'heavy', 'cruise', 'ballistic'].includes(v.cargo.key) ||
               v.cargo.amount > 1))) ||

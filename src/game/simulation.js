@@ -21,6 +21,7 @@ import { updatePorts } from './city/ports.js';
 import { updateDefense } from './defense/coordinator.js';
 import { sideIds, aiSides, teamOf } from './factions.js';
 import { updateSettlements } from './territory/settlements.js';
+import { updateFieldSupply } from './units/ground/field-supply.js';
 export function step(s, dt) {
   if (s.result || !Number.isFinite(dt) || dt <= 0) return;
   dt = Math.min(0.1, dt);
@@ -42,6 +43,7 @@ export function step(s, dt) {
   updateOil(s, rates, dt);
   updateTraining(s, dt);
   updatePorts(s, dt);
+  updateFieldSupply(s);
   updateDefense(s);
   updateArmyComposition(s);
   updateGround(s, rates, dt, { event, random });

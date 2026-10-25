@@ -35,7 +35,7 @@ def sources(revision=None):
             target.write_bytes(subprocess.check_output(['git', 'show', f'{sha}:{name}'], cwd=ROOT))
         entry = cache / 'src/audio/game-audio.js'
     # Bundle the actual module graph: adding a focused audio module must not break QA.
-    script = "import{build}from'esbuild';const r=await build({entryPoints:[process.argv[1]],bundle:true,write:false,format:'esm',platform:'browser'});process.stdout.write(r.outputFiles[0].text);"
+    script = "import{build}from'esbuild';import{existsSync}from'node:fs';import path from'node:path';const worker=path.join(path.dirname(process.argv[1]),'pcm-worker.js');const define={};if(existsSync(worker)){const w=await build({entryPoints:[worker],bundle:true,write:false,format:'iife',platform:'browser'});define.__SKYFRONT_AUDIO_WORKER_SOURCE__=JSON.stringify(w.outputFiles[0].text)}const r=await build({entryPoints:[process.argv[1]],bundle:true,write:false,format:'esm',platform:'browser',define});process.stdout.write(r.outputFiles[0].text);"
     code = subprocess.check_output(['node', '--input-type=module', '-e', script, str(entry)], cwd=ROOT).decode('utf8')
     return module_url(code)
 
@@ -46,11 +46,12 @@ RENDER = r'''async ({url, wav}) => {
   const {GameAudio} = await import(url), out = {};
   const rate = 44100;
   const camera = {position:{x:0,y:100,z:0},matrixWorld:{elements:[1,0,0,0]}};
-  const state = {units:[{side:1,hp:1,delay:0,status:'flying',x:0,y:0,z:0,key:'heavy'}],
+  const state = {sides:[{},{}],units:[{side:1,hp:1,delay:0,status:'flying',x:0,y:0,z:0,key:'heavy'}],
     buildings:[{side:0,hp:10,x:0,z:0}],groundUnits:[]};
   for (const mode of ['siren','blast','stress','mute','demo','rain','rainHigh','rainPaused','rainMuted']) {
     const context = new OfflineAudioContext(2, rate * 8, rate), audio = new GameAudio();
     audio.unlock(context);
+    await audio.ready;
     for(let i=0; i<400 && !audio.buffers.reload; i++)
       await new Promise(resolve => setTimeout(resolve,5));
     if (!audio.buffers.reload || !audio.buffers.blastLarge) throw Error('Synthesis did not finish');

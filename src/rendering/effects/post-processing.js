@@ -2,13 +2,20 @@ import * as T from '../../../vendor/three/three.module.js';
 import { weatherStyle } from './weather-style.js';
 import { FILM_GRAIN_GLSL } from './film-grain.js';
 const vertexShader = 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
+// Follow the stable resolution budget, rather than reacting to individual frames.
+// Recovery waits for native scale so the 0.90/0.95 steps cannot churn attachments.
+export function adaptivePostSamples(scale = 1, maxSamples = 4, previous = 4) {
+  const desired = scale <= 0.9 ? 2 : scale >= 1 ? 4 : previous;
+  const supported = maxSamples >= 4 ? 4 : maxSamples >= 2 ? 2 : maxSamples >= 1 ? 1 : 0;
+  return Math.min(desired, supported);
+}
 export class EveningPost {
   constructor(renderer) {
     this.renderer = renderer;
     this.target = new T.WebGLRenderTarget(1, 1, {
       type: T.HalfFloatType,
       depthBuffer: true,
-      samples: 4,
+      samples: adaptivePostSamples(1, renderer.capabilities?.maxSamples ?? 4),
     });
     this.target.depthTexture = new T.DepthTexture(1, 1, T.UnsignedIntType);
     this.fogNight = new T.Color('#68777b');
@@ -90,10 +97,21 @@ export class EveningPost {
   setVision() {
     this.uniforms.visionActive.value = 0;
   }
-  resize(width, height) {
+  resize(width, height, scale = 1) {
     const ratio = this.renderer.getPixelRatio();
     const x = Math.max(1, Math.floor(width * ratio)),
       y = Math.max(1, Math.floor(height * ratio));
+    const samples = adaptivePostSamples(
+      scale,
+      this.renderer.capabilities?.maxSamples ?? 4,
+      this.target.samples,
+    );
+    if (samples !== this.target.samples) {
+      this.target.samples = samples;
+      // setSize already disposes when dimensions change. For unchanged dimensions,
+      // explicitly release the previous multisample renderbuffers exactly once.
+      if (x === this.target.width && y === this.target.height) this.target.dispose();
+    }
     this.target.setSize(x, y);
     this.bloom.setSize(Math.max(1, Math.ceil(x / 2)), Math.max(1, Math.ceil(y / 2)));
     this.uniforms.pixel.value.set(1 / x, 1 / y);

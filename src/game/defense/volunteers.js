@@ -27,6 +27,13 @@ export function setAutoDefense(s, side, ids, enabled) {
       (!enabled || !s.groundUnits.some((p) => p.carrierId === u.id || p.boardingId === u.id))
     ) {
       u.autoDefense = enabled;
+      if (!enabled && u.supplyTrip) {
+        if (u.order?.supplyId === u.supplyTrip.crateId) {
+          u.path = [];
+          u.order = null;
+        }
+        delete u.supplyTrip;
+      }
       if (!enabled) {
         u.defensePost = null;
         u.defenseCapture = null;

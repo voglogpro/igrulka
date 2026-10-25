@@ -278,7 +278,7 @@ test('day/night follows simulation time, repeats after twenty minutes and never 
   assert.ok(Math.abs(E.dayPhase(1200).hour - E.dayPhase(0).hour) < 1e-8);
   assert.equal(E.dayPhase(0).hour, 18.5);
 });
-test('aircraft cap and army reservations refuse excess orders before charging', () => {
+test('aircraft cap and local army queue refuse excess orders before charging', () => {
   const s = fresh(),
     site = ready(s, 0, 'launcher', -800, 0);
   s.sides[0].inventory.drone = 10;
@@ -287,7 +287,8 @@ test('aircraft cap and army reservations refuse excess orders before charging', 
   assert.equal(typeof E.launch(s, 0, 'drone', { x: 1000, z: 0 }), 'string');
   assert.equal(s.sides[0].inventory.drone, stock);
   const b = ready(s, 0, 'barracks', -1080, -10);
-  for (let i = 0; i < E.GROUND_LIMIT - 1; i++) ground(s, 'infantry', -300 + i, 0);
+  for (let i = 0; i < 130; i++) ground(s, 'infantry', -900, 400);
+  for (let i = 0; i < 7; i++) assert.equal(E.recruit(s, 0, 'infantry'), true);
   assert.equal(E.recruit(s, 0, 'infantry'), true);
   const credits = s.sides[0].credits;
   assert.equal(typeof E.recruit(s, 0, 'infantry'), 'string');

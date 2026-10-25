@@ -182,7 +182,7 @@ test('weapon cargo leaves the warehouse at pickup, reaches a silo physically, an
   assert.ok(Math.hypot(cargo.x - factory.x, cargo.z - factory.z) < 65);
 });
 
-test('disabled plants and destroyed depots cannot deliver; finite support-truck cargo refills neighbours and obeys stop', () => {
+test('disabled plants stop dispatch while destroyed depots preserve paid cargo already on the road; support trucks obey stop', () => {
   const s = fresh(),
     b = building(s),
     u = unit(s),
@@ -207,7 +207,10 @@ test('disabled plants and destroyed depots cannot deliver; finite support-truck 
   assert.ok(s.ammoVehicles.some((v) => v.cargo));
   b.hp = 0;
   E.advance(s, 1.1);
-  assert.equal(s.ammoVehicles.length, 0);
+  assert.ok(
+    s.ammoVehicles.some((v) => v.hp > 0 && v.cargo),
+    'source destruction cannot erase paid cargo on a healthy vehicle',
+  );
 });
 
 test('current ammo imports reject prototype keys, foreign recipients, excess cargo and ammo metadata on unarmed objects', () => {
@@ -451,7 +454,7 @@ test('redeploying an empty stationary MOG cannot manufacture free rounds or canc
   assert.equal(u.ammoReserve, 0);
 });
 
-test('saving immediately after depot destruction preserves a valid campaign until the next fleet reconciliation', () => {
+test('saving after depot destruction preserves paid cargo through reconciliation and its eventual physical delivery', () => {
   const s = fresh(),
     b = building(s),
     u = unit(s);
@@ -465,9 +468,17 @@ test('saving immediately after depot destruction preserves a valid campaign unti
   assert.ok(copy.ammoVehicles.some((v) => v.cargo));
   E.advance(s, 1.1);
   E.advance(copy, 1.1);
-  assert.equal(copy.ammoVehicles.length, 0);
-  assert.equal(s.ammoVehicles.length, 0);
+  assert.ok(copy.ammoVehicles.some((v) => v.cargo));
+  assert.deepEqual(
+    copy.ammoVehicles.map((v) => v.cargo),
+    s.ammoVehicles.map((v) => v.cargo),
+  );
   assert.equal(copy.groundUnits[0].ammoReserve, 0);
   assert.equal(copy.sides[0].ammoStock.small, 0);
   assert.deepEqual(copy.sides, s.sides);
+  E.advance(copy, 30);
+  E.advance(s, 30);
+  assert.equal(copy.groundUnits[0].ammoReserve, 30);
+  assert.deepEqual(copy.sides, s.sides);
+  assert.deepEqual(copy.ammoCrates, s.ammoCrates);
 });

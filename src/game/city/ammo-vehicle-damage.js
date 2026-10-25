@@ -20,6 +20,7 @@ export function damageAmmoVehicle(s, vehicle, amount) {
   vehicle.path = [];
   vehicle.targetId = null;
   vehicle.targetKind = null;
+  vehicle.fieldPoint = null;
   vehicle.goal = null;
   vehicle.status = 'destroyed';
   vehicle.replaceAt = s.time + config.replacementDelay;

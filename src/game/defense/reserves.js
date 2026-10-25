@@ -6,6 +6,7 @@ import { defenseAvailable, assignDefensePost } from './formation.js';
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 export function updateDefenseReserves(s, side, own, report, memory) {
   for (const u of own) {
+    if (u.supplyTrip) continue;
     const task = u.defenseTask;
     if (!task) continue;
     if (!u.guard || u.boardingId || u.delivery || u.routeState) {

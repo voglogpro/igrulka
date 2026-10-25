@@ -196,6 +196,6 @@ test('context inspector makes allied cities read-only while own repair controls 
   );
   assert.equal((settlementListHTML(s).match(/data-settlement-focus=/g) || []).length, 8);
   const html = settlementInspectorHTML(s, E.SETTLEMENTS[0].id);
-  assert.match(html, /Проведите дорогу от своего штаба/);
+  assert.match(html, /Подведите дорогу к отмеченному въезду/);
   assert.doesNotMatch(html, /data-repair|data-demolish|data-upgrade/);
 });

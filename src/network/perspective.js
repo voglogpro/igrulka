@@ -39,6 +39,8 @@ const groundFields = [
   'downed',
 ];
 const buildingFields = [
+  'settlementId',
+  'settlementSlot',
   'id',
   'side',
   'key',
@@ -207,6 +209,11 @@ function projectView(authority, side, compact, detached = true) {
       : publicFields(v, ['id', 'side', 'depotId', 'x', 'y', 'z', 'yaw', 'status', 'hp', 'maxHp']),
   );
   delete view.ammoLogisticsAt;
+  delete view.fieldSupplyAt;
+  delete view.fieldSupplyCursor;
+  view.ammoCrates = (view.ammoCrates || []).map((c) =>
+    c.side === side ? c : publicFields(c, ['id', 'side', 'key', 'x', 'z', 'hp', 'maxHp']),
+  );
   view.ships = (view.ships || []).map((v) => (v.side === side ? v : publicFields(v, shipFields)));
   view.projectiles = view.projectiles
     .filter((p) => {
@@ -319,6 +326,7 @@ function projectView(authority, side, compact, detached = true) {
       'groundUnits',
       'serviceVehicles',
       'ammoVehicles',
+      'ammoCrates',
       'ships',
       'projectiles',
       'trenches',
@@ -342,6 +350,7 @@ function projectView(authority, side, compact, detached = true) {
     'groundUnits',
     'serviceVehicles',
     'ammoVehicles',
+    'ammoCrates',
     'ships',
     'projectiles',
     'trenches',
