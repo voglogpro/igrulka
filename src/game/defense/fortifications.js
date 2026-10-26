@@ -3,6 +3,9 @@ import { event } from '../shared/events.js';
 import { FORTIFICATION as C } from './config.js';
 import { invalidateFrontline } from './cache.js';
 import { staticObjectsInBounds } from '../shared/static-spatial.js';
+import { allied } from '../factions.js';
+import { trenchContested } from './positions.js';
+import { invalidateTrenchLinks } from './trench-links.js';
 const workTimes = new WeakMap();
 const labels = ['Земляные работы', 'Окоп', 'Укреплённый окоп', 'Блокпост'];
 
@@ -51,14 +54,26 @@ export function prepareDefensivePosition(s, u) {
     if (u.guard && u.digging) u.digging = false;
     return null;
   }
-  let t = staticObjectsInBounds(
+  const nearby = staticObjectsInBounds(
     s,
     'trenches',
     u.x - C.postRadius,
     u.z - C.postRadius,
     u.x + C.postRadius,
     u.z + C.postRadius,
-  ).find((t) => t.side === u.side && Math.hypot(t.x - u.x, t.z - u.z) < C.postRadius);
+  ).filter((t) => Math.hypot(t.x - u.x, t.z - u.z) < C.postRadius);
+  let t =
+    nearby.find((t) => t.side === u.side) ||
+    nearby.find((t) => !trenchContested(s, t, u.side, u.id));
+  if (t && !allied(s, t.side, u.side)) {
+    t.side = u.side;
+    invalidateFrontline(s);
+    invalidateTrenchLinks(s);
+    event(s, 'trenchCaptured', { x: t.x, z: t.z, side: u.side, unitId: u.id, trenchId: t.id });
+  }
+  // An occupied enemy trench is physical earthwork too. Do not place a fresh
+  // duplicate on top of it while its owner is still contesting the position.
+  if (!t && nearby.length) return null;
   if (!t && s.trenches.length < C.maxPositions) {
     t = { id: s.nextId++, side: u.side, x: u.x, z: u.z, progress: 0, yaw: u.yaw || 0 };
     s.trenches.push(t);
@@ -111,6 +126,7 @@ export function updateFortification(s, u, dt) {
   const after = fortificationStatus(t).level;
   if (after > before) {
     invalidateFrontline(s);
+    invalidateTrenchLinks(s);
     event(s, 'fortification', {
       x: t.x,
       z: t.z,

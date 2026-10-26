@@ -19,6 +19,7 @@ import {
   reloadFromReserve,
   ammunitionProfile,
 } from '../units/ground/ammunition.js';
+import { isMogDefense } from './upgrade-tiers.js';
 export function interceptPoint(origin, u, speed) {
   const rx = u.x - origin.x,
     ry = u.y - origin.y,
@@ -45,6 +46,9 @@ export function defenseCycle(s, b, dt) {
   const f = s.sides[b.side],
     d = defenseStats(f, b);
   b.heat = Math.max(0, (b.heat || 0) - d.cooling * dt);
+  // Preserve the fractional part of the MOG's firing interval. Clamping it
+  // away made .06 and .0536 both fire every .10 s, then .048 jump to .05 s.
+  d.cadenceRemainder = b.cooldown > 0 ? b.cooldown - dt : 0;
   b.cooldown = Math.max(0, (b.cooldown || 0) - dt);
   initializeAmmunition(b);
   if (ammunitionProfile(b)?.shared) {
@@ -147,104 +151,112 @@ export function fireDefenses(s, rates, dt) {
     if ((isInfantry(b.key) || b.key === 'gun') && (b.groundReload > 0 || b.groundAmmo <= 0))
       continue;
     if (b.cooldown > 0 || b.reloadLeft > 0 || b.ammo <= 0) continue;
-    const infantry = isInfantry(b.key),
-      fast = ['gun', 'shilka'].includes(b.key) || infantry,
-      speed = missile ? 190 : fast ? 390 : 330,
-      oy = infantry
-        ? b.key === 'mog'
-          ? 3.2
-          : 2.4
-        : b.key === 'gun'
-          ? 2.5
-          : GROUND_UNITS[b.key]
-            ? 5
-            : 8,
-      origin = { x: b.x, y: oy, z: b.z },
-      aim = interceptPoint(origin, u, speed),
-      spread = missile
-        ? 0
-        : (fast ? 5 + Math.hypot(u.x - b.x, u.z - b.z) * 0.025 : 2.5) *
-          (radar ? 0.75 : 1) *
-          (b.tracking < 1.2 ? 1.5 : 1) *
-          d.accuracy *
-          weatherSpread(s) *
-          (1 + Math.pow(b.heat, 2) * 3) *
-          (infantry && b.key !== 'mog' ? 1.7 : 1);
-    aim.x += (random(s) - 0.5) * spread * 2;
-    aim.y += (random(s) - 0.5) * spread * 1.2;
-    aim.z += (random(s) - 0.5) * spread * 2;
-    if (!missile) aim.y += 0.5 * COMBAT.gravity * aim.time * aim.time;
-    b.targetX = aim.x;
-    b.targetZ = aim.z;
-    b.targetY = aim.y;
-    const dx = aim.x - b.x,
-      dy = aim.y - oy,
-      dz = aim.z - b.z,
-      length = Math.hypot(dx, dy, dz) || 1;
-    f.spentAmmo += d.shotCost;
-    b.cooldown =
-      (d.cooldown * (b.heat > 0.9 ? 1.6 : 1)) /
-      (GROUND_UNITS[b.key] ? 1 : rates[b.side].productivity);
-    if (isInfantry(b.key) || b.key === 'gun') b.groundAmmo--;
-    else b.ammo--;
-    b.heat = Math.min(1.5, b.heat + d.heatPerShot);
-    b.lastSpread = spread;
-    const muzzleLength =
-        infantry && b.key !== 'mog'
-          ? 2
-          : ['gun', 'mog'].includes(b.key)
-            ? 6
-            : missile
-              ? 7
-              : fast
-                ? 9
-                : 14,
-      sideOffset = ((b.rounds || 0) % 2 ? 1 : -1) * (fast ? 0.8 : 1.2),
-      horizontal = Math.hypot(dx, dz) || 1,
-      mx = b.x + (dx / length) * muzzleLength - (dz / horizontal) * sideOffset,
-      my = oy + (dy / length) * muzzleLength,
-      mz = b.z + (dz / length) * muzzleLength + (dx / horizontal) * sideOffset;
-    b.rounds = (b.rounds || 0) + 1;
-    if (infantry) recordFire(s, b, random);
-    s.projectiles.push({
-      sourceId: b.id,
-      abm,
-      gravity: missile ? 0 : COMBAT.gravity,
-      tracer: missile || !fast || b.rounds % 3 === 0,
-      id: s.nextId++,
-      side: b.side,
-      source: b.id,
-      targetId: u.id,
-      x: mx,
-      y: my,
-      z: mz,
-      px: mx,
-      py: my,
-      pz: mz,
-      vx: (dx / length) * speed,
-      vy: (dy / length) * speed,
-      vz: (dz / length) * speed,
-      speed,
-      damage: d.damage,
-      kind: missile ? 'interceptor' : fast ? 'bullet' : 'shell',
-      life: 0,
-      maxLife: missile ? 5 : Math.min(2, range / speed + 0.6),
-    });
-    s.stats.shots++;
-    event(s, 'shot', {
-      x: b.x,
-      y: oy,
-      z: b.z,
-      side: b.side,
-      key: missile ? 'sam' : fast ? 'gun' : 'cannon',
-      shooter: b.key,
-      buildingId: b.id,
-      mx,
-      my,
-      mz,
-      tx: aim.x,
-      ty: aim.y,
-      tz: aim.z,
-    });
+    const sustained = isMogDefense(b);
+    let cadence = sustained ? d.cadenceRemainder : 0;
+    // At the bounded .1 s simulation step even the final tier needs at most
+    // three real rounds. Never create a catch-up storm after an idle period.
+    for (let shot = 0; shot < (sustained ? 3 : 1) && cadence <= 0; shot++) {
+      if (sustained && b.groundAmmo <= 0) break;
+      const infantry = isInfantry(b.key),
+        fast = ['gun', 'shilka'].includes(b.key) || infantry,
+        speed = missile ? 190 : fast ? 390 : 330,
+        oy = infantry
+          ? b.key === 'mog'
+            ? 3.2
+            : 2.4
+          : b.key === 'gun'
+            ? 2.5
+            : GROUND_UNITS[b.key]
+              ? 5
+              : 8,
+        origin = { x: b.x, y: oy, z: b.z },
+        aim = interceptPoint(origin, u, speed),
+        spread = missile
+          ? 0
+          : (fast ? 5 + Math.hypot(u.x - b.x, u.z - b.z) * 0.025 : 2.5) *
+            (radar ? 0.75 : 1) *
+            (b.tracking < 1.2 ? 1.5 : 1) *
+            d.accuracy *
+            weatherSpread(s) *
+            (1 + Math.pow(b.heat, 2) * 3) *
+            (infantry && b.key !== 'mog' ? 1.7 : 1);
+      aim.x += (random(s) - 0.5) * spread * 2;
+      aim.y += (random(s) - 0.5) * spread * 1.2;
+      aim.z += (random(s) - 0.5) * spread * 2;
+      if (!missile) aim.y += 0.5 * COMBAT.gravity * aim.time * aim.time;
+      b.targetX = aim.x;
+      b.targetZ = aim.z;
+      b.targetY = aim.y;
+      const dx = aim.x - b.x,
+        dy = aim.y - oy,
+        dz = aim.z - b.z,
+        length = Math.hypot(dx, dy, dz) || 1;
+      f.spentAmmo += d.shotCost;
+      cadence +=
+        (d.cooldown * (b.heat > 0.9 ? 1.6 : 1)) /
+        (GROUND_UNITS[b.key] ? 1 : rates[b.side].productivity);
+      b.cooldown = Math.max(0, cadence);
+      if (isInfantry(b.key) || b.key === 'gun') b.groundAmmo--;
+      else b.ammo--;
+      b.heat = Math.min(1.5, b.heat + d.heatPerShot);
+      b.lastSpread = spread;
+      const muzzleLength =
+          infantry && b.key !== 'mog'
+            ? 2
+            : ['gun', 'mog'].includes(b.key)
+              ? 6
+              : missile
+                ? 7
+                : fast
+                  ? 9
+                  : 14,
+        sideOffset = ((b.rounds || 0) % 2 ? 1 : -1) * (fast ? 0.8 : 1.2),
+        horizontal = Math.hypot(dx, dz) || 1,
+        mx = b.x + (dx / length) * muzzleLength - (dz / horizontal) * sideOffset,
+        my = oy + (dy / length) * muzzleLength,
+        mz = b.z + (dz / length) * muzzleLength + (dx / horizontal) * sideOffset;
+      b.rounds = (b.rounds || 0) + 1;
+      if (infantry) recordFire(s, b, random);
+      s.projectiles.push({
+        sourceId: b.id,
+        abm,
+        gravity: missile ? 0 : COMBAT.gravity,
+        tracer: missile || !fast || b.rounds % 3 === 0,
+        id: s.nextId++,
+        side: b.side,
+        source: b.id,
+        targetId: u.id,
+        x: mx,
+        y: my,
+        z: mz,
+        px: mx,
+        py: my,
+        pz: mz,
+        vx: (dx / length) * speed,
+        vy: (dy / length) * speed,
+        vz: (dz / length) * speed,
+        speed,
+        damage: d.damage,
+        kind: missile ? 'interceptor' : fast ? 'bullet' : 'shell',
+        life: 0,
+        maxLife: missile ? 5 : Math.min(2, range / speed + 0.6),
+      });
+      s.stats.shots++;
+      event(s, 'shot', {
+        x: b.x,
+        y: oy,
+        z: b.z,
+        side: b.side,
+        key: missile ? 'sam' : fast ? 'gun' : 'cannon',
+        shooter: b.key,
+        buildingId: b.id,
+        mx,
+        my,
+        mz,
+        tx: aim.x,
+        ty: aim.y,
+        tz: aim.z,
+      });
+    }
   }
 }

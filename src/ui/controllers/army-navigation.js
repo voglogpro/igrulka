@@ -23,7 +23,8 @@ export function createArmyNavigation({
     return stops.sort((a, b) => a[0] - b[0]);
   }
   function focusUnits(ids, distance = null) {
-    const units = getState().groundUnits.filter((u) => ids.includes(u.id) && u.hp > 0);
+    const selected = new Set(ids),
+      units = getState().groundUnits.filter((u) => selected.has(u.id) && u.hp > 0);
     if (!units.length) return;
     getWorld().focus(
       units.reduce((n, u) => n + u.x, 0) / units.length,
@@ -71,7 +72,8 @@ export function createArmyNavigation({
   }
 
   function focusSelected() {
-    const units = getState().groundUnits.filter((u) => getSelection().includes(u.id));
+    const selected = new Set(getSelection()),
+      units = getState().groundUnits.filter((u) => selected.has(u.id));
     if (units.length)
       getWorld().focus(
         units.reduce((n, u) => n + u.x, 0) / units.length,

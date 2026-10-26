@@ -27,7 +27,7 @@ try:
             page.wait_for_function('Boolean(window.skyfront)')
             page.wait_for_function('skyfront.getWorld().shadersReady')
             assert page.evaluate('skyfront.getWorld().shaderWarmupStatus') in ['ready','timeout']
-            assert page.title().startswith('8.11.1')
+            assert page.title().startswith('8.11.2')
             page.locator('[data-action="start"]').click()
             page.keyboard.press('Space')
             assert page.evaluate('skyfront.isPaused()')

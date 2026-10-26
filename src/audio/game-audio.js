@@ -1,5 +1,6 @@
 import { uavEngineMix } from './engines.js';
 import { FootstepScheduler } from './footsteps.js';
+import { recordedJetMix } from './ordnance.js';
 import { audioBufferBank, warmAudioPCM, audioBankDiagnostics } from './sample-bank.js';
 
 // How loud each weapon is and how often the same class may start a new sound.
@@ -44,6 +45,15 @@ const VEHICLES = new Set([
 ]);
 const WHEELED = new Set(['apc', 'armoredcar', 'mlrs']);
 const SPEED_OF_SOUND = 343;
+const ORDNANCE = new Set([
+  'rocketLaunch',
+  'cruiseLaunch',
+  'ballisticLaunch',
+  'artillery',
+  'missileDive',
+  'whistle',
+  'atgm',
+]);
 
 export function soundClass(e) {
   if (e.key === 'sam') return 'sam';
@@ -65,12 +75,28 @@ export function distanceMix(distance, loudness = 1) {
   };
 }
 
+// A heavy launch has a larger acoustic footprint than a rifle. Keep the existing
+// rifle/engine/ambience mix while allowing the recorded low end to reach a high
+// strategy camera and remain audible behind ordinary gunfire.
+export function ordnanceMix(distance, loudness = 1) {
+  const d = Math.max(0, distance),
+    mix = distanceMix(d, loudness);
+  return {
+    ...mix,
+    dry: loudness * (260 / (260 + d)),
+    wet: mix.wet * 1.12,
+    echo: mix.echo * 1.2,
+    cutoff: Math.max(900, Math.min(7000, 10000 * Math.exp(-d / 1100))),
+  };
+}
+
 export class GameAudio {
   constructor() {
     this.enabled = true;
     this.volume = 0.35;
     this.last = {};
     this.voices = 0;
+    this.activeSamples = new Set();
     this.engines = [];
     this.activeEngines = 0;
     this.whistled = new Set();
@@ -179,9 +205,20 @@ export class GameAudio {
   // One positioned battlefield sound: buffer → distance filter → dry/pan + reverb + echo sends.
   sample(name, distance, pan, loudness, options = {}) {
     const list = this.buffers?.[name];
-    if (!list || !this.enabled || this.voices >= 44) return;
-    const mix = distanceMix(distance, loudness);
+    if (!list || !this.enabled) return;
+    const priority = options.priority || ORDNANCE.has(name);
+    const mix = ORDNANCE.has(name)
+      ? ordnanceMix(distance, loudness)
+      : distanceMix(distance, loudness);
     if (mix.dry < 0.012 && !options.force) return;
+    if (this.voices >= 44 && priority) {
+      const ordinary = [...this.activeSamples].find((voice) => !voice.priority);
+      if (ordinary) {
+        ordinary.source.stop(this.context.currentTime);
+        ordinary.finish();
+      }
+    }
+    if (this.voices >= 44) return;
     const c = this.context,
       at = c.currentTime + (options.delay ?? mix.delay),
       source = c.createBufferSource(),
@@ -209,10 +246,16 @@ export class GameAudio {
     echo.connect(this.echoIn);
     source.start(at, options.offset ?? 0);
     this.voices++;
-    source.onended = () => {
+    const voice = { name, source, priority, finished: false, finish: null };
+    voice.finish = () => {
+      if (voice.finished) return;
+      voice.finished = true;
       this.voices--;
+      this.activeSamples.delete(voice);
       for (const node of [source, filter, dry, wet, echo, stereo]) node.disconnect();
     };
+    this.activeSamples.add(voice);
+    source.onended = voice.finish;
   }
   // Distance from the camera itself: zooming out moves the listener away from the battle.
   locate(e, fallbackDistance, fallbackPan) {
@@ -237,7 +280,8 @@ export class GameAudio {
     if (e.type === 'shot') {
       const kind = soundClass(e);
       if (kind === 'sam') {
-        if (this.throttle('sam', 0.12)) this.sample('whoosh', where.distance, where.pan, 1.1);
+        if (this.throttle('sam', 0.12))
+          this.sample('rocketLaunch', where.distance, where.pan, 0.8, { rate: 1.16 });
         return;
       }
       if (kind === 'rocket') {
@@ -247,8 +291,7 @@ export class GameAudio {
       }
       if (kind === 'atgm') {
         if (this.throttle('atgm', 0.1)) {
-          this.sample('rifle', where.distance, where.pan, 0.6, { rate: 0.6 });
-          this.sample('atgm', where.distance, where.pan, 0.9);
+          this.sample('atgm', where.distance, where.pan, 0.7, { rate: 1.12 });
         }
         return;
       }
@@ -310,10 +353,10 @@ export class GameAudio {
     }
     if (e.type === 'launch' && this.throttle('launch', 0.1))
       this.sample(
-        e.key === 'ballistic' ? 'ballisticLaunch' : e.key === 'cruise' ? 'rocketLaunch' : 'whoosh',
+        e.key === 'ballistic' ? 'ballisticLaunch' : e.key === 'cruise' ? 'cruiseLaunch' : 'whoosh',
         where.distance,
         where.pan,
-        e.key === 'ballistic' ? 0.95 : 0.8,
+        e.key === 'ballistic' ? 1.05 : 0.8,
       );
   }
   createEngines() {
@@ -406,13 +449,23 @@ export class GameAudio {
       this.sample('missileDive', where.distance, where.pan, 0.5, { delay: 0, offset: 1.5 - left });
     }
     for (const p of state.projectiles || []) {
-      if (p.shooterKey !== 'howitzer' || this.whistled.has(p.id)) continue;
+      if (!['howitzer', 'mlrs'].includes(p.shooterKey) || this.whistled.has(p.id)) continue;
       const left = (p.flight ?? 0) - p.life;
-      if (left > 1.3 || left < 0.2) continue;
+      if (left > 1.5 || left < 0.2) continue;
       this.whistled.add(p.id);
       const where = this.locate({ x: p.tx, y: 2, z: p.tz }, 0, 0);
-      // Skip into the whistle so it ends together with the shell.
-      this.sample('whistle', where.distance, where.pan, 0.55, { delay: 0, offset: 1.3 - left });
+      // Recorded rocket air-rush is an approach cue, not a synthesized whistle
+      // or a claim that the source recorded a ballistic re-entry.
+      this.sample(
+        p.shooterKey === 'mlrs' ? 'missileDive' : 'whistle',
+        where.distance,
+        where.pan,
+        0.55,
+        {
+          delay: 0,
+          offset: 1.5 - left,
+        },
+      );
     }
     if (this.whistled.size > 200) this.whistled.clear();
   }
@@ -475,6 +528,8 @@ export class GameAudio {
                 ? 'rotor'
                 : 'moped'
           ].push(u);
+      for (const p of state.projectiles || [])
+        if (!p.dead && (p.shooterKey === 'mlrs' || p.kind === 'interceptor')) wanted.jet.push(p);
       // Nearby foot soldiers use the bounded one-shot scheduler above.
       for (const u of state.groundUnits || [])
         if (u.hp > 0 && u.moving && VEHICLES.has(u.key))
@@ -492,7 +547,7 @@ export class GameAudio {
               u.z - this.listener.z,
             ),
           }))
-          .filter((o) => o.d < 1000)
+          .filter((o) => o.d < (kind === 'jet' ? 1500 : 1000))
           .sort((a, b) => a.d - b.d)
           .slice(0, voices.length);
       for (let i = 0; i < voices.length; i++) {
@@ -503,7 +558,8 @@ export class GameAudio {
           active++;
           const { u, d } = item,
             mix = distanceMix(d, 1),
-            uav = kind === 'rotor' || kind === 'moped' ? uavEngineMix(u, d, this.listener) : null;
+            uav = kind === 'rotor' || kind === 'moped' ? uavEngineMix(u, d, this.listener) : null,
+            missile = kind === 'jet' ? recordedJetMix(u, d, this.listener) : null;
           gain =
             kind === 'truck'
               ? 0.24 * mix.dry
@@ -511,14 +567,26 @@ export class GameAudio {
                 ? 0.32 * mix.dry * (['leopard', 'howitzer', 'heavytank'].includes(u.key) ? 1.25 : 1)
                 : uav
                   ? uav.gain
-                  : 0.3 * mix.dry;
+                  : missile.gain;
           voice.source.playbackRate.setTargetAtTime(
-            kind === 'diesel' ? (WHEELED.has(u.key) ? 1.15 : 0.9) : uav ? uav.rate : 1,
+            kind === 'diesel'
+              ? WHEELED.has(u.key)
+                ? 1.15
+                : 0.9
+              : uav
+                ? uav.rate
+                : missile
+                  ? missile.rate
+                  : 1,
             t,
             0.2,
           );
           voice.filter.frequency.setTargetAtTime(
-            uav ? uav.cutoff : Math.min(kind === 'diesel' ? 600 : 3000, mix.cutoff),
+            uav
+              ? uav.cutoff
+              : missile
+                ? missile.cutoff
+                : Math.min(kind === 'diesel' ? 600 : 3000, mix.cutoff),
             t,
             0.15,
           );

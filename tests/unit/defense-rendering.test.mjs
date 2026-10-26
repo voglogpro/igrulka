@@ -23,7 +23,7 @@ test('fortifications use bounded shared batches, advance stages and remove stale
     state.trenches[0].progress += 0.01;
     view.sync(state);
   }
-  assert.equal(scene.children.length, 3);
+  assert.equal(scene.children.length, 6);
   resources.forEach(([geometry, material, matrices], i) => {
     assert.equal(view.pools[i].geometry, geometry);
     assert.equal(view.pools[i].material, material);

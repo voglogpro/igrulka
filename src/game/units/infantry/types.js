@@ -255,7 +255,7 @@ export const INFANTRY_TYPES = {
     shotMetal: 0.009,
     magazine: 90,
     reload: 4,
-    heatPerShot: 0.028,
+    heatPerShot: 0.018,
     cooling: 0.12,
     groundRange: 140,
     groundDamage: 4,

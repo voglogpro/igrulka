@@ -61,6 +61,14 @@ def run_dom(p):
       if height==768:assert m['scroll']<=2,(key,width,height,m)
       covered=host.evaluate("h=>[...h.querySelectorAll('.inspect-upgrade-row button,.inspect-buttons button,.army-primary-orders button')].filter(b=>b.getClientRects().length).filter(b=>{const r=b.getBoundingClientRect();return !b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}).map(b=>b.textContent)")
       assert not covered,(key,width,height,covered)
+      if key=='mog' and is_ground and level==1 and width==1024 and height==600:
+       assert 'Охлаждение / нагрев' in host.inner_text()
+       upgrade=host.locator('[data-upgrade]').first
+       assert '500' in upgrade.inner_text()
+       row=host.locator('#army-equipment-detail .stat').filter(has_text='Охлаждение / нагрев').bounding_box()
+       report['mog600']={'mainCard':metrics,'details':m,'nextUpgrade':upgrade.inner_text(),'coolingPresent':True,
+                        'coolingVisibleWithoutScrolling':row['y']>=m['top'] and row['y']+row['height']<=m['bottom']}
+       page.screenshot(path=str(ARTIFACTS/'inspector-mog8112-1024x600.png'))
       page.wait_for_timeout(10)
       assert details.evaluate('e=>e.open')
      report['cards']+=1
@@ -92,7 +100,7 @@ def run_game(p):
   page=browser.new_page(viewport={'width':1024,'height':768},offline=True)
   errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
   page.set_default_timeout(90000)
-  page.goto((ARTIFACTS/'inspector-8102.html').as_uri(),wait_until='load',timeout=120000)
+  page.goto((ROOT/'play/Skyfront.html').as_uri(),wait_until='load',timeout=120000)
   page.wait_for_function('Boolean(window.skyfront)')
   page.locator('[data-action="start"]').click();page.keyboard.press('Space')
   ids=page.evaluate('''()=>{

@@ -163,7 +163,7 @@ export const BUILDINGS = {
       'Три бойца за мешками с землёй. Пулемёт поражает дроны и ближайшую пехоту; имеет нагрев, боезапас и перезарядку. Ракеты перехватывают только ЗРК.',
     magazine: 100,
     reload: 4,
-    heatPerShot: 0.028,
+    heatPerShot: 0.018,
     cooling: 0.12,
     groundRange: 135,
     groundDamage: 4,

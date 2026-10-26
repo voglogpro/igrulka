@@ -54,7 +54,64 @@ try:
             # Apply the software-GPU budget before the first frame, including both world initializations.
             # Match simulation and WebSocket traffic still run on the real authoritative server.
             page.add_init_script('''Object.defineProperty(window,'devicePixelRatio',{get:()=>.5});window.__qaRenderEnabled=false;const qaFrame=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>{const run=()=>{if(!window.__qaRenderEnabled){setTimeout(run,50);return;}qaFrame(()=>setTimeout(()=>{const w=window.skyfront?.getWorld();if(w&&!window.__qaFirstFrame){window.__qaFirstFrame=true;w.sun.shadow.mapSize.set(1024,1024);}callback(performance.now());},100));};return setTimeout(run,0);};''')
-            page.add_init_script('''const NativeSocket=window.WebSocket;window.__qaSockets=[];window.__qaMessages=[];window.WebSocket=class extends NativeSocket{constructor(...args){super(...args);window.__qaSockets.push(this);const listen=this.addEventListener.bind(this);this.addEventListener=(type,handler,options)=>listen(type,type==='message'?event=>{if(!this.__qaDropMessages)handler.call(this,event);}:handler,options);this.addEventListener('message',event=>{try{const m=JSON.parse(event.data);window.__qaMessages.push({type:m.type,phase:m.room?.phase});if(window.__qaMessages.length>24)window.__qaMessages.shift();}catch{}});this.addEventListener('close',event=>window.__qaMessages.push({type:'transport-close',code:event.code}));}};''')
+            page.add_init_script('''
+              const NativeSocket=window.WebSocket;
+              window.__qaSockets=[];window.__qaMessages=[];window.__qaDecodedSnapshots=[];
+              window.__qaPausedSnapshots=0;window.__qaAppliedPausedSnapshots=0;
+              window.__qaLastPausedSnapshotAt=0;window.__qaLastAppliedPausedSnapshot=null;
+              window.__qaPauseControlObserved=null;
+              window.WebSocket=class extends NativeSocket {
+                constructor(...args) {
+                  super(...args);window.__qaSockets.push(this);
+                  const listen=this.addEventListener.bind(this),rawEvents=new WeakMap();
+                  // Native registration keeps this raw logger outside the game-handler wrapper.
+                  listen('message',event=>{
+                    try {
+                      const m=JSON.parse(event.data),at=performance.now();
+                      const record={type:m.type,phase:m.room?.phase,at,sequence:m.sync?.seq};
+                      rawEvents.set(event,record);window.__qaMessages.push(record);
+                      if(m.type==='room'&&m.room?.phase==='disconnected'&&window.skyfront){
+                        window.__qaPauseControlObserved={at,display:skyfront.getState().time,
+                          latestDecoded:window.__qaDecodedSnapshots.at(-1)?.time,
+                          previousDecoded:window.__qaDecodedSnapshots.at(-2)?.time};
+                      }
+                      if(m.type==='snapshot'&&m.room?.phase==='disconnected'){
+                        window.__qaPausedSnapshots++;window.__qaLastPausedSnapshotAt=at;
+                      }
+                      if(window.__qaMessages.length>24)window.__qaMessages.shift();
+                    } catch {}
+                  });
+                  this.addEventListener=(type,handler,options)=>listen(type,type==='message'?event=>{
+                    if(this.__qaDropMessages)return;
+                    const nativeParse=JSON.parse;let decodedMessage=null;
+                    // Retain the SAME message parsed by NetworkSession. Its handler adds
+                    // decoded .state synchronously, so the post-handler clock is authoritative.
+                    JSON.parse=function(...values){
+                      const value=nativeParse.apply(this,values);
+                      if(values[0]===event.data&&value?.type==='snapshot')decodedMessage=value;
+                      return value;
+                    };
+                    try {handler.call(this,event);}
+                    finally {
+                      JSON.parse=nativeParse;
+                      if(decodedMessage?.state&&window.skyfront){
+                        const raw=rawEvents.get(event),sample={
+                          time:decodedMessage.state.time,phase:decodedMessage.room?.phase,
+                          display:skyfront.getState().time,decodedAt:performance.now(),rawAt:raw?.at,
+                          sequence:decodedMessage.sync?.seq,tick:decodedMessage.tick,
+                        };
+                        window.__qaDecodedSnapshots.push(sample);
+                        if(window.__qaDecodedSnapshots.length>12)window.__qaDecodedSnapshots.shift();
+                        if(sample.phase==='disconnected'){
+                          window.__qaAppliedPausedSnapshots++;window.__qaLastAppliedPausedSnapshot=sample;
+                        }
+                      }
+                    }
+                  }:handler,options);
+                  listen('close',event=>window.__qaMessages.push({type:'transport-close',code:event.code}));
+                }
+              };
+            ''')
             page.add_init_script('if(!localStorage.getItem("skyfront-realtime-v3"))localStorage.setItem("skyfront-realtime-v3",'+json.dumps(fixtures[i])+');')
             print('Loading network player '+str(i+1),flush=True)
             page.goto(address+'?multiplayer=1',wait_until='commit',timeout=30000)
@@ -133,9 +190,47 @@ try:
             report['minimapMove']=movement
             assert movement['error']<=movement['pixelDiagonal'],movement
             first.wait_for_function('p=>Math.hypot(skyfront.getWorld().controls.target.x-p.x,skyfront.getWorld().controls.target.z-p.z)<5',arg=movement,polling=50)
-            target=first.evaluate('''id=>{const w=skyfront.getWorld(),b=w.state.buildings.find(b=>b.id===id),v=w.camera.position.clone().set(b.x,4,b.z).project(w.camera),r=w.renderer.domElement.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}''',enemy)
-            first.mouse.click(target['x'],target['y'])
-            first.wait_for_function('document.querySelector("#inspector")?.textContent.includes("Союзный город")',polling=50)
+            def allied_pick(sync):
+                return first.evaluate('''({id,sync})=>{
+                  const w=skyfront.getWorld(),E=skyfront.engine;
+                  if(sync){w.sync();w.scene.updateMatrixWorld(true);}
+                  const b=w.state.buildings.find(b=>b.id===id),r=w.renderer.domElement.getBoundingClientRect();
+                  // The permanent foundation is clickable throughout construction.
+                  const v=w.camera.position.clone().set(b.x,sync?w.height(b.x,b.z)+.7:4,b.z).project(w.camera);
+                  const point={x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};
+                  w.pointer.set((point.x-r.left)/r.width*2-1,-(point.y-r.top)/r.height*2+1);
+                  w.ray.setFromCamera(w.pointer,w.camera);
+                  const roots=[...[...w.models.values()].map(m=>m.root),...w.groundModels.values(),
+                    ...w.infantry.meshes,...(w.ammoCrates?.pickTargets||[])].filter(root=>root.visible);
+                  let picked=null;
+                  for(const hit of w.ray.intersectObjects(roots,true)){
+                    let hitId;
+                    if(hit.object.userData.crateIds)hitId=hit.object.userData.crateIds[hit.instanceId];
+                    else if(hit.object.userData.infantryBatch)hitId=hit.object.userData.unitIds[hit.instanceId];
+                    else {let o=hit.object;while(o&&!o.userData.buildingId&&!o.userData.groundId)o=o.parent;
+                      hitId=o?.userData.buildingId||o?.userData.groundId;}
+                    if(hitId&&E.observedTarget(w.state,0,hitId)){picked=hitId;break;}
+                  }
+                  const element=document.elementFromPoint(point.x,point.y);
+                  return {expected:id,picked,point,proxyPresent:w.models.has(id),progress:b.progress,
+                    canvas:element===w.renderer.domElement,element:element?.outerHTML.slice(0,220),
+                    selected:w.selected,buildKey:w.buildKey,aiming:w.aiming,groundTargeting:w.groundTargeting,
+                    camera:w.controls.diagnostics()};
+                }''',{'id':enemy,'sync':sync})
+            report['alliedPickBeforeSync']=allied_pick(False)
+            target=report['alliedPickSynchronized']=allied_pick(True)
+            try:
+                assert target['canvas'] and target['picked']==enemy,target
+                first.mouse.click(target['point']['x'],target['point']['y'])
+                first.wait_for_function('document.querySelector("#inspector")?.textContent.includes("Союзный город")',polling=50,timeout=8000)
+            except Exception:
+                report['alliedReadonlyFailure']=first.evaluate('''()=>{const w=skyfront.getWorld();return{
+                  selected:w.selected,buildKey:w.buildKey,aiming:w.aiming,
+                  inspector:document.querySelector('#inspector')?.textContent,
+                  inspectorHidden:document.querySelector('#inspector')?.hidden,
+                  panel:document.querySelector('#panel')?.textContent.slice(0,250)};}''')
+                first.screenshot(path=str(ARTIFACTS/f'multiplayer{suffix}-allied-pick-failure.png'),timeout=30000)
+                raise
             assert first.locator('#inspector [data-repair],#inspector [data-upgrade],#inspector [data-demolish]').count()==0
             first.screenshot(path=str(ARTIFACTS/'coop810-allied-readonly.png'),timeout=120000)
             first.keyboard.press('Escape')
@@ -150,12 +245,35 @@ try:
             page.screenshot(path=str(ARTIFACTS/f'multiplayer{suffix}-player-{i+1}.png'),timeout=120000)
         print('Real map building clicks synchronize both cities; foreign demolition refused and solo saves preserved',flush=True)
         activate(first)
+        paused_snapshots=first.evaluate('window.__qaAppliedPausedSnapshots')
         contexts[1].set_offline(True)
         second.evaluate('window.__qaSockets.at(-1).close()')
         first.wait_for_function('skyfront.network().room.phase==="disconnected"',polling=50)
-        frozen=first.evaluate('skyfront.getState().time')
+        def pause_state():
+            return first.evaluate('''()=>{const n=skyfront.network(),samples=window.__qaDecodedSnapshots;return{
+              at:performance.now(),phase:n.room.phase,paused:skyfront.isPaused(),display:skyfront.getState().time,
+              latest:samples.at(-1)?.time,previous:samples.at(-2)?.time,received:samples.at(-1)?.decodedAt,
+              pausedSnapshots:window.__qaPausedSnapshots,lastPausedMessage:window.__qaLastPausedSnapshotAt,
+              appliedPausedSnapshots:window.__qaAppliedPausedSnapshots,
+              rawControl:window.__qaPauseControlObserved,
+              decodedSnapshots:samples.slice(-6),messages:window.__qaMessages.slice(-12)};}''')
+        report['pauseControlReceived']=pause_state()
+        for page in pages:
+            page.wait_for_function('skyfront.network()?.room.phase==="disconnected"&&skyfront.isPaused()',polling=50)
+        # The reliable phase control intentionally bypasses a pending snapshot ACK.
+        # Wait for the following authoritative paused snapshot to be decoded/applied,
+        # rather than treating an older interpolated display time as the pause time.
+        first.wait_for_function('''count=>window.__qaAppliedPausedSnapshots>count&&
+          skyfront.network()?.room.phase==='disconnected'&&skyfront.isPaused()&&
+          window.__qaLastAppliedPausedSnapshot.rawAt>=window.__qaLastPausedSnapshotAt&&
+          Math.abs(skyfront.getState().time-window.__qaLastAppliedPausedSnapshot.time)<1e-9''',arg=paused_snapshots,timeout=10000,polling=50)
+        report['pauseSettled']=pause_state()
+        frozen=report['pauseSettled']['display']
         first.wait_for_timeout(1500)
-        assert abs(first.evaluate('skyfront.getState().time')-frozen)<.06
+        report['pauseAfterStableWindow']=pause_state()
+        assert report['pauseAfterStableWindow']['phase']=='disconnected'
+        assert abs(report['pauseAfterStableWindow']['display']-frozen)<.001,report['pauseAfterStableWindow']
+        assert abs(report['pauseAfterStableWindow']['latest']-report['pauseSettled']['latest'])<.001,report['pauseAfterStableWindow']
         first.screenshot(path=str(ARTIFACTS/f'multiplayer{suffix}-disconnect.png'),timeout=120000)
         contexts[1].set_offline(False)
         for page in pages:

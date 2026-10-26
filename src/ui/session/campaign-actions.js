@@ -26,6 +26,7 @@ export function createCampaignActions({
       },
       export: soloOnly(() => {
         const state = getState();
+        persist();
         files.download(game.save(state), `skyfront-city-${Math.floor(state.time)}.json`);
       }),
       import: soloOnly(() => files.choose()),

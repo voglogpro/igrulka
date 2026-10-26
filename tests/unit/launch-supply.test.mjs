@@ -58,7 +58,7 @@ test('warehouse stock cannot teleport to a remote rack; physical delivery is fin
 for (const [level, delays] of [
   [0, [0, 10, 20, 30, 40, 50]],
   [1, [0, 5, 10, 15, 20, 25]],
-  [2, [0, 0, 10, 10, 20, 20]],
+  [2, [0, 0.8, 10, 10.8, 20, 20.8]],
 ]) {
   test(`launch level ${level} enforces its finite salvo schedule across independent reservations`, () => {
     const s = fresh(),
@@ -84,7 +84,7 @@ test('a partial level-two burst cannot reset on the next simulation tick', () =>
   E.step(s, 0.05);
   E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
   E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
-  assert.equal(s.units[1].delay, 0);
+  assert.equal(s.units[1].delay, 0.75);
   assert.ok(Math.abs(s.units[2].delay - 9.95) < 1e-9);
 });
 
@@ -100,7 +100,7 @@ test('save/load preserves a partially consumed burst and upgrades never reschedu
   E.step(s, 0.05);
   E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
   E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
-  assert.equal(s.units[1].delay, 0);
+  assert.equal(s.units[1].delay, 0.75);
   assert.ok(Math.abs(s.units[2].delay - 9.95) < 1e-9);
 
   s = fresh();
@@ -117,7 +117,7 @@ test('save/load preserves a partially consumed burst and upgrades never reschedu
   );
   assert.equal(E.availableLaunchStock(b, 'drone'), stock);
   E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
-  assert.equal(s.units.at(-1).delay, 20);
+  assert.equal(s.units.at(-1).delay, 20.8);
 });
 
 test('only a connected factory can stage its warehouse stock internally; factory launch is slow and drone-only', () => {

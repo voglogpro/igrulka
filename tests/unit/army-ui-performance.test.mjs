@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
 import { ARMY_CATEGORIES, updateArmyRecruitment } from '../../src/ui/army-recruitment.js';
 import { DistrictHUD } from '../../src/ui/districts.js';
+import { renderSquadRoster } from '../../src/ui/deployment.js';
+import { createArmyNavigation } from '../../src/ui/controllers/army-navigation.js';
 
 function recruitmentDOM(t) {
   const nodes = new Map(),
@@ -107,4 +109,113 @@ test('district orders handle a large selected army without repeated selection se
   state.groundUnits.at(-1).carrierId = null;
   hud.update(state, selection, true);
   assert.equal(get('.district-order').disabled, false);
+});
+
+test('large saved groups resolve in linear work and changing selection keeps roster buttons mounted', (t) => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document'),
+    state = E.createGame(8113),
+    nodes = new Map();
+  let writes = 0,
+    idReads = 0,
+    html = '';
+  const host = {
+    dataset: {},
+    classList: { toggle() {} },
+    querySelector: (selector) => nodes.get(selector),
+    querySelectorAll: (selector) => [...(nodes.get(selector)?.values() || [])],
+    get innerHTML() {
+      return html;
+    },
+    set innerHTML(value) {
+      html = value;
+      writes++;
+      nodes.clear();
+      nodes.set('[data-roster-selected]', { textContent: '' });
+      for (const [, attribute, value] of html.matchAll(/data-(army-role|squad|group)="([^"]+)"/g)) {
+        const selector = `[data-${attribute}]`;
+        if (!nodes.has(selector)) nodes.set(selector, new Map());
+        const name = attribute === 'army-role' ? 'armyRole' : attribute;
+        const node = {
+          dataset: { [name]: value },
+          active: false,
+          classList: {
+            toggle(token, active) {
+              assert.equal(token, 'active');
+              node.active = active;
+            },
+          },
+        };
+        nodes.get(selector).set(value, node);
+      }
+    },
+  };
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: { querySelector: () => host },
+  });
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'document', previous);
+    else delete globalThis.document;
+  });
+  for (let i = 0; i < 500; i++) {
+    const unit = E.makeGround(state, 0, 'infantry', -1100, -300),
+      id = unit.id;
+    unit.squadId = 10000 + Math.floor(i / 5);
+    Object.defineProperty(unit, 'id', {
+      enumerable: true,
+      get() {
+        idReads++;
+        return id;
+      },
+    });
+    state.groundUnits.push(unit);
+  }
+  const ids = state.groundUnits.map((u) => u.id);
+  for (let n = 1; n <= 9; n++) state.groups[0][n] = ids.slice();
+  idReads = 0;
+  renderSquadRoster(state, []);
+  assert.ok(idReads < 12 * ids.length, `${idReads} ID reads for ${ids.length} units`);
+  assert.equal(writes, 1);
+  const firstWave = nodes.get('[data-squad]').get('10000'),
+    lastWave = nodes.get('[data-squad]').get('10099');
+  renderSquadRoster(state, [ids[0]]);
+  assert.equal(writes, 1);
+  assert.equal(firstWave.active, true);
+  assert.equal(lastWave.active, false);
+  assert.equal(nodes.get('[data-roster-selected]').textContent, ' · выбрано 1');
+  renderSquadRoster(state, [ids.at(-1)]);
+  assert.equal(writes, 1);
+  assert.equal(firstWave.active, false);
+  assert.equal(lastWave.active, true);
+  assert.equal(nodes.get('[data-squad]').get('10000'), firstWave);
+  state.groundUnits[0].hp = 0;
+  renderSquadRoster(state, [ids.at(-1)]);
+  assert.equal(writes, 2, 'a real composition change refreshes counts');
+  assert.match(host.innerHTML, /<b>499<\/b>/);
+});
+
+test('camera focus for a large selection reads the current selection once and keeps its original center and distance', () => {
+  const ids = Array.from({ length: 1000 }, (_, i) => i + 1),
+    calls = [];
+  const state = {
+    groundUnits: ids.map((id) => ({ id, hp: id === 1000 ? 0 : 100, x: id, z: -id })),
+  };
+  ids.includes = () => assert.fail('quadratic selection membership search');
+  let reads = 0;
+  const navigation = createArmyNavigation({
+    game: E,
+    getState: () => state,
+    getSelection: () => {
+      reads++;
+      return ids;
+    },
+    getWorld: () => ({ controls: { zoomDistance: 450 }, focus: (...args) => calls.push(args) }),
+    selectArmy() {},
+    toast() {},
+  });
+  navigation.focusUnits(ids);
+  assert.deepEqual(calls.pop(), [500, -500, 320]);
+  navigation.actions['army-focus']();
+  assert.deepEqual(calls.pop(), [500.5, -500.5, 220]);
+  assert.equal(reads, 1);
 });

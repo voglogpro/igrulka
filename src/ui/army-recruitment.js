@@ -77,7 +77,7 @@ export function recruitmentHTML({
   recruitMode = 'point',
 }) {
   const category = ARMY_CATEGORIES[armyCategory] || ARMY_CATEGORIES.infantry;
-  return `<div class="muster-overview"><div><h2>Состав и развёртывание</h2><p>Постоянная оборона и ручные приказы.</p></div><div class="muster-capacity"><b id="army-capacity"></b><span>состав / лимит</span></div></div><nav class="army-category-tabs" aria-label="Роды войск">${Object.entries(
+  return `<div class="muster-overview"><div><h2>Состав и развёртывание</h2><p>Постоянная оборона и ручные приказы.</p></div><div class="muster-capacity"><b id="army-capacity"></b><span>Войска и подготовка</span></div></div><nav class="army-category-tabs" aria-label="Роды войск">${Object.entries(
     ARMY_CATEGORIES,
   )
     .map(
@@ -103,7 +103,7 @@ export function armyTargetRequest(key, value) {
 
 function compositionHTML(state, category) {
   const report = E.armyCompositionStatus(state, 0);
-  return `<section class="composition-panel" aria-label="Постоянный состав обороны"><div class="composition-heading"><div><h3>Состав обороны</h3><p>Задайте цель по типам. Казармы и бронезаводы сами восполняют потери.</p></div><b id="composition-total"></b></div><div class="composition-columns"><span>Тип / состояние</span><span>В строю + очередь</span><span>Цель</span></div><div class="composition-rows">${category.keys
+  return `<section class="composition-panel" aria-label="Постоянный состав обороны"><div class="composition-heading"><div><h3>Состав обороны</h3><p>Задайте цель по типам. Казармы и бронезаводы сами восполняют потери.</p></div><div class="composition-actions"><b id="composition-total"></b><button data-action="defense-attack" disabled title="Отправить 30% готовых защитников в атаку без покупки новых бойцов">В атаку · 30%</button></div></div><div class="composition-columns"><span>Тип / состояние</span><span>В строю + очередь</span><span>Цель</span></div><div class="composition-rows">${category.keys
     .filter((key) => E.recruitmentFacility(key))
     .map((key) => {
       const row = report.types.find((t) => t.key === key);
@@ -138,7 +138,12 @@ function updateComposition(report) {
   }
 }
 
-export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'point' }) {
+export function updateArmyRecruitment({
+  state,
+  recruitCount,
+  recruitMode = 'point',
+  defenseAttackPending = false,
+}) {
   refreshRecruitmentChoices(state, recruitCount);
   const faction = state.sides[0],
     composition = E.armyCompositionStatus(state, 0);
@@ -170,6 +175,16 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
       )
       .join(' · ') || 'Постройте казармы или бронезавод у дороги';
   updateComposition(composition);
+  const attack = E.defenseAttackStatus(state, 0),
+    attackButton = $('[data-action="defense-attack"]');
+  const attackPending = defenseAttackPending || !!attackButton.dataset.pending;
+  attackButton.disabled = attackPending || !attack.ok;
+  attackButton.textContent = `В атаку · 30% (${attack.count})`;
+  attackButton.title = attackPending
+    ? 'Отдаём приказ'
+    : attack.reason ||
+      `Отправить ${attack.count} из ${attack.eligible} готовых защитников. Без доплаты; остальные держат оборону.`;
+  attackButton.setAttribute('aria-label', `Отправить 30% обороны в атаку: ${attack.count} бойцов`);
   $('#army-roster-label').textContent = `На поле: ${units.length} · выбрать по типу`;
   const counts = new Map();
   for (const unit of units) counts.set(unit.key, (counts.get(unit.key) || 0) + 1);

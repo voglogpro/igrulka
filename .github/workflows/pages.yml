@@ -31,13 +31,14 @@ jobs:
       - name: Prepare standalone game
         run: |
           version=$(node -p "require('./package.json').version")
-          mkdir -p "_site/releases/$version" _site/releases/8.10.3 _site/releases/8.11.0
+          mkdir -p "_site/releases/$version" _site/releases/8.10.3 _site/releases/8.11.0 _site/releases/8.11.1
           cp play/Skyfront.html "_site/releases/$version/index.html"
           # The old running servers advertise the root URL with protocol 10.
           # Keep their client stable while new invitations use a versioned path.
           git show 4b084d422ba54c0845371ebddbabc2c0cb2c0f88:play/Skyfront.html > _site/index.html
           cp _site/index.html _site/releases/8.10.3/index.html
           git show a66497e8d47af23a0661a88327f55073559288c4:play/Skyfront.html > _site/releases/8.11.0/index.html
+          git show 2d20ca02168d9c6b200b72a74c17c9abf535e8e5:play/Skyfront.html > _site/releases/8.11.1/index.html
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4

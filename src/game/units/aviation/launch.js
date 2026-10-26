@@ -121,7 +121,11 @@ export function launch(s, owner, key, aim, count = 1, siteId = null) {
       left = tempo.count;
     }
     const d = weaponStats(f, key),
-      delay = Math.max(0, next - s.time),
+      // Two upgraded rails share a ten-second window, but the second craft
+      // leaves later instead of occupying the first one's route and model.
+      slot = tempo.count - left,
+      launchAt = next + slot * COMBAT.cadence[key],
+      delay = Math.max(0, launchAt - s.time),
       route = flightRoute(origin, target, key);
     s.units.push({
       id: s.nextId++,

@@ -416,11 +416,28 @@
   line-height: 1.4;
   margin: 0;
 }
-.composition-heading > b {
+.composition-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 6px;
+}
+.composition-actions > b {
   white-space: nowrap;
   font-size: 18px;
   color: var(--accent);
   font-weight: 500;
+}
+#game .composition-actions [data-action='defense-attack'] {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid #e2b7796b;
+  border-radius: 3px;
+  background: #e2b77912;
+  color: var(--accent);
+  font-size: 10px;
+  white-space: nowrap;
 }
 .composition-columns,
 .composition-row {

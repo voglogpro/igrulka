@@ -58,6 +58,36 @@ const SHORT = {
   gepard: 'Gepard',
 };
 export const shortUnitName = (key) => SHORT[key] || E.GROUND_UNITS[key]?.name || key;
+const rosterNodes = new WeakMap();
+
+function rememberRosterNodes(host) {
+  const buttons = (selector, attribute) =>
+    new Map([...host.querySelectorAll(selector)].map((node) => [node.dataset[attribute], node]));
+  rosterNodes.set(host, {
+    selected: host.querySelector('[data-roster-selected]'),
+    roles: buttons('[data-army-role]', 'armyRole'),
+    waves: buttons('[data-squad]', 'squad'),
+    groups: buttons('[data-group]', 'group'),
+  });
+}
+
+function updateRosterSelection(host, selection, chosen, chips, waves, groups) {
+  const nodes = rosterNodes.get(host);
+  if (!nodes) return;
+  const label = selection.length ? ` · выбрано ${selection.length}` : '';
+  if (nodes.selected && nodes.selected.textContent !== label) nodes.selected.textContent = label;
+  for (const role of chips) nodes.roles.get(role.key)?.classList.toggle('active', role.active > 0);
+  for (const wave of waves)
+    nodes.waves.get(String(wave.id))?.classList.toggle(
+      'active',
+      wave.ids.some((id) => chosen.has(id)),
+    );
+  for (const group of groups)
+    nodes.groups.get(String(group.n))?.classList.toggle(
+      'active',
+      group.ids.some((id) => chosen.has(id)),
+    );
+}
 
 let collapsed = false;
 try {
@@ -80,7 +110,9 @@ export function toggleSquadRoster() {
 export function renderSquadRoster(state, selection) {
   const host = $('#groups-bar');
   const chosen = new Set(selection);
-  const field = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0 && !u.civil);
+  const own = state.groundUnits.filter((u) => u.side === 0 && u.hp > 0),
+    field = own.filter((u) => !u.civil),
+    ownIds = new Set(own.map((u) => u.id));
   const squads = E.squadRoster(state, 0);
   const roles = new Map();
   for (const u of field) {
@@ -99,7 +131,7 @@ export function renderSquadRoster(state, selection) {
   const waves = squads.filter((g) => g.ids.length + g.queued > 1);
   const groups = [];
   for (let n = 1; n <= 9; n++) {
-    const ids = E.getGroup(state, 0, n);
+    const ids = (state.groups?.[0]?.[n] || []).filter((id) => ownIds.has(id));
     if (ids.length) groups.push({ n, ids });
   }
   const order = Object.keys(E.GROUND_UNITS);
@@ -107,18 +139,21 @@ export function renderSquadRoster(state, selection) {
   host.hidden = !chips.length;
   const signature = JSON.stringify([
     collapsed,
-    chips,
-    waves.map((g) => [g.id, g.key, g.ids.length, g.queued, g.ids.some((id) => chosen.has(id))]),
-    groups.map((g) => [g.n, g.ids.length, g.ids.some((id) => chosen.has(id))]),
-    selection.length,
+    chips.map((r) => [r.key, r.count, r.queued]),
+    waves.map((g) => [g.id, g.key, g.ids.length, g.queued]),
+    groups.map((g) => [g.n, g.ids.length]),
   ]);
-  if (host.dataset.signature === signature) return;
+  if (host.dataset.signature === signature) {
+    updateRosterSelection(host, selection, chosen, chips, waves, groups);
+    return;
+  }
   host.dataset.signature = signature;
   host.classList.toggle('collapsed', collapsed);
   const total = field.length;
-  const head = `<div class="roster-head"><span>АРМИЯ <b>${total}</b>${selection.length ? ` · выбрано ${selection.length}` : ''}</span><button data-action="roster-toggle" title="${collapsed ? 'Развернуть' : 'Свернуть'} панель армии" aria-label="${collapsed ? 'Развернуть' : 'Свернуть'} панель армии">${collapsed ? '▸' : '▾'}</button></div>`;
+  const head = `<div class="roster-head"><span>АРМИЯ <b>${total}</b><span data-roster-selected>${selection.length ? ` · выбрано ${selection.length}` : ''}</span></span><button data-action="roster-toggle" title="${collapsed ? 'Развернуть' : 'Свернуть'} панель армии" aria-label="${collapsed ? 'Развернуть' : 'Свернуть'} панель армии">${collapsed ? '▸' : '▾'}</button></div>`;
   if (collapsed) {
     host.innerHTML = head;
+    rememberRosterNodes(host);
     return;
   }
   const roleChips = chips
@@ -144,4 +179,5 @@ export function renderSquadRoster(state, selection) {
     `<div class="roster-row">${roleChips}</div>` +
     (waveChips ? `<div class="roster-row"><small>Волны</small>${waveChips}</div>` : '') +
     (groupChips ? `<div class="roster-row"><small>Группы</small>${groupChips}</div>` : '');
+  rememberRosterNodes(host);
 }

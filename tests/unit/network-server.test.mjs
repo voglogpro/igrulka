@@ -310,7 +310,7 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
 
 test('old protocols are explicitly refused and protocol eleven creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 11);
+  assert.equal(PROTOCOL_VERSION, 12);
   const host = await connect();
   host.send({ type: 'create', protocol: 10, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);

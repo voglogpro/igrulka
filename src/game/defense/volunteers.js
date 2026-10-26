@@ -1,12 +1,46 @@
 import { validSide } from '../factions.js';
 import { GROUND_UNITS } from '../config.js';
 import { invalidateFrontline } from './cache.js';
+import { clearGroundRoute } from '../units/ground/route-queue.js';
+import { cancelTransportDelivery } from '../units/vehicles/transport.js';
 
 export function clearAutoDefense(u) {
   u.autoDefense = false;
   u.defenseTask = null;
   u.defensePost = null;
   u.defenseCapture = null;
+}
+
+// Accept the standing order now; the coordinator assigns its actual front
+// position through the bounded planning pulse. Do not first march a whole
+// batch to the same temporary rally and calculate one A* for every recruit.
+export function queueAutoDefense(s, units) {
+  const occupied = new Set();
+  for (const u of s.groundUnits) {
+    if (u.carrierId != null) occupied.add(u.carrierId);
+    if (u.boardingId != null) occupied.add(u.boardingId);
+  }
+  let queued = 0;
+  for (const u of units) {
+    if (GROUND_UNITS[u.key]?.support || occupied.has(u.id)) continue;
+    clearAutoDefense(u);
+    clearGroundRoute(u);
+    cancelTransportDelivery(u);
+    delete u.supplyTrip;
+    u.boardingId = null;
+    u.guard = null;
+    u.guardTargetId = null;
+    u.path = [];
+    u.order = null;
+    u.digging = false;
+    u.trenchId = null;
+    u.defenseReadyAt = 0;
+    u.autoDefense = true;
+    u.stance = { mode: 'defend', post: 'auto' };
+    queued++;
+  }
+  if (queued) invalidateFrontline(s);
+  return queued;
 }
 
 export function setAutoDefense(s, side, ids, enabled) {

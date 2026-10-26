@@ -219,7 +219,8 @@ export function tickUnit(s, u, dt, rates, hooks) {
   }
   u.groundCooldown = (cooldown * (1 + u.suppression)) / equipmentModifiers(u).rate;
   u.groundAmmo--;
-  if (d.heatPerShot) u.heat = Math.min(1.5, (u.heat || 0) + d.heatPerShot);
+  if (d.heatPerShot)
+    u.heat = Math.min(1.5, (u.heat || 0) + (aaMagazine?.heatPerShot ?? d.heatPerShot));
   u.targetX = tx;
   u.targetY = 2.5;
   u.targetZ = tz;

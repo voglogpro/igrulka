@@ -1,12 +1,14 @@
-import { FIELD, isInfantry, GROUND_UNITS } from '../../config.js';
+import { FIELD, isInfantry, GROUND_UNITS, BUILDINGS } from '../../config.js';
 import { clamp } from '../../shared/math.js';
-import { groundPath } from './navigation.js';
+import { groundPath, walkable } from './navigation.js';
 import { unloadGround, cancelTransportDelivery } from '../vehicles/transport.js';
 import { clearGroundRoute } from './route-queue.js';
 import { clearAutoDefense } from '../../defense/volunteers.js';
 import { invalidateFrontline } from '../../defense/cache.js';
 import { hostile } from '../../factions.js';
-export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
+import { trenchContested } from '../../defense/positions.js';
+import { invalidateTrenchLinks } from '../../defense/trench-links.js';
+export function orderGround(s, side, ids, aim, { preserveRoute = false, defer = false } = {}) {
   if (s.result) return 'Кампания завершена';
   if (aim?.targetId != null) {
     const target = [...s.groundUnits, ...s.buildings].find((v) => v.id === aim.targetId);
@@ -19,16 +21,40 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
     Math.abs(aim.z) > FIELD.z
   )
     return 'Выберите точку в пределах карты';
+  const selected = new Set(ids);
   const units = (s.groundUnits || []).filter(
-    (u) => u.side === side && u.hp > 0 && !u.carrierId && !u.downed && ids.includes(u.id),
+    (u) => u.side === side && u.hp > 0 && !u.carrierId && !u.downed && selected.has(u.id),
   );
+  // Large commands acknowledge their destinations without synchronously running
+  // hundreds of A* searches inside the click handler. Existing route fields
+  // persist pending work and allow immediate manual cancellation/replacement.
+  const queued = !preserveRoute && (defer || units.length >= 16);
   const destinations = groundFormationDestinations(s, side, units, aim);
+  const attackedBuilding =
+    queued && aim.targetId != null
+      ? s.buildings.find((b) => b.id === aim.targetId && hostile(s, side, b.side))
+      : null;
   let count = 0;
   for (let index = 0; index < units.length; index++) {
-    const u = units[index],
-      destination = destinations[index],
-      path = groundPath(s, u, destination, GROUND_UNITS[u.key].size * 0.42);
-    if (!path.length) continue;
+    const u = units[index];
+    let destination = destinations[index];
+    if (
+      attackedBuilding &&
+      !walkable(s, destination.x, destination.z, GROUND_UNITS[u.key].size * 0.42)
+    ) {
+      const b = attackedBuilding,
+        dx = u.x - b.x,
+        dz = u.z - b.z;
+      const length = Math.max(Math.abs(dx), Math.abs(dz), 1);
+      const half = (BUILDINGS[b.key]?.size || 30) * 0.56 + GROUND_UNITS[u.key].size * 0.42 + 4;
+      destination = {
+        x: b.x + ((dx || (side % 2 ? 1 : -1)) * half) / length,
+        z: b.z + (dz * half) / length,
+      };
+    }
+    const radius = GROUND_UNITS[u.key].size * 0.42,
+      path = queued ? [] : groundPath(s, u, destination, radius);
+    if (queued ? !walkable(s, destination.x, destination.z, radius) : !path.length) continue;
     delete u.supplyTrip;
     if (['medic', 'supply'].includes(GROUND_UNITS[u.key].support)) u.supportManual = true;
     if (!preserveRoute) clearGroundRoute(u);
@@ -36,7 +62,7 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
     cancelTransportDelivery(u);
     u.guard = null;
     u.guardTargetId = null;
-    if (!aim.keepStance) u.stance = null;
+    if (!aim.keepStance && !preserveRoute) u.stance = null;
     u.path = path;
     u.order = {
       ...destination,
@@ -48,6 +74,7 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false } = {}) {
     u.trenchId = null;
     u.boardingId = null;
     u.navRevision = s.networkRevision;
+    if (queued) u.routeState = { status: 'moving', retryAt: s.time };
     count++;
   }
   if (count) invalidateFrontline(s);
@@ -78,21 +105,21 @@ export function groundFormationDestinations(s, side, units, aim) {
 
 export function saveGroup(s, side, index, ids) {
   s.groups ||= [{}, {}];
-  const valid = [...new Set(ids)].filter((id) =>
-    s.groundUnits.some((u) => u.id === id && u.side === side && u.hp > 0),
-  );
+  const own = new Set(s.groundUnits.filter((u) => u.side === side && u.hp > 0).map((u) => u.id));
+  const valid = [...new Set(ids)].filter((id) => own.has(id));
   s.groups[side][index] = valid;
   return valid;
 }
 
-export const getGroup = (s, side, index) =>
-  (s.groups?.[side]?.[index] || []).filter((id) =>
-    s.groundUnits.some((u) => u.id === id && u.side === side && u.hp > 0),
-  );
+export const getGroup = (s, side, index) => {
+  const own = new Set(s.groundUnits.filter((u) => u.side === side && u.hp > 0).map((u) => u.id));
+  return (s.groups?.[side]?.[index] || []).filter((id) => own.has(id));
+};
 
 export function commandUnits(s, side, ids, command) {
+  const selected = new Set(ids);
   const units = s.groundUnits.filter(
-      (u) => u.side === side && u.hp > 0 && !u.downed && ids.includes(u.id),
+      (u) => u.side === side && u.hp > 0 && !u.downed && selected.has(u.id),
     ),
     fireState = !units.every((u) => u.holdFire),
     camoState = !units.filter((u) => isInfantry(u.key) && !u.carrierId).every((u) => u.camouflaged);
@@ -123,6 +150,8 @@ export function commandUnits(s, side, ids, command) {
       changed++;
     }
     if (command === 'dig' && isInfantry(u.key) && !u.carrierId) {
+      let t = (s.trenches ||= []).find((t) => Math.hypot(t.x - u.x, t.z - u.z) < 4);
+      if (t && trenchContested(s, t, side, u.id)) continue;
       delete u.supplyTrip;
       clearAutoDefense(u);
       clearGroundRoute(u);
@@ -132,12 +161,15 @@ export function commandUnits(s, side, ids, command) {
       u.order = null;
       u.moving = false;
       u.digging = true;
-      let t = (s.trenches ||= []).find((t) => Math.hypot(t.x - u.x, t.z - u.z) < 4);
       if (!t && s.trenches.length < 240) {
         t = { id: s.nextId++, side, x: u.x, z: u.z, progress: 0, yaw: u.yaw || 0 };
         s.trenches.push(t);
       }
       if (t) {
+        if (t.side !== side && hostile(s, t.side, side)) {
+          t.side = side;
+          invalidateTrenchLinks(s);
+        }
         u.trenchId = t.id;
         changed++;
       }

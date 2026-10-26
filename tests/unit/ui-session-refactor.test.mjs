@@ -176,7 +176,8 @@ test('campaign actions route actual file effects and deny solo-only actions duri
   const router = createActionRouter(actions.actions),
     button = { dataset: { action: 'new-confirm' } };
   router.dispatch('export');
-  assert.deepEqual(calls[0], ['download', '{"time":12.9}', 'skyfront-city-12.json']);
+  assert.equal(calls[0], 'persist');
+  assert.deepEqual(calls[1], ['download', '{"time":12.9}', 'skyfront-city-12.json']);
   router.dispatch('new-confirm', button);
   assert.equal(button.dataset.action, 'new');
   network = true;

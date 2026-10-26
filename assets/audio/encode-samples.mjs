@@ -1,5 +1,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
+const ordnance = [
+  'rocket-launch',
+  'cruise-launch',
+  'ballistic-launch',
+  'artillery-shot',
+  'missile-flight',
+  'missile-approach',
+];
 for (const name of [
   'fpv-rotor',
   'prop-engine',
@@ -7,6 +15,7 @@ for (const name of [
   'footstep-2',
   'footstep-3',
   'truck-engine',
+  ...ordnance,
 ]) {
   const wav = await readFile(new URL(`./${name}.wav`, import.meta.url));
   if (wav.toString('ascii', 0, 4) !== 'RIFF' || wav.toString('ascii', 8, 12) !== 'WAVE')
@@ -31,7 +40,7 @@ for (const name of [
   const encoded = pcm.toString('base64'),
     chunks = encoded.match(/.{1,120}/g);
   const source = [
-    `// Generated PCM16LE from assets/audio/${name}.wav; CC0 provenance: assets/audio/LICENSE.md.`,
+    `// Generated PCM16LE from assets/audio/${name}.wav; ${ordnance.includes(name) ? 'recording' : 'CC0'} provenance: assets/audio/LICENSE.md.`,
     '// Keep bundled: offline/file:// playback must not fetch or decode external media.',
     `export const sampleRate = ${rate};`,
     'export const pcm = [',

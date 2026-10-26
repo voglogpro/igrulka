@@ -106,6 +106,41 @@ function compileMask(s, radius) {
   }
   return { blocked, obstacles, terrain };
 }
+
+function connectedCells(grid) {
+  if (grid.components) return grid.components;
+  const blocked = grid.blocked;
+  const components = new Uint32Array(blocked.length),
+    queue = new Int32Array(blocked.length);
+  let label = 0;
+  for (let start = 0; start < blocked.length; start++) {
+    if (blocked[start] || components[start]) continue;
+    label++;
+    let head = 0,
+      tail = 1;
+    queue[0] = start;
+    components[start] = label;
+    const offer = (next) => {
+      if (!blocked[next] && !components[next]) {
+        components[next] = label;
+        queue[tail++] = next;
+      }
+    };
+    while (head < tail) {
+      const current = queue[head++],
+        column = current % WIDTH;
+      if (column > 0) offer(current - 1);
+      if (column < WIDTH - 1) offer(current + 1);
+      if (current >= WIDTH) offer(current - WIDTH);
+      if (current + WIDTH < blocked.length) offer(current + WIDTH);
+    }
+  }
+  // This optimistic graph deliberately ignores swept edge obstacles. It may
+  // still send a difficult query to A*, but never rejects a valid diagonal:
+  // that diagonal already requires both adjacent axis cells to be open.
+  grid.components = components;
+  return components;
+}
 function crossesRectangle(a, b, rectangle) {
   let low = 0,
     high = 1;
@@ -249,6 +284,8 @@ export function groundPath(s, from, to, radius = 3) {
   const start = nearest(from),
     end = nearest(to);
   if (start < 0 || end < 0) return [];
+  const components = connectedCells(grid);
+  if (components[start] !== components[end]) return [];
   const scores = new Float64Array(blocked.length);
   scores.fill(Infinity);
   scores[start] = 0;

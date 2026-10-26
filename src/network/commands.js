@@ -1,7 +1,8 @@
 import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
-export const PROTOCOL_VERSION = 11;
+// Equipment quotes and the army-wave command must match the client's rules.
+export const PROTOCOL_VERSION = 12;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -17,9 +18,12 @@ const ids = (list) =>
   list.length <= E.GROUND_COMMAND_LIMIT &&
   list.every(validId) &&
   new Set(list).size === list.length;
-const unitsOwned = (s, side, list) =>
-  ids(list) &&
-  list.every((id) => s.groundUnits.some((u) => u.id === id && u.side === side && u.hp > 0));
+const unitsOwned = (s, side, list) => {
+  if (!ids(list)) return false;
+  const owned = new Set();
+  for (const unit of s.groundUnits) if (unit.side === side && unit.hp > 0) owned.add(unit.id);
+  return list.every((id) => owned.has(id));
+};
 const object = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
 const invalid = 'Некорректная команда';
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
@@ -125,6 +129,9 @@ export function executeCommand(s, side, type, a = {}) {
       return unitsOwned(s, side, a.ids) && typeof a.enabled === 'boolean'
         ? E.setAutoDefense(s, side, a.ids, a.enabled)
         : invalid;
+    case 'defense-attack':
+      if (Object.keys(a).length) return invalid;
+      return E.launchDefenseAttack(s, side);
     case 'deploy': {
       if (
         !configured(E.GROUND_UNITS, a.key) ||

@@ -27,6 +27,8 @@ export const FRONTLINE = Object.freeze({
   donorShare: 0.5,
   pressureThreshold: 1.15,
   maxTransferDistance: 620,
+  rearTransferDistance: 2200,
+  crossTransferDistance: 3600,
   minDuty: 12,
   maxDuty: 24,
   calmSeconds: 6,

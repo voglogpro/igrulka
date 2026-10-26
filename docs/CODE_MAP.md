@@ -258,6 +258,33 @@
 
 ## Общие модули
 
+### Оборона и звук 8.11.2
+
+Пути игровых модулей в таблице указаны от `src/`.
+
+| Механика                                         | Модуль                                                 |
+| ------------------------------------------------ | ------------------------------------------------------ |
+| Баланс фронтов и ближайший подходящий защитник   | `game/defense/formation.js`                            |
+| Повторное занятие и оспаривание укреплений       | `game/defense/positions.js`, `fortifications.js` рядом |
+| Непрерывные участки укрытия                      | `game/defense/trench-links.js`                         |
+| Пакетная отрисовка рва                           | `rendering/defense/trench-links.js`                    |
+| Реакция на прорыв и резерв                       | `game/defense/frontline.js`, `reserves.js` рядом       |
+| Атака 30% пехоты                                 | `game/units/ground/defense-attack.js`                  |
+| Дозированное планирование больших приказов       | `game/units/ground/orders.js`, `route-queue.js` рядом  |
+| Быстрый отказ для несвязанных областей           | `game/units/ground/navigation.js`                      |
+| Стабильные кнопки больших групп                  | `ui/deployment.js`                                     |
+| Отложенное автосохранение и защита границ сессии | `ui/session/autosave.js`, подключение в `ui/app.js`    |
+| Кнопка атаки в составе обороны                   | `ui/army-recruitment.js`                               |
+| Цена, охлаждение и нагрев МОГ                    | `game/combat/upgrade-tiers.js`                         |
+| Дробная часть темпа МОГ                          | `game/combat/air-defense.js`                           |
+| Интервалы парного пуска                          | `game/units/aviation/launch.js`                        |
+| Записанные ракеты и артиллерия, ресемплинг       | `audio/ordnance.js`                                    |
+| Дистанция, приоритет и микс                      | `audio/game-audio.js`                                  |
+
+Источник и воспроизводимая подготовка аудио: `assets/audio/prepare-ordnance.py`,
+`ordnance-sources.json` и `LICENSE.md`. Замер обработчика приказа:
+`tests/soak/input-cost.mjs`. Итоговые проверки: [DEFENSE-8112](qa/DEFENSE-8112.md).
+
 Пополнение с индивидуальным назначением: `units/ground/deployment.js`; состав и ожидающие бойцы отряда: `squads.js`; выбор целей, классы брони и упреждение: `engagement.js`. Все пути здесь от `src/game/`. Интерфейс наведения и карточек — `src/ui/deployment.js`; линия пути — `src/rendering/deployment-preview.js`. Формат метаданных проверяется в `game/persistence/squads.js`.
 
 Расход пикселей — `src/rendering/performance/render-budget.js`; общий снимок видимости для отрисовки — `ground-visibility.js` рядом. Разбиение леса — `rendering/terrain/instance-tiles.js`; цветное объединение геометрии — `rendering/mesh-utils.js`; разворот самолётов — `rendering/models/aircraft-motion.js`. Сравнение тяжёлых сцен — `tests/browser/performance.py`, проверка нового набора — `tests/browser/deployment.py`.

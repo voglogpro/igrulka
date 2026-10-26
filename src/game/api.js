@@ -40,6 +40,11 @@ export { OIL, oilStorage, oilProduction, oilBurn, oilCost, hasOil } from './city
 export { berthOf, quayOf } from './city/ports.js';
 export { oilFieldAt } from './city/construction.js';
 export { setAutoDefense } from './defense/volunteers.js';
+export {
+  defenseAttackStatus,
+  launchDefenseAttack,
+  DEFENSE_ATTACK_PERCENT,
+} from './units/ground/defense-attack.js';
 export { frontlineReport } from './defense/frontline.js';
 export { fortificationStatus } from './defense/fortifications.js';
 export { FRONTLINE, FRONT_SECTORS, FORTIFICATION } from './defense/config.js';

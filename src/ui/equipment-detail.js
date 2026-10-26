@@ -95,5 +95,11 @@ export function equipmentHTML(state, entity) {
             ['Темп огня', percent(current.rate), percent(next.rate)],
             ['Разброс', percent(current.spread), percent(next.spread)],
           ];
+  if (entity.key === 'gun' || entity.key === 'mog')
+    rows.push([
+      'Охлаждение / нагрев',
+      `${percent(current.cooling)} / ${percent(current.heat)}`,
+      `${percent(next.cooling)} / ${percent(next.heat)}`,
+    ]);
   return `<section class="equipment-detail" aria-label="Оснащение"><div class="inspect-line"><b>Оснащение ${status.level + 1} / 3</b><span>${status.level === 2 ? 'Максимум' : 'Следующий уровень →'}</span></div>${rows.map(([label, value, future]) => `<div class="stat"><span>${label}</span><b>${value}${status.level < 2 ? ` → ${future}` : ''}</b></div>`).join('')}${status.level < 2 ? `<button data-upgrade="${entity.id}"${status.ok ? '' : ' disabled'} title="${escape(status.reason || 'Оплата только деньгами')}">Улучшить · ${status.cost} ₡</button>${status.reason ? `<p class="small-muted">${escape(status.reason)}</p>` : ''}` : ''}${!production && !launcher ? '<p class="small-muted">Урон и прочность не меняются.</p>' : ''}</section>`;
 }

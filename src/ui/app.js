@@ -2,6 +2,7 @@ import { createCommandExecutor } from './session/command-executor.js';
 import { resolveArmySelection } from './selection.js';
 import { advanceSimulationFrame } from './session/simulation-budget.js';
 import { createFrameTasks } from './session/frame-tasks.js';
+import { createAutosave } from './session/autosave.js';
 import { openMultiplayerEntry } from './session/multiplayer-entry.js';
 import { createStrikeController } from './controllers/strike-controller.js';
 import { createActionRouter } from './controllers/action-router.js';
@@ -51,6 +52,7 @@ let world,
   saveTimer = 0,
   uiTimer = 0,
   pointerBusy = false,
+  defenseAttackPending = false,
   lastResult = null,
   toastTimer,
   lastRaid = -10,
@@ -77,6 +79,13 @@ const campaignStore = createCampaignStore({
   game: E,
   notify: toast,
   reload: () => location.reload(),
+});
+const autosave = createAutosave({
+  getState: () => state,
+  getEpoch: () => campaignEpoch,
+  getSession: () => network,
+  isBlocked: () => campaignStore.replacing,
+  persist: (current) => campaignStore.persist(current),
 });
 audio.set(settings.sound, settings.volume);
 const armyNavigation = createArmyNavigation({
@@ -224,7 +233,9 @@ function home(side = 0) {
   );
 }
 function enterNetwork(session) {
+  if (autosave.pending) flushPersistence();
   campaignEpoch++;
+  defenseAttackPending = false;
   uiRefresh.clear();
   if (!soloBackup) {
     soloBackup = E.save(state);
@@ -289,7 +300,9 @@ function leaveNetwork(message) {
     if (message) toast(message);
     return;
   }
+  autosave.cancel();
   campaignEpoch++;
+  defenseAttackPending = false;
   uiRefresh.clear();
   network = null;
   state = E.load(soloBackup);
@@ -331,10 +344,14 @@ function toast(text, danger = false) {
   toastTimer = setTimeout(() => ($('#notice').hidden = true), 3600);
 }
 function persist() {
-  campaignStore.persist(state, network);
+  autosave.request();
+}
+function flushPersistence() {
+  autosave.flush();
 }
 function replaceCampaign(next) {
   campaignStore.replace(next, state, network, () => {
+    autosave.cancel();
     uiRefresh.clear();
     started = false;
     paused = true;
@@ -814,7 +831,7 @@ async function commandGround(p) {
           ? 'Войска направлены захватывать и охранять район'
           : p.boardId
             ? 'Бойцы направляются к транспорту'
-            : `Приказ: ${r} ед. → ${Math.round(p.x)}, ${Math.round(p.z)}`,
+            : `Приказ: ${r} ед. → ${Math.round(p.x)}, ${Math.round(p.z)}${r >= 16 ? ' · маршруты готовятся по очереди' : ''}`,
     );
     if (issuedMode === 'attackmove') clearTroopTarget();
     persist();
@@ -1190,7 +1207,12 @@ function updateLivePanel() {
     updateFactoryPlansPanel(state);
   }
   if (panel === 'army') {
-    updateArmyRecruitment({ state, recruitCount, recruitMode });
+    updateArmyRecruitment({
+      state,
+      recruitCount,
+      recruitMode,
+      defenseAttackPending: !!defenseAttackPending,
+    });
   }
   if (panel === 'economy') {
     const e = E.economy(state, 0);
@@ -1263,7 +1285,7 @@ const campaignActions = createCampaignActions({
   getState: () => state,
   isNetwork: () => !!network,
   getDifficulty: () => chosenDifficulty,
-  persist,
+  persist: flushPersistence,
   replaceCampaign,
   toast,
   files: browserCampaignFiles({ document, input: $('#import-file') }),
@@ -1275,6 +1297,30 @@ const actionRouter = createActionRouter({
   ...armyNavigation.actions,
   'army-stop': () => {
     troopCommand('stop');
+  },
+  'defense-attack': async (button) => {
+    if (defenseAttackPending) return;
+    const epoch = campaignEpoch;
+    const pending = { epoch };
+    defenseAttackPending = pending;
+    button.disabled = true;
+    button.dataset.pending = 'true';
+    try {
+      const result = await execute('defense-attack', {});
+      if (epoch !== campaignEpoch) return;
+      if (typeof result === 'string') toast(result, true);
+      else {
+        persist();
+        toast(`В атаку выдвигаются ${result} бойцов. Остальные держат оборону.`);
+      }
+    } catch {
+      if (epoch === campaignEpoch)
+        toast('Не удалось отдать приказ. Повторите после восстановления связи.', true);
+    } finally {
+      if (defenseAttackPending === pending) defenseAttackPending = false;
+      delete button.dataset.pending;
+      if (epoch === campaignEpoch) updateLivePanel();
+    }
   },
   network: () => {
     lobby.open();
@@ -1703,7 +1749,7 @@ bindPageLifecycle({
   },
   focusAudio: (visible) => audio.focus(visible),
   hasStarted: () => started,
-  persist,
+  persist: flushPersistence,
 });
 buildList();
 updateHUD();
@@ -1721,7 +1767,7 @@ window.skyfront = {
   chooseBuild,
   select,
   openPanel,
-  save: persist,
+  save: flushPersistence,
   isPaused: () => paused,
   getAudio: () => audio.diagnostics(),
   armStrike,

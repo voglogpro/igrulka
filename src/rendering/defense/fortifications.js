@@ -2,6 +2,7 @@ import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
 import { FORTIFICATION } from '../../game/defense/config.js';
 import { fortificationStatus } from '../../game/defense/fortifications.js';
+import { TrenchLinkView } from './trench-links.js';
 
 function template(stage) {
   const root = new T.Group(),
@@ -67,13 +68,14 @@ export class FortificationView {
     this.height = height;
     this.visible = visible;
     this.models = new Map();
+    this.seen = new Set();
     this.dummy = new T.Object3D();
     this.capacity = FORTIFICATION.maxPositions;
-    this.signature = '';
     this.pools = Array.from({ length: 3 }, (_, stage) => {
       const model = template(stage),
         mesh = new T.InstancedMesh(model.geometry, model.material, this.capacity);
       mesh.count = 0;
+      mesh.visible = false;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.frustumCulled = false;
@@ -81,48 +83,84 @@ export class FortificationView {
       scene.add(mesh);
       return mesh;
     });
+    this.links = new TrenchLinkView(scene, { height });
   }
   sync(state) {
-    const counts = [0, 0, 0],
-      seen = new Set();
-    let signature = '';
+    const seen = this.seen;
+    seen.clear();
+    let dirty = false,
+      shadowsChanged = false;
     for (const t of state.trenches || []) {
       if (seen.size >= this.capacity || !this.visible(state, t)) continue;
       seen.add(t.id);
-      const status = fortificationStatus(t);
-      const record = this.models.get(t.id) || {};
-      record.level = status.level;
-      record.x = t.x;
-      record.z = t.z;
-      this.models.set(t.id, record);
-      const d = this.dummy;
-      d.position.set(t.x, Math.max(0, this.height(t.x, t.z)) + 0.07, t.z);
-      d.rotation.set(0, t.yaw || 0, 0);
-      d.scale.set(1, 0.15 + Math.min(1, t.progress) * 0.85, 1);
-      d.updateMatrix();
-      this.pools[0].setMatrixAt(counts[0]++, d.matrix);
-      d.scale.set(1, 1, 1);
-      d.updateMatrix();
-      if (status.level >= 2) this.pools[1].setMatrixAt(counts[1]++, d.matrix);
-      if (status.level >= 3) this.pools[2].setMatrixAt(counts[2]++, d.matrix);
-      // Refresh shadows a few times while digging, then only on actual position/stage changes.
-      signature += `${t.id}:${status.level}:${Math.floor(t.progress * 3)}:${t.x}:${t.z}:${t.yaw || 0};`;
+      const status = fortificationStatus(t),
+        previous = this.models.get(t.id),
+        yaw = t.yaw || 0,
+        moved = !previous || previous.x !== t.x || previous.z !== t.z || previous.yaw !== yaw;
+      if (
+        moved ||
+        previous.level !== status.level ||
+        previous.side !== t.side ||
+        previous.progress !== status.progress
+      ) {
+        shadowsChanged ||=
+          moved ||
+          previous.level !== status.level ||
+          previous.side !== t.side ||
+          Math.floor(previous.progress * 3) !== Math.floor(status.progress * 3);
+        this.models.set(t.id, {
+          level: status.level,
+          x: t.x,
+          z: t.z,
+          yaw,
+          side: t.side,
+          progress: status.progress,
+          y: moved ? Math.max(0, this.height(t.x, t.z)) + 0.07 : previous.y,
+        });
+        dirty = true;
+      }
     }
-    for (const id of this.models.keys()) if (!seen.has(id)) this.models.delete(id);
-    for (let i = 0; i < 3; i++) {
-      this.pools[i].count = counts[i];
-      this.pools[i].instanceMatrix.needsUpdate = true;
-    }
-    const changed = signature !== this.signature;
-    this.signature = signature;
-    return changed;
+    for (const id of this.models.keys())
+      if (!seen.has(id)) {
+        this.models.delete(id);
+        dirty = shadowsChanged = true;
+      }
+    const counts = [0, 0, 0];
+    if (dirty)
+      for (const record of this.models.values()) {
+        const d = this.dummy;
+        d.position.set(record.x, record.y, record.z);
+        d.rotation.set(0, record.yaw, 0);
+        d.scale.set(1, 0.15 + record.progress * 0.85, 1);
+        d.updateMatrix();
+        this.pools[0].setMatrixAt(counts[0]++, d.matrix);
+        d.scale.set(1, 1, 1);
+        d.updateMatrix();
+        if (record.level >= 2) this.pools[1].setMatrixAt(counts[1]++, d.matrix);
+        if (record.level >= 3) this.pools[2].setMatrixAt(counts[2]++, d.matrix);
+      }
+    if (dirty)
+      for (let i = 0; i < 3; i++) {
+        const mesh = this.pools[i];
+        mesh.count = counts[i];
+        mesh.visible = mesh.count > 0;
+        if (mesh.count) {
+          mesh.instanceMatrix.clearUpdateRanges();
+          mesh.instanceMatrix.addUpdateRange(0, mesh.count * 16);
+          mesh.instanceMatrix.needsUpdate = true;
+        }
+      }
+    // Refresh shadows a few times while digging; moving soldiers alone neither
+    // rebuild the earthwork buffers nor invalidate their static shadow map.
+    return this.links.sync(state, seen) || shadowsChanged;
   }
   diagnostics() {
     return {
       positions: this.models.size,
       stages: this.pools.map((p) => p.count),
       capacity: this.capacity,
-      batches: 3,
+      links: this.links.diagnostics(),
+      batches: 6,
     };
   }
   dispose() {
@@ -133,5 +171,7 @@ export class FortificationView {
       mesh.material.dispose();
     }
     this.models.clear();
+    this.seen.clear();
+    this.links.dispose();
   }
 }

@@ -1,5 +1,64 @@
 # Recorded aircraft engines, ground engine and footsteps
 
+## Recorded rocket and artillery sounds, 8.11.2
+
+The following additions use downloaded recordings, not synthesized weapon noises.
+The publisher/source descriptions and licenses were checked on 2026-10-26.
+Each fictional game weapon uses an edited recording as a sound-design reference;
+this is not a claim that the game simulates that recording's exact weapon system.
+
+| Game asset                                   | Actual recording and credit                                                                                    | Primary source / license                                                                                                                                                                                                                                                               |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rocket-launch.wav`                          | “Rocket Launch.flac”, qubodup, extracted from U.S. Government footage                                          | [Freesound #182794](https://freesound.org/people/qubodup/sounds/182794/), CC0 1.0                                                                                                                                                                                                      |
+| `cruise-launch.wav`                          | “Tomahawk Missile Rocket Launch 2”, qubodup, extracted from U.S. Government footage of a BGM-109 launch        | [Freesound #162379](https://freesound.org/people/qubodup/sounds/162379/), CC0 1.0                                                                                                                                                                                                      |
+| `artillery-shot.wav`                         | “Artillery Gunfire”, qubodup, extracted from ArmyVideoTube U.S. Government footage                             | [Freesound #239137](https://freesound.org/people/qubodup/sounds/239137/), CC0 1.0                                                                                                                                                                                                      |
+| `missile-flight.wav`, `missile-approach.wav` | “Rocket Flight Loop”, qubodup, edited from NASA public-domain rocket footage                                   | [Freesound #171106](https://freesound.org/people/qubodup/sounds/171106/), CC0 1.0                                                                                                                                                                                                      |
+| `ballistic-launch.wav`                       | Minuteman III test launch, 19 February 2025; Staff Sgt. Joshua LeRoi, U.S. Space Force / Space Launch Delta 30 | [DVIDS #952860, VIRIN 250219-X-VJ291-1003](https://www.dvidshub.net/video/952860/minuteman-iii-test-launch-showcases-readiness-us-nuclear-forces-safe-effective-deterrent-non-narrated), marked PUBLIC DOMAIN; [DVIDS public-use conditions](https://www.dvidshub.net/about/copyright) |
+
+The flight loop and terminal approach cue contain recorded NASA rocket-engine
+noise. They are **not** recordings of a military missile flying past a microphone
+or of a ballistic warhead re-entering the atmosphere. The approach cue is a short
+fade of that real engine recording; no generated whistle or oscillator is added.
+
+For the DVIDS recording, no imagery, logos, identifiable people, speech or music
+is included. The appearance of U.S. Department of War (DoW) visual information
+does not imply or constitute DoW endorsement.
+
+Exact public download URLs, source SHA-256 hashes and crop times are in
+[`ordnance-sources.json`](ordnance-sources.json). The large source videos and
+listening files stay outside the distribution. DVIDS #926058 was also inspected
+but rejected because its audio track is silent; it is not a shipped asset.
+
+Processing: 16 kHz mono PCM16, 35 Hz high-pass, 7 kHz low-pass, a 3 dB bass shelf
+at 135 Hz, DC removal, edge fades and peak normalisation to 0.82. The flight loop
+has a 20 ms seam crossfade. Six runtime WAV files total **616,264 bytes**. No new
+weapon tone/noise synthesis is used. Existing rifle samples, UAV motors and
+ambient presets are unchanged. The runtime mixer retains distance, stereo,
+outdoor reverb, echo, the existing compressor and output ceiling.
+
+Rebuild the audio from the verified sources (FFmpeg required, one encoding thread):
+
+```sh
+python assets/audio/prepare-ordnance.py
+node assets/audio/encode-samples.mjs
+```
+
+Use `--sources-dir artifacts/qa` to reuse locally downloaded source files. The
+JavaScript PCM modules are embedded in the portable HTML and prepared by the
+existing audio Worker; playback does not fetch a file, decode an MP3 or allocate
+another sample bank per soldier.
+
+Derived WAV SHA-256:
+
+- `rocket-launch.wav`: `4074ddecaffec8def740582d5cd109278cb810641230171df42aba692d5e31a9`
+- `cruise-launch.wav`: `27902e9b852d8d7f89941d24612c55d129c56bc67645eb35906d7009f341e874`
+- `ballistic-launch.wav`: `fa1377bb5130862b278095b9a71bdcdfc0a88faeaf1e39f78b445c08ac433b3e`
+- `artillery-shot.wav`: `d73d5dc0b436d8a2201ef0f25845b5389aabf63fa610164db70a4f5dd5ac4f2f`
+- `missile-flight.wav`: `c1e8ac895836da17cc6a17a6802258d6a4b030af49005c4e964fcaffb55a4239`
+- `missile-approach.wav`: `fb9677befdfd4154a67bcd8341511f190eee1036a78095807196399cb64c700e`
+
+## Earlier recordings
+
 These recordings are released under **CC0 1.0 Universal**. They may be edited,
 redistributed and used commercially. Attribution is not required, but the authors
 and primary source pages are credited here. No account or API key is needed at runtime.

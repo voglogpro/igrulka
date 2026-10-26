@@ -69,6 +69,8 @@ const licenses = await Promise.all(
     'vendor/three/THREE-LICENSE.txt',
     'assets/fonts/golostext-OFL.txt',
     'assets/fonts/manrope-OFL.txt',
+    'assets/audio/LICENSE.md',
+    'assets/audio/CC0-1.0.txt',
   ].map((name) => readFile(path.join(root, name), 'utf8')),
 );
 html +=

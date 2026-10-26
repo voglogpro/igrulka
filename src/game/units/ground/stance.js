@@ -4,7 +4,7 @@ import { BRIDGES, walkable } from './navigation.js';
 import { orderGround } from './orders.js';
 import { guardGround } from './guard.js';
 import { prepareDefensivePosition } from '../../defense/fortifications.js';
-import { updateDefenseFormation } from '../../defense/formation.js';
+import { queueAutoDefense } from '../../defense/volunteers.js';
 
 // A stance is a standing order that outlives a single click: new units take it when they leave
 // the barracks. "attack" advances on the enemy headquarters with combat stops, "defend" holds
@@ -35,7 +35,13 @@ export function bridgePoint(side, post) {
 
 function defenders(s, side, post) {
   return s.groundUnits.filter(
-    (u) => u.side === side && u.hp > 0 && u.stance?.mode === 'defend' && u.stance.post === post,
+    (u) =>
+      u.side === side &&
+      u.hp > 0 &&
+      u.stance?.mode === 'defend' &&
+      (u.defensePost?.corridorId === post ||
+        u.stance.post === post ||
+        (u.stance.post === 'auto' && u.guard && (u.guard.z < 0 ? 'north' : 'south') === post)),
   ).length;
 }
 
@@ -80,6 +86,8 @@ export function applyStance(s, side, ids, stance) {
       if (u.order && u.order !== previous.get(u.id)) u.stance = { mode: 'attack' };
     return result;
   }
+  if (!stance.post || stance.post === 'auto')
+    return queueAutoDefense(s, units) || 'Выберите доступные боевые отряды';
   const post = stance.post && stance.post !== 'auto' ? stance.post : chooseBridge(s, side);
   const point = bridgePoint(side, post);
   const previous = new Map(units.map((u) => [u.id, u.guard]));
@@ -93,12 +101,6 @@ export function applyStance(s, side, ids, stance) {
       u.entrenched = false;
       assigned++;
     }
-  if (assigned && (!stance.post || stance.post === 'auto'))
-    updateDefenseFormation(
-      s,
-      side,
-      s.groundUnits.filter((u) => u.side === side && u.hp > 0),
-    );
   return assigned || 'Нет свободного доступного места для поста';
 }
 

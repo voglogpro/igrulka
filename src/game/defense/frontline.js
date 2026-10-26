@@ -49,8 +49,23 @@ export function observedFrontline(s, side, previous = []) {
       seen.set(u.id, { id: u.id, x: u.x, z: u.z, strength: defenseStrength(u), time: s.time });
       visible.add(u.id);
     }
+  const lines = corridorGeometry(s, side),
+    direction = side % 2 === 0 ? 1 : -1;
+  const urgency = new Map();
+  for (const v of seen.values()) {
+    let closest = lines[0];
+    for (const line of lines)
+      if (Math.abs(line.z - v.z) < Math.abs(closest.z - v.z)) closest = line;
+    const ownHalf = s.sides.length <= 2 || (closest.id === 'north' ? v.z <= 0 : v.z >= 0);
+    urgency.set(v.id, ownHalf ? Math.max(0, (closest.x - v.x) * direction - 80) * v.strength : 0);
+  }
   return {
-    seen: [...seen.values()].sort((a, b) => b.time - a.time || a.id - b.id).slice(0, C.maxSeen),
+    seen: [...seen.values()]
+      .sort(
+        (a, b) =>
+          (urgency.get(b.id) || 0) - (urgency.get(a.id) || 0) || b.time - a.time || a.id - b.id,
+      )
+      .slice(0, C.maxSeen),
     visible,
   };
 }
@@ -72,13 +87,41 @@ export function calculateFrontline(
 ) {
   const own = s.groundUnits.filter((u) => u.side === side && military(u));
   const lines = corridorGeometry(s, side, direction);
+  const rearAssignments = new Map();
+  const rearAssignment = (point) => {
+    if (rearAssignments.has(point)) return rearAssignments.get(point);
+    let closest = null,
+      best = Infinity;
+    for (const line of lines) {
+      const distance = Math.abs(line.z - point.z);
+      if (distance < best || (distance === best && line.id.localeCompare(closest.id) < 0)) {
+        closest = line;
+        best = distance;
+      }
+    }
+    let result = null;
+    if (
+      closest &&
+      (closest.x - point.x) * direction > 80 &&
+      (s.sides.length <= 2 || (closest.id === 'north' ? point.z <= 0 : point.z >= 0))
+    ) {
+      let slot = closest.slots[0];
+      for (const candidate of closest.slots)
+        if (Math.abs(candidate.z - point.z) < Math.abs(slot.z - point.z)) slot = candidate;
+      result = { corridorId: closest.id, slot: slot.slot };
+    }
+    rearAssignments.set(point, result);
+    return result;
+  };
+  const rearBreach = (line, point) => rearAssignment(point)?.corridorId === line.id;
+  const belongs = (line, point) => corridorContains(line, point) || rearBreach(line, point);
   const posts = [];
   const sectors = lines.map((line) => {
-    const enemies = memory.filter((v) => corridorContains(line, v));
+    const enemies = memory.filter((v) => belongs(line, v));
     const contacts = (s.contacts?.[side] || []).filter(
       (v) =>
         v.expires > s.time &&
-        corridorContains(line, v) &&
+        belongs(line, v) &&
         !visible.has(v.unitId) &&
         !memory.some((m) => m.id === v.unitId),
     );
@@ -119,7 +162,15 @@ export function calculateFrontline(
         (u) =>
           u.guard && Math.abs(u.z - slot.z) <= C.postGap * 0.65 && Math.abs(u.x - slot.x) <= 100,
       );
-      const nearby = enemies.filter((v) => Math.abs(v.z - slot.z) <= C.postGap * 0.8);
+      const nearby = enemies.filter((v) =>
+        rearBreach(line, v)
+          ? rearAssignment(v).slot === slot.slot
+          : Math.abs(v.z - slot.z) <= C.postGap * 0.8,
+      );
+      const breached = nearby.filter((v) => rearBreach(line, v));
+      const intrusion = breached
+        .slice()
+        .sort((a, b) => (a.x - b.x) * direction || b.strength - a.strength || a.id - b.id)[0];
       const localEnemy = nearby.reduce((sum, v) => sum + v.strength * decay(v), 0);
       const localContacts = contacts
         .filter((c) => Math.abs(c.z - slot.z) <= C.postGap)
@@ -133,6 +184,8 @@ export function calculateFrontline(
         reserved: occupants.length,
         pressure: (localEnemy + localContacts) / (localStrength + 1),
         enemy: localEnemy,
+        breakthrough: breached.reduce((sum, v) => sum + v.strength * decay(v), 0),
+        threatPoint: intrusion ? { x: intrusion.x, z: intrusion.z } : null,
         armor: nearby.reduce((sum, v) => sum + (v.strength >= 2.5 ? v.strength * decay(v) : 0), 0),
         knowledge,
         confidence,

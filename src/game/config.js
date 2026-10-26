@@ -40,8 +40,8 @@ export function defenseStats(f, b) {
     cooldown: d.cooldown / modifiers.rate,
     magazine: Math.ceil(shared ? (d.groundMagazine ?? d.magazine) : d.magazine),
     reload: shared ? (d.groundReload ?? d.reload) : d.reload,
-    cooling: d.cooling,
-    heatPerShot: d.heatPerShot,
+    cooling: d.cooling * (modifiers.cooling || 1),
+    heatPerShot: d.heatPerShot * (modifiers.heat || 1),
   };
 }
 export function canEngageAir(key, target) {
