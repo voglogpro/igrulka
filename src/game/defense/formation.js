@@ -5,7 +5,15 @@ import { FRONTLINE as C } from './config.js';
 import { corridorGeometry, defensePostPoint, spreadOrder } from './geometry.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-export function defenseAvailable(s, u) {
+export function occupiedDefenseCarriers(s) {
+  const occupied = new Set();
+  for (const u of s.groundUnits) {
+    if (u.carrierId != null) occupied.add(u.carrierId);
+    if (u.boardingId != null) occupied.add(u.boardingId);
+  }
+  return occupied;
+}
+export function defenseAvailable(s, u, occupied = null) {
   return (
     u.autoDefense &&
     (u.guard || (!u.order && !u.path?.length)) &&
@@ -18,7 +26,9 @@ export function defenseAvailable(s, u) {
     !u.routeState &&
     !GROUND_UNITS[u.key]?.support &&
     !u.civil &&
-    !s.groundUnits.some((v) => v.carrierId === u.id || v.boardingId === u.id)
+    !(occupied
+      ? occupied.has(u.id)
+      : s.groundUnits.some((v) => v.carrierId === u.id || v.boardingId === u.id))
   );
 }
 export function assignDefensePost(s, u, point, snap = false) {
@@ -31,7 +41,8 @@ export function assignDefensePost(s, u, point, snap = false) {
 // One bounded planning pulse, never a per-frame all-army repath.
 export function updateDefenseFormation(s, side, own) {
   const direction = side % 2 === 0 ? 1 : -1,
-    lines = corridorGeometry(s, side);
+    lines = corridorGeometry(s, side),
+    occupiedCarriers = occupiedDefenseCarriers(s);
   let attempts = 0,
     issued = 0;
   for (const u of own) {
@@ -40,7 +51,7 @@ export function updateDefenseFormation(s, side, own) {
       u.defenseCapture = null;
       continue;
     }
-    if (!defenseAvailable(s, u) || u.defenseTask) continue;
+    if (!defenseAvailable(s, u, occupiedCarriers) || u.defenseTask) continue;
     if (u.defenseCapture) {
       const site = s.districts.find((v) => v.id === u.defenseCapture.districtId);
       if (site?.owner !== side && site?.owner == null && site?.hp > 0) continue;
@@ -58,7 +69,7 @@ export function updateDefenseFormation(s, side, own) {
       if (assignDefensePost(s, u, point)) issued++;
     }
   }
-  const volunteers = own.filter((u) => defenseAvailable(s, u));
+  const volunteers = own.filter((u) => defenseAvailable(s, u, occupiedCarriers));
   const refs = () => volunteers.filter((u) => u.defensePost).map((u) => u.defensePost);
   // A lost primary position is filled from a spare row, never by moving its sole neighbour.
   // This keeps a casualty from creating a permanent hole after all initial assignments are done.

@@ -1,6 +1,7 @@
 import { createCommandExecutor } from './session/command-executor.js';
 import { resolveArmySelection } from './selection.js';
 import { advanceSimulationFrame } from './session/simulation-budget.js';
+import { createFrameTasks } from './session/frame-tasks.js';
 import { openMultiplayerEntry } from './session/multiplayer-entry.js';
 import { createStrikeController } from './controllers/strike-controller.js';
 import { createActionRouter } from './controllers/action-router.js';
@@ -70,6 +71,7 @@ let world,
   interactionRevision = 0,
   campaignEpoch = 0;
 const audio = new GameAudio();
+const uiRefresh = createFrameTasks();
 const campaignStore = createCampaignStore({
   storage,
   game: E,
@@ -223,6 +225,7 @@ function home(side = 0) {
 }
 function enterNetwork(session) {
   campaignEpoch++;
+  uiRefresh.clear();
   if (!soloBackup) {
     soloBackup = E.save(state);
     soloStarted = started;
@@ -287,6 +290,7 @@ function leaveNetwork(message) {
     return;
   }
   campaignEpoch++;
+  uiRefresh.clear();
   network = null;
   state = E.load(soloBackup);
   world.state = state;
@@ -331,6 +335,7 @@ function persist() {
 }
 function replaceCampaign(next) {
   campaignStore.replace(next, state, network, () => {
+    uiRefresh.clear();
     started = false;
     paused = true;
     acc = 0;
@@ -383,30 +388,40 @@ function frame(dt) {
   uiTimer += dt;
   if (uiTimer > 0.35) {
     uiTimer = 0;
-    updateHUD();
-    updateLivePanel();
-    if (strike.model.aiming) updateStrikeHUD();
-    if (troopMode === 'deploy') previewDeployment(deployPoint, true);
-    if (!pointerBusy && armySelection.length) {
-      const unitsById = new Map(state.groundUnits.map((u) => [u.id, u]));
-      if (
-        armySelection.some((id) => {
-          const u = unitsById.get(id);
-          return !u || u.hp <= 0 || u.carrierId;
-        })
-      )
-        selectArmy(armySelection.filter((id) => unitsById.get(id)?.hp > 0));
-    }
-    if (selected && !pointerBusy) renderInspector();
-    world.updateMinimap($('#minimap'));
-    renderGroups();
-    if (state.result && !lastResult) {
-      lastResult = state.result;
-      persist();
-      $('#result').hidden = false;
-      $('#result').innerHTML =
-        `<span class="eyebrow">${network ? 'МАТЧ ЗАВЕРШЁН' : 'КАМПАНИЯ ЗАВЕРШЕНА'}</span><h2>${state.result === 'victory' ? (state.sides.length === 4 ? 'Оба вражеских штаба уничтожены' : 'Командный пункт врага уничтожен') : state.sides.length === 4 ? 'Оба союзных штаба потеряны' : 'Ваш командный пункт потерян'}</h2><p>${time(state.time)} · Перехватов: ${state.sides[0].kills} · Дорог выведено из строя: ${state.stats.roadsCut}</p><button class="primary" data-action="${network ? 'network-leave' : 'new'}">${network ? 'Закрыть матч' : 'Новая кампания'}</button>`;
-    }
+    // Do not stack every periodic DOM/minimap pass on one expensive army tick.
+    // Closures read the current campaign/selection when executed, never a stale snapshot.
+    uiRefresh.request({
+      hud: updateHUD,
+      panel: updateLivePanel,
+      targeting: () => {
+        if (strike.model.aiming) updateStrikeHUD();
+        if (troopMode === 'deploy') previewDeployment(deployPoint, true);
+      },
+      inspection: () => {
+        if (pointerBusy) return;
+        if (armySelection.length) {
+          const unitsById = new Map(state.groundUnits.map((u) => [u.id, u]));
+          if (
+            armySelection.some((id) => {
+              const u = unitsById.get(id);
+              return !u || u.hp <= 0 || u.carrierId;
+            })
+          )
+            selectArmy(armySelection.filter((id) => unitsById.get(id)?.hp > 0));
+        }
+        if (selected) renderInspector();
+      },
+      minimap: () => world.updateMinimap($('#minimap')),
+      groups: renderGroups,
+    });
+  }
+  uiRefresh.runNext();
+  if (state.result && !lastResult) {
+    lastResult = state.result;
+    persist();
+    $('#result').hidden = false;
+    $('#result').innerHTML =
+      `<span class="eyebrow">${network ? 'МАТЧ ЗАВЕРШЁН' : 'КАМПАНИЯ ЗАВЕРШЕНА'}</span><h2>${state.result === 'victory' ? (state.sides.length === 4 ? 'Оба вражеских штаба уничтожены' : 'Командный пункт врага уничтожен') : state.sides.length === 4 ? 'Оба союзных штаба потеряны' : 'Ваш командный пункт потерян'}</h2><p>${time(state.time)} · Перехватов: ${state.sides[0].kills} · Дорог выведено из строя: ${state.stats.roadsCut}</p><button class="primary" data-action="${network ? 'network-leave' : 'new'}">${network ? 'Закрыть матч' : 'Новая кампания'}</button>`;
   }
 }
 function handleEvent(e) {
@@ -1624,7 +1639,9 @@ document.addEventListener('change', async (ev) => {
 $('#import-file').addEventListener('change', campaignActions.importFile);
 bindMinimap($('#minimap'), {
   focusInput: () => world.controls.focusInput(),
-  focus: (x, z) => world.focus(x, z),
+  // A map click changes viewpoint directly; flying across the entire map
+  // repeatedly rendered high-resolution shadows for intermediate locations.
+  focus: (x, z) => world.focus(x, z, undefined, { instant: true }),
   map: E.MAP,
 });
 const keyboard = createKeyboardController({

@@ -28,9 +28,8 @@ export class DistrictHUD {
   update(state, selection, visible) {
     this.host.hidden = !visible;
     if (!visible) return;
-    const units = state.groundUnits.filter(
-      (u) => selection.includes(u.id) && u.hp > 0 && !u.carrierId,
-    );
+    const selected = new Set(selection),
+      units = state.groundUnits.filter((u) => selected.has(u.id) && u.hp > 0 && !u.carrierId);
     const foot = units.some((u) => E.isInfantry(u.key));
     for (const card of this.host.children) {
       const d = E.districtStatus(state, card.dataset.district);

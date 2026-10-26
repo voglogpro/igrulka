@@ -2,7 +2,9 @@ import { isInfantry, GROUND_UNITS } from '../config.js';
 import { event } from '../shared/events.js';
 import { FORTIFICATION as C } from './config.js';
 import { invalidateFrontline } from './cache.js';
+import { staticObjectsInBounds } from '../shared/static-spatial.js';
 const workTimes = new WeakMap();
+const labels = ['Земляные работы', 'Окоп', 'Укреплённый окоп', 'Блокпост'];
 
 export function fortificationStatus(t) {
   const progress = Math.max(0, Math.min(1, t?.progress || 0));
@@ -21,7 +23,7 @@ export function fortificationStatus(t) {
     progress,
     nextProgress,
     cover: C.cover[level],
-    label: ['Земляные работы', 'Окоп', 'Укреплённый окоп', 'Блокпост'][level],
+    label: labels[level],
   };
 }
 
@@ -49,9 +51,14 @@ export function prepareDefensivePosition(s, u) {
     if (u.guard && u.digging) u.digging = false;
     return null;
   }
-  let t = s.trenches.find(
-    (t) => t.side === u.side && Math.hypot(t.x - u.x, t.z - u.z) < C.postRadius,
-  );
+  let t = staticObjectsInBounds(
+    s,
+    'trenches',
+    u.x - C.postRadius,
+    u.z - C.postRadius,
+    u.x + C.postRadius,
+    u.z + C.postRadius,
+  ).find((t) => t.side === u.side && Math.hypot(t.x - u.x, t.z - u.z) < C.postRadius);
   if (!t && s.trenches.length < C.maxPositions) {
     t = { id: s.nextId++, side: u.side, x: u.x, z: u.z, progress: 0, yaw: u.yaw || 0 };
     s.trenches.push(t);
@@ -71,6 +78,7 @@ export function updateFortification(s, u, dt) {
     if (u.digging) u.digging = false;
     return;
   }
+  if (!u.digging && t.progress >= 1 && (t.fortificationWork || 0) >= C.maxWork) return;
   const speed = u.key === 'engineer' ? C.engineerSpeed : 1;
   const before = fortificationStatus(t).level;
   if (u.digging && isInfantry(u.key) && !u.moving) {

@@ -13,7 +13,11 @@ export function rememberInspectorCard(host) {
   const records = history(host);
   records.set(previous.id, {
     open: details.open,
-    scroll: details.querySelector(':scope > div')?.scrollTop || 0,
+    // Even reading scrollTop of a closed details body flushes pending layout.
+    // Keep its last visible position until the user opens the details again.
+    scroll: details.open
+      ? details.querySelector(':scope > div')?.scrollTop || 0
+      : records.get(previous.id)?.scroll || 0,
   });
   if (records.size > 96) records.delete(records.keys().next().value);
 }
@@ -29,8 +33,10 @@ export function restoreInspectorCard(host, state, id) {
   if (!details) return;
   const saved = history(host).get(id);
   details.open = saved?.open || false;
-  const body = details.querySelector(':scope > div');
-  if (body) body.scrollTop = saved?.scroll || 0;
+  if (details.open) {
+    const body = details.querySelector(':scope > div');
+    if (body) body.scrollTop = saved?.scroll || 0;
+  }
 }
 
 export function compactEquipmentAction(host, state, entity, destination) {

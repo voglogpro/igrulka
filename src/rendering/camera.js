@@ -121,13 +121,21 @@ export class FixedCamera {
     this.forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     this.right.set(-this.forward.z, 0, this.forward.x);
   }
-  focus(x, z, distance = CAMERA.max) {
+  focus(x, z, distance, { instant = false } = {}) {
     this.desired.set(
       MathUtils.clamp(x, -BOUNDS.x, BOUNDS.x),
       0,
       MathUtils.clamp(z, -BOUNDS.z, BOUNDS.z),
     );
-    this.zoomDistance = MathUtils.clamp(distance, CAMERA.min, CAMERA.max);
+    const requestedDistance =
+      distance === undefined ? (instant ? this.distance : CAMERA.max) : distance;
+    this.zoomDistance = MathUtils.clamp(requestedDistance, CAMERA.min, CAMERA.max);
+    if (instant) {
+      this.target.copy(this.desired);
+      this.distance = this.zoomDistance;
+      // Update the camera only; the normal next frame owns sync and rendering.
+      this.update(0);
+    }
   }
   update(dt = 1 / 60, keys = null) {
     if (this.enableKeyboardPan && keys) {

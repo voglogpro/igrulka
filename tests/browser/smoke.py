@@ -25,7 +25,9 @@ try:
                 page.on('response', lambda r: report['errors'].append(f'HTTP {r.status} {r.url}') if r.status>=400 else None)
             page.goto(target, wait_until='load', timeout=120000)
             page.wait_for_function('Boolean(window.skyfront)')
-            assert page.title().startswith('8.11.0')
+            page.wait_for_function('skyfront.getWorld().shadersReady')
+            assert page.evaluate('skyfront.getWorld().shaderWarmupStatus') in ['ready','timeout']
+            assert page.title().startswith('8.11.1')
             page.locator('[data-action="start"]').click()
             page.keyboard.press('Space')
             assert page.evaluate('skyfront.isPaused()')

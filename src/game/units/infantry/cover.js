@@ -11,6 +11,7 @@ import { COVER_PATCHES } from '../../map.js';
 import { segmentDistance } from '../../city/road-network.js';
 import { fortificationStatus } from '../../defense/fortifications.js';
 import { FORTIFICATION } from '../../defense/config.js';
+import { staticObjectsInBounds } from '../../shared/static-spatial.js';
 // Forests and thickets are generated with the terrain so hills and woods line up.
 export { COVER_PATCHES };
 const coverCache = new WeakMap();
@@ -77,7 +78,14 @@ export function coverInfo(s, u, from = null) {
     kind = patch.forest ? 'Лес' : 'Кустарник';
   }
   const infantry = isInfantry(u.key);
-  for (const b of s.buildings) {
+  for (const b of staticObjectsInBounds(
+    s,
+    'buildings',
+    u.x - MAX_COVER_RADIUS,
+    u.z - MAX_COVER_RADIUS,
+    u.x + MAX_COVER_RADIUS,
+    u.z + MAX_COVER_RADIUS,
+  )) {
     const dx = u.x - b.x,
       dz = u.z - b.z,
       size = BUILDINGS[b.key]?.size || 30;
@@ -102,7 +110,14 @@ export function coverInfo(s, u, from = null) {
         wall = { nx: 0, nz: Math.sign(dz), distance: edgeZ };
     }
   }
-  for (const t of s.trenches || [])
+  for (const t of staticObjectsInBounds(
+    s,
+    'trenches',
+    u.x - FORTIFICATION.coverRadius,
+    u.z - FORTIFICATION.coverRadius,
+    u.x + FORTIFICATION.coverRadius,
+    u.z + FORTIFICATION.coverRadius,
+  ))
     if (t.progress >= 1 && Math.hypot(t.x - u.x, t.z - u.z) < FORTIFICATION.coverRadius) {
       const fortification = fortificationStatus(t);
       cover = Math.max(cover, fortification.cover);
@@ -115,12 +130,14 @@ export function coverInfo(s, u, from = null) {
 }
 // Widest building footprint used as a cheap bounding-box reject before the exact segment test.
 const MAX_BLOCKER_RADIUS = Math.max(30, ...Object.values(BUILDINGS).map((b) => b.size || 0)) * 0.48;
+const MAX_COVER_RADIUS =
+  Math.max(30, ...Object.values(BUILDINGS).map((b) => b.size || 0)) * 0.75 + 12;
 export function lineOfSight(s, a, b) {
   const minX = Math.min(a.x, b.x) - MAX_BLOCKER_RADIUS,
     maxX = Math.max(a.x, b.x) + MAX_BLOCKER_RADIUS,
     minZ = Math.min(a.z, b.z) - MAX_BLOCKER_RADIUS,
     maxZ = Math.max(a.z, b.z) + MAX_BLOCKER_RADIUS;
-  for (const o of s.buildings) {
+  for (const o of staticObjectsInBounds(s, 'buildings', minX, minZ, maxX, maxZ)) {
     if (o.x < minX || o.x > maxX || o.z < minZ || o.z > maxZ) continue;
     if (o.hp <= 0 || o.demolished || o.id === a.id || o.id === b.id) continue;
     const d = BUILDINGS[o.key];

@@ -36,7 +36,7 @@ with sync_playwright() as p:
         report['cdnAppReadySeconds'] = round(time.monotonic()-started, 3)
         report['cdnNavigation'] = guest.evaluate('''()=>{const n=performance.getEntriesByType('navigation')[0];return {firstByteMs:n.responseStart,downloadMs:n.responseEnd-n.responseStart,transferBytes:n.transferSize}}''')
         report['cdnTitle'] = guest.title()
-        assert '8.11.0' in report['cdnTitle']
+        assert '8.11.1' in report['cdnTitle']
         guest.locator('#net-name').fill('CDN probe guest')
         guest.locator('[data-net="join"]').click()
         guest.locator('[data-net="ready"]').wait_for()

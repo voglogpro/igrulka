@@ -47,6 +47,8 @@ import { VehicleBatch } from './performance/vehicle-batch.js';
 import { BuildingBatch } from './performance/building-batch.js';
 import { ContactShadows } from './performance/contact-shadows.js';
 import { ShadowBudget } from './performance/shadow-budget.js';
+import { freezeStaticScenery } from './performance/static-scenery.js';
+import { warmSceneShaders } from './performance/shader-warmup.js';
 import { DeploymentPreview } from './deployment-preview.js';
 import * as E from '../game/index.js';
 import { BUILDINGS, riverX } from '../game/index.js';
@@ -144,6 +146,9 @@ export class RTSWorld {
     this.environment();
     this.landmarks();
     this.makeCover();
+    this.staticSceneryNodes = freezeStaticScenery(this.scene, {
+      exclude: [this.sun, this.sun.target, this.sunDisc],
+    });
     this.districtView = new DistrictView(this);
     this.settlementView = new SettlementView(this);
     this.selection = new T.Mesh(
@@ -329,7 +334,20 @@ export class RTSWorld {
       visible: (s, t) => t.side === 0 || E.fogVisible(s, 0, t.x, t.z),
     });
     this.trenchModels = this.fortifications.models;
+    // Prepare the shared body shader before the first recruited soldier enters.
+    // Initial sync below resets the seeded pool to zero visible instances.
+    this.infantry.pool('infantry', 0);
     this.sync();
+    this.shadersReady = false;
+    this.shaderWarmupStatus = 'warming';
+    this.shaderWarmup = warmSceneShaders(this.renderer, this.scene, this.camera, this.post).then(
+      (result) => {
+        this.shaderWarmupStatus = result.status;
+        this.shadersReady = true;
+        this.last = performance.now();
+        return result;
+      },
+    );
     // Let the app finish wiring its UI before the first GPU frame.
     this.frame = requestAnimationFrame(this.animate);
   }
@@ -467,8 +485,13 @@ export class RTSWorld {
     this.selection.material.color.set(factionHex(b.side));
     if (b.ground && b.side === 0) this.selection.visible = false;
   }
-  focus(x, z, distance = 570) {
-    this.controls.focus(x, z, distance);
+  focus(x, z, distance, options) {
+    this.controls.focus(
+      x,
+      z,
+      distance === undefined ? (options?.instant ? this.controls.distance : 570) : distance,
+      options,
+    );
   }
   road(...args) {
     return roadForWorld.call(this, ...args);
@@ -542,6 +565,7 @@ export class RTSWorld {
   diagnostics() {
     return {
       renderer: 'WebGL / Three.js',
+      shaderWarmup: this.shaderWarmupStatus,
       buildings: this.models.size,
       units: this.unitModels.size,
       groundUnits: this.groundModels.size,
@@ -588,6 +612,16 @@ export class RTSWorld {
       wallDt = Math.max(0, (now - this.last) / 1000);
     this.last = now;
     if (document.hidden) return;
+    if (!this.shadersReady) {
+      const keyboardAllowed =
+        !this.callbacks.isModal?.() &&
+        !document.activeElement?.closest?.(
+          'input,textarea,select,[contenteditable]:not([contenteditable="false"])',
+        );
+      if (!keyboardAllowed) this.keys = {};
+      this.controls.update(wallDt, keyboardAllowed ? this.keys : null);
+      return;
+    }
     if (this.shadowBudget.observeFrame(wallDt)) {
       this.sun.shadow.mapSize.setScalar(this.shadowBudget.mapSize);
       this.sun.shadow.map?.dispose();

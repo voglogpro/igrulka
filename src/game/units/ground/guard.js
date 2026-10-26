@@ -173,24 +173,32 @@ export function defendLineGround(s, side, ids, a, b) {
 }
 
 function threats(s, u) {
-  const alliedPosts = s.groundUnits.filter(
-    (v) => v.side === u.side && v.hp > 0 && v.guard && distance(v.guard, u.guard) <= ALLY_RADIUS,
-  );
-  return s.groundUnits
-    .filter(
-      (enemy) =>
-        hostile(s, enemy.side, u.side) &&
-        enemy.hp > 0 &&
-        !enemy.carrierId &&
-        distance(enemy, u.guard) <= MAX_LEASH &&
-        groundVisible(s, u.side, enemy) &&
-        (distance(enemy, u.guard) <= GUARD_RADIUS ||
-          alliedPosts.some(
-            (ally) => ally.id !== u.id && distance(enemy, ally.guard) <= ASSIST_RADIUS,
-          )) &&
-        lineOfSight(s, u, enemy),
-    )
-    .sort((a, b) => distance(a, u.guard) - distance(b, u.guard) || a.id - b.id);
+  // Rank cheap geometric candidates before the expensive visibility/terrain rays.
+  // A guard needs the nearest visible threat, not a line-of-sight result for
+  // every soldier in the opposing platoon each time its think clock fires.
+  let alliedPosts;
+  const candidates = [];
+  for (const enemy of s.groundUnits) {
+    if (!hostile(s, enemy.side, u.side) || enemy.hp <= 0 || enemy.carrierId) continue;
+    const range = distance(enemy, u.guard);
+    if (range > MAX_LEASH) continue;
+    if (range > GUARD_RADIUS) {
+      alliedPosts ||= s.groundUnits.filter(
+        (v) =>
+          v.id !== u.id &&
+          v.side === u.side &&
+          v.hp > 0 &&
+          v.guard &&
+          distance(v.guard, u.guard) <= ALLY_RADIUS,
+      );
+      if (!alliedPosts.some((ally) => distance(enemy, ally.guard) <= ASSIST_RADIUS)) continue;
+    }
+    candidates.push({ enemy, range });
+  }
+  candidates.sort((a, b) => a.range - b.range || a.enemy.id - b.enemy.id);
+  for (const { enemy } of candidates)
+    if (groundVisible(s, u.side, enemy) && lineOfSight(s, u, enemy)) return enemy;
+  return null;
 }
 
 export function updateGuard(s, u) {
@@ -199,7 +207,7 @@ export function updateGuard(s, u) {
   if ((u.guardNextThink || 0) > s.time) return;
   u.guardNextThink = s.time + 0.4;
   const d = GROUND_UNITS[u.key];
-  const target = u.holdFire ? null : threats(s, u)[0];
+  const target = u.holdFire ? null : threats(s, u);
   const firingDistance = (d.groundRange || 0) * 0.78;
   if (target && firingDistance > 0) {
     u.guardTargetId = target.id;

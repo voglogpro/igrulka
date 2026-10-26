@@ -266,6 +266,8 @@
 
 `archive/legacy/` нужен только тестам прежнего прототипа. `docs/history/` хранит планы прошлых версий. Готовый `play/Skyfront.html` объединяет текущие исходники и не служит местом ручных изменений.
 
+Зависания 8.11.1: индекс неподвижных препятствий и окопов — `game/shared/static-spatial.js`; ближайшая видимая угроза — `game/units/ground/guard.js`; занятые БТР в обороне — `game/defense/formation.js`. Фиксированные матрицы ландшафта — `rendering/performance/static-scenery.js`, матрицы городских моделей — `static-transforms.js` рядом. Растущие instance buffers и ленивые bounds пехоты — `rendering/models/infantry/soldiers.js`. Очередь периодических обновлений UI — `ui/session/frame-tasks.js`, подключение — `ui/app.js`; каталог армии — `ui/army-recruitment.js`. Сравнение длительности отдельных шагов и полного SHA состояния — `tests/soak/frame-cost.mjs`; условия и ограничения — [STUTTERS-8111.md](qa/STUTTERS-8111.md). Все пути относительно `src/`, кроме `tests/`.
+
 ## Карта, нефть и порты (8.6)
 
 - `src/game/map.js` — размеры поля (`MAP`, `FIELD`, `inField`), море (`SEA`, `seaDistance`, `isWater`; `riverDistance` оставлен как совместимая мера «меньше 44 — вода»), коридоры `CORRIDORS`, остров `ISLAND`, месторождения `OIL_FIELDS`, холмы `HILLS` с запечённой сеткой высот (`groundHeight`, `terrainClear` для линии видимости), леса `COVER_PATCHES`.

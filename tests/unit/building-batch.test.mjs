@@ -131,3 +131,91 @@ test('city culling includes offscreen shadow casters but excludes proxies outsid
     'culled proxy still exists for independent picking',
   );
 });
+
+test('static proxy matrices rest between changes and refresh construction, collapse, new rubble and root movement', () => {
+  const w = fixture(),
+    referenceWorld = fixture(),
+    batch = new BuildingBatch(w.scene),
+    definition = { id: 1, key: 'housing', side: 0, x: 20, z: 30, hp: 300, progress: 1 },
+    actual = model.call(w, definition),
+    reference = model.call(referenceWorld, definition),
+    models = new Map([[1, actual]]);
+  batch.sync(models);
+  let compositions = 0,
+    multiplications = 0;
+  actual.root.traverse((object) => {
+    const update = object.updateMatrix,
+      multiply = object.matrixWorld.multiplyMatrices;
+    object.updateMatrix = function () {
+      compositions++;
+      return update.call(this);
+    };
+    object.matrixWorld.multiplyMatrices = function (a, b) {
+      multiplications++;
+      return multiply.call(this, a, b);
+    };
+  });
+  for (let i = 0; i < 60; i++) {
+    batch.sync(models);
+    w.scene.updateMatrixWorld(true);
+  }
+  assert.equal(compositions, 0, 'unchanged proxies do not recompose hidden parts each frame');
+  assert.equal(multiplications, 0, 'unchanged proxies do not repeat world matrix multiplication');
+  const compare = () => {
+    batch.sync(models);
+    w.scene.updateMatrixWorld(true);
+    referenceWorld.scene.updateMatrixWorld(true);
+    const matrices = [];
+    reference.root.traverse((object) => matrices.push(object.matrixWorld.elements));
+    let index = 0;
+    actual.root.traverse((object) => {
+      assert.deepEqual(object.matrixWorld.elements, matrices[index++]);
+    });
+    assert.equal(index, matrices.length);
+  };
+  for (const m of [actual, reference]) {
+    m.content.scale.y = 0.45;
+    m.scaffold.visible = true;
+  }
+  compare();
+  assert.ok(compositions > 0 && multiplications > 0);
+  for (const m of [actual, reference]) {
+    m.content.scale.y = 0.2;
+    m.content.position.y = -2;
+    m.content.rotation.set(0.12, 0.05, 0.18);
+    m.root.position.x += 25;
+    m.root.rotation.y = 0.4;
+    const rubble = new T.Group(),
+      stone = new T.Mesh(w.boxGeo, w.mat('#665544'));
+    stone.position.set(6, 1, -3);
+    rubble.position.y = 0.5;
+    rubble.add(stone);
+    m.root.add(rubble);
+  }
+  compare();
+  const point = new T.Vector3(0, 0, 0).applyMatrix4(actual.content.matrixWorld),
+    ray = new T.Raycaster(new T.Vector3(point.x, 100, point.z), new T.Vector3(0, -1, 0));
+  assert.ok(
+    ray.intersectObject(actual.root, true).length,
+    'moved and collapsed building remains pickable',
+  );
+  for (const m of [actual, reference]) {
+    m.content.visible = false;
+    m.scaffold.visible = false;
+  }
+  compare();
+  for (const m of [actual, reference]) {
+    m.content.visible = true;
+    m.content.position.set(0, 0, 0);
+    m.content.rotation.set(0, 0, 0);
+    m.content.scale.set(1, 1, 1);
+  }
+  compare();
+  models.clear();
+  batch.sync(models);
+  actual.root.traverse((object) => {
+    assert.equal(object.matrixAutoUpdate, true);
+    assert.equal(object.matrixWorldAutoUpdate, true);
+  });
+  assert.equal(batch.transforms.records.size, 0);
+});

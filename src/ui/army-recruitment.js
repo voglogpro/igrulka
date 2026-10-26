@@ -114,8 +114,7 @@ function compositionHTML(state, category) {
     )}</div><p class="composition-note">0 — не пополнять. Цель учитывает всех живых бойцов этого типа и оплаченные заказы, включая ручную атаку. Новое пополнение само занимает фронт. Резерв: 250 ₡ и 5 сплавов; для техники — ещё 5 нефти.</p><p id="composition-message" role="status" aria-live="polite"></p></section>`;
 }
 
-function updateComposition(state) {
-  const report = E.armyCompositionStatus(state, 0);
+function updateComposition(report) {
   $('#composition-total').textContent = `Цель: ${report.totals.desired}`;
   for (const row of report.types) {
     const input = $(`[data-army-target="${row.key}"]`);
@@ -141,7 +140,8 @@ function updateComposition(state) {
 
 export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'point' }) {
   refreshRecruitmentChoices(state, recruitCount);
-  const faction = state.sides[0];
+  const faction = state.sides[0],
+    composition = E.armyCompositionStatus(state, 0);
   const sites = state.buildings.filter(
     (b) => b.side === 0 && ['barracks', 'vehiclebase'].includes(b.key) && b.hp > 0 && !b.demolished,
   );
@@ -169,19 +169,21 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
             : `${E.BUILDINGS[b.key].name}: очередь свободна`,
       )
       .join(' · ') || 'Постройте казармы или бронезавод у дороги';
-  updateComposition(state);
+  updateComposition(composition);
   $('#army-roster-label').textContent = `На поле: ${units.length} · выбрать по типу`;
+  const counts = new Map();
+  for (const unit of units) counts.set(unit.key, (counts.get(unit.key) || 0) + 1);
   const types = Object.entries(E.GROUND_UNITS)
-    .map(([key, d]) => ({ key, d, units: units.filter((u) => u.key === key) }))
-    .filter((g) => g.units.length);
-  const signature = types.map((g) => g.key + ':' + g.units.length).join(',');
+    .map(([key, d]) => ({ key, d, count: counts.get(key) || 0 }))
+    .filter((g) => g.count);
+  const signature = types.map((g) => g.key + ':' + g.count).join(',');
   if ($('#army-list').dataset.signature !== signature) {
     $('#army-list').dataset.signature = signature;
     $('#army-list').innerHTML =
       types
         .map(
           (g) =>
-            `<button class="army-role" data-army-role="${g.key}"><span>${g.d.name}</span><b>${g.units.length}</b></button>`,
+            `<button class="army-role" data-army-role="${g.key}"><span>${g.d.name}</span><b>${g.count}</b></button>`,
         )
         .join('') || '<span class="small-muted">Войска ещё не подготовлены</span>';
   }
@@ -202,7 +204,7 @@ export function updateArmyRecruitment({ state, recruitCount, recruitMode = 'poin
     button.hidden = !facilityReady;
     button.disabled =
       recruitMode === 'defend'
-        ? (E.armyCompositionStatus(state, 0).targets[key] || 0) + recruitCount > E.ARMY_TARGET_MAX
+        ? (composition.targets[key] || 0) + recruitCount > E.ARMY_TARGET_MAX
         : !facilityReady || resources || full;
     button.classList.toggle('recruit-ready', !button.disabled);
     button.setAttribute('aria-label', `${d.name}. ${d.role}`);

@@ -1,7 +1,7 @@
 import { GROUND_UNITS, isInfantry } from '../config.js';
 import { event } from '../shared/events.js';
 import { FRONTLINE as C } from './config.js';
-import { defenseAvailable, assignDefensePost } from './formation.js';
+import { defenseAvailable, assignDefensePost, occupiedDefenseCarriers } from './formation.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 export function updateDefenseReserves(s, side, own, report, memory) {
@@ -43,7 +43,8 @@ export function updateDefenseReserves(s, side, own, report, memory) {
     }
   }
   if ((memory.nextReinforce || 0) > s.time) return;
-  const volunteers = own.filter((u) => defenseAvailable(s, u));
+  const occupiedCarriers = occupiedDefenseCarriers(s);
+  const volunteers = own.filter((u) => defenseAvailable(s, u, occupiedCarriers));
   const active = own.filter((u) => u.defenseTask).length;
   const limit = Math.min(C.maxReinforcing, Math.floor(volunteers.length * C.reserveShare));
   if (active >= limit) return;

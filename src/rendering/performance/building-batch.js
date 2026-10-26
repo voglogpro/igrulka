@@ -1,5 +1,6 @@
 import { VehicleBatch } from './vehicle-batch.js';
 import { STATIC_BUILDING_KEYS } from '../models/buildings.js';
+import { StaticTransforms } from './static-transforms.js';
 import * as T from '../../../vendor/three/three.module.js';
 
 // Keep each building's hierarchy as its picking, scaffold and damage proxy.
@@ -19,7 +20,7 @@ export class BuildingBatch extends VehicleBatch {
     this.bounds = new T.Sphere(new T.Vector3(), 65);
     this.lastView = new T.Matrix4();
     this.lastShadow = new T.Matrix4();
-    this.states = new Map();
+    this.transforms = new StaticTransforms();
     this.initialized = false;
   }
   sync(models, camera = null, sun = null) {
@@ -28,23 +29,8 @@ export class BuildingBatch extends VehicleBatch {
     for (const [id, model] of models) {
       if (!STATIC_BUILDING_KEYS.has(model.root.userData.buildingKey)) continue;
       count++;
-      const content = model.content,
-        old = this.states.get(id),
-        root = model.root;
-      const values = [
-        root,
-        root.visible,
-        content.visible,
-        content.scale.y,
-        content.position.y,
-        content.rotation.x,
-        content.rotation.z,
-        model.scaffold.visible,
-      ];
-      if (!old || values.some((value, index) => value !== old[index])) {
-        dirty = true;
-        this.states.set(id, values);
-      }
+      if (this.transforms.sync(model)) dirty = true;
+      if (this.roots.get(id) !== model.root) dirty = true;
     }
     if (count !== this.roots.size) dirty = true;
     if (camera) {
@@ -77,10 +63,14 @@ export class BuildingBatch extends VehicleBatch {
     }
     if (!dirty) return;
     this.initialized = true;
+    const previous = new Set(this.roots.values());
     this.roots.clear();
     for (const [id, model] of models)
-      if (STATIC_BUILDING_KEYS.has(model.root.userData.buildingKey)) this.roots.set(id, model.root);
-    for (const id of this.states.keys()) if (!this.roots.has(id)) this.states.delete(id);
+      if (STATIC_BUILDING_KEYS.has(model.root.userData.buildingKey)) {
+        this.roots.set(id, model.root);
+        previous.delete(model.root);
+      }
+    for (const root of previous) this.transforms.release(root);
     super.sync(
       this.roots,
       null,
@@ -99,7 +89,7 @@ export class BuildingBatch extends VehicleBatch {
   dispose() {
     super.dispose();
     this.roots.clear();
-    this.states.clear();
+    this.transforms.dispose();
     this.initialized = false;
   }
 }

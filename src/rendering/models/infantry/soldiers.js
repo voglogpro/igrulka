@@ -13,6 +13,29 @@ const temp = new T.Object3D(),
   frustum = new T.Frustum(),
   viewProjection = new T.Matrix4(),
   bounds = new T.Sphere(new T.Vector3(), 12);
+// Keep the mesh, geometry, material and picking references stable when an army
+// outgrows its initial GPU buffer. Dispose only the old instance buffer/bindings.
+function reserveInstances(mesh, count) {
+  const old = mesh.instanceMatrix;
+  if (count <= old.count) return;
+  let capacity = old.count;
+  while (capacity < count) capacity *= 2;
+  const matrix = new T.InstancedBufferAttribute(new Float32Array(capacity * 16), 16);
+  matrix.setUsage(T.DynamicDrawUsage);
+  matrix.array.set(old.array);
+  mesh.dispose();
+  mesh.instanceMatrix = matrix;
+}
+function uploadInstances(mesh) {
+  mesh.visible = mesh.count > 0;
+  // Rendering is manually culled. Aggregate bounds are needed only on a click,
+  // where Three.js computes them lazily; invalidation preserves moving picking.
+  mesh.boundingSphere = null;
+  if (!mesh.count) return;
+  mesh.instanceMatrix.clearUpdateRanges();
+  mesh.instanceMatrix.addUpdateRange(0, mesh.count * 16);
+  mesh.instanceMatrix.needsUpdate = true;
+}
 // Centre-based helper: the shared world.box places boxes by their base.
 function part(w, root, x, y, z, sx, sy, sz, color, rx = 0, ry = 0, rz = 0) {
   const mesh = w.box(root, x, y - sy / 2, z, sx, sy, sz, color);
@@ -212,6 +235,7 @@ export class InfantryBatch {
       return mesh;
     });
     this.corpses = [];
+    this.selectionIds = new Set();
     this.selected = new T.InstancedMesh(
       new T.RingGeometry(0.9, 1, 24),
       new T.MeshBasicMaterial({
@@ -269,7 +293,7 @@ export class InfantryBatch {
   stampEquipment(u, matrix) {
     if (!upgradeable(u) || !(u.level > 0)) return;
     const mesh = this.equipment[Math.min(2, u.level) - 1];
-    if (mesh.count >= mesh.instanceMatrix.count) return;
+    reserveInstances(mesh, mesh.count + 1);
     mesh.setMatrixAt(mesh.count, matrix);
     mesh.userData.unitIds[mesh.count++] = u.id;
   }
@@ -281,6 +305,8 @@ export class InfantryBatch {
     );
     for (const p of this.pools.values()) p.count = 0;
     for (const mesh of this.equipment) mesh.count = 0;
+    this.selectionIds.clear();
+    for (const id of this.world.armySelection || []) this.selectionIds.add(id);
     let selected = 0;
     for (const u of units) {
       if (
@@ -303,7 +329,9 @@ export class InfantryBatch {
           Number.isFinite(u.targetX) && !u.moving
             ? Math.atan2(u.targetX - u.x, u.targetZ - u.z)
             : u.yaw || 0;
-      for (let m = 0; m < members && pool.count < 512; m++) {
+      reserveInstances(pool.body, pool.count + members);
+      reserveInstances(pool.legs, (pool.count + members) * 2);
+      for (let m = 0; m < members; m++) {
         const x = members > 1 ? (m - (members - 1) / 2) * 2.7 : 0,
           z = members > 1 ? (m % 2) * 2 - 1 : 0,
           c = Math.cos(angle),
@@ -368,7 +396,8 @@ export class InfantryBatch {
           pool.legs.userData.unitIds[index * 2 + leg] = u.id;
         }
       }
-      if (this.world.armySelection?.includes(u.id) && selected < 600) {
+      if (this.selectionIds.has(u.id)) {
+        reserveInstances(this.selected, selected + 1);
         temp.position.set(u.x, (u.y || 1) + 0.4, u.z);
         temp.rotation.set(-Math.PI / 2, 0, 0);
         temp.scale.setScalar(u.key === 'mog' ? 7 : u.key === 'assault' ? 4.5 : 1.8);
@@ -386,7 +415,9 @@ export class InfantryBatch {
         // Ease-out: the body drops fast, then settles.
         t = 1 - (1 - fall) * (1 - fall),
         sink = age > CORPSE_LIFE - 5 ? (age - (CORPSE_LIFE - 5)) / 5 : 0;
-      for (let m = 0; m < c.members && pool.count < 512; m++) {
+      reserveInstances(pool.body, pool.count + c.members);
+      reserveInstances(pool.legs, (pool.count + c.members) * 2);
+      for (let m = 0; m < c.members; m++) {
         const index = pool.count++,
           off = c.members > 1 ? (m - (c.members - 1) / 2) * 2.4 : 0,
           cs = Math.cos(c.yaw),
@@ -416,35 +447,23 @@ export class InfantryBatch {
         !isInfantry(u.key) &&
         !u.carrierId &&
         (!visibleIds || visibleIds.has(u.id)) &&
-        this.world.armySelection?.includes(u.id) &&
-        selected < 600
+        this.selectionIds.has(u.id)
       ) {
+        reserveInstances(this.selected, selected + 1);
         temp.position.set(u.x, (u.y || 1) + 0.4, u.z);
         temp.rotation.set(-Math.PI / 2, 0, 0);
         temp.scale.setScalar(Math.max(4, GROUND_UNITS[u.key].size * 0.72));
         temp.updateMatrix();
         this.selected.setMatrixAt(selected++, temp.matrix);
       }
-    for (const mesh of this.equipment) {
-      mesh.visible = mesh.count > 0;
-      if (mesh.count) {
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.computeBoundingSphere();
-      }
-    }
+    for (const mesh of this.equipment) uploadInstances(mesh);
     for (const p of this.pools.values()) {
       p.body.count = p.count;
       p.legs.count = p.count * 2;
-      p.body.instanceMatrix.needsUpdate = true;
-      p.legs.instanceMatrix.needsUpdate = true;
-      // Raycaster uses these bounds even though rendering frustum culling is manual.
-      // A squad that moved outside its original bounds must remain clickable.
-      if (p.count) {
-        p.body.computeBoundingSphere();
-        p.legs.computeBoundingSphere();
-      }
+      uploadInstances(p.body);
+      uploadInstances(p.legs);
     }
     this.selected.count = selected;
-    this.selected.instanceMatrix.needsUpdate = true;
+    uploadInstances(this.selected);
   }
 }

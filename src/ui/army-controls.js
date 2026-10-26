@@ -186,9 +186,12 @@ export function renderArmyControls({ state, armySelection }, primary) {
     );
   for (const command of ['dig', 'camo', 'board'])
     host.querySelector(`[data-troop="${command}"]`).disabled = !foot;
-  host.querySelector('[data-troop="unload"]').disabled = !units.some(
-    (u) => E.GROUND_UNITS[u.key].capacity && state.groundUnits.some((p) => p.carrierId === u.id),
+  const selectedCarriers = new Set(
+    units.filter((u) => E.GROUND_UNITS[u.key].capacity).map((u) => u.id),
   );
+  host.querySelector('[data-troop="unload"]').disabled =
+    !selectedCarriers.size ||
+    !state.groundUnits.some((passenger) => selectedCarriers.has(passenger.carrierId));
   let equipment = host.querySelector('#army-equipment-detail');
   if (!equipment) {
     equipment = document.createElement('div');
