@@ -131,6 +131,80 @@ test('a factory prepares its own desired bay locally and can exchange with anoth
   assert.equal(E.weaponStock(s, 0, 'heavy'), 2);
 });
 
+test('factory exchanges reserve distinct civic bays and an old occupied bay resumes the same paid delivery after loading', () => {
+  const s = fresh(),
+    a = ready(s, 'factory');
+  E.acceptLaunchDelivery(a, 'drone', 2);
+  s.sides[0].inventory.heavy = 2;
+  E.requestWeaponDelivery(s, 0, a.id, 'heavy', 2);
+  E.updateLaunchSupply(s);
+  assert.equal(typeof E.buildRoad(s, 0, -1105, -45, -1230, -45), 'object');
+  const b = ready(s, 'factory', -1200, -10);
+  E.acceptLaunchDelivery(b, 'drone', 2);
+  s.sides[0].inventory.drone = 0;
+  E.requestWeaponDelivery(s, 0, a.id, 'drone', 1);
+  until(
+    s,
+    () =>
+      s.ammoVehicles.some(
+        (v) => v.status === 'outbound' && v.targetId === a.id && v.cargo?.key === 'drone',
+      ),
+    20,
+  );
+  const van = s.ammoVehicles.find(
+    (v) => v.status === 'outbound' && v.targetId === a.id && v.cargo?.key === 'drone',
+  );
+  for (const other of s.ammoVehicles)
+    if (other !== van) {
+      assert.ok(
+        Math.hypot(van.goal.x - other.home.x, van.goal.z - other.home.z) >= 6.35,
+        'a delivery bay must not reuse another factory vehicle home',
+      );
+    }
+  const blocker = s.ammoVehicles.find((v) => v.depotId === a.id && v.status === 'idle');
+  assert.ok(blocker);
+  // This is the old saved trip that timed out: the paid destination is another
+  // stationary van's exact home. Keep its cargo and let normal logistics retry.
+  const blocked = { ...blocker.home };
+  van.goal = { ...blocked };
+  van.path[van.path.length - 1] = { ...blocked };
+  const cold = E.load(E.save(s)),
+    copy = cold.ammoVehicles.find((v) => v.id === van.id);
+  until(
+    s,
+    () => Math.hypot(van.goal.x - blocked.x, van.goal.z - blocked.z) > 6.35,
+    2.2,
+    () => E.step(cold, 0.05),
+  );
+  assert.deepEqual(van.cargo, { kind: 'weapon', key: 'drone', amount: 1 });
+  assert.deepEqual(copy.cargo, van.cargo);
+  assert.deepEqual(copy.goal, van.goal);
+  until(
+    s,
+    () => a.launchStore.drone >= 1,
+    100,
+    () => {
+      E.step(cold, 0.05);
+      for (const game of [s, cold]) {
+        assert.equal(E.weaponStock(game, 0, 'drone'), 2);
+        assert.equal(E.weaponStock(game, 0, 'heavy'), 2);
+        for (let i = 0; i < game.ammoVehicles.length; i++)
+          for (let j = i + 1; j < game.ammoVehicles.length; j++) {
+            const x = game.ammoVehicles[i],
+              y = game.ammoVehicles[j];
+            assert.ok(
+              Math.hypot(x.x - y.x, x.z - y.z) >= 6.34,
+              'the exchange must never pass through a parked van',
+            );
+          }
+      }
+    },
+  );
+  const fleet = (game) => game.ammoVehicles.map(({ revision, ...v }) => v);
+  assert.deepEqual(fleet(cold), fleet(s));
+  assert.deepEqual(cold.sides, s.sides);
+});
+
 test('losing an empty pickup vehicle cannot destroy weapons still inside the launch rack', () => {
   const { s, silo } = fixture();
   E.requestWeaponDelivery(s, 0, silo.id, 'ballistic', 1);

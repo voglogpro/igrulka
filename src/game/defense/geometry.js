@@ -12,8 +12,7 @@ export function corridorGeometry(s, side, direction = directionOf(side)) {
       (d) => Math.sign(d.z) === sign && (d.x === 0 || d.x * direction < 0),
     );
     const owned =
-      district &&
-      s.districts?.some((d) => d.id === district.id && allied(s, d.owner, side) && d.hp > 0);
+      district && s.districts?.some((d) => d.id === district.id && allied(s, d.owner, side));
     const x = owned
       ? district.x + direction * (district.radius + C.territoryAdvance)
       : -direction * C.homeLineX;
@@ -41,6 +40,8 @@ export function corridorGeometry(s, side, direction = directionOf(side)) {
       x,
       z: (sign * (shore + edge)) / 2,
       districtId: district?.id || null,
+      depot: district ? { x: district.x, z: district.z, radius: district.radius } : null,
+      secured: !!owned,
       points: [
         { x, z: sign * shore },
         { x, z: sign * edge },
@@ -57,7 +58,12 @@ export function defensePostPoint(lines, reference, direction) {
   const row = reference.row;
   return {
     x: slot.x - direction * (row === 0 ? 0 : C.supportOffset + (row - 1) * C.rowSpacing),
-    z: slot.z,
+    // The second infantry row and its vehicle support hold the actual depot.
+    // Outer/rear rows still span the complete land corridor, including flanks.
+    z:
+      line.secured && [1, 2, 3].includes(row) && line.depot
+        ? line.depot.z + (reference.slot - (line.slots.length - 1) / 2) * 20
+        : slot.z,
   };
 }
 

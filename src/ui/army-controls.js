@@ -3,6 +3,7 @@ import { $ } from './format.js';
 import { renderDefenseDetail } from './defense-inspector.js';
 import { icon } from './icons.js';
 import { updateEquipmentDetails } from './equipment-detail.js';
+import { depotLayerName } from '../game/defense/layers.js';
 import {
   rememberInspectorCard,
   restoreInspectorCard,
@@ -68,8 +69,9 @@ export function renderArmyControls({ state, armySelection }, primary) {
   const volunteers = candidates.filter((u) => u.autoDefense);
   const reinforcing = volunteers.filter((u) => u.defenseTask && !u.defenseTask.returning).length;
   const returning = volunteers.filter((u) => u.defenseTask?.returning).length;
+  const raids = volunteers.filter((u) => u.defenseMission).length;
   host.querySelector('#army-auto-defense-note').textContent = volunteers.length
-    ? `Автооборона: ${volunteers.length - reinforcing - returning} в резерве · ${reinforcing} усиливают участок · ${returning} возвращаются. Прямой приказ отменяет участие.`
+    ? `Рубежи: ${volunteers.length - reinforcing - returning - raids} · Перехват: ${reinforcing} · Обход: ${raids} · Возврат: ${returning}. Прямой приказ отменяет задачу.`
     : 'Защитники сами формируют фронт. Прямые приказы управляют выбранной группой.';
   const reloading = units.filter((u) => (u.groundReload || u.reloadLeft) > 0).length;
   $('#ground-info').textContent =
@@ -84,7 +86,7 @@ export function renderArmyControls({ state, armySelection }, primary) {
   $('#ground-state').textContent =
     units.length > 1
       ? `${units.filter((u) => E.isInfantry(u.key)).length} пехота · ${units.filter((u) => !E.isInfantry(u.key)).length} техника${reloading ? ` · ${reloading} перезарядка` : ''}${units.some((u) => u.guard) ? ' · охрана' : ''}`
-      : `${rank ? '★'.repeat(rank) + ' · ' : ''}${primary.guard ? 'Охрана · ' : ''}${cover.kind} · ${Math.round((primary.suppression || 0) * 100)}% подавление${primary.digging ? ' · роет окоп' : ''}${primary.carrierId ? ' · в транспорте' : ''}`;
+      : `${rank ? '★'.repeat(rank) + ' · ' : ''}${primary.autoDefense ? depotLayerName(primary) + ' · ' : primary.guard ? 'Охрана · ' : ''}${cover.kind} · ${Math.round((primary.suppression || 0) * 100)}% подавление${primary.digging ? ' · роет окоп' : ''}${primary.carrierId ? ' · в транспорте' : ''}`;
   $('#army-detail-text').textContent =
     `${d.role} Опыт ${Math.floor(primary.xp || 0)}/450 · ранг ${rank}. ${magazineText} ${primary.key === 'operator' ? `FPV ${primary.fpvAmmo ?? 3}/3, готов через ${Math.max(0, Math.ceil((primary.fpvReady || 0) - state.time))} с.` : ''}`;
   const position = state.trenches.find((t) => t.id === primary.trenchId && t.side === primary.side);

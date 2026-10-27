@@ -267,7 +267,7 @@ test('barracks can send recruits to guard, wait, or move with combat to rally', 
   }
 });
 
-test('default rally guards both human sides but leaves solo bot available for its AI', () => {
+test('default rally guards human troops and lets the solo bot enter the shared depot commander', () => {
   const s = fresh();
   const b = game.build(s, 1, 'barracks', 1080, -10);
   assert.notEqual(typeof b, 'string', b);
@@ -278,26 +278,23 @@ test('default rally guards both human sides but leaves solo bot available for it
   b.armyQueue[0].progress = 0.999;
   game.advance(s, 0.1);
   const first = s.groundUnits.find((u) => u.side === 1);
-  assert.equal(first.guard, undefined);
+  assert.equal(first.guard ?? null, null);
   for (let i = 0; i < 6; i++) unit(s, 1, 'infantry', 900, 200 + i * 8);
   s.ai.nextArmy = 0;
   s.time = 231;
   game.advance(s, 0.1);
-  assert.ok(
-    first.order?.mode === 'attackmove' ||
-      (first.aiDistrict && first.guard && first.path.length > 0),
-    'the actual army AI must give the recruit an attack or a reachable district post',
-  );
-  const districtGuards = s.groundUnits.filter((u) => u.side === 1 && u.aiDistrict && u.guard);
-  assert.ok(districtGuards.length > 0 && districtGuards.length <= 3);
-  const attacker = s.groundUnits.find((u) => u.side === 1 && u.order?.mode === 'attackmove');
-  assert.ok(attacker, 'district garrisons must leave an actual attacking reserve');
-  const enemyHQ = s.buildings.find((site) => site.side === 0 && site.key === 'hq');
-  const before = Math.hypot(attacker.x - enemyHQ.x, attacker.z - enemyHQ.z);
+  assert.ok(first.autoDefense && first.stance?.mode === 'defend');
+  const districtGuards = s.groundUnits.filter((u) => u.side === 1 && u.autoDefense);
+  assert.equal(districtGuards.length, 7);
+  assert.ok(districtGuards.every((u) => u.order?.mode !== 'attackmove'));
+  const advancing = districtGuards.find((u) => u.guard && u.path.length > 0);
+  assert.ok(advancing, 'the shared planner must issue a reachable depot post');
+  const goal = { ...advancing.guard },
+    before = Math.hypot(advancing.x - goal.x, advancing.z - goal.z);
   game.advance(s, 2);
   assert.ok(
-    Math.hypot(attacker.x - enemyHQ.x, attacker.z - enemyHQ.z) < before - 5,
-    'the attacking reserve must really move toward the enemy instead of idling at base',
+    Math.hypot(advancing.x - goal.x, advancing.z - goal.z) < before - 5,
+    'the guard must really move toward the depot approach instead of idling at base',
   );
   s.mode = 'multiplayer';
   assert.equal(defaultRallyMode(s, b), 'guard');

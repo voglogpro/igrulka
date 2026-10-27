@@ -44,6 +44,10 @@ function foot(s, side, d, key = 'infantry') {
   const u = E.makeGround(s, side, key, d.x, d.z);
   u.holdFire = true;
   u.autoDefense = false;
+  // These are deliberate local occupants, not idle bot recruits volunteering
+  // for a new post on their own city's front.
+  u.guard = { x: d.x, z: d.z };
+  u.order = { ...u.guard, mode: 'guard' };
   s.groundUnits.push(u);
   return u;
 }

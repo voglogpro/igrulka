@@ -2,6 +2,7 @@ import { BUILDINGS } from '../config.js';
 import { passable, dirtyNetwork, projectPoint } from './road-network.js';
 import { serviceFieldRoute, serviceParking, servicePathClear } from './service-field-routes.js';
 import { weatherSpeed } from '../weather.js';
+import { moveCivicVehicle } from '../units/ground/movement.js';
 
 const settings = () => BUILDINGS.service.service;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -164,20 +165,8 @@ function repairTick(s, v, dt) {
   }
   return t.hp < t.maxHp - 1e-8;
 }
-function move(v, travel) {
-  while (travel > 0 && v.path.length) {
-    const p = v.path[0],
-      length = distance(v, p);
-    if (length > 1e-8) {
-      const step = Math.min(travel, length);
-      v.yaw = Math.atan2(p.x - v.x, p.z - v.z);
-      v.x += ((p.x - v.x) * step) / length;
-      v.z += ((p.z - v.z) * step) / length;
-      travel -= step;
-    }
-    if (length <= travel + 1e-8 || distance(v, p) < 1e-8) v.path.shift();
-    else break;
-  }
+function move(s, v, dt, speed) {
+  moveCivicVehicle(s, v, dt, speed);
   if (!v.path.length) v.state = v.target ? 'repairing' : 'idle';
 }
 
@@ -275,7 +264,7 @@ export function updateServices(s, dt) {
       think(s, v, b);
     }
     if (v.state === 'outbound' || v.state === 'returning')
-      move(v, cfg.speed * weatherSpeed(s) * dt);
+      move(s, v, dt, cfg.speed * weatherSpeed(s));
     else if (v.state === 'repairing' && active(s, b) && !repairTick(s, v, dt)) {
       v.target = null;
       sendHome(s, v, b);

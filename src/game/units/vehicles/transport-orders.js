@@ -2,7 +2,12 @@ import { FIELD, GROUND_UNITS } from '../../config.js';
 import { clamp } from '../../shared/math.js';
 import { walkable } from '../ground/navigation.js';
 import { orderGround } from '../ground/orders.js';
-import { cancelTransportDelivery, planGroundUnload, unloadGround } from './transport.js';
+import {
+  cancelTransportDelivery,
+  planGroundUnload,
+  unloadGround,
+  UNLOAD_RADII,
+} from './transport.js';
 
 export { cancelTransportDelivery } from './transport.js';
 export const DELIVERY_ARRIVAL_RADIUS = 4;
@@ -62,6 +67,7 @@ export function transportDeliveryStatus(s, side, carrierId) {
 
 export function updateTransportDeliveries(s) {
   if (s.result) return;
+  let landingChecks = 0;
   for (const u of s.groundUnits) {
     const delivery = u.delivery;
     if (!delivery) continue;
@@ -73,7 +79,24 @@ export function updateTransportDeliveries(s) {
       cancelTransportDelivery(u);
       continue;
     }
-    if (u.path?.length) continue;
+    if (u.path?.length) {
+      // Local collision avoidance can wait outside an occupied landing instead
+      // of driving through the troops and only then discovering no unload slot.
+      // Keep the existing route/passengers and inspect at most two landings per
+      // tick, on each mission's retry cadence, rather than scanning every army
+      // for every loaded APC in the same frame.
+      if (
+        s.time >= delivery.retryAt &&
+        landingChecks < 2 &&
+        Math.hypot(u.x - delivery.x, u.z - delivery.z) <=
+          UNLOAD_RADII.at(-1) + GROUND_UNITS[u.key].size * 0.5 + 4
+      ) {
+        landingChecks++;
+        delivery.status = planGroundUnload(s, u, delivery).error ? 'blocked' : 'moving';
+        delivery.retryAt = s.time + DELIVERY_RETRY_SECONDS;
+      }
+      continue;
+    }
     if (s.time < delivery.retryAt) continue;
     const arrived = Math.hypot(u.x - delivery.x, u.z - delivery.z) <= DELIVERY_ARRIVAL_RADIUS;
     if (arrived) {

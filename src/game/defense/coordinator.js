@@ -9,6 +9,7 @@ import {
 } from './frontline.js';
 import { updateDefenseFormation } from './formation.js';
 import { updateDefenseReserves } from './reserves.js';
+import { updateDepotMissions } from './missions.js';
 
 export function updateDefense(s) {
   if (s.result) return;
@@ -23,6 +24,7 @@ export function updateDefense(s) {
     updateDefenseFormation(s, side, own);
     const report = calculateFrontline(s, side, memory.seen, observed.visible);
     updateDefenseReserves(s, side, own, report, memory);
+    updateDepotMissions(s, side, own, report, memory);
     cacheFrontline(s, side, calculateFrontline(s, side, memory.seen, observed.visible));
   }
 }

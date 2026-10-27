@@ -1,5 +1,6 @@
 import { GROUND_UNITS, BUILDINGS } from '../config.js';
 import { validSide } from '../factions.js';
+import { depotSupplyPoint } from '../defense/supply.js';
 import { walkable } from '../units/ground/navigation.js';
 import {
   AMMUNITION,
@@ -71,7 +72,7 @@ export function fieldSupplyJobs(s, side) {
           );
       if (!group) {
         const size = BUILDINGS[need.target.key]?.size || 0;
-        let point = null;
+        let point = depotSupplyPoint(s, need.target, FIELD_SUPPLY.serviceRadius);
         for (const [dx, dz] of [
           [12, 12],
           [-12, 12],
@@ -82,6 +83,7 @@ export function fieldSupplyJobs(s, side) {
           [0, size * 0.6 + 8],
           [0, -size * 0.6 - 8],
         ]) {
+          if (point) break;
           const p = { x: need.target.x + dx, z: need.target.z + dz };
           if (
             walkable(s, p.x, p.z, 3) &&

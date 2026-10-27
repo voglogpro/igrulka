@@ -9,6 +9,7 @@ export function clearAutoDefense(u) {
   u.defenseTask = null;
   u.defensePost = null;
   u.defenseCapture = null;
+  u.defenseMission = null;
 }
 
 // Accept the standing order now; the coordinator assigns its actual front
@@ -71,6 +72,7 @@ export function setAutoDefense(s, side, ids, enabled) {
       if (!enabled) {
         u.defensePost = null;
         u.defenseCapture = null;
+        u.defenseMission = null;
       }
       if (!enabled && u.defenseTask) u.defenseTask.until = s.time;
       changed++;

@@ -308,9 +308,9 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
   assert.equal((await rapid.closed()).code, 1008);
 });
 
-test('old protocols are explicitly refused and protocol eleven creates and joins a real room', async (t) => {
+test('old protocols are explicitly refused and the current protocol creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 12);
+  assert.equal(PROTOCOL_VERSION, 13);
   const host = await connect();
   host.send({ type: 'create', protocol: 10, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
@@ -335,7 +335,9 @@ test('WebSocket auto-defense belongs to each owner and snapshots preserve only o
   const { a, b, room } = pair;
   const peers = [a, b];
   for (const d of room.state.districts)
-    d.owner = E.DISTRICTS.find((v) => v.id === d.id).x < 0 ? 0 : 1;
+    // Each defender starts on its own secured depot. Both configured depots
+    // have x=0; x-based ownership accidentally made both flags hostile to zero.
+    d.owner = E.DISTRICTS.find((v) => v.id === d.id).z < 0 ? 0 : 1;
   room.state.networkRevision++;
   const defenders = [0, 1].map((side) => {
     const corridorId = side ? 'south' : 'north';

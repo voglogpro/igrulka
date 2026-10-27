@@ -2,7 +2,7 @@ import { walkable } from '../ground/navigation.js';
 import { GROUND_UNITS, isInfantry, groundHeight } from '../../config.js';
 import { orderGround } from '../ground/orders.js';
 import { clearAutoDefense } from '../../defense/volunteers.js';
-export function freeSpot(s, center, radius = 2, start = 0) {
+export function freeSpot(s, center, radius = 2, start = 0, accepts = () => true) {
   for (let i = 0; i < 64; i++) {
     const a = (i + start) * 2.399,
       r = 12 + Math.floor(i / 10) * 8,
@@ -15,7 +15,8 @@ export function freeSpot(s, center, radius = 2, start = 0) {
           u.hp > 0 &&
           !u.carrierId &&
           Math.hypot(u.x - x, u.z - z) < radius + GROUND_UNITS[u.key].size * 0.5 + 1,
-      )
+      ) &&
+      accepts({ x, z })
     )
       return { x, z };
   }

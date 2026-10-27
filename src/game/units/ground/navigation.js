@@ -200,6 +200,22 @@ export function walkable(s, x, z, radius = 3, ignore = null) {
           return false;
   return true;
 }
+// Local steering and reversing must validate the whole step, not just its endpoint.
+// Trees remain traversable forest cover; shorelines, buildings and ruins are solid.
+export function groundStepClear(s, from, to, radius = 3) {
+  const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.z - from.z)));
+  for (let i = 1; i <= steps; i++)
+    if (
+      !walkable(
+        s,
+        from.x + ((to.x - from.x) * i) / steps,
+        from.z + ((to.z - from.z) * i) / steps,
+        radius,
+      )
+    )
+      return false;
+  return true;
+}
 // Bounded A* over the whole field with a binary heap, no diagonal corner cutting.
 export function groundPath(s, from, to, radius = 3) {
   const clear = (a, b, footprint = radius) => {

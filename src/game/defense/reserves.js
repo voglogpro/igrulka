@@ -1,12 +1,45 @@
-import { GROUND_UNITS, isInfantry } from '../config.js';
+import { GROUND_UNITS } from '../config.js';
+import { groundWeaponProfile } from '../units/ground/engagement.js';
 import { event } from '../shared/events.js';
 import { FRONTLINE as C } from './config.js';
 import { defenseAvailable, assignDefensePost, occupiedDefenseCarriers } from './formation.js';
+import { corridorGeometry, defensePostPoint } from './geometry.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+function interceptPoint(u, target, rank = 0) {
+  const d = GROUND_UNITS[u.key],
+    dx = u.x - target.x,
+    dz = u.z - target.z,
+    length = Math.hypot(dx, dz),
+    nx = length > 1e-6 ? dx / length : u.side % 2 === 0 ? -1 : 1,
+    nz = length > 1e-6 ? dz / length : 0,
+    stand =
+      u.key === 'operator'
+        ? 185
+        : Math.max((d.groundMinRange || 0) + 25, Math.min(90, (d.groundRange || 80) * 0.45)),
+    along = stand + Math.floor(rank / 2) * 20,
+    across = rank % 2 ? 12 : -12;
+  return { x: target.x + nx * along - nz * across, z: target.z + nz * along + nx * across };
+}
+function freeIntercept(own, u, target) {
+  return Array.from({ length: C.maxReinforcing }, (_, rank) =>
+    interceptPoint(u, target, rank),
+  ).find((point) =>
+    own.every((v) => {
+      if (v.id === u.id) return true;
+      const clearance = (GROUND_UNITS[u.key].size + GROUND_UNITS[v.key].size) * 0.5 + 7;
+      return [v.guard, v.defenseTask?.home, v.defenseMission?.home]
+        .filter(Boolean)
+        .every((post) => distance(point, post) >= clearance - 1e-6);
+    }),
+  );
+}
 export function updateDefenseReserves(s, side, own, report, memory) {
+  let following = 0;
+  const direction = side % 2 === 0 ? 1 : -1,
+    lines = corridorGeometry(s, side);
   for (const u of own) {
-    if (u.supplyTrip) continue;
+    if (u.supplyTrip || u.order?.mode === 'cover') continue;
     const task = u.defenseTask;
     if (!task) continue;
     if (!u.guard || u.boardingId || u.delivery || u.routeState) {
@@ -30,7 +63,27 @@ export function updateDefenseReserves(s, side, own, report, memory) {
     }
     const local = report.posts
       .filter((p) => p.corridorId === task.sectorId)
-      .sort((a, b) => distance(a, u.guard) - distance(b, u.guard))[0];
+      .sort(
+        (a, b) =>
+          (b.breakthrough || 0) - (a.breakthrough || 0) ||
+          distance(a, u.guard) - distance(b, u.guard),
+      )[0];
+    const currentThreat = local?.threatPoint;
+    const fresh =
+      currentThreat && memory.seen.some((v) => v.id === currentThreat.id && s.time - v.time < 8);
+    if (fresh && local.breakthrough > 0) {
+      task.until = Math.max(task.until, s.time + C.minDuty);
+      // A breach is a moving target. Follow its last observed position instead
+      // of waiting forever at the first interception marker behind the line.
+      const toward = freeIntercept(own, u, currentThreat);
+      if (
+        toward &&
+        following < 2 &&
+        distance(u.guard, toward) > 65 &&
+        assignDefensePost(s, u, toward)
+      )
+        following++;
+    }
     if (
       !u.autoDefense ||
       task.until <= s.time ||
@@ -38,7 +91,10 @@ export function updateDefenseReserves(s, side, own, report, memory) {
         (local?.pressure || 0) < 0.7 &&
         !(local?.breakthrough > 0))
     ) {
-      if (assignDefensePost(s, u, task.home) || assignDefensePost(s, u, task.home, true)) {
+      const home = u.defensePost
+        ? defensePostPoint(lines, u.defensePost, direction) || task.home
+        : task.home;
+      if (assignDefensePost(s, u, home) || assignDefensePost(s, u, home, true)) {
         task.home = { ...u.guard };
         task.returning = true;
       }
@@ -49,7 +105,16 @@ export function updateDefenseReserves(s, side, own, report, memory) {
   const volunteers = own.filter((u) => defenseAvailable(s, u, occupiedCarriers));
   const volunteerIds = new Set(volunteers.map((u) => u.id));
   const donorCounts = new Map(),
+    lineCounts = new Map(),
     sectorById = new Map(report.sectors.map((v) => [v.id, v]));
+  for (const u of own) {
+    if (!u.autoDefense || !u.defensePost) continue;
+    const id = u.defensePost.corridorId;
+    if (!lineCounts.has(id)) lineCounts.set(id, { total: 0, ready: 0 });
+    const count = lineCounts.get(id);
+    count.total++;
+    if (!u.defenseTask && !u.defenseCapture && volunteerIds.has(u.id)) count.ready++;
+  }
   for (const u of own) {
     if (!u.autoDefense || !(u.defensePost?.row > 0) || u.defenseCapture) continue;
     const id = u.defensePost.corridorId;
@@ -93,8 +158,13 @@ export function updateDefenseReserves(s, side, own, report, memory) {
         (u) =>
           !u.defenseTask &&
           !u.defenseCapture &&
-          GROUND_UNITS[u.key].groundRange > 0 &&
-          (u.defensePost?.row > 0 || unposted(u)) &&
+          (GROUND_UNITS[u.key].groundRange > 0 || (u.key === 'operator' && u.fpvAmmo > 0)) &&
+          (u.defensePost?.row >= 4 ||
+            unposted(u) ||
+            (target.breakthrough > 0 &&
+              u.defensePost &&
+              lineCounts.get(u.defensePost.corridorId)?.ready >
+                Math.max(2, Math.ceil(lineCounts.get(u.defensePost.corridorId).total * 0.5)))) &&
           (u.defenseReadyAt || 0) <= s.time &&
           u.hp / u.maxHp >= 0.45 &&
           (u.suppression || 0) < 0.45 &&
@@ -111,15 +181,19 @@ export function updateDefenseReserves(s, side, own, report, memory) {
                   : C.maxTransferDistance),
       )
       .sort((a, b) => {
-        const role = (u) =>
-          target.armor > 0 &&
-          (['antiArmor', 'antiTankRifle'].includes(GROUND_UNITS[u.key].groundWeapon) ||
-            !isInfantry(u.key))
-            ? 0
-            : 1;
+        const role = (u) => {
+          if (!(target.armor > 0)) return GROUND_UNITS[u.key].indirect ? 2 : 1;
+          const weapon = groundWeaponProfile(u.key).id;
+          if (weapon === 'antiArmor' || (u.key === 'operator' && u.fpvAmmo > 0)) return 0;
+          if (weapon === 'cannon' || weapon === 'antiTankRifle') return 1;
+          return GROUND_UNITS[u.key].indirect ? 2 : 4;
+        };
         return (
+          distance(a, intercept) / Math.max(1, GROUND_UNITS[a.key].speed) +
+            role(a) * 20 -
+            distance(b, intercept) / Math.max(1, GROUND_UNITS[b.key].speed) -
+            role(b) * 20 ||
           Number(unposted(a)) - Number(unposted(b)) ||
-          role(a) - role(b) ||
           Number(a.defensePost?.corridorId !== target.corridorId) -
             Number(b.defensePost?.corridorId !== target.corridorId) ||
           distance(a, intercept) - distance(b, intercept) ||
@@ -130,21 +204,7 @@ export function updateDefenseReserves(s, side, own, report, memory) {
       if (attempts++ >= C.maxPathAttempts) return;
       // Returning details leave holes in their old ranks. Counting active units would
       // reuse an occupied high rank; explicitly reserve the first free physical slot.
-      const point = Array.from({ length: C.maxReinforcing }, (_, rank) => ({
-        x:
-          intercept.x -
-          (side % 2 === 0 ? 1 : -1) *
-            (18 + Math.floor(rank / 2) * 20 + (isInfantry(u.key) ? 0 : 40)),
-        z: intercept.z + (rank % 2 ? 12 : -12),
-      })).find((candidate) =>
-        own.every((v) => {
-          if (v.id === u.id) return true;
-          const clearance = (GROUND_UNITS[u.key].size + GROUND_UNITS[v.key].size) * 0.5 + 7;
-          return [v.guard, v.defenseTask?.home]
-            .filter(Boolean)
-            .every((post) => distance(candidate, post) >= clearance - 1e-6);
-        }),
-      );
+      const point = freeIntercept(own, u, intercept);
       if (!point) continue;
       const home = u.guard ? { ...u.guard } : { x: u.x, z: u.z };
       if (!assignDefensePost(s, u, point)) continue;

@@ -38,10 +38,10 @@ function battle(side = 0) {
     s.districts.find((d) => d.id === line.districtId).owner = side;
   const lines = corridorGeometry(s, side),
     defenders = [];
-  for (const row of [0, 2, 4])
+  for (const row of [0, 2, 4, 6])
     for (const line of lines)
       for (const slot of line.slots) {
-        if (defenders.length >= 28) break;
+        if (defenders.length >= 48) break;
         const reference = { corridorId: line.id, slot: slot.slot, row };
         const p = defensePostPoint(lines, reference, direction);
         const u = unit(s, side, 'infantry', p.x, p.z, true);
@@ -355,7 +355,7 @@ test('paused commands and spawning invalidate counts immediately without a new s
   for (let i = 0; i < 100; i++) assert.equal(E.frontlineReport(s, 0), stable);
 });
 
-test('the solo bot only opts its existing defenders in and preserves production, income and an advancing attack reserve', () => {
+test('the solo bot assigns all idle combat troops to the shared depot commander and preserves its income bonus', () => {
   const s = fresh();
   delete s.mode;
   s.ai.nextArmy = 0;
@@ -367,17 +367,23 @@ test('the solo bot only opts its existing defenders in and preserves production,
   const before = E.economy(s, 1).bonus;
   updateArmyAI(s, { random: E.random });
   const automatic = troops.filter((u) => u.autoDefense);
-  assert.ok(automatic.length > 0 && automatic.length <= 3);
-  assert.ok(automatic.every((u) => u.aiDefender && u.guard));
-  const attackers = troops.filter((u) => u.order?.mode === 'attackmove');
-  assert.ok(attackers.length >= 2);
-  const x = attackers[0].x;
+  assert.equal(automatic.length, troops.length);
+  assert.ok(automatic.every((u) => u.stance?.mode === 'defend'));
+  assert.ok(troops.every((u) => u.order?.mode !== 'attackmove'));
+  const initial = new Map(troops.map((u) => [u.id, { x: u.x, z: u.z }]));
   E.advance(s, 2);
-  assert.ok(attackers[0].x < x);
+  assert.ok(
+    troops.some(
+      (u) =>
+        u.defensePost &&
+        u.guard &&
+        Math.hypot(u.x - initial.get(u.id).x, u.z - initial.get(u.id).z) > 5,
+    ),
+  );
   assert.equal(E.economy(s, 1).bonus, before);
 });
 
-test('a critically injured bot defense volunteer actually retreats while pinned and non-detail guards keep their posts', () => {
+test('an injured automatic bot guard reacts to actual incoming damage while explicit manual posts stay pinned', () => {
   const s = fresh();
   delete s.mode;
   s.ai.nextArmy = 0;
@@ -389,20 +395,29 @@ test('a critically injured bot defense volunteer actually retreats while pinned 
   troops[0].aiDefender = troops[1].aiDefender = true;
   troops[2].aiDefender = false;
   troops[1].autoDefense = false;
+  troops[2].autoDefense = false;
+  troops[0].holdFire = false;
   const pinnedPosts = troops.slice(1).map((u) => ({ ...u.guard }));
   updateArmyAI(s, { random: E.random });
   const retreating = troops[0],
     x = retreating.x;
-  assert.equal(retreating.order.mode, 'retreat');
-  assert.equal(retreating.autoDefense, false);
-  assert.equal(retreating.guard, null);
+  const automaticPost = { ...retreating.guard };
+  damageGround(s, retreating, 1, undefined, 'bullet', { x: x - 60, z: retreating.z });
+  for (const memory of s.frontlineMemory) memory.nextThink = s.time + E.FRONTLINE.cadence;
+  E.step(s, 0.05);
+  assert.equal(retreating.order.mode, 'cover');
+  assert.equal(retreating.autoDefense, true);
+  assert.deepEqual(retreating.guard, automaticPost);
   assert.ok(retreating.path.length > 0);
   assert.deepEqual(
     troops.slice(1).map((u) => u.guard),
     pinnedPosts,
   );
   E.advance(s, 2);
-  assert.ok(retreating.x > x, 'the injured detail physically walks towards its own headquarters');
+  assert.ok(
+    retreating.x > x,
+    'the injured detail physically moves away from the known incoming fire',
+  );
 });
 
 test('new persistence fields reject invalid types, unknown sectors, forged memory and excess fortification work', () => {

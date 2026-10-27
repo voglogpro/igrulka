@@ -22,6 +22,7 @@ import { updateDefense } from './defense/coordinator.js';
 import { sideIds, aiSides, teamOf } from './factions.js';
 import { updateSettlements } from './territory/settlements.js';
 import { updateFieldSupply } from './units/ground/field-supply.js';
+import { beginTrenchLinkBatch, endTrenchLinkBatch } from './defense/trench-links.js';
 export function step(s, dt) {
   if (s.result || !Number.isFinite(dt) || dt <= 0) return;
   dt = Math.min(0.1, dt);
@@ -46,7 +47,12 @@ export function step(s, dt) {
   updateFieldSupply(s);
   updateDefense(s);
   updateArmyComposition(s);
-  updateGround(s, rates, dt, { event, random });
+  beginTrenchLinkBatch(s);
+  try {
+    updateGround(s, rates, dt, { event, random });
+  } finally {
+    endTrenchLinkBatch(s);
+  }
   moveUnits(s, dt);
   fireDefenses(s, rates, dt);
   moveProjectiles(s, dt);

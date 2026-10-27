@@ -36,6 +36,7 @@ export function makeGround(s, side, key, x, z) {
     defenseTask: null,
     defensePost: null,
     defenseCapture: null,
+    defenseMission: null,
     defenseReadyAt: 0,
     fpvAmmo: key === 'operator' ? 3 : 0,
     civil: !!d.civil,

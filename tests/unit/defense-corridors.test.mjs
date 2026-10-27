@@ -59,7 +59,7 @@ test('two independent terrain lines stay still when troops move, and change only
   assert.ok(advanced.sectors.every((v) => v.enemy === 0 && v.knowledge === 'unknown'));
 });
 
-test('twelve real volunteers capture home-side neutral sites, then cover both entire dry corridors with distinct posts', () => {
+test('twelve real volunteers capture both depots, retain inner garrisons and report remaining outer gaps', () => {
   for (const side of [0, 1]) {
     const s = fresh(),
       troops = army(s, side, 12),
@@ -84,15 +84,17 @@ test('twelve real volunteers capture home-side neutral sites, then cover both en
     assert.equal(new Set(troops.map((u) => `${u.guard.x},${u.guard.z}`)).size, 12);
     assert.ok(troops.every((u) => !u.path.length && !u.defenseCapture));
     for (const sector of report.sectors) {
-      assert.equal(sector.coverage.weak, false);
-      assert.equal(sector.coverage.arrived, 6);
-      assert.ok(sector.coverage.maxGap <= 80);
+      assert.equal(sector.coverage.weak, true);
       const positions = troops.filter((u) => u.defensePost.corridorId === sector.id);
-      assert.ok(
-        Math.max(...positions.map((u) => Math.abs(u.z))) -
-          Math.min(...positions.map((u) => Math.abs(u.z))) >
-          300,
+      const depot = E.DISTRICTS.find((d) => d.id === `${sector.id}-depot`);
+      const inner = positions.filter(
+        (u) => u.defensePost.row === 2 && Math.hypot(u.x - depot.x, u.z - depot.z) < depot.radius,
       );
+      const outer = positions.filter((u) => u.defensePost.row === 0);
+      assert.ok(inner.length >= 2, 'capturing sections must remain as the physical depot garrison');
+      assert.ok(outer.length > 0 && outer.length < 6);
+      assert.equal(sector.coverage.arrived, outer.length);
+      assert.ok(sector.coverage.maxGap > 80);
     }
     for (const u of troops) assert.ok(E.walkable(s, u.x, u.z, E.GROUND_UNITS[u.key].size * 0.42));
   }
@@ -318,7 +320,7 @@ test('defense persistence validates structural fields, whitelists extras and mig
   assert.ok(migrated.groundUnits.every((u) => u.autoDefense === false && !u.defensePost));
 });
 
-test('solo AI keeps its income and attack budget while only existing bot defenders volunteer', () => {
+test('solo AI commits all idle combat troops to the shared depot planner without changing its economic bonus', () => {
   const s = fresh();
   delete s.mode;
   s.time = E.difficultyOf(s).armyFrom + 1;
@@ -332,13 +334,18 @@ test('solo AI keeps its income and attack budget while only existing bot defende
   });
   const bonus = E.economy(s, 1).bonus;
   updateArmyAI(s, { random: E.random });
-  assert.ok(troops.filter((u) => u.autoDefense).every((u) => u.aiDefender));
-  assert.ok(troops.filter((u) => u.autoDefense).length <= 3);
-  const attackers = troops.filter((u) => u.order?.mode === 'attackmove');
-  assert.ok(attackers.length >= 3);
-  const start = attackers[0].x;
+  assert.ok(troops.every((u) => u.autoDefense && u.stance?.mode === 'defend'));
+  assert.ok(troops.every((u) => u.order?.mode !== 'attackmove'));
+  const initial = new Map(troops.map((u) => [u.id, { x: u.x, z: u.z }]));
   E.advance(s, 2);
-  assert.notEqual(attackers[0].x, start);
+  assert.ok(
+    troops.some(
+      (u) =>
+        u.defensePost &&
+        u.guard &&
+        Math.hypot(u.x - initial.get(u.id).x, u.z - initial.get(u.id).z) > 5,
+    ),
+  );
   assert.equal(E.economy(s, 1).bonus, bonus);
 });
 

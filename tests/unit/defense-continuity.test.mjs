@@ -20,8 +20,8 @@ function fresh() {
   // Keep territorial geometry fixed; neutral warehouse capture is covered by
   // defense-corridors, not this regression of persistent front positions.
   for (const d of s.districts) {
-    d.owner = 1;
-    d.control = -1;
+    d.owner = 0;
+    d.control = 1;
   }
   return s;
 }
@@ -279,7 +279,7 @@ test('completed adjacent trenches form actual continuous cover, with bounded per
 function preparedBattle() {
   const s = fresh(),
     units = [];
-  for (const row of [0, 2])
+  for (const row of [0, 2, 4])
     for (const line of corridorGeometry(s, 0))
       for (const slot of line.slots)
         units.push(post(s, 'infantry', { corridorId: line.id, slot: slot.slot, row }));

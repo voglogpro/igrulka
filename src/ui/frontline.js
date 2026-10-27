@@ -70,7 +70,7 @@ export class FrontlineHUD {
               : s.knowledge === 'estimated'
                 ? 'Оценка'
                 : 'Под наблюдением';
-        return `<button data-front-sector="${s.id}" class="${s.pressure >= 1.15 ? 'threat' : ''}"><span>${s.label}<small>${status}</small></span><b>${s.defenders}<small>защит.</small></b></button>`;
+        return `<button data-front-sector="${s.id}" class="${s.pressure >= 1.15 ? 'threat' : ''}"><span>${s.label}<small>${s.objective || status}</small></span><b>${s.defenders}<small>защит.</small></b></button>`;
       })
       .join('');
     this.host.querySelector('.frontline-reserve').textContent =

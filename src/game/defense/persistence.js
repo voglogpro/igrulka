@@ -52,6 +52,43 @@ export function restoreDefense(s) {
     return { nextThink: memory.nextThink, nextReinforce: memory.nextReinforce ?? 0, seen };
   });
   for (const u of s.groundUnits) {
+    if (s.version < 20) u.defenseMission = null;
+    if (u.defenseMission != null) {
+      const m = u.defenseMission;
+      if (
+        !object(m) ||
+        m.kind !== 'raid' ||
+        !['flank', 'watch', 'return'].includes(m.phase) ||
+        !FRONT_SECTORS.some((v) => v.id === m.sectorId) ||
+        !point(m.home) ||
+        !point(m.point) ||
+        !finite(m.startedAt) ||
+        m.startedAt > s.time ||
+        !finite(m.until) ||
+        m.until < m.startedAt ||
+        m.until > m.startedAt + 180 ||
+        !finite(m.nextThinkAt) ||
+        m.nextThinkAt > s.time + 4 + 1e-6 ||
+        !u.autoDefense ||
+        !u.guard ||
+        !u.defensePost ||
+        m.sectorId !== u.defensePost.corridorId ||
+        !['infantry', 'assault', 'sniper'].includes(u.key) ||
+        u.defenseTask ||
+        u.defenseCapture
+      )
+        throw Error('Повреждена задача обходной группы');
+      u.defenseMission = {
+        kind: 'raid',
+        phase: m.phase,
+        sectorId: m.sectorId,
+        home: { x: m.home.x, z: m.home.z },
+        point: { x: m.point.x, z: m.point.z },
+        startedAt: m.startedAt,
+        until: m.until,
+        nextThinkAt: m.nextThinkAt,
+      };
+    }
     if (s.version < 15) {
       // Keep the physical guard location; the new planner assigns new posts through real paths.
       u.defensePost = null;

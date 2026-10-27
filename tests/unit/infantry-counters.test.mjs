@@ -53,6 +53,10 @@ test('early AT rifle actually fires one round, spends a full reload and cannot f
       rifle = unit(s, side, 'atrifle', a.x, a.z, false),
       target = unit(s, 1 - side, 'apc', b.x, b.z);
     target.hp = target.maxHp = 5000;
+    // Isolate the weapon cycle from an idle soldier's autonomous reload retreat.
+    // Explicit manual posts remain stationary even while the magazine is empty.
+    rifle.guard = { x: a.x, z: a.z };
+    rifle.order = { ...rifle.guard, mode: 'guard' };
     assert.equal(E.GROUND_UNITS.atrifle.tech, undefined);
     until(s, () => shots(s, rifle.id).length === 1, 2);
     const first = shots(s, rifle.id)[0].time;

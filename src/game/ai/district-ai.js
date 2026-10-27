@@ -1,67 +1,68 @@
-import { allied, hqOf } from '../factions.js';
-import { isInfantry, GROUND_UNITS } from '../config.js';
-import {
-  DISTRICTS,
-  captureDistrict,
-  setDistrictRepair,
-  districtStatus,
-} from '../territory/districts.js';
-import { commandUnits } from '../units/ground/orders.js';
+import { aiSides } from '../factions.js';
+import { GROUND_UNITS } from '../config.js';
+import { setDistrictRepair } from '../territory/districts.js';
+import { queueAutoDefense } from '../defense/volunteers.js';
+import { depotObjectives } from './depot-doctrine.js';
 
-// A small garrison budget leaves most of the army available for its original city attack.
-export const AI_DISTRICT_GARRISON_LIMIT = 3;
+// Compatibility export: minimum paid capture infantry, no longer a cap on guards.
+export { AI_CAPTURE_INFANTRY_MIN as AI_DISTRICT_GARRISON_LIMIT } from './depot-doctrine.js';
 export function updateDistrictAI(s, side = 1) {
-  if (s.mode === 'multiplayer' || s.result) return;
+  if (!aiSides(s).includes(side) || s.result) return;
+  const sites = depotObjectives(s, side),
+    occupied = new Set();
   for (const u of s.groundUnits) {
-    if (u.side !== side || !u.aiDistrict) continue;
-    if (!u.guard || u.hp <= 0) {
-      u.aiDistrict = null;
-      continue;
-    }
-    if (u.hp / u.maxHp < 0.3) {
-      commandUnits(s, side, [u.id], 'retreat');
-      u.aiDistrict = null;
-    }
+    if (u.carrierId != null) occupied.add(u.carrierId);
+    if (u.boardingId != null) occupied.add(u.boardingId);
   }
-  const assigned = s.groundUnits.filter(
-    (u) => u.side === side && u.hp > 0 && u.aiDistrict && u.guard,
-  );
-  const candidates = s.groundUnits.filter(
-    (u) =>
-      u.side === side &&
+  const available = [];
+  for (const u of s.groundUnits) {
+    if (u.side !== side) continue;
+    // Old campaigns used a separate one-man depot guard. Give those posts to
+    // the shared planner, but never steal a later explicit march or guard.
+    if (u.aiDistrict) {
+      const legacy = sites.find((d) => d.id === u.aiDistrict),
+        atLegacy =
+          legacy && u.guard && Math.hypot(u.guard.x - legacy.x, u.guard.z - legacy.z) < 120;
+      u.aiDistrict = null;
+      if (
+        atLegacy &&
+        u.hp > 0 &&
+        !u.downed &&
+        !u.carrierId &&
+        !u.boardingId &&
+        !occupied.has(u.id) &&
+        !u.delivery &&
+        !u.supplyTrip &&
+        !u.defenseTask &&
+        !GROUND_UNITS[u.key]?.support
+      ) {
+        available.push(u);
+        continue;
+      }
+    }
+    const d = GROUND_UNITS[u.key];
+    if (
+      d &&
+      !d.civil &&
+      !d.support &&
       u.hp / u.maxHp > 0.55 &&
-      isInfantry(u.key) &&
-      !GROUND_UNITS[u.key].support &&
       !u.downed &&
-      u.key !== 'atgm' &&
-      !u.aiDefender &&
+      !u.autoDefense &&
+      !u.defenseTask &&
       !u.carrierId &&
       !u.boardingId &&
+      !occupied.has(u.id) &&
       !u.guard &&
       !u.delivery &&
+      !u.supplyTrip &&
       !u.routeState &&
-      u.order?.mode !== 'retreat',
-  );
-  let remaining = AI_DISTRICT_GARRISON_LIMIT - assigned.length;
-  const reserved = new Set(assigned.map((u) => u.aiDistrict));
-  for (const u of candidates) {
-    if (remaining <= 0) break;
-    const choices = DISTRICTS.filter(
-      (d) =>
-        !reserved.has(d.id) &&
-        !allied(s, s.districts?.find((site) => site.id === d.id)?.owner, side) &&
-        (s.sides.length <= 2 || Math.sign(d.z) === Math.sign(hqOf(s, side).z)),
-    ).sort((a, b) => Math.hypot(a.x - u.x, a.z - u.z) - Math.hypot(b.x - u.x, b.z - u.z));
-    for (const target of choices) {
-      if (typeof captureDistrict(s, side, [u.id], target.id) !== 'number') continue;
-      u.aiDistrict = target.id;
-      reserved.add(target.id);
-      remaining--;
-      break;
-    }
+      !u.order &&
+      !u.path?.length
+    )
+      available.push(u);
   }
-  for (const raw of s.districts || []) {
-    const d = districtStatus(s, raw.id);
+  if (available.length) queueAutoDefense(s, available);
+  for (const d of sites) {
     if (
       d.owner === side &&
       !d.blocked &&

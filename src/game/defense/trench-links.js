@@ -1,12 +1,38 @@
 import { walkable } from '../units/ground/navigation.js';
 
-export const TRENCH_LINK_MAX_SPAN = 100;
+export const TRENCH_LINK_MAX_SPAN = 180;
 export const TRENCH_LINK_MAX_LATERAL = 12;
 const CELL = 64;
 const caches = new WeakMap();
+const batches = new WeakMap();
 
 export function invalidateTrenchLinks(s) {
+  const batch = batches.get(s);
+  if (batch) {
+    batch.dirty = true;
+    return;
+  }
   caches.delete(s);
+}
+
+// All soldiers in one ground update see the same derived connection geometry.
+// Persistent endpoint records stay live; completed/captured links become fresh
+// immediately after the outer batch ends, even while simulation time is paused.
+export function beginTrenchLinkBatch(s) {
+  const batch = batches.get(s);
+  if (batch) {
+    batch.depth++;
+    return;
+  }
+  prepare(s);
+  batches.set(s, { depth: 1, dirty: false });
+}
+
+export function endTrenchLinkBatch(s) {
+  const batch = batches.get(s);
+  if (!batch || --batch.depth > 0) return;
+  batches.delete(s);
+  if (batch.dirty) caches.delete(s);
 }
 
 function clearLink(s, a, b) {
@@ -21,6 +47,7 @@ function clearLink(s, a, b) {
 function prepare(s) {
   let cache = caches.get(s);
   const trenches = s.trenches || [];
+  if (cache && batches.has(s)) return cache;
   if (
     cache &&
     cache.revision === s.networkRevision &&
@@ -32,8 +59,8 @@ function prepare(s) {
     .filter((t) => t.progress >= 1)
     .sort((a, b) => a.z - b.z || a.x - b.x || a.id - b.id);
   const links = [];
-  // At most one forward neighbour per position: the 240 saved positions can
-  // never produce a quadratic number of visible meshes or cover segments.
+  // At most two cardinal neighbours per position: a connected front/rear
+  // rectangle stays bounded even when the persistent trench graph is full.
   for (let i = 0; i < completed.length; i++) {
     const a = completed[i];
     let b = null,
@@ -52,6 +79,29 @@ function prepare(s) {
     }
     if (b && clearLink(s, a, b))
       links.push({ id: `${a.id}:${b.id}`, a, b, side: a.side === b.side ? a.side : null });
+    let across = null,
+      acrossRange = Infinity;
+    for (const candidate of completed) {
+      const dx = candidate.x - a.x;
+      if (
+        dx < 10 ||
+        dx > TRENCH_LINK_MAX_SPAN ||
+        Math.abs(candidate.z - a.z) > TRENCH_LINK_MAX_LATERAL
+      )
+        continue;
+      const range = Math.hypot(dx, candidate.z - a.z);
+      if (range < acrossRange || (range === acrossRange && candidate.id < across?.id)) {
+        across = candidate;
+        acrossRange = range;
+      }
+    }
+    if (across && across !== b && clearLink(s, a, across))
+      links.push({
+        id: `${a.id}:${across.id}`,
+        a,
+        b: across,
+        side: a.side === across.side ? a.side : null,
+      });
   }
   const buckets = new Map();
   for (const link of links)

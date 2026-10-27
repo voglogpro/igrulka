@@ -16,7 +16,7 @@ function fresh() {
   return { s, b, f };
 }
 
-test('AI pays for three district infantry before random armor, counting its pending queue', () => {
+test('AI pays for minimum capture infantry then a mixed-role core, counting its pending queue', () => {
   const { s, b, f } = fresh();
   const before = { credits: f.credits, materials: f.materials };
   for (let i = 0; i < 3; i++) {
@@ -32,7 +32,11 @@ test('AI pays for three district infantry before random armor, counting its pend
   assert.equal(needsCaptureInfantry(s), false);
   s.time = s.ai.nextArmy + 1;
   updateArmyAI(s, { random: () => 0.99 });
-  assert.equal(b.armyQueue.at(-1).key, 'operator', 'only infantry facilities are available');
+  assert.equal(
+    b.armyQueue.at(-1).key,
+    'atrifle',
+    'early infantry receive affordable anti-armor support',
+  );
 });
 
 test('capture recruitment leaves headquarters defenders alone and respects normal resources and completion', () => {
@@ -68,7 +72,7 @@ test('seed6 reaches and holds at least two districts on the expanded map without
   // Expanding both the coast and the city by 400m adds physical marching time.
   E.advance(s, 60);
   assert.ok(s.stats.districtsCaptured >= 2, `seed6 captures: ${s.stats.districtsCaptured}`);
-  assert.ok(s.groundUnits.some((u) => u.side === 1 && u.aiDistrict));
+  assert.ok(s.groundUnits.some((u) => u.side === 1 && u.autoDefense && u.defensePost));
 });
 
 test('the minimum capture detail can buy ordinary infantry while preserving its 250-credit reserve', () => {
@@ -84,7 +88,7 @@ test('the minimum capture detail can buy ordinary infantry while preserving its 
   assert.equal(b.armyQueue.length, 1);
 });
 
-test('idle AI defenders recover from an inaccessible local post, while successful and manual orders keep priority', () => {
+test('idle AI defenders join the common planner instead of stale local points, while manual orders keep priority', () => {
   const { s, f } = fresh();
   f.credits = 0;
   s.ai.nextArmy = 0;
@@ -102,9 +106,9 @@ test('idle AI defenders recover from an inaccessible local post, while successfu
   const order = structuredClone(manual.order),
     path = structuredClone(manual.path);
   updateArmyAI(s, { random: () => 0.5 });
-  assert.ok(reachable.guard && reachable.path.length);
+  assert.equal(reachable.guard, null);
   assert.equal(reachable.autoDefense, true);
-  assert.equal(blocked.guard, undefined);
+  assert.equal(blocked.guard, null);
   assert.equal(blocked.autoDefense, true);
   assert.equal(blocked.path.length, 0);
   assert.deepEqual(manual.order, order);
@@ -113,6 +117,7 @@ test('idle AI defenders recover from an inaccessible local post, while successfu
   const start = { x: blocked.x, z: blocked.z };
   E.advance(s, 1.2);
   assert.ok(blocked.defensePost && blocked.guard && blocked.path.length);
+  assert.ok(reachable.defensePost && reachable.guard && reachable.path.length);
   assert.ok(Math.hypot(blocked.x - start.x, blocked.z - start.z) > 5);
   assert.deepEqual(manual.order, order);
 });

@@ -51,7 +51,7 @@ export class TrenchLinkView {
     this.records = new Map();
     this.seen = new Set();
     this.dummy = new T.Object3D();
-    this.capacity = FORTIFICATION.maxPositions * Math.ceil(TRENCH_LINK_MAX_SPAN / PIECE_LENGTH);
+    this.capacity = FORTIFICATION.maxPositions * 2 * Math.ceil(TRENCH_LINK_MAX_SPAN / PIECE_LENGTH);
     this.rebuilds = 0;
     this.pools = Array.from({ length: 3 }, (_, stage) => {
       const source = template(stage),

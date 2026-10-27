@@ -2,7 +2,7 @@ import { BUILDINGS } from '../config.js';
 import { groundPath, walkable } from '../units/ground/navigation.js';
 import { projectPoint } from './road-network.js';
 
-export const SERVICE_RADIUS = 2.5;
+export const SERVICE_RADIUS = 3;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 // A load bumps networkRevision even when no obstacle changed. Keep an existing

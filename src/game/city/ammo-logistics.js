@@ -1,6 +1,7 @@
 import { BUILDINGS, groundHeight } from '../config.js';
 import { equipmentModifiers } from '../combat/upgrade-tiers.js';
-import { groundPath, walkable } from '../units/ground/navigation.js';
+import { groundPath } from '../units/ground/navigation.js';
+import { moveCivicVehicle } from '../units/ground/movement.js';
 import { freeSpot } from '../units/vehicles/transport.js';
 import {
   AMMUNITION as C,
@@ -21,6 +22,24 @@ import { fieldSupplyJobs, depositFieldAmmo } from './field-ammo.js';
 export { requestWeaponDelivery } from './weapon-transfer.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const PARKING_GAP = 6.35;
+function parkingSpace(s, van = null, parkedOnly = false) {
+  const fleet = [...(s.ammoVehicles || []), ...(s.serviceVehicles || [])].filter(
+    (other) => other !== van && (other.hp == null || other.hp > 0),
+  );
+  return (point) =>
+    !fleet.some((other) => {
+      const occupied = (!parkedOnly || !other.path?.length) && distance(other, point) < PARKING_GAP;
+      const goal = other.goal || other.path?.at(-1);
+      return (
+        occupied ||
+        (goal && distance(goal, point) < PARKING_GAP) ||
+        (other.home && distance(other.home, point) < PARKING_GAP)
+      );
+    });
+}
+const parking = (s, target, start = 0, van = null) =>
+  freeSpot(s, target, 3, start, parkingSpace(s, van));
 const depotActive = (s, b) => ammoDepotReady(b) && b.ammoEnabled !== false;
 const targetOf = (s, v) =>
   v.targetKind === 'field' && v.fieldPoint
@@ -83,7 +102,7 @@ function reconcile(s) {
         C.fleetLimit
       )
         continue;
-      const home = freeSpot(s, b, 3, slot * 7);
+      const home = parking(s, b, slot * 7);
       if (!home) continue;
       if (previous) {
         f.credits -= C.vehicle.replacementCost;
@@ -114,7 +133,7 @@ function reconcile(s) {
 }
 
 function destination(s, v, target) {
-  return freeSpot(s, target, 3, v.slot * 7);
+  return parking(s, target, v.slot * 7, v);
 }
 function route(s, v, point, status) {
   const path = groundPath(s, v, point, 3),
@@ -142,8 +161,8 @@ function returnHome(s, v) {
         b.key === (v.cargo.kind === 'ammo' ? 'ammofactory' : 'factory'),
     );
     if (replacement) {
-      const parking = freeSpot(s, replacement, 3);
-      if (parking) v.home = parking;
+      const point = parking(s, replacement, v.slot * 7, v);
+      if (point) v.home = point;
     } else {
       v.path = [];
       v.status = 'blocked';
@@ -151,6 +170,10 @@ function returnHome(s, v) {
       v.goal = null;
       return;
     }
+  }
+  if (original && !parkingSpace(s, v, true)(v.home)) {
+    const point = parking(s, original, v.slot * 7, v);
+    if (point) v.home = point;
   }
   if (!route(s, v, v.home, 'returning')) {
     v.path = [];
@@ -353,6 +376,23 @@ export function updateAmmoLogistics(s, dt) {
       } else returnHome(s, v);
       v.retryAt = s.time + 2;
     }
+    // Old saves or a newly parked vehicle can claim an in-flight bay. Reserve
+    // another real destination; never unload through the obstructing vehicle.
+    if (
+      thinking &&
+      searches < 4 &&
+      v.goal &&
+      v.path.length &&
+      ['outbound', 'returning'].includes(v.status) &&
+      !parkingSpace(s, v, true)(v.goal)
+    ) {
+      searches++;
+      if (v.status === 'returning') returnHome(s, v);
+      else if (target) {
+        const point = destination(s, v, target);
+        if (point) route(s, v, point, 'outbound');
+      }
+    }
     if (
       thinking &&
       searches < 4 &&
@@ -369,27 +409,8 @@ export function updateAmmoLogistics(s, dt) {
         v.retryAt = s.time + 2;
       }
     }
-    let remaining = C.speed * dt;
-    while (v.path.length && remaining > 0) {
-      const point = v.path[0],
-        d = distance(v, point),
-        amount = Math.min(d, remaining),
-        t = d ? amount / d : 1;
-      const x = v.x + (point.x - v.x) * t,
-        z = v.z + (point.z - v.z) * t;
-      if (!walkable(s, x, z, 3)) {
-        v.path = [];
-        v.status = 'blocked';
-        v.retryAt = s.time + 2;
-        break;
-      }
-      v.yaw = Math.atan2(point.x - v.x, point.z - v.z);
-      v.x = x;
-      v.z = z;
-      v.y = groundHeight(x, z) + 1;
-      remaining -= amount;
-      if (d <= amount + 1e-6) v.path.shift();
-    }
+    moveCivicVehicle(s, v, dt, C.speed);
+    v.y = groundHeight(v.x, v.z) + 1;
     if (v.path.length || v.status === 'blocked') continue;
     if (v.status === 'outbound') {
       v.status = 'unloading';

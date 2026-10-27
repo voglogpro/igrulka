@@ -1,4 +1,4 @@
-import { hostile } from '../factions.js';
+import { allied, hostile } from '../factions.js';
 import { validSide } from '../factions.js';
 import { GROUND_UNITS, isInfantry } from '../config.js';
 import { groundVisible } from '../units/infantry/cover.js';
@@ -46,7 +46,15 @@ export function observedFrontline(s, side, previous = []) {
   const visible = new Set();
   for (const u of s.groundUnits)
     if (hostile(s, u.side, side) && military(u) && groundVisible(s, side, u)) {
-      seen.set(u.id, { id: u.id, x: u.x, z: u.z, strength: defenseStrength(u), time: s.time });
+      seen.set(u.id, {
+        id: u.id,
+        x: u.x,
+        z: u.z,
+        // A damaged armoured vehicle still calls for an anti-armour response.
+        // Preserve that known threat class inside the existing bounded strength field.
+        strength: isInfantry(u.key) ? defenseStrength(u) : Math.max(2.5, defenseStrength(u)),
+        time: s.time,
+      });
       visible.add(u.id);
     }
   const lines = corridorGeometry(s, side),
@@ -117,6 +125,7 @@ export function calculateFrontline(
   const belongs = (line, point) => corridorContains(line, point) || rearBreach(line, point);
   const posts = [];
   const sectors = lines.map((line) => {
+    const depot = s.districts.find((d) => d.id === line.districtId);
     const enemies = memory.filter((v) => belongs(line, v));
     const contacts = (s.contacts?.[side] || []).filter(
       (v) =>
@@ -185,7 +194,7 @@ export function calculateFrontline(
         pressure: (localEnemy + localContacts) / (localStrength + 1),
         enemy: localEnemy,
         breakthrough: breached.reduce((sum, v) => sum + v.strength * decay(v), 0),
-        threatPoint: intrusion ? { x: intrusion.x, z: intrusion.z } : null,
+        threatPoint: intrusion ? { id: intrusion.id, x: intrusion.x, z: intrusion.z } : null,
         armor: nearby.reduce((sum, v) => sum + (v.strength >= 2.5 ? v.strength * decay(v) : 0), 0),
         knowledge,
         confidence,
@@ -210,6 +219,19 @@ export function calculateFrontline(
     };
     return {
       id: line.id,
+      districtId: line.districtId,
+      objective: depot?.contested
+        ? 'Бой за склад'
+        : allied(s, depot?.owner, side)
+          ? depot.hp <= 0
+            ? 'Восстановление склада'
+            : 'Склад под защитой'
+          : 'Захват склада',
+      layers: {
+        outer: assigned.filter((u) => u.defensePost?.row === 0).length,
+        inner: assigned.filter((u) => u.defensePost?.row > 0 && u.defensePost.row < 4).length,
+        rear: assigned.filter((u) => u.defensePost?.row >= 4).length,
+      },
       label: line.id === 'north' ? 'Северный коридор' : 'Южный коридор',
       x: line.x,
       z: line.z,

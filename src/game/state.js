@@ -81,8 +81,26 @@ export function createGame(
     projectiles: [],
     events: [],
     log: [],
-    ai: { nextBuild: 7, nextAttack: 170, roadPlan: 0 },
-    ...(count === 4 ? { aiBySide: { 3: { nextBuild: 7, nextAttack: 170, roadPlan: 0 } } } : {}),
+    ai: {
+      nextBuild: 7,
+      nextAttack: 170,
+      roadPlan: 0,
+      aiDefenseAt: 0,
+      aiGroundReserve: { amount: 0, nextAt: 0 },
+    },
+    ...(count === 4
+      ? {
+          aiBySide: {
+            3: {
+              nextBuild: 7,
+              nextAttack: 170,
+              roadPlan: 0,
+              aiDefenseAt: 0,
+              aiGroundReserve: { amount: 0, nextAt: 0 },
+            },
+          },
+        }
+      : {}),
     result: null,
     stats: {
       shots: 0,

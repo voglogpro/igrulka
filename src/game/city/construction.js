@@ -1,4 +1,12 @@
-import { BUILDINGS, MAP, riverDistance, groundHeight, seaDistance, OIL_FIELDS } from '../config.js';
+import {
+  BUILDINGS,
+  GROUND_UNITS,
+  MAP,
+  riverDistance,
+  groundHeight,
+  seaDistance,
+  OIL_FIELDS,
+} from '../config.js';
 import {
   projectPoint,
   nearestRoad,
@@ -14,11 +22,25 @@ import { purchaseQuote, recordBuildingPurchase } from './pricing.js';
 import { initializeAmmunition } from '../units/ground/ammunition.js';
 import { activeSettlementFootprints } from '../territory/settlements.config.js';
 import { SETTLEMENTS } from '../territory/settlements.config.js';
+import { groundVisible } from '../units/infantry/cover.js';
 // The oil field under a point, if a well placed there would tap it.
 export const oilFieldAt = (x, z) =>
   OIL_FIELDS.find((f) => Math.hypot(x - f.x, z - f.z) <= f.r * 0.7) || null;
 
-export function physicalPlacement(s, key, x, z) {
+function trafficAt(s, key, x, z, viewer = null) {
+  const d = BUILDINGS[key];
+  for (const units of [s.groundUnits || [], s.ammoVehicles || [], s.serviceVehicles || []])
+    for (const u of units) {
+      if (!(u.hp > 0 || (u.stationId != null && u.hp == null)) || u.carrierId) continue;
+      const clearance = d.size * 0.56 + (GROUND_UNITS[u.key]?.size || 6) * 0.42 + 3;
+      if (Math.abs(u.x - x) >= clearance || Math.abs(u.z - z) >= clearance) continue;
+      if (viewer != null && !groundVisible(s, viewer, u)) continue;
+      return u;
+    }
+  return null;
+}
+
+export function physicalPlacement(s, key, x, z, owner = 0) {
   const d = BUILDINGS[key];
   if (!d || d.retired || ![x, z].every(Number.isFinite)) return 'Некорректная постройка';
   if (Math.abs(x) > MAP.width / 2 - d.size || Math.abs(z) > MAP.depth / 2 - d.size)
@@ -53,6 +75,7 @@ export function physicalPlacement(s, key, x, z) {
       Math.hypot(b.x - x, b.z - z) < (d.size + (BUILDINGS[b.key]?.size || 30)) * 0.6 + 5
     )
       return b.hp <= 0 ? 'Сначала разберите руины' : 'Место занято другой постройкой';
+  if (trafficAt(s, key, x, z, owner)) return 'Освободите площадку от бойцов и техники';
   for (const r of s.roads)
     if (!r.removed && projectPoint(x, z, r).distance < d.size * 0.5 + (r.connectorTo ? 3 : 6))
       return 'Отодвиньте здание от проезжей части';
@@ -60,7 +83,7 @@ export function physicalPlacement(s, key, x, z) {
 }
 
 export function placementPlan(s, owner, key, x, z) {
-  const error = physicalPlacement(s, key, x, z);
+  const error = physicalPlacement(s, key, x, z, owner);
   if (error) return { error };
   if (!ROAD_REQUIRED.has(key)) return { x, z };
   const near = nearestRoad(s, owner, x, z, { connected: true });
@@ -100,6 +123,9 @@ export function build(s, owner, key, x, z, rotation = null) {
   if (!d || !f) return 'Неизвестная постройка';
   const p = placementPlan(s, owner, key, x, z);
   if (p.error) return p.error;
+  // Preview must not reveal concealed infantry. Actual construction still
+  // respects physical occupancy, without burying units or changing resources.
+  if (trafficAt(s, key, x, z)) return 'Площадка сейчас недоступна';
   const cost = quote.cost + (p.driveCost || 0);
   if (f.credits < cost || f.materials < quote.metal) return 'Не хватает денег или сплавов';
   f.credits -= cost;

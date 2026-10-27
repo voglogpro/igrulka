@@ -6,6 +6,7 @@ import { initializeAmmunition, reloadFromReserve } from './ammunition.js';
 import { fuelFactor } from '../../city/oil.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry, defenseStats, groundHeight } from '../../config.js';
 import { groundPath, walkable } from './navigation.js';
+import { moveGroundUnit } from './movement.js';
 import { lineOfSight, recordFire } from '../infantry/cover.js';
 import { updateInfantrySupport } from '../infantry/support.js';
 import { updateAutomaticFPV } from '../infantry/fpv.js';
@@ -37,25 +38,6 @@ import {
 const AUTOMATIC = new Set(['machinegunner', 'apc', 'mog', 'armoredcar', 'lighttank', 'ifv']);
 // Bullets are aimed slightly upward and fall onto the target; the rise matches a parabolic drop.
 const LOFT_GRAVITY = 42;
-
-// A step that clips a building corner moves along the free axis instead, like sliding on a wall.
-function slide(s, u, dx, dz, dist, radius) {
-  for (const [sx, sz] of Math.abs(dx) > Math.abs(dz)
-    ? [
-        [Math.sign(dx), 0],
-        [0, Math.sign(dz)],
-      ]
-    : [
-        [0, Math.sign(dz)],
-        [Math.sign(dx), 0],
-      ])
-    if ((sx || sz) && walkable(s, u.x + sx * dist, u.z + sz * dist, radius)) {
-      u.x += sx * dist;
-      u.z += sz * dist;
-      return true;
-    }
-  return false;
-}
 
 export function tickUnit(s, u, dt, rates, hooks) {
   const { event, random } = hooks,
@@ -121,29 +103,11 @@ export function tickUnit(s, u, dt, rates, hooks) {
   }
   const retreat = u.order?.mode === 'retreat';
   u.moving = false;
-  if (mobile && u.path?.length && !stopToFight) {
-    const p = u.path[0],
-      dx = p.x - u.x,
-      dz = p.z - u.z,
-      len = Math.hypot(dx, dz),
-      slow = retreat ? 1.3 : u.suppression > 0.8 ? 0.3 : u.suppression > 0.45 ? 0.65 : 1,
+  if (mobile && u.path?.length && (!stopToFight || u.order?.mode === 'cover')) {
+    const slow = retreat ? 1.3 : u.suppression > 0.8 ? 0.3 : u.suppression > 0.45 ? 0.65 : 1,
       speed =
-        d.speed * (u.hp / u.maxHp < 0.3 ? 0.75 : 1) * slow * weatherSpeed(s) * fuelFactor(s, u),
-      dist = Math.min(len, speed * dt);
-    u.yaw = Math.atan2(dx, dz);
-    if (
-      walkable(s, u.x + (dx / (len || 1)) * dist, u.z + (dz / (len || 1)) * dist, d.size * 0.42)
-    ) {
-      u.x += (dx / (len || 1)) * dist;
-      u.z += (dz / (len || 1)) * dist;
-      if (len < 1 + speed * dt) u.path.shift();
-    } else if (slide(s, u, dx, dz, dist, d.size * 0.42)) {
-      // Grazing a corner: slid along the wall instead of stopping.
-    } else if ((u.repathAt || 0) < s.time) {
-      u.repathAt = s.time + 2;
-      u.path = groundPath(s, u, u.order || p, d.size * 0.42);
-    }
-    u.moving = !!u.path.length;
+        d.speed * (u.hp / u.maxHp < 0.3 ? 0.75 : 1) * slow * weatherSpeed(s) * fuelFactor(s, u);
+    moveGroundUnit(s, u, dt, speed);
   }
   if (mobile) u.y = 1 + groundHeight(u.x, u.z);
   if (u.key === 'mog') u.setup = u.moving ? 0 : Math.min(1, (u.setup || 0) + dt / 3);

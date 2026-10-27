@@ -5,6 +5,7 @@ import {
   deliverGround,
   transportDeliveryStatus,
   DELIVERY_RETRY_SECONDS,
+  updateTransportDeliveries,
 } from '../../src/game/units/vehicles/transport-orders.js';
 import {
   planGroundUnload,
@@ -221,6 +222,23 @@ test('a landing occupied after departure waits atomically and retries on game ti
   );
   const retryAt = apc.delivery.retryAt;
   assert.ok(retryAt > s.time && retryAt <= s.time + DELIVERY_RETRY_SECONDS + 1e-6);
+  const waiting = { x: apc.x, z: apc.z },
+    pendingPath = structuredClone(apc.path),
+    budget = s.sides.map((side) => [side.credits, side.materials]),
+    passengerIds = passengers.map((p) => p.id);
+  updateTransportDeliveries(s);
+  assert.deepEqual(
+    s.sides.map((side) => [side.credits, side.materials]),
+    budget,
+  );
+  assert.deepEqual(
+    passengers.map((p) => p.id),
+    passengerIds,
+  );
+  assert.deepEqual(apc.path, pendingPath, 'the paid delivery keeps its pending physical route');
+  E.advance(s, 0.2);
+  assert.deepEqual({ x: apc.x, z: apc.z }, waiting);
+  assert.equal(apc.moving, false, 'waiting really stops the carrier until its retry');
   for (const u of blockers) u.hp = 0;
   E.advance(s, Math.max(0, retryAt - s.time - 0.1));
   assert.ok(passengers.every((p) => p.carrierId === apc.id));

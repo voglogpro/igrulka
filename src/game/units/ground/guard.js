@@ -6,6 +6,7 @@ import { cancelTransportDelivery } from '../vehicles/transport.js';
 import { clearGroundRoute } from './route-queue.js';
 import { clearAutoDefense } from '../../defense/volunteers.js';
 import { invalidateFrontline } from '../../defense/cache.js';
+import { ENGAGEMENT_CELL, prepareGroundEngagement } from './engagement.js';
 
 const GUARD_RADIUS = 95;
 const ALLY_RADIUS = 68;
@@ -17,6 +18,12 @@ export const GUARD_POST_RADIUS = 54;
 export const GUARD_POST_CANDIDATES = 121;
 export const GUARD_PATH_ATTEMPTS = 4;
 export const GUARD_POST_CLEARANCE = 7;
+export const GUARD_PATHS_PER_STEP = 2;
+const POST_CELL = 32;
+// The shared combat index is built before movement. A full .1 s step, including
+// retreat speed, moves the fastest unit less than 5 m across its original cell.
+const MOVEMENT_MARGIN = 8;
+const guardFrames = new WeakMap();
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const pointValid = (s, u, p) =>
@@ -26,6 +33,161 @@ const pointValid = (s, u, p) =>
   Math.abs(p.x) <= FIELD.x &&
   Math.abs(p.z) <= FIELD.z &&
   walkable(s, p.x, p.z, GROUND_UNITS[u.key].size * 0.42);
+
+function frame(s) {
+  let value = guardFrames.get(s);
+  if (
+    value?.time === s.time &&
+    !value.invalidated &&
+    value.units === s.groundUnits &&
+    value.count === s.groundUnits.length &&
+    value.revision === s.networkRevision
+  )
+    return value;
+  const previous = value?.time === s.time ? value : null,
+    engagement = prepareGroundEngagement(s),
+    pending = new Map(),
+    sides = new Set();
+  value = {
+    time: s.time,
+    units: s.groundUnits,
+    count: s.groundUnits.length,
+    revision: s.networkRevision,
+    engagement,
+    extras: new Map(),
+    posts: null,
+    selected: new Set(),
+    sides: [],
+    metrics: previous?.metrics || {
+      indexed: 0,
+      enemyChecks: 0,
+      postChecks: 0,
+      visibilityTests: 0,
+      lineTests: 0,
+      paths: 0,
+      bySide: {},
+    },
+  };
+  for (const u of s.groundUnits) {
+    value.metrics.indexed++;
+    if (u.hp <= 0) continue;
+    // Normal live units already belong to the shared index. Preserve the old
+    // guard rules for a rare unfinished record without treating buildings as troops.
+    if (!u.carrierId && !engagement.ids.has(u.id)) {
+      const key = `${u.side}:${Math.floor(u.x / ENGAGEMENT_CELL)},${Math.floor(u.z / ENGAGEMENT_CELL)}`;
+      if (!value.extras.has(key)) value.extras.set(key, []);
+      value.extras.get(key).push(u);
+    }
+    if (!u.guard || !GROUND_UNITS[u.key] || u.carrierId || u.boardingId || u.supplyTrip) continue;
+    if (u.order?.mode === 'cover') continue;
+    sides.add(u.side);
+    if ((u.guardNextThink || 0) > s.time || (u.guardRepathAt || 0) > s.time) continue;
+    const d = GROUND_UNITS[u.key],
+      target = !u.holdFire && engagement.ids.get(u.guardTargetId),
+      firingDistance = (d.groundRange || 0) * 0.78,
+      intercept =
+        target?.hp > 0 &&
+        !target.carrierId &&
+        hostile(s, target.side, u.side) &&
+        firingDistance > 0;
+    let needsPath;
+    if (intercept) {
+      const length = distance(u, target),
+        toward = {
+          x: target.x + (u.x - target.x) * (firingDistance / (length || 1)),
+          z: target.z + (u.z - target.z) * (firingDistance / (length || 1)),
+        };
+      needsPath =
+        length > firingDistance &&
+        pointValid(s, u, toward) &&
+        (isInfantry(u.key) || distance(toward, u.guard) <= 40);
+    } else
+      needsPath =
+        distance(u, u.guard) > 3 &&
+        (!u.path?.length || !['guard', 'guardReturn'].includes(u.order?.mode));
+    if (!needsPath) continue;
+    if (!pending.has(u.side)) pending.set(u.side, []);
+    pending.get(u.side).push(u);
+  }
+  value.sides = [...sides].sort((a, b) => a - b);
+  for (const queue of pending.values())
+    queue.sort((a, b) => (a.guardRepathAt || 0) - (b.guardRepathAt || 0) || a.id - b.id);
+  const positions = new Map(),
+    start = Math.round(s.time * 20) % s.sides.length;
+  while (value.selected.size < GUARD_PATHS_PER_STEP) {
+    let progress = false;
+    for (let i = 0; i < s.sides.length && value.selected.size < GUARD_PATHS_PER_STEP; i++) {
+      const side = (start + i) % s.sides.length,
+        index = positions.get(side) || 0,
+        u = pending.get(side)?.[index];
+      if (!u) continue;
+      value.selected.add(u);
+      positions.set(side, index + 1);
+      progress = true;
+    }
+    if (!progress) break;
+  }
+  guardFrames.set(s, value);
+  return value;
+}
+
+function guardPath(s, u, point) {
+  if ((u.guardRepathAt || 0) > s.time) return null;
+  const f = frame(s),
+    used = f.metrics.bySide[u.side] || 0;
+  if (
+    f.metrics.paths >= GUARD_PATHS_PER_STEP ||
+    (f.selected.size ? !f.selected.has(u) : f.sides.length > 1 && used >= 1)
+  ) {
+    // Existing think/retry clocks are a persistent pending request. Budget denial
+    // retries next simulation step, while a failed real search gets normal backoff.
+    u.guardNextThink = Math.min(u.guardNextThink, s.time + 0.05);
+    return null;
+  }
+  f.metrics.paths++;
+  f.metrics.bySide[u.side] = used + 1;
+  u.guardRepathAt = s.time + TARGET_REPATH;
+  return groundPath(s, u, point, GROUND_UNITS[u.key].size * 0.42);
+}
+
+function assists(s, f, u, enemy) {
+  if (!f.posts) {
+    f.posts = new Map();
+    for (const v of s.groundUnits) {
+      if (v.hp <= 0 || !v.guard) continue;
+      const key = `${v.side}:${Math.floor(v.guard.x / POST_CELL)},${Math.floor(v.guard.z / POST_CELL)}`;
+      if (!f.posts.has(key)) f.posts.set(key, []);
+      f.posts.get(key).push(v);
+    }
+  }
+  // Assistance uses the assigned post, even if that ally is currently intercepting
+  // far away. Only the same city lends its guards; co-op ownership stays separate.
+  const minX = Math.max(u.guard.x - ALLY_RADIUS, enemy.x - ASSIST_RADIUS),
+    maxX = Math.min(u.guard.x + ALLY_RADIUS, enemy.x + ASSIST_RADIUS),
+    minZ = Math.max(u.guard.z - ALLY_RADIUS, enemy.z - ASSIST_RADIUS),
+    maxZ = Math.min(u.guard.z + ALLY_RADIUS, enemy.z + ASSIST_RADIUS);
+  for (let z = Math.floor(minZ / POST_CELL); z <= Math.floor(maxZ / POST_CELL); z++)
+    for (let x = Math.floor(minX / POST_CELL); x <= Math.floor(maxX / POST_CELL); x++)
+      for (const v of f.posts.get(`${u.side}:${x},${z}`) || []) {
+        f.metrics.postChecks++;
+        if (
+          v.id !== u.id &&
+          v.hp > 0 &&
+          v.guard &&
+          distance(v.guard, u.guard) <= ALLY_RADIUS &&
+          distance(enemy, v.guard) <= ASSIST_RADIUS
+        )
+          return true;
+      }
+  return false;
+}
+
+export function guardMetrics(s) {
+  const f = guardFrames.get(s);
+  return f?.time === s.time
+    ? { ...f.metrics, bySide: { ...f.metrics.bySide }, limit: GUARD_PATHS_PER_STEP }
+    : null;
+}
 
 function guardCandidates(s, u, p) {
   const size = GROUND_UNITS[u.key].size;
@@ -139,6 +301,8 @@ export function assignGuardPost(
   u.digging = false;
   u.trenchId = null;
   u.navRevision = s.networkRevision;
+  const cached = guardFrames.get(s);
+  if (cached) cached.invalidated = true;
   return true;
 }
 
@@ -176,33 +340,43 @@ function threats(s, u) {
   // Rank cheap geometric candidates before the expensive visibility/terrain rays.
   // A guard needs the nearest visible threat, not a line-of-sight result for
   // every soldier in the opposing platoon each time its think clock fires.
-  let alliedPosts;
+  const f = frame(s),
+    cache = f.engagement;
   const candidates = [];
-  for (const enemy of s.groundUnits) {
-    if (!hostile(s, enemy.side, u.side) || enemy.hp <= 0 || enemy.carrierId) continue;
+  const offer = (enemy) => {
+    f.metrics.enemyChecks++;
+    if (!GROUND_UNITS[enemy.key]) return;
+    if (!hostile(s, enemy.side, u.side) || enemy.hp <= 0 || enemy.carrierId) return;
     const range = distance(enemy, u.guard);
-    if (range > MAX_LEASH) continue;
-    if (range > GUARD_RADIUS) {
-      alliedPosts ||= s.groundUnits.filter(
-        (v) =>
-          v.id !== u.id &&
-          v.side === u.side &&
-          v.hp > 0 &&
-          v.guard &&
-          distance(v.guard, u.guard) <= ALLY_RADIUS,
-      );
-      if (!alliedPosts.some((ally) => distance(enemy, ally.guard) <= ASSIST_RADIUS)) continue;
-    }
+    if (range > MAX_LEASH || (range > GUARD_RADIUS && !assists(s, f, u, enemy))) return;
     candidates.push({ enemy, range });
-  }
+  };
+  for (
+    let z = Math.floor((u.guard.z - MAX_LEASH - MOVEMENT_MARGIN) / ENGAGEMENT_CELL);
+    z <= Math.floor((u.guard.z + MAX_LEASH + MOVEMENT_MARGIN) / ENGAGEMENT_CELL);
+    z++
+  )
+    for (
+      let x = Math.floor((u.guard.x - MAX_LEASH - MOVEMENT_MARGIN) / ENGAGEMENT_CELL);
+      x <= Math.floor((u.guard.x + MAX_LEASH + MOVEMENT_MARGIN) / ENGAGEMENT_CELL);
+      x++
+    )
+      for (const side of cache.enemies[u.side] || []) {
+        for (const enemy of cache.sideBuckets[side].get(`${x},${z}`) || []) offer(enemy);
+        for (const enemy of f.extras.get(`${side}:${x},${z}`) || []) offer(enemy);
+      }
   candidates.sort((a, b) => a.range - b.range || a.enemy.id - b.enemy.id);
-  for (const { enemy } of candidates)
-    if (groundVisible(s, u.side, enemy) && lineOfSight(s, u, enemy)) return enemy;
+  for (const { enemy } of candidates) {
+    f.metrics.visibilityTests++;
+    if (!groundVisible(s, u.side, enemy)) continue;
+    f.metrics.lineTests++;
+    if (lineOfSight(s, u, enemy)) return enemy;
+  }
   return null;
 }
 
 export function updateGuard(s, u) {
-  if (u.supplyTrip) return;
+  if (u.supplyTrip || u.order?.mode === 'cover') return;
   if (!u.guard || !GROUND_UNITS[u.key] || u.carrierId || u.boardingId) return;
   if ((u.guardNextThink || 0) > s.time) return;
   u.guardNextThink = s.time + 0.4;
@@ -220,11 +394,10 @@ export function updateGuard(s, u) {
         z: target.z + (u.z - target.z) * (firingDistance / distance(u, target)),
       };
       if (pointValid(s, u, toward) && (isInfantry(u.key) || distance(toward, u.guard) <= 40)) {
-        const path = groundPath(s, u, toward, d.size * 0.42);
-        if (path.length) {
+        const path = guardPath(s, u, toward);
+        if (path?.length) {
           u.path = path;
           u.order = { ...toward, mode: 'guardIntercept', targetId: target.id };
-          u.guardRepathAt = s.time + TARGET_REPATH;
         }
       }
     } else if (distance(u, target) <= firingDistance && u.order?.mode === 'guardIntercept') {
@@ -233,14 +406,22 @@ export function updateGuard(s, u) {
     return;
   }
   u.guardTargetId = null;
+  if (u.order?.mode === 'guardIntercept') {
+    // Losing the threat (including a hold-fire order) ends the intercept now.
+    // Its old chase cooldown must not keep walking away from the guard post or
+    // delay the independently budgeted return request.
+    u.path = [];
+    u.order = { ...u.guard, mode: 'guardReturn' };
+    u.guardRepathAt = 0;
+  }
   if (distance(u, u.guard) <= 3) {
     u.path = [];
     u.order = { ...u.guard, mode: 'guard' };
     return;
   }
-  if (!u.path?.length || u.order?.mode !== 'guard') {
-    const path = groundPath(s, u, u.guard, d.size * 0.42);
-    if (path.length) {
+  if (!u.path?.length || !['guard', 'guardReturn'].includes(u.order?.mode)) {
+    const path = guardPath(s, u, u.guard);
+    if (path?.length) {
       u.path = path;
       u.order = { ...u.guard, mode: 'guard' };
     }

@@ -5,7 +5,6 @@ import { demolish, repair, canPlace, build } from '../city/construction.js';
 import { passable, overlappingRoad } from '../city/road-network.js';
 import { economy } from '../city/economy.js';
 import { buildRoad } from '../city/roads.js';
-import { purchaseQuote } from '../city/pricing.js';
 import { difficultyOf } from './difficulty.config.js';
 import { random } from '../shared/random.js';
 import { produce } from '../units/aviation/production.js';
@@ -14,10 +13,29 @@ import { launch } from '../units/aviation/launch.js';
 import { oilPlan } from './oil-ai.js';
 import { settlementRoadPlan } from './settlement-ai.js';
 import { weaponStock } from '../units/aviation/launch-supply.js';
+import { armyProductionReserve, infrastructureReserve } from './depot-doctrine.js';
+
+// Rebuild once per second and persist the decision window, so loading midway
+// through it cannot spend a different budget or consume different random draws.
+function groundBudget(s, side) {
+  const plan = aiState(s, side);
+  let value = plan.aiGroundReserve;
+  if (s.time >= value.nextAt) {
+    const facilities = new Set(
+      s.buildings
+        .filter((b) => b.side === side && b.hp > 0 && b.progress >= 1 && !b.demolished)
+        .map((b) => b.key),
+    );
+    value = { nextAt: s.time + 1, amount: armyProductionReserve(s, side, facilities) };
+    plan.aiGroundReserve = value;
+  }
+  return value.amount;
+}
 export function ai(s, side = 1) {
   if (!validSide(s, side)) return;
   const memory = aiState(s, side);
-  const f = s.sides[side],
+  const level = difficultyOf(s),
+    f = s.sides[side],
     hq = hqOf(s, side),
     active = (key) => s.buildings.filter((b) => b.side === side && b.key === key && b.hp > 0),
     ready = (key) => active(key).filter((b) => b.progress >= 1);
@@ -47,27 +65,29 @@ export function ai(s, side = 1) {
           ? 'housing'
           : active('industry').length < 2
             ? 'industry'
-            : !active('factory').length
-              ? 'factory'
-              : !active('launcher').length
-                ? 'launcher'
-                : active('gun').length < 3
-                  ? 'gun'
-                  : null;
+            : s.time > level.armyFrom - 90 && !active('barracks').length
+              ? 'barracks'
+              : !active('factory').length
+                ? 'factory'
+                : !active('launcher').length
+                  ? 'launcher'
+                  : active('gun').length < 3
+                    ? 'gun'
+                    : null;
     if (!key && !oilBusy) {
       const goals = [
+        ['barracks', s.time > level.armyFrom - 90 ? 1 : 0],
+        ['ammofactory', s.time > level.armyFrom - 40 ? 1 : 0],
+        ['vehiclebase', s.time > level.armyFrom + 20 ? 1 : 0],
         ['housing', Math.min(9, 3 + Math.floor(s.time / 130))],
         ['industry', Math.min(5, 2 + Math.floor(s.time / 250))],
         ['radar', s.time > 220 ? 1 : 0],
         ['sam', s.time > 220 ? 2 : 0],
         ['launcher', s.time > 600 ? 2 : 1],
         ['factory', s.time > 580 ? 2 : 1],
-        ['barracks', s.time > 240 ? 1 : 0],
-        ['ammofactory', s.time > 280 ? 1 : 0],
         ['silo', s.time > 360 ? 1 : 0],
         ['training', s.time > 640 ? 1 : 0],
         ['market', s.time > 420 ? 1 : 0],
-        ['vehiclebase', s.time > 300 ? 1 : 0],
         ['gun', Math.min(6, 3 + Math.floor(s.time / 240))],
       ];
       key = goals.find(([k, n]) => active(k).length < n)?.[0] || null;
@@ -121,7 +141,10 @@ export function ai(s, side = 1) {
   if (ready('factory').length) {
     const queued = ready('factory').reduce((n, b) => n + (b.queue?.length || 0), 0),
       stock = Object.keys(WEAPONS).reduce((n, key) => n + weaponStock(s, side, key), 0),
-      reserve = purchaseQuote(s, side, 'building', memory.plannedBuild)?.cost ?? 150;
+      reserve = Math.max(
+        infrastructureReserve(s, side, memory.plannedBuild) || 150,
+        groundBudget(s, side),
+      );
     if (queued < 3 && stock < 7 && f.credits > reserve + 90 && f.materials > 30) {
       let key = random(s) > 0.5 ? 'cruise' : random(s) > 0.5 ? 'heavy' : 'drone';
       if (random(s) > 0.75) key = 'ballistic';
