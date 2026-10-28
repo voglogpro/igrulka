@@ -1,5 +1,5 @@
-// Legacy interface/weapon/engine presets, prepared before play. Main ordnance
-// and impacts use field recordings from ordnance.js and explosions.js instead.
+// Offline synthesis of every sound the battle uses. Buffers are rendered once on unlock,
+// so a burst of fire costs one buffer source per round instead of a node graph of oscillators.
 import { onePole, finish } from './dsp.js';
 
 // Supersonic crack, propellant boom, a pitched-down thump and a rumbling gas tail.

@@ -1,4 +1,4 @@
-export const DEFAULT_CLIENT_URL = 'https://voglogpro.github.io/igrulka/releases/8.13.1/';
+export const DEFAULT_CLIENT_URL = 'https://voglogpro.github.io/igrulka/releases/8.13.2/';
 
 export function clientPageUrl(value = DEFAULT_CLIENT_URL) {
   if (

@@ -22,10 +22,13 @@ with sync_playwright() as p:
   result=page.evaluate('''async()=>{
    const before=audio.diagnostics(),t=performance.now();audio.unlock();const repeatedUnlockMs=performance.now()-t;
    audio.sample('rifle',0,0,.3);const voice=audio.voices;
-   return {coldUnlockMs:unlockMs,contextCreateMs,repeatedUnlockMs,heartbeatCount:gaps.length,maxHeartbeatGapMs:Math.max(...gaps),longTasks,bank:before.bank,enginePool:before.enginePool,voice};
+   return {rate:audio.context.sampleRate,coldUnlockMs:unlockMs,contextCreateMs,repeatedUnlockMs,heartbeatCount:gaps.length,maxHeartbeatGapMs:Math.max(...gaps),longTasks,bank:before.bank,enginePool:before.enginePool,voice};
   }''')
-  assert result['bank'][0]['workerJobs']>0,result
-  assert result['bank'][0]['rendered']==result['bank'][0]['total'],result
+  # The speculative 48 kHz bank can precede a real 44.1 kHz device bank.
+  # ready applies to the context actually playing, not the first Map entry.
+  active_bank=next(bank for bank in result['bank'] if bank['rate']==result['rate'])
+  assert active_bank['workerJobs']>0,result
+  assert active_bank['rendered']==active_bank['total'],result
   assert result['enginePool']==12 and result['voice']==1,result
   assert result['heartbeatCount']>10,result
   assert result['coldUnlockMs']-result['contextCreateMs']<100,result

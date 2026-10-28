@@ -1,6 +1,7 @@
 import {
   GUNS,
   gunshot,
+  explosion,
   whoosh,
   clicks,
   dieselLoop,
@@ -11,7 +12,6 @@ import {
 import { recordedEngineLoop } from './engines.js';
 import { recordedGroundSample } from './footsteps.js';
 import { recordedOrdnanceSample } from './ordnance.js';
-import { recordedExplosionSample } from './explosions.js';
 
 // Existing rifle/ambience presets and variants stay intact; ordnance uses the
 // recordings below. Worker and idle fallback execute this same catalog.
@@ -33,15 +33,15 @@ export function pcmCatalog(rate) {
   for (let i = 0; i < 3; i++) add('footstep', () => recordedGroundSample(rate, 'footstep', i));
   for (const key of ['rifle', 'mg', 'hmg', 'shilka', 'autocannon', 'blast', 'tank'])
     if (GUNS[key]) add(key, () => gunshot(rate, GUNS[key]));
-  add('blast', () => recordedExplosionSample(rate, 'blast'));
-  add('blastSmall', () => recordedExplosionSample(rate, 'blastSmall'));
+  add('blast', () => explosion(rate, 1.2));
+  add('blastSmall', () => explosion(rate, 0.75));
   add('whoosh', () => whoosh(rate, 1.4));
   for (const key of Object.keys(GUNS))
     if (key !== 'artillery') add(key, () => gunshot(rate, GUNS[key]));
   for (const key of ['rifle', 'mg', 'hmg', 'shilka']) add(key, () => gunshot(rate, GUNS[key]));
-  add('blastLarge', () => recordedExplosionSample(rate, 'blastLarge'));
-  add('blastSmall', () => recordedExplosionSample(rate, 'blastSmall'));
-  add('blast', () => recordedExplosionSample(rate, 'blast'));
+  add('blastLarge', () => explosion(rate, 2.2));
+  add('blastSmall', () => explosion(rate, 0.85));
+  add('blast', () => explosion(rate, 1.35));
   add('atgm', () => recordedOrdnanceSample(rate, 'rocketLaunch'));
   add('whistle', () => recordedOrdnanceSample(rate, 'missileDive'));
   add('reload', () => clicks(rate));

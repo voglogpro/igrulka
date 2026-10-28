@@ -1,4 +1,3 @@
-import { heavyMix, distantLoopMix, BurstBudget } from './battle-mix.js';
 import { uavEngineMix } from './engines.js';
 import { FootstepScheduler } from './footsteps.js';
 import { recordedJetMix } from './ordnance.js';
@@ -46,9 +45,6 @@ const VEHICLES = new Set([
 ]);
 const WHEELED = new Set(['apc', 'armoredcar', 'mlrs']);
 const SPEED_OF_SOUND = 343;
-// Recorded impacts have short transients and lower integrated levels than the
-// old sustained noise presets. Calibrate this family, not master or siren.
-const BLAST_LEVEL = { blastSmall: 1.15, blast: 1.25, blastLarge: 1.35 };
 const ORDNANCE = new Set([
   'rocketLaunch',
   'cruiseLaunch',
@@ -83,7 +79,15 @@ export function distanceMix(distance, loudness = 1) {
 // rifle/engine/ambience mix while allowing the recorded low end to reach a high
 // strategy camera and remain audible behind ordinary gunfire.
 export function ordnanceMix(distance, loudness = 1) {
-  return heavyMix(distance, loudness);
+  const d = Math.max(0, distance),
+    mix = distanceMix(d, loudness);
+  return {
+    ...mix,
+    dry: loudness * (260 / (260 + d)),
+    wet: mix.wet * 1.12,
+    echo: mix.echo * 1.2,
+    cutoff: Math.max(900, Math.min(7000, 10000 * Math.exp(-d / 1100))),
+  };
 }
 
 export class GameAudio {
@@ -92,8 +96,6 @@ export class GameAudio {
     this.activated = false;
     this.volume = 0.35;
     this.last = {};
-    this.burst = new BurstBudget();
-    this.paused = false;
     this.voices = 0;
     this.activeSamples = new Set();
     this.engines = [];
@@ -147,14 +149,19 @@ export class GameAudio {
       this.reverbIn.connect(this.reverb);
       this.reverb.connect(this.master);
       this.echoIn = c.createGain();
-      this.heavyEchoIn = c.createGain();
-      // Fixed shared recording-processing bus; no extra sample sources or generated IR.
-      this.heavyBus = c.createBiquadFilter();
-      this.heavyBus.type = 'lowshelf';
-      this.heavyBus.frequency.value = 110;
-      if (this.heavyBus.gain) this.heavyBus.gain.value = 3;
-      this.heavyBus.connect(this.dry);
-      this.resetEcho();
+      const delay = c.createDelay(2),
+        feedback = c.createGain(),
+        tone = c.createBiquadFilter();
+      delay.delayTime.value = 0.46;
+      feedback.gain.value = 0.32;
+      tone.type = 'lowpass';
+      tone.frequency.value = 1300;
+      this.echoIn.connect(delay);
+      delay.connect(tone);
+      tone.connect(feedback);
+      feedback.connect(delay);
+      tone.connect(this.master);
+      tone.connect(this.reverbIn);
       this.buffers = this.renderBuffers();
       const suspended = !context && c.suspend ? c.suspend().catch(() => {}) : Promise.resolve();
       this.preparation = Promise.all([this.ready, suspended]);
@@ -195,7 +202,6 @@ export class GameAudio {
     return bank.buffers;
   }
   set(enabled, volume = this.volume) {
-    if (!enabled && this.enabled) this.clearBattleAudio();
     this.enabled = enabled;
     this.volume = volume;
     if (this.master) {
@@ -203,67 +209,9 @@ export class GameAudio {
       else this.master.gain.setTargetAtTime(enabled ? volume : 0, this.context.currentTime, 0.05);
     }
   }
-  resetEcho() {
-    for (const node of this.echoNodes || []) node.disconnect();
-    this.echoIn.disconnect();
-    this.heavyEchoIn.disconnect();
-    this.echoNodes = [];
-    // Preserve the ordinary rifle/ambient reflection graph.
-    const ordinaryDelay = this.context.createDelay(2),
-      ordinaryTone = this.context.createBiquadFilter(),
-      feedback = this.context.createGain();
-    ordinaryDelay.delayTime.value = 0.46;
-    ordinaryTone.type = 'lowpass';
-    ordinaryTone.frequency.value = 1300;
-    feedback.gain.value = 0.32;
-    this.echoIn.connect(ordinaryDelay);
-    ordinaryDelay.connect(ordinaryTone);
-    ordinaryTone.connect(feedback);
-    feedback.connect(ordinaryDelay);
-    ordinaryTone.connect(this.master);
-    ordinaryTone.connect(this.reverbIn);
-    this.echoNodes.push(ordinaryDelay, ordinaryTone, feedback);
-    for (const [seconds, level] of [
-      [0.38, 0.28],
-      [0.83, 0.15],
-    ]) {
-      const delay = this.context.createDelay(1),
-        tone = this.context.createBiquadFilter(),
-        gain = this.context.createGain();
-      delay.delayTime.value = seconds;
-      tone.type = 'lowpass';
-      tone.frequency.value = 1050;
-      gain.gain.value = level;
-      this.heavyEchoIn.connect(delay);
-      delay.connect(tone);
-      tone.connect(gain);
-      gain.connect(this.dry);
-      this.echoNodes.push(delay, tone, gain);
-    }
-  }
-  clearBattleAudio() {
-    if (!this.context) return;
-    for (const voice of [...this.activeSamples]) {
-      voice.source.stop(this.context.currentTime);
-      voice.finish();
-    }
-    this.burst.reset();
-    this.last = {};
-    if (this.echoIn) this.resetEcho();
-    if (this.reverb?.buffer) {
-      const impulse = this.reverb.buffer;
-      this.reverb.buffer = null;
-      this.reverb.buffer = impulse;
-    }
-    for (const voice of this.engines) {
-      voice.level.gain.cancelScheduledValues?.(this.context.currentTime);
-      voice.level.gain.setValueAtTime(0, this.context.currentTime);
-    }
-  }
   // Interface blips stay synthetic and centred; they are not part of the battlefield.
   tone(freq, end, length, gain = 0.1, type = 'sine') {
-    if (!this.activated || this.paused || !this.context || !this.enabled || this.voices >= 40)
-      return;
+    if (!this.activated || !this.context || !this.enabled || this.voices >= 40) return;
     const c = this.context,
       t = c.currentTime,
       o = c.createOscillator(),
@@ -287,15 +235,14 @@ export class GameAudio {
   }
   // One positioned battlefield sound: buffer → distance filter → dry/pan + reverb + echo sends.
   sample(name, distance, pan, loudness, options = {}) {
-    if (!this.activated || this.paused) return;
+    if (!this.activated) return;
     const list = this.buffers?.[name];
     if (!list || !this.enabled) return;
-    const heavy = ORDNANCE.has(name) || name === 'blastLarge' || name === 'blast';
-    const priority = options.priority || heavy;
-    const level = loudness * (BLAST_LEVEL[name] || 1);
-    const mix = heavy ? ordnanceMix(distance, level) : distanceMix(distance, level);
+    const priority = options.priority || ORDNANCE.has(name);
+    const mix = ORDNANCE.has(name)
+      ? ordnanceMix(distance, loudness)
+      : distanceMix(distance, loudness);
     if (mix.dry < 0.012 && !options.force) return;
-    if (!this.burst.take(this.context.currentTime, priority)) return;
     if (this.voices >= 44 && priority) {
       const ordinary = [...this.activeSamples].find((voice) => !voice.priority);
       if (ordinary) {
@@ -324,11 +271,11 @@ export class GameAudio {
     source.connect(filter);
     filter.connect(dry);
     dry.connect(stereo);
-    stereo.connect(heavy ? this.heavyBus : this.dry);
+    stereo.connect(this.dry);
     filter.connect(wet);
-    wet.connect(heavy ? this.heavyEchoIn : this.reverbIn);
+    wet.connect(this.reverbIn);
     filter.connect(echo);
-    echo.connect(heavy ? this.heavyEchoIn : this.echoIn);
+    echo.connect(this.echoIn);
     source.start(at, options.offset ?? 0);
     this.voices++;
     const voice = { name, source, priority, finished: false, finish: null };
@@ -436,13 +383,9 @@ export class GameAudio {
       if (this.throttle('reload', 0.1)) this.sample('reload', where.distance, where.pan, 0.35);
       return;
     }
-    if (e.type === 'launch' && this.throttle('launch:' + e.key, 0.1))
+    if (e.type === 'launch' && this.throttle('launch', 0.1))
       this.sample(
-        e.key === 'ballistic'
-          ? 'ballisticLaunch'
-          : e.key === 'cruise'
-            ? 'cruiseLaunch'
-            : 'rocketLaunch',
+        e.key === 'ballistic' ? 'ballisticLaunch' : e.key === 'cruise' ? 'cruiseLaunch' : 'whoosh',
         where.distance,
         where.pan,
         e.key === 'ballistic' ? 1.05 : 0.8,
@@ -571,9 +514,7 @@ export class GameAudio {
       rightX: m[0],
       rightZ: m[2],
     };
-    if (paused && !this.paused) this.clearBattleAudio();
-    this.paused = paused;
-    if (!paused && this.enabled) this.incoming(state);
+    if (!paused) this.incoming(state);
     const walker = this.footsteps.take(
       state.groundUnits || [],
       this.listener,
@@ -639,7 +580,7 @@ export class GameAudio {
               u.z - this.listener.z,
             ),
           }))
-          .filter((o) => o.d < (['jet', 'moped', 'rotor'].includes(kind) ? 5200 : 1000))
+          .filter((o) => o.d < (kind === 'jet' ? 1500 : 1000))
           .sort((a, b) => a.d - b.d)
           .slice(0, voices.length);
       for (let i = 0; i < voices.length; i++) {
@@ -660,7 +601,6 @@ export class GameAudio {
                 : uav
                   ? uav.gain
                   : missile.gain;
-          if (uav || missile) gain = distantLoopMix(d, gain).gain;
           voice.source.playbackRate.setTargetAtTime(
             kind === 'diesel'
               ? WHEELED.has(u.key)
@@ -676,9 +616,9 @@ export class GameAudio {
           );
           voice.filter.frequency.setTargetAtTime(
             uav
-              ? distantLoopMix(d, gain, uav.cutoff).cutoff
+              ? uav.cutoff
               : missile
-                ? distantLoopMix(d, gain, missile.cutoff).cutoff
+                ? missile.cutoff
                 : Math.min(kind === 'diesel' ? 600 : 3000, mix.cutoff),
             t,
             0.15,
@@ -704,10 +644,7 @@ export class GameAudio {
   focus(visible) {
     if (!this.activated || !this.context) return;
     if (visible) this.context.resume().catch(() => {});
-    else {
-      this.clearBattleAudio();
-      this.context.suspend().catch(() => {});
-    }
+    else this.context.suspend().catch(() => {});
   }
   diagnostics() {
     return {
