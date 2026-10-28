@@ -1,33 +1,52 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rainLoop } from '../../src/audio/ambience/rain.js';
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { prepareRecordedRain } from '../../src/audio/ambience/rain.js';
+import { encodedRain } from '../../src/audio/samples/rain-recording.js';
+import { pcmCatalog } from '../../src/audio/pcm-catalog.js';
 
-test('rain is a soft band-limited circular patter without a broadband hiss or a cut at the loop seam', () => {
-  const previous = Math.random;
-  let seed = 86;
-  Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
-  try {
-    const rate = 24000,
-      data = rainLoop(rate);
-    let sum = 0,
-      energy = 0,
-      differences = 0,
-      peak = 0;
-    for (let i = 0; i < data.length; i++) {
-      assert.ok(Number.isFinite(data[i]));
-      sum += data[i];
-      energy += data[i] ** 2;
-      differences += (data[i] - data[(i + data.length - 1) % data.length]) ** 2;
-      peak = Math.max(peak, Math.abs(data[i]));
-    }
-    assert.equal(data.length, rate * 5);
-    assert.ok(Math.abs(sum / data.length) < 1e-7);
-    assert.ok(peak <= 0.951 && peak > 0.9);
-    assert.ok(differences / energy < 0.12, 'limited high-frequency derivative energy');
-    const seam = Math.abs(data[0] - data.at(-1));
-    assert.ok(seam < Math.sqrt(differences / data.length) * 5, `seam ${seam}`);
-    assert.ok(energy / data.length > 0.001, 'drops remain audible');
-  } finally {
-    Math.random = previous;
-  }
+test('real rain is bundled exactly and synthetic worker rain is removed', async () => {
+  const data = Buffer.from(encodedRain, 'base64');
+  const metadata = JSON.parse(
+    await readFile(new URL('../../assets/audio/rain-sources.json', import.meta.url)),
+  );
+  assert.equal(data.subarray(0, 4).toString(), 'OggS');
+  assert.equal(createHash('sha256').update(data).digest('hex'), metadata.sha256);
+  assert.equal(metadata.synthesized, false);
+  assert.equal(metadata.author, 'InspectorJ');
+  assert.equal(metadata.license, 'CC-BY-4.0');
+  const jobs = pcmCatalog(8000);
+  assert.equal(jobs.length, 41);
+  assert.ok(!jobs.some((job) => job.name === 'rain'));
+});
+
+test('rain decoding is shared per context; closed and unsupported contexts stay silent', async () => {
+  let calls = 0;
+  const buffer = { duration: 56.5 };
+  const context = {
+    state: 'suspended',
+    decodeAudioData(bytes) {
+      calls++;
+      assert.equal(new Uint8Array(bytes)[0], 79);
+      return Promise.resolve(buffer);
+    },
+  };
+  const pending = prepareRecordedRain(context);
+  assert.equal(prepareRecordedRain(context), pending);
+  assert.equal(await pending, buffer);
+  assert.equal(calls, 1);
+  context.state = 'closed';
+  assert.equal(
+    await prepareRecordedRain({ state: 'closed', decodeAudioData: context.decodeAudioData }),
+    null,
+  );
+  assert.equal(
+    await prepareRecordedRain({
+      decodeAudioData() {
+        throw new Error('codec');
+      },
+    }),
+    null,
+  );
 });

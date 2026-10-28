@@ -291,7 +291,10 @@ export function assignGuardPost(
   delete u.supplyTrip;
   clearGroundRoute(u);
   cancelTransportDelivery(u);
-  if (!preserveDefense) clearAutoDefense(u);
+  if (!preserveDefense) {
+    clearAutoDefense(u);
+    delete u.defenseAttack;
+  }
   u.guard = post;
   if (['medic', 'supply'].includes(GROUND_UNITS[u.key]?.support)) u.supportManual = true;
   u.stance = null;

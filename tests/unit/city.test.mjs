@@ -85,11 +85,12 @@ test('cutting the only trunk reduces downstream economy to 20%; bypass and repai
 test('an attack aimed at a road actually severs it and the next tick updates supply', () => {
   const s = fresh();
   funds(s);
-  town(s);
+  const own = town(s);
   const enemy = town(s, 1),
     central = s.roads.find((r) => r.side === 1 && r.camp && r.ax < 1015 && r.bx > 1015);
   s.sides[0].inventory.drone = 1;
-  E.updateLaunchSupply(s);
+  E.requestWeaponDelivery(s, 0, own.launcher.id, 'drone', 1);
+  while (!E.availableLaunchStock(own.launcher, 'drone') && s.time < 40) E.step(s, 0.05);
   assert.equal(E.launch(s, 0, 'drone', central.id), 1);
   E.advance(s, 70);
   assert.ok(central.hp < central.maxHp * 0.3);
@@ -109,7 +110,7 @@ test('road construction splits long streets, validates collisions, and supports 
   assert.equal(snapped.x, -1230);
   assert.equal(snapped.z, -45);
 });
-test('drone base manufactures and launches stock; optional pads reserve it once', () => {
+test('factory manufactures local stock and a real pad receives and launches it once', () => {
   const s = fresh();
   funds(s);
   assert.match(E.produce(s, 0, 'drone'), /базу дронов/);
@@ -118,7 +119,7 @@ test('drone base manufactures and launches stock; optional pads reserve it once'
   assert.equal(E.produce(s, 0, 'drone', 3), true);
   E.advance(s, 37);
   assert.equal(E.weaponStock(s, 0, 'drone'), 3);
-  assert.equal(E.launch(s, 0, 'drone', 2), 1);
+  assert.equal(typeof E.launch(s, 0, 'drone', 2), 'string');
   const launcher = ready(s, 0, 'launcher', -750, -150);
   assert.equal(launcher.roadLink, undefined);
   E.advance(s, 35);
@@ -128,6 +129,7 @@ test('drone base manufactures and launches stock; optional pads reserve it once'
   );
   assert.equal(E.launch(s, 0, 'drone', 2, 1, launcher.id), 1);
   assert.equal(E.launch(s, 0, 'drone', { x: 980, z: 30 }, 1, launcher.id), 1);
+  assert.equal(E.launch(s, 0, 'drone', { x: 900, z: 30 }, 1, launcher.id), 1);
   assert.equal(s.units.length, 3);
   assert.equal(s.sides[0].inventory.drone, 0);
   assert.match(E.launch(s, 0, 'drone', 2), /готового аппарата/);
@@ -226,11 +228,12 @@ test('zero ammunition stops defense and impact destruction completes the campaig
   assert.equal(s.stats.shots, 0);
   const win = fresh();
   funds(win);
-  town(win);
+  const own = town(win);
   win.buildings[1].hp = 90;
   win.sides[0].inventory.drone = 1;
-  E.updateLaunchSupply(win);
-  E.launch(win, 0, 'drone', 2);
+  E.requestWeaponDelivery(win, 0, own.launcher.id, 'drone', 1);
+  while (!E.availableLaunchStock(own.launcher, 'drone') && win.time < 40) E.step(win, 0.05);
+  assert.equal(E.launch(win, 0, 'drone', 2), 1);
   E.advance(win, 70);
   assert.equal(win.result, 'victory');
   const t = win.time;

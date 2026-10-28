@@ -88,6 +88,41 @@ test('the minimum capture detail can buy ordinary infantry while preserving its 
   assert.equal(b.armyQueue.length, 1);
 });
 
+test('an expensive future building cannot starve the three paid capture recruits, while later reinforcements protect its quote', () => {
+  const { s, b, f } = fresh();
+  s.ai.plannedBuild = 'silo';
+  const infantry = E.GROUND_UNITS.infantry;
+  const materials = f.materials;
+  f.credits = 250 + infantry.cost;
+  updateArmyAI(s, {});
+  assert.equal(b.armyQueue.length, 1);
+  assert.equal(b.armyQueue[0].key, 'infantry');
+  assert.equal(f.credits, 250);
+  assert.equal(f.materials, materials - infantry.metal);
+  for (let i = 0; i < 2; i++) {
+    f.credits += infantry.cost;
+    s.time = s.ai.nextArmy + 1;
+    updateArmyAI(s, {});
+  }
+  assert.deepEqual(
+    b.armyQueue.map((q) => q.key),
+    ['infantry', 'infantry', 'infantry'],
+  );
+  assert.equal(f.credits, 250);
+  assert.equal(f.materials, materials - infantry.metal * 3);
+  assert.equal(needsCaptureInfantry(s), false);
+  f.credits = 250 + E.GROUND_UNITS.atrifle.cost;
+  s.time = s.ai.nextArmy + 1;
+  const before = { credits: f.credits, materials: f.materials };
+  updateArmyAI(s, {});
+  assert.equal(
+    b.armyQueue.length,
+    3,
+    'mixed reinforcement must preserve the full pending infrastructure quote',
+  );
+  assert.deepEqual({ credits: f.credits, materials: f.materials }, before);
+});
+
 test('idle AI defenders join the common planner instead of stale local points, while manual orders keep priority', () => {
   const { s, f } = fresh();
   f.credits = 0;

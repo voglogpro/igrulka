@@ -271,6 +271,8 @@ export class InfantryBatch {
           1024,
         );
       body.frustumCulled = legs.frustumCulled = false;
+      // A prepared role owns its buffers before any soldier is visible.
+      body.count = legs.count = 0;
       body.instanceMatrix.setUsage(T.DynamicDrawUsage);
       legs.instanceMatrix.setUsage(T.DynamicDrawUsage);
       body.userData.infantryBatch = true;

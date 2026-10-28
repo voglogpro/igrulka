@@ -28,6 +28,9 @@ function fakeContext() {
       this.state = 'closed';
       return Promise.resolve();
     },
+    decodeAudioData() {
+      return Promise.resolve({ duration: 56.5 });
+    },
     createBuffer(channels, length, sampleRate) {
       this.allocations++;
       const samples = Array.from({ length: channels }, () => new Float32Array(length));

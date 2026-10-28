@@ -119,6 +119,8 @@ export function animateVehicleDrive(root, phase) {
   if (!wheels) return;
   const spokes = root.getObjectByName('drive-spokes'),
     links = root.getObjectByName('track-links');
+  // This producer always marks all drive buffers dirty after writing them.
+  for (const mesh of [wheels, spokes, links]) mesh.userData.versionedDrive = true;
   let cached;
   if (root.userData.batchedVisual) {
     root.userData.driveCacheKey ??= wheels.geometry.uuid;

@@ -16,6 +16,8 @@ export const OIL = {
   fireDamage: 5,
   // Vehicles on empty tanks crawl at this share of their speed.
   dryCrawl: 0.35,
+  engineMultiplier: 1.5,
+  deliveryBurn: 0.012,
 };
 
 const live = (b) => b.hp > 0 && b.progress >= 1 && !b.demolished;
@@ -54,7 +56,13 @@ export function oilBurn(s, side) {
   let total = 0;
   for (const u of s.groundUnits || [])
     if (u.side === side && u.hp > 0 && u.moving && !u.carrierId)
-      total += GROUND_UNITS[u.key]?.fuel || 0;
+      total += (GROUND_UNITS[u.key]?.fuel || 0) * OIL.engineMultiplier;
+  // Field delivery and repair fleets also burn fuel during real travel.
+  for (const v of s.ammoVehicles || [])
+    if (v.side === side && v.hp > 0 && v.path?.length) total += OIL.deliveryBurn;
+  // Civil repair vans are not combatants and have no hit-point field.
+  for (const v of s.serviceVehicles || [])
+    if (v.side === side && (v.hp == null || v.hp > 0) && v.path?.length) total += OIL.deliveryBurn;
   return total;
 }
 

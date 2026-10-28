@@ -8,6 +8,7 @@ import { invalidateFrontline } from '../../defense/cache.js';
 import { hostile } from '../../factions.js';
 import { trenchContested } from '../../defense/positions.js';
 import { invalidateTrenchLinks } from '../../defense/trench-links.js';
+import { invalidateStaticGeometry } from '../../shared/static-spatial.js';
 export function orderGround(s, side, ids, aim, { preserveRoute = false, defer = false } = {}) {
   if (s.result) return 'Кампания завершена';
   if (aim?.targetId != null) {
@@ -64,8 +65,12 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false, defer = 
     )
       continue;
     delete u.supplyTrip;
-    if (['medic', 'supply'].includes(GROUND_UNITS[u.key].support)) u.supportManual = true;
-    if (!preserveRoute) clearGroundRoute(u);
+    if (!preserveRoute && ['medic', 'supply'].includes(GROUND_UNITS[u.key].support))
+      u.supportManual = true;
+    if (!preserveRoute) {
+      clearGroundRoute(u);
+      delete u.defenseAttack;
+    }
     if (!preserveRoute) clearAutoDefense(u);
     cancelTransportDelivery(u);
     u.guard = null;
@@ -143,6 +148,7 @@ export function commandUnits(s, side, ids, command) {
     deferRetreat = command === 'retreat' && units.filter((u) => !u.carrierId).length >= 16;
   let changed = 0;
   for (const u of units) {
+    if (['stop', 'dig', 'retreat'].includes(command)) delete u.defenseAttack;
     if (command === 'stop') {
       delete u.supplyTrip;
       if (['medic', 'supply'].includes(GROUND_UNITS[u.key].support)) u.supportManual = true;
@@ -182,6 +188,7 @@ export function commandUnits(s, side, ids, command) {
       if (!t && s.trenches.length < 240) {
         t = { id: s.nextId++, side, x: u.x, z: u.z, progress: 0, yaw: u.yaw || 0 };
         s.trenches.push(t);
+        invalidateStaticGeometry(s, 'trenches');
       }
       if (t) {
         if (t.side !== side && hostile(s, t.side, side)) {

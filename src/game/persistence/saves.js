@@ -13,6 +13,7 @@ import { restoreServices } from './services.js';
 import { restoreDefense } from '../defense/persistence.js';
 import { restoreOil } from './oil.js';
 import { restoreEconomy } from './economy.js';
+import { restoreElectronics } from '../city/electronics.js';
 import { migrateMapLayout } from './map-layout.js';
 import { restoreRetiredResearch } from './retired-research.js';
 import { restoreArmyComposition } from '../units/ground/composition.js';
@@ -35,7 +36,9 @@ export function load(raw) {
   const s = JSON.parse(raw);
   const sourceVersion = s.version;
   if (
-    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, VERSION].includes(s.version) ||
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, VERSION].includes(
+      s.version,
+    ) ||
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
@@ -434,7 +437,8 @@ export function load(raw) {
   if (
     typeof s.rules !== 'object' ||
     typeof s.rules.rear !== 'boolean' ||
-    typeof s.rules.oil !== 'boolean'
+    typeof s.rules.oil !== 'boolean' ||
+    (s.rules.components != null && typeof s.rules.components !== 'boolean')
   )
     throw Error('Повреждены правила');
   for (const f of s.sides) f.rearAuto ??= true;
@@ -447,6 +451,7 @@ export function load(raw) {
   migrateMapLayout(s, sourceVersion);
   restoreDefense(s);
   restoreEconomy(s, sourceVersion);
+  restoreElectronics(s, sourceVersion);
   restoreRetiredResearch(s, sourceVersion);
   restoreArmyComposition(s, sourceVersion);
   restoreGroundScars(s, sourceVersion);

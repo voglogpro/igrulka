@@ -20,9 +20,28 @@ function template(stage) {
     root.add(mesh);
   };
   if (stage === 0) {
-    add(0, 0, 0, 6.4, 0.14, 3.8, '#29322b');
+    add(0, 0, 0, 6.4, 0.12, 3.8, '#28271f');
+    for (let i = 0; i < 5; i++) {
+      add(-2.7 + i * 1.3, 0.13, 0.1 * Math.sin(i), 0.17, 0.05, 3.1, '#554832');
+      for (const side of [-1, 1]) {
+        const offset = Math.sin(i * 2.3 + side) * 0.16;
+        add(-2.7 + i * 1.3, 0.05, side * (2.15 + offset), 1.45, 0.38, 1.5, '#625239', true);
+        if (i !== 2)
+          add(
+            -2.7 + i * 1.3,
+            0.27,
+            side * (2.2 + offset),
+            1.3,
+            0.43,
+            0.86,
+            i % 2 ? '#786648' : '#6b593d',
+            true,
+          );
+        add(-2.7 + i * 1.3, 0.1, side * 1.73, 1.24, 0.48, 0.13, '#40372a');
+      }
+    }
     for (const side of [-1, 1]) {
-      add(side * 3.4, 0.1, 0, 0.9, 0.7, 4.3, '#6b6047');
+      for (const end of [-1, 1]) add(side * 3.4, 0.04, end * 1.6, 1.0, 0.5, 1.1, '#6b6047', true);
       for (let i = 0; i < 6; i++)
         add(-3 + i * 1.2, 0.13, side * 2.1, 0.69, 0.42, 0.53, i % 2 ? '#817258' : '#736447', true);
     }
@@ -40,18 +59,21 @@ function template(stage) {
             i % 2 ? '#7d7255' : '#8d7c5d',
             true,
           );
-        for (let i = 0; i < 3; i++)
+        for (const i of [0, 2])
           add(side * 3.5, 0.55 + row * 0.55, -1.2 + i * 1.2, 0.5, 0.34, 0.7, '#786b51', true);
       }
   } else {
     for (const side of [-1, 1]) {
-      add(side * 3.3, 0.1, -2.7, 0.18, 4.1, 0.18, '#53594d');
-      add(side * 3.3, 0.1, -0.4, 0.18, 3.8, 0.18, '#53594d');
+      add(side * 3.3, 0.1, -2.7, 0.22, 1.35, 0.22, '#53594d');
+      add(side * 3.3, 0.1, -0.4, 0.22, 1.2, 0.22, '#53594d');
       add(side * 3.1, 0.15, 2.8, 0.24, 1.8, 0.24, '#71644b');
     }
-    // Rear shelter leaves the firing aperture open and the occupant visible from above.
-    add(0, 4.1, -1.7, 7.4, 0.16, 3.2, '#59634e');
-    for (let i = 0; i < 7; i++) add(-3 + i, 4.3, -1.7, 0.14, 0.08, 3.3, '#777a5d');
+    // Short open timber sections keep occupants readable from above.
+    for (const side of [-1, 1]) {
+      for (let row = 0; row < 4; row++)
+        add(side * 3.1, 0.12 + row * 0.26, -0.7, 0.17, 0.21, 2.5, row % 2 ? '#6a5940' : '#776448');
+      add(side * 2.6, 1.22, -2.35, 1.8, 0.35, 0.7, '#7f7154', true);
+    }
     add(-2.3, 0.3, -2.5, 1.5, 0.7, 1, '#655c46');
     add(2.3, 0.3, -2.5, 1.1, 0.9, 0.8, '#4c5948');
   }

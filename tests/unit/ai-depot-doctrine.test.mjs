@@ -246,6 +246,7 @@ test('aircraft and ground recruitment both pay normally without spending the nex
     factory = facility(s, 1, 'factory', -65);
   const f = s.sides[1],
     memory = aiState(s, 1);
+  f.components = 20;
   f.credits = 420;
   const before = { ...f };
   s.time = E.difficultyOf(s).armyFrom + 1;

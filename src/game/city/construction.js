@@ -16,6 +16,7 @@ import {
   removeDriveways,
 } from './road-network.js';
 import { ROAD_REQUIRED } from './rules.js';
+import { hasComponents, spendComponents } from './electronics.js';
 import { addRoad } from './roads.js';
 import { event } from '../shared/events.js';
 import { purchaseQuote, recordBuildingPurchase } from './pricing.js';
@@ -128,8 +129,10 @@ export function build(s, owner, key, x, z, rotation = null) {
   if (trafficAt(s, key, x, z)) return 'Площадка сейчас недоступна';
   const cost = quote.cost + (p.driveCost || 0);
   if (f.credits < cost || f.materials < quote.metal) return 'Не хватает денег или сплавов';
+  if (!hasComponents(s, owner, quote.components || 0)) return 'Не хватает электроники';
   f.credits -= cost;
   f.materials -= quote.metal;
+  spendComponents(s, owner, quote.components || 0);
   recordBuildingPurchase(s, owner, key);
   const b = {
     id: s.nextId++,

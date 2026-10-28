@@ -1,5 +1,6 @@
 import {
   availableLaunchStock,
+  launchSiteAllows,
   launchStoreCapacity,
   launchStoreTotal,
   movableWeaponStock,
@@ -28,7 +29,7 @@ export function requestWeaponDelivery(s, side, siteId, key, amount = 1) {
     site.hp <= 0 ||
     site.demolished ||
     site.progress < 1 ||
-    !launchStoreCapacity(site, key) ||
+    !launchSiteAllows(site, key) ||
     !Number.isSafeInteger(amount) ||
     amount < 1 ||
     amount > 6

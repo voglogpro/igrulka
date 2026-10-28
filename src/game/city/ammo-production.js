@@ -2,6 +2,7 @@ import { BUILDINGS } from '../config.js';
 import { buildingConnected } from './road-network.js';
 import { economy } from './economy.js';
 import { oilEnabled } from './oil.js';
+import { componentsEnabled, hasComponents, spendComponents } from './electronics.js';
 import { equipmentModifiers } from '../combat/upgrade-tiers.js';
 import {
   AMMUNITION as C,
@@ -43,6 +44,14 @@ function status(s, b, desired) {
     if (f.credits - credits * fraction < C.reserveCredits) return 'credits';
     if (f.materials < metal * fraction) return 'materials';
     if (oilEnabled(s) && (f.oil || 0) < oil * fraction) return 'oil';
+    if (
+      !hasComponents(
+        s,
+        b.side,
+        componentsEnabled(s) ? Math.ceil((C.components[key] || 0) * fraction) : 0,
+      )
+    )
+      return 'components';
     return 'active';
   };
   if (!ammoDepotReady(b)) return b.hp <= 0 || b.demolished ? 'ruined' : 'building';
@@ -60,6 +69,7 @@ const reasons = {
   credits: 'Сохраняется резерв 250 денег',
   materials: 'Не хватает сплавов',
   oil: 'Не хватает нефти',
+  components: 'Не хватает электроники',
   active: 'Выпускает боеприпасы',
   finished: 'Матч завершён',
 };
@@ -103,17 +113,20 @@ export function updateAmmoProduction(s) {
       const amount = Math.min(C.batches[key], desired[key] - f.ammoStock[key]);
       if (amount <= 0) continue;
       const fraction = amount / C.batches[key],
-        [credits, metal, oil] = C.costs[key];
+        [credits, metal, oil] = C.costs[key],
+        parts = componentsEnabled(s) ? Math.ceil((C.components[key] || 0) * fraction) : 0;
       if (
         f.credits - credits * fraction < C.reserveCredits ||
         f.materials < metal * fraction ||
-        (oilEnabled(s) && (f.oil || 0) < oil * fraction)
+        (oilEnabled(s) && (f.oil || 0) < oil * fraction) ||
+        !hasComponents(s, b.side, parts)
       )
         continue;
       f.credits -= credits * fraction;
       f.ammoProductionSpent = (f.ammoProductionSpent || 0) + credits * fraction;
       f.materials -= metal * fraction;
       if (oilEnabled(s)) f.oil -= oil * fraction;
+      spendComponents(s, b.side, parts);
       f.ammoStock[key] += amount;
       b.ammoCursor = (index + 1) % C.kinds.length;
       break;

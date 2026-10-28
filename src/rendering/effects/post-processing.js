@@ -12,6 +12,7 @@ export function adaptivePostSamples(scale = 1, maxSamples = 4, previous = 4) {
 export class EveningPost {
   constructor(renderer) {
     this.renderer = renderer;
+    this.outputSize = new T.Vector2(1, 1);
     this.target = new T.WebGLRenderTarget(1, 1, {
       type: T.HalfFloatType,
       depthBuffer: true,
@@ -28,6 +29,7 @@ export class EveningPost {
       frame: { value: this.target.texture },
       glow: { value: this.bloom.texture },
       pixel: { value: new T.Vector2(1, 1) },
+      grainPixelScale: { value: new T.Vector2(1, 1) },
       time: { value: 0 },
       depthFrame: { value: this.target.depthTexture },
       inverseProjection: { value: new T.Matrix4() },
@@ -61,6 +63,7 @@ export class EveningPost {
       vertexShader,
       fragmentShader: `
    uniform sampler2D frame;uniform sampler2D glow;uniform sampler2D depthFrame;uniform float time;
+   uniform vec2 grainPixelScale;
    uniform mat4 inverseProjection;uniform mat4 cameraWorld;uniform float groundFog;uniform vec3 fogTint;varying vec2 vUv;
    uniform sampler2D visionFrame;uniform vec2 visionOrigin;uniform vec2 visionExtent;uniform float visionActive;uniform vec3 visionTint;
    ${FILM_GRAIN_GLSL}
@@ -82,7 +85,7 @@ export class EveningPost {
     gl_FragColor=vec4(col,1.);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
-    float grain=filmGrain(gl_FragCoord.xy,time);
+    float grain=filmGrain(gl_FragCoord.xy*grainPixelScale,time);
     float luminance=dot(gl_FragColor.rgb,vec3(.2126,.7152,.0722));
     gl_FragColor.rgb+=grain*mix(.013,.006,smoothstep(.1,.85,luminance));
    }`,
@@ -98,7 +101,8 @@ export class EveningPost {
     this.uniforms.visionActive.value = 0;
   }
   resize(width, height, scale = 1) {
-    const ratio = this.renderer.getPixelRatio();
+    const baseRatio = this.renderer.getPixelRatio(),
+      ratio = baseRatio * scale;
     const x = Math.max(1, Math.floor(width * ratio)),
       y = Math.max(1, Math.floor(height * ratio));
     const samples = adaptivePostSamples(
@@ -115,6 +119,14 @@ export class EveningPost {
     this.target.setSize(x, y);
     this.bloom.setSize(Math.max(1, Math.ceil(x / 2)), Math.max(1, Math.ceil(y / 2)));
     this.uniforms.pixel.value.set(1 / x, 1 / y);
+    // The compositor fills a stable canvas. Keep grain coordinates on the same
+    // adaptive scene pixel grid that previously reached the canvas directly.
+    const output = this.renderer.getDrawingBufferSize
+      ? this.renderer.getDrawingBufferSize(this.outputSize)
+      : this.outputSize.set(Math.floor(width * baseRatio), Math.floor(height * baseRatio));
+    this.uniforms.grainPixelScale.value.set(x / Math.max(1, output.x), y / Math.max(1, output.y));
+    this.renderScale = scale;
+    this.scenePixelRatio = ratio;
   }
   render(scene, camera, time) {
     this.uniforms.time.value = time;

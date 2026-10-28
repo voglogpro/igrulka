@@ -2,11 +2,16 @@ import { isInfantry, GROUND_UNITS } from '../config.js';
 import { event } from '../shared/events.js';
 import { FORTIFICATION as C } from './config.js';
 import { invalidateFrontline } from './cache.js';
-import { staticObjectsInBounds } from '../shared/static-spatial.js';
+import {
+  staticObjectsInBounds,
+  staticGeometryRevision,
+  invalidateStaticGeometry,
+} from '../shared/static-spatial.js';
 import { allied } from '../factions.js';
 import { trenchContested } from './positions.js';
 import { invalidateTrenchLinks } from './trench-links.js';
 const workTimes = new WeakMap();
+const nearbyGeometry = new WeakMap();
 const labels = ['Земляные работы', 'Окоп', 'Укреплённый окоп', 'Блокпост'];
 
 export function fortificationStatus(t) {
@@ -54,14 +59,38 @@ export function prepareDefensivePosition(s, u) {
     if (u.guard && u.digging) u.digging = false;
     return null;
   }
-  const nearby = staticObjectsInBounds(
-    s,
-    'trenches',
-    u.x - C.postRadius,
-    u.z - C.postRadius,
-    u.x + C.postRadius,
-    u.z + C.postRadius,
-  ).filter((t) => Math.hypot(t.x - u.x, t.z - u.z) < C.postRadius);
+  const revision = staticGeometryRevision(s, 'trenches');
+  let cached = nearbyGeometry.get(u);
+  if (
+    !cached ||
+    cached.state !== s ||
+    cached.x !== u.x ||
+    cached.z !== u.z ||
+    cached.network !== s.networkRevision ||
+    cached.revision !== revision ||
+    cached.objects !== s.trenches ||
+    cached.count !== s.trenches.length
+  ) {
+    cached = {
+      state: s,
+      x: u.x,
+      z: u.z,
+      network: s.networkRevision,
+      revision,
+      objects: s.trenches,
+      count: s.trenches.length,
+      nearby: staticObjectsInBounds(
+        s,
+        'trenches',
+        u.x - C.postRadius,
+        u.z - C.postRadius,
+        u.x + C.postRadius,
+        u.z + C.postRadius,
+      ).filter((t) => Math.hypot(t.x - u.x, t.z - u.z) < C.postRadius),
+    };
+    nearbyGeometry.set(u, cached);
+  }
+  const nearby = cached.nearby;
   let t =
     nearby.find((t) => t.side === u.side) ||
     nearby.find((t) => !trenchContested(s, t, u.side, u.id));
@@ -77,6 +106,7 @@ export function prepareDefensivePosition(s, u) {
   if (!t && s.trenches.length < C.maxPositions) {
     t = { id: s.nextId++, side: u.side, x: u.x, z: u.z, progress: 0, yaw: u.yaw || 0 };
     s.trenches.push(t);
+    invalidateStaticGeometry(s, 'trenches');
   }
   if (t) {
     u.trenchId = t.id;

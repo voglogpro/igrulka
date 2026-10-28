@@ -1,3 +1,4 @@
+import { updateSelectionCoverage } from './performance/selection-coverage.js';
 import { makeGlow as makeGlowForWorld, makeFacade as makeFacadeForWorld } from './textures.js';
 import {
   height as heightForWorld,
@@ -461,19 +462,8 @@ export class RTSWorld {
     this.selected = id;
     const b = E.observedTarget(this.state, 0, id);
     this.selection.visible = !!b;
-    this.coverage.visible = false;
+    updateSelectionCoverage(this, b);
     if (!b) return;
-    const range =
-      E.isInfantry(b.key) && b.key !== 'mog'
-        ? 0
-        : b.key === 'radar'
-          ? 320
-          : (BUILDINGS[b.key] || E.GROUND_UNITS[b.key])?.range;
-    if (range && b.side === 0 && (!b.ground || this.armySelection.length <= 1)) {
-      this.coverage.visible = true;
-      this.coverage.scale.setScalar(range);
-      this.coverage.position.set(b.x, 1.4, b.z);
-    }
     this.selection.position.set(b.x, 0.9, b.z);
     this.selection.scale.setScalar(
       b.key === 'road'
@@ -543,15 +533,19 @@ export class RTSWorld {
   resizeRender() {
     const { clientWidth: width, clientHeight: height } = this.host;
     if (!width || !height) return;
-    const ratio = renderPixelRatio(width, height, devicePixelRatio, this.renderBudget.scale),
-      size = this.renderer.getSize(new T.Vector2());
-    if (size.x === width && size.y === height && this.renderer.getPixelRatio() === ratio) return;
-    // setPixelRatio already calls setSize in Three. Set all three dimensions
-    // together so each real change resizes the canvas only once.
-    this.renderer.setDrawingBufferSize(width, height, ratio);
-    this.renderer.domElement.style.width = width + 'px';
-    this.renderer.domElement.style.height = height + 'px';
-    this.post.resize(width, height, this.renderBudget.scale);
+    const ratio = renderPixelRatio(width, height, devicePixelRatio),
+      scale = this.renderBudget.scale,
+      size = this.renderer.getSize(new T.Vector2()),
+      canvasChanged =
+        size.x !== width || size.y !== height || this.renderer.getPixelRatio() !== ratio;
+    // Adaptive scene resolution belongs to offscreen targets. Resetting the
+    // browser drawing buffer here can stall even when geometry is already warm.
+    if (canvasChanged) {
+      this.renderer.setDrawingBufferSize(width, height, ratio);
+      this.renderer.domElement.style.width = width + 'px';
+      this.renderer.domElement.style.height = height + 'px';
+    }
+    if (canvasChanged || this.post.renderScale !== scale) this.post.resize(width, height, scale);
   }
   updateMinimap(...args) {
     return updateMinimapForWorld.call(this, ...args);
@@ -582,7 +576,7 @@ export class RTSWorld {
       effects: this.combatFX.diagnostics().particles,
       fx: this.combatFX.diagnostics(),
       memory: { ...this.renderer.info.memory, programs: this.renderer.info.programs.length },
-      fogOfWar: true,
+      fogOfWar: false,
       weather: this.weatherFX.diagnostics(),
       traffic: this.traffic.diagnostics(),
       serviceFleet: this.serviceFleet.diagnostics(),
@@ -603,7 +597,9 @@ export class RTSWorld {
       bloom: true,
       shadows: this.sun.shadow.mapSize.x,
       shadowInterval: this.shadowBudget.interval,
-      pixelRatio: this.renderer.getPixelRatio(),
+      pixelRatio: this.post.scenePixelRatio,
+      scenePixelRatio: this.post.scenePixelRatio,
+      canvasPixelRatio: this.renderer.getPixelRatio(),
       renderScale: this.renderBudget.scale,
       camera: this.controls.diagnostics(),
       seaBed: this.height(riverX(0), 300),

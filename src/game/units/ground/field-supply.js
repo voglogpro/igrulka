@@ -2,6 +2,7 @@ import { GROUND_UNITS } from '../../config.js';
 import { FIELD_SUPPLY as C } from '../../city/field-ammo.js';
 import { ammunitionProfile, ammunitionStatus, receiveAmmunition } from './ammunition.js';
 import { groundPath, walkable } from './navigation.js';
+import { clearGroundRoute } from './route-queue.js';
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const ownedOrder = (u) =>
   u.supplyTrip &&
@@ -43,7 +44,12 @@ export function updateFieldSupply(s) {
       crate.stock[profile.kind] -= receiveAmmunition(u, profile.kind, crate.stock[profile.kind]);
     }
     if (u.supplyTrip) {
-      if (!ownedOrder(u) || u.routeState || u.delivery || !u.autoDefense) {
+      if (
+        !ownedOrder(u) ||
+        u.routeState ||
+        u.delivery ||
+        (!u.autoDefense && u.defenseAttack?.phase !== 'active')
+      ) {
         if (ownedOrder(u)) {
           u.path = [];
           u.order = null;
@@ -74,18 +80,21 @@ export function updateFieldSupply(s) {
       continue;
     }
     const d = GROUND_UNITS[u.key];
+    const cityMission = u.defenseAttack?.phase === 'active';
     const guardMode = ['guard', 'guardReturn', 'guardIntercept', 'wait'].includes(u.order?.mode);
     if (
       !d ||
       d.support ||
       u.key === 'mog' ||
       !d.speed ||
-      !u.autoDefense ||
+      (!u.autoDefense && !cityMission) ||
       u.delivery ||
-      u.routeState ||
+      (u.routeState && !cityMission) ||
       u.digging ||
-      (u.path?.length && !guardMode) ||
-      (u.order && !guardMode) ||
+      (u.path?.length && !guardMode && !(cityMission && !u.moving)) ||
+      (u.order &&
+        !guardMode &&
+        !(cityMission && ['attack', 'attackmove'].includes(u.order.mode))) ||
       ammunitionStatus(s, u).total > 0 ||
       searches >= 4
     )
@@ -100,6 +109,7 @@ export function updateFieldSupply(s) {
       goal = { x: crate.x + Math.cos(angle) * 10, z: crate.z + Math.sin(angle) * 10 };
     if (!walkable(s, goal.x, goal.z, d.size * 0.42)) continue;
     const home = u.guard ? { x: u.guard.x, z: u.guard.z } : { x: u.x, z: u.z };
+    if (cityMission) clearGroundRoute(u);
     u.supplyTrip = { crateId: crate.id, phase: 'outbound', home };
     searches++;
     if (!setPath(s, u, goal, 'resupply')) delete u.supplyTrip;

@@ -194,3 +194,66 @@ test('a full defensive line keeps six fixed draws and uploads nothing when only 
   assert.equal(disposals, 6);
   assert.equal(scene.children.length, 0);
 });
+
+test('irregular earthwork templates stay bounded, open above occupants and reuse six shared geometries', () => {
+  const { state, scene, view } = fixture();
+  view.sync(state);
+  assert.equal(scene.children.filter((child) => child.isInstancedMesh).length, 6);
+  for (const mesh of [...view.pools, ...view.links.pools]) {
+    const position = mesh.geometry.attributes.position;
+    assert.ok(position.count < 20000, 'bounded shared geometry');
+    mesh.geometry.computeBoundingBox();
+    assert.ok(mesh.geometry.boundingBox.max.y < 2, 'no repetitive roof hides occupants');
+    assert.ok(position.array.every(Number.isFinite));
+  }
+  view.dispose();
+  assert.equal(scene.children.length, 0);
+});
+
+test('short firing sections leave real gaps in dark excavation, tall berms, bags and timber while low earth stays continuous', () => {
+  const { view } = fixture();
+  for (const [stage, mesh] of view.links.pools.entries()) {
+    const positions = mesh.geometry.attributes.position,
+      colors = mesh.geometry.attributes.color,
+      darkFloor = new T.Color('#28271f');
+    let darkVertices = 0;
+    let upperMin = Infinity,
+      upperMax = -Infinity,
+      lowEnds = 0;
+    for (let i = 0; i < positions.count; i++) {
+      const y = positions.getY(i),
+        z = positions.getZ(i);
+      if (
+        stage === 0 &&
+        Math.abs(colors.getX(i) - darkFloor.r) < 1e-6 &&
+        Math.abs(colors.getY(i) - darkFloor.g) < 1e-6 &&
+        Math.abs(colors.getZ(i) - darkFloor.b) < 1e-6
+      ) {
+        darkVertices++;
+        assert.ok(Math.abs(z) <= 0.321, 'dark excavation cannot continue across the upper gap');
+      }
+      if (stage > 0 || y > 0.13) {
+        upperMin = Math.min(upperMin, z);
+        upperMax = Math.max(upperMax, z);
+        assert.ok(Math.abs(z) <= 0.34, `stage${stage} upper section bridges the gap at ${z}`);
+      }
+      if (stage === 0 && Math.abs(z) > 0.49) {
+        lowEnds++;
+        assert.ok(
+          y <= 0.13,
+          'continuous linking earth must remain low, without tall or dark walls',
+        );
+      }
+    }
+    assert.ok(upperMax > upperMin);
+    assert.ok(
+      (1 - (upperMax - upperMin)) * 6 > 1.8,
+      'a six-metre piece has a readable upper interruption',
+    );
+    if (stage === 0) {
+      assert.ok(darkVertices > 0, 'test locates the actual dark floor in merged vertex colors');
+      assert.ok(lowEnds > 0, 'subtle earth still represents continuous game cover');
+    }
+  }
+  view.dispose();
+});

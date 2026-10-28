@@ -1,3 +1,5 @@
+import { updateSelectionCoverage } from './performance/selection-coverage.js';
+import { syncRoadVisuals } from './performance/road-visual-sync.js';
 import { disposeTree, batchStatic } from './mesh-utils.js';
 import * as T from '../../vendor/three/three.module.js';
 import * as E from '../game/index.js';
@@ -157,31 +159,7 @@ export function sync() {
       }
     }
   }
-  const roadView = this.roadView.update(this.state.roads, E.passable),
-    roads = roadView.roads;
-  if (roadView.layoutChanged) {
-    this.streetLayout = roads.map((r) => ({
-      a: { x: r.ax, z: r.az },
-      b: { x: r.bx, z: r.bz },
-      width: r.connectorTo ? 5 : 10,
-      index: r.id,
-    }));
-    for (const root of this.roadModels.values())
-      disposeTree(root, this.sharedGeometries, this.sharedMaterials);
-    this.roadModels.clear();
-    this.roadVisuals.clear();
-  }
-  for (const r of roadView.layoutChanged ? roads : roadView.changed) {
-    const visual = (E.passable(r) ? 1 : 0) + ':' + Math.ceil((r.hp / r.maxHp) * 3);
-    if (this.roadVisuals.get(r.id) === visual) continue;
-    const old = this.roadModels.get(r.id);
-    if (old) disposeTree(old, this.sharedGeometries, this.sharedMaterials);
-    const root = this.road(r, this.streetLayout);
-    this.roadModels.set(r.id, root);
-    this.roadVisuals.set(r.id, visual);
-    this.renderer.shadowMap.needsUpdate = true;
-  }
-  if (roadView.layoutChanged || roadView.changed.length) this.roadBatch.sync(this.roadModels);
+  syncRoadVisuals(this);
   const ids = new Set();
   for (const u of this.state.units) {
     ids.add(u.id);
@@ -266,8 +244,9 @@ export function sync() {
       this.selection.position.set(t.x, 1.5, t.z);
       this.coverage.position.set(t.x, 1.4, t.z);
     } else if (!t) {
-      this.selection.visible = this.coverage.visible = false;
+      this.selection.visible = false;
     }
+    updateSelectionCoverage(this, t);
   }
   this.infantry.sync(this.state.groundUnits || [], this.state.time, visibleGround);
   // Moving units use current-frame contact shadows, never an old static sun-map silhouette.

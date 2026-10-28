@@ -1,5 +1,5 @@
 import * as E from '../game/index.js';
-import { escape } from './format.js';
+import { escape, deliveryText, price } from './format.js';
 
 const percent = (value) => Math.round(value * 100) + '%';
 const rendered = new WeakMap();
@@ -18,9 +18,14 @@ export function updateEquipmentDetails(host, state, entity) {
 }
 export function supplyHTML(state, entity) {
   if (entity.side !== 0 || entity.hp <= 0) return '';
-  const logistics = E.ammoLogisticsStatus?.(state, entity.side, entity.id);
+  const logistics = ['factory', 'launcher', 'silo', 'electronics'].includes(entity.key)
+    ? null
+    : E.ammoLogisticsStatus?.(state, entity.side, entity.id);
   let content = '';
-  if (entity.key === 'ammofactory' && E.ammoFactoryStatus) {
+  if (entity.key === 'electronics' && E.electronicsFactoryStatus) {
+    const report = E.electronicsFactoryStatus(state, entity.side, entity.id);
+    content = `<b>Электроника ${report.stock} / ${report.capacity}</b><p class="small-muted">Сборка ${percent(report.progress)} · ${report.seconds} с/ед.<br>${price({ ...report.recipe, components: 0 })} → 1 эл.</p><p class="status-note">${escape(report.reason)}</p>`;
+  } else if (entity.key === 'ammofactory' && E.ammoFactoryStatus) {
     const report = E.ammoFactoryStatus(state, entity.side, entity.id),
       labels = { small: 'Патроны', shell: 'Снаряды', rocket: 'Ракеты', sam: 'ЗУР' };
     content = `<b>Склад боеприпасов</b>${Object.entries(labels)
@@ -31,15 +36,28 @@ export function supplyHTML(state, entity) {
       .join(
         '',
       )}<p class="small-muted">Машины: ${report.fleet.busy} заняты / ${report.fleet.total} · выпуск ${percent(report.production)}</p><p class="status-note">${escape(report.reason)}</p>`;
-  } else if (['launcher', 'silo', 'factory'].includes(entity.key)) {
+  } else if (entity.key === 'factory') {
+    const report = E.factoryWarehouseStatus?.(state, entity);
+    const stock = report?.stock || entity.launchStore || {};
+    content = `<b>Склад завода: ${report?.total ?? Object.values(stock).reduce((n, v) => n + v, 0)} / ${report?.capacity ?? E.launchStoreCapacity(entity)}</b><p class="small-muted">${Object.entries(
+      E.WEAPONS,
+    )
+      .map(([key, d]) => `${escape(d.name)}: ${stock[key] || 0}`)
+      .join(
+        ' · ',
+      )}</p><p class="status-note">${escape(report?.reason || 'Производство и склад; отправка к пусковым машинами снабжения')}</p>`;
+  } else if (['launcher', 'silo'].includes(entity.key)) {
     const tempo = E.launchTempo(entity);
     content = `<b>Запас на площадке ${E.launchStoreTotal(entity)} / ${E.launchStoreCapacity(entity)}</b><p class="small-muted">${Object.entries(
       E.WEAPONS,
     )
       .filter(([key]) => E.launchSiteAllows(entity, key))
-      .map(([key, d]) => `${escape(d.name)}: ${E.availableLaunchStock(entity, key)}`)
+      .map(([key, d]) => {
+        const delivery = E.weaponDeliveryStatus?.(state, entity, key);
+        return `${escape(d.name)}: ${E.availableLaunchStock(entity, key)}${delivery ? ` · ${escape(deliveryText(delivery))}` : ''}`;
+      })
       .join(
-        ' · ',
+        '<br>',
       )}<br>Пуск ${tempo.count} за ${tempo.interval} с · очередь ${E.queuedLaunches(state, entity)}</p>`;
   } else if (E.ammunitionStatus) {
     const ammo = E.ammunitionStatus(state, entity);
@@ -73,8 +91,8 @@ export function equipmentHTML(state, entity) {
   const status = E.upgradeStatus(state, entity.side, entity.id),
     current = status.modifiers,
     next = status.nextModifiers,
-    production = entity.key === 'ammofactory',
-    launcher = ['launcher', 'silo', 'factory'].includes(entity.key),
+    production = ['ammofactory', 'factory'].includes(entity.key),
+    launcher = ['launcher', 'silo'].includes(entity.key),
     tempo = launcher ? E.launchTempo(entity) : null,
     nextTempo = launcher ? E.launchTempo({ ...entity, level: status.nextLevel }) : null,
     rows = production

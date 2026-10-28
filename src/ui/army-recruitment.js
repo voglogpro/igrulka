@@ -1,5 +1,5 @@
 import * as E from '../game/index.js';
-import { $ } from './format.js';
+import { $, price } from './format.js';
 import { icon } from './icons.js';
 import { UNIT_PROFILES, unitIllustration } from './unit-profiles.js';
 
@@ -38,8 +38,7 @@ export function availableRecruitment(state, keys) {
   });
 }
 
-const recruitPrice = (quote) =>
-  `${quote.cost} ₡ · ${quote.metal} спл.${quote.oil ? ` · ${quote.oil} нефти` : ''}`;
+const recruitPrice = price;
 
 function recruitCardsHTML(state, category, count) {
   return (
@@ -103,7 +102,7 @@ export function armyTargetRequest(key, value) {
 
 function compositionHTML(state, category) {
   const report = E.armyCompositionStatus(state, 0);
-  return `<section class="composition-panel" aria-label="Постоянный состав обороны"><div class="composition-heading"><div><h3>Состав обороны</h3><p>Задайте цель по типам. Казармы и бронезаводы сами восполняют потери.</p></div><div class="composition-actions"><b id="composition-total"></b><button data-action="defense-attack" disabled title="Отправить 30% готовых защитников в атаку без покупки новых бойцов">В атаку · 30%</button></div></div><div class="composition-columns"><span>Тип / состояние</span><span>В строю + очередь</span><span>Цель</span></div><div class="composition-rows">${category.keys
+  return `<section class="composition-panel" aria-label="Постоянный состав обороны"><div class="composition-heading"><div><h3>Состав обороны</h3><p>Задайте цель по типам. Казармы и бронезаводы сами восполняют потери.</p></div><div class="composition-actions"><b id="composition-total"></b><button data-action="defense-attack" disabled title="Отправить 30% готовых защитников в атаку без покупки новых бойцов">В атаку · 30%</button><div class="attack-mission"><span id="attack-living" class="small-muted" role="status"></span><button data-action="attack-recall" disabled>Отозвать</button></div></div></div><div class="composition-columns"><span>Тип / состояние</span><span>В строю + очередь</span><span>Цель</span></div><div class="composition-rows">${category.keys
     .filter((key) => E.recruitmentFacility(key))
     .map((key) => {
       const row = report.types.find((t) => t.key === key);
@@ -185,6 +184,11 @@ export function updateArmyRecruitment({
     : attack.reason ||
       `Отправить ${attack.count} из ${attack.eligible} готовых защитников. Без доплаты; остальные держат оборону.`;
   attackButton.setAttribute('aria-label', `Отправить 30% обороны в атаку: ${attack.count} бойцов`);
+  $('#attack-living').textContent =
+    `В атаке ${attack.active || 0} · возврат ${attack.returning || 0}`;
+  const recallButton = $('[data-action="attack-recall"]');
+  recallButton.disabled = !!recallButton.dataset.pending || !(attack.active > 0);
+  recallButton.title = 'Вернуть живых участников атаки к своим постам';
   $('#army-roster-label').textContent = `На поле: ${units.length} · выбрать по типу`;
   const counts = new Map();
   for (const unit of units) counts.set(unit.key, (counts.get(unit.key) || 0) + 1);
@@ -210,7 +214,8 @@ export function updateArmyRecruitment({
     const resources =
       faction.credits < quote.cost ||
       faction.materials < quote.metal ||
-      (faction.oil || 0) < quote.oil;
+      (faction.oil || 0) < quote.oil ||
+      (faction.components || 0) < (quote.components || 0);
     const full =
       ready
         .filter((b) => b.key === E.recruitmentFacility(key))

@@ -221,6 +221,21 @@ test('the reproducible network battle keeps its historical 120-per-city sample a
       120,
     );
   assert.ok(s.units.every((u) => u.hp === E.WEAPONS.drone.hp && u.maxHp === E.WEAPONS.drone.hp));
+  assert.ok(
+    s.units.every((u) => {
+      const source = s.buildings.find((b) => b.id === u.sourceId && b.side === u.side);
+      return source?.key === 'launcher' && E.launchSiteAllows(source, u.key);
+    }),
+    'already airborne stress aircraft must originate from current legal launch sites',
+  );
+  for (const b of s.buildings.filter((b) => E.launchStoreCapacity(b))) {
+    assert.ok(Object.values(b.launchStore).every((n) => Number.isSafeInteger(n) && n >= 0));
+    assert.equal(
+      E.launchStoreTotal(b),
+      0,
+      'staged flights cannot be duplicated as ready rack stock',
+    );
+  }
   E.advance(s, 0.3);
   assert.ok(s.stats.shots > 0);
   assert.ok(s.projectiles.some((p) => p.domain !== 'ground'));

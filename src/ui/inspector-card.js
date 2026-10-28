@@ -74,9 +74,24 @@ export function compactEquipmentAction(host, state, entity, destination) {
 export function compactInspectorStatus(host, state, b) {
   const status = host.querySelector('.inspect-key-status');
   if (!status) return;
-  if (['factory', 'launcher', 'silo'].includes(b.key)) {
+  if (b.side !== 0 || b.hp <= 0 || b.demolished) {
+    status.textContent = '';
+    status.hidden = true;
+    return;
+  }
+  if (b.key === 'electronics') {
+    const report = E.electronicsFactoryStatus?.(state, b.side, b.id);
+    status.textContent = report
+      ? `${report.stock}/${report.capacity} эл. · сборка ${Math.round(report.progress * 100)}% · ${report.reason}`
+      : '';
+  } else if (b.key === 'factory') {
+    const report = E.factoryWarehouseStatus?.(state, b);
+    status.textContent = report
+      ? `Склад ${report.total}/${report.capacity} · ${report.reason}`
+      : 'Производство и склад вооружения';
+  } else if (['launcher', 'silo'].includes(b.key)) {
     const tempo = E.launchTempo(b);
-    status.textContent = `Готово ${E.launchStoreTotal(b)}/${E.launchStoreCapacity(b)} · пуск ${tempo.count}/${tempo.interval} с · очередь ${E.queuedLaunches(state, b)}`;
+    status.textContent = `На площадке ${E.launchStoreTotal(b)}/${E.launchStoreCapacity(b)} · пуск ${tempo.count}/${tempo.interval} с · очередь ${E.queuedLaunches(state, b)}`;
   } else if (b.key === 'ammofactory') {
     const report = E.ammoFactoryStatus(state, b.side, b.id);
     status.textContent = `Выпуск ${Math.round(report.production * 100)}% · машины ${report.fleet.busy}/${report.fleet.total}`;

@@ -443,6 +443,7 @@ export class GameAudio {
     sirenWet.connect(this.reverbIn);
     siren.start();
     this.siren = { source: siren, level: sirenLevel, filter: sirenTone, on: false };
+    if (!this.buffers.rain) return;
     const rain = c.createBufferSource(),
       rainLevel = c.createGain();
     rain.buffer = this.buffers.rain;
@@ -451,7 +452,7 @@ export class GameAudio {
     rain.connect(rainLevel);
     rainLevel.connect(this.dry);
     rain.start();
-    this.rain = { level: rainLevel };
+    this.rain = { source: rain, level: rainLevel };
   }
   // Raid warning: enemy aircraft in the air close to any of the listener's buildings.
   raidThreat(state, side) {
@@ -530,7 +531,7 @@ export class GameAudio {
       // Rain is quieter from high above the valley.
       const height = Math.max(0.35, Math.min(1, 380 / Math.max(120, camera.position.y)));
       this.rain.level.gain.setTargetAtTime(
-        this.enabled && !paused ? wet * 0.075 * height : 0,
+        this.enabled && !paused ? wet * 0.55 * height : 0,
         t,
         0.8,
       );

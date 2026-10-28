@@ -2,7 +2,8 @@ import { validSide, sideIds } from '../../factions.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry } from '../../config.js';
 import { event as emit } from '../../shared/events.js';
 import { random } from '../../shared/random.js';
-import { groundPath } from './navigation.js';
+import { orderGround } from './orders.js';
+import { boardGround, unloadGround } from '../vehicles/transport.js';
 import { loadSupplyTruck, supplyNearbyAmmo } from '../../city/ammo-logistics.js';
 import { createAmmoStock, ammunitionProfile, ammunitionStatus } from './ammunition.js';
 import { clearGroundRoute } from './route-queue.js';
@@ -79,7 +80,7 @@ function woundedBySide(s) {
         !v.carrierId &&
         isInfantry(v.key) &&
         !isSupport(v) &&
-        (v.downed || v.hp < v.maxHp * 0.7)
+        (v.downed || v.hp < v.maxHp * 0.95)
       )
         cache.sides[v.side].push(v);
     wounded.set(s, cache);
@@ -87,15 +88,28 @@ function woundedBySide(s) {
   return cache.sides;
 }
 
-function centroid(units) {
-  if (!units.length) return null;
-  let x = 0,
-    z = 0;
-  for (const u of units) {
-    x += u.x;
-    z += u.z;
+// Separate front buckets avoid staging in the sea between the land crossings.
+const camps = new WeakMap();
+function supportCamp(s, u) {
+  let cache = camps.get(s);
+  if (!cache || cache.time !== s.time) {
+    cache = { time: s.time, sides: s.sides.map(() => [[], []]) };
+    for (const v of s.groundUnits)
+      if (v.hp > 0 && !v.carrierId && !isSupport(v) && !v.civil)
+        cache.sides[v.side][v.z < 0 ? 0 : 1].push(v);
+    camps.set(s, cache);
   }
-  return { x: x / units.length, z: z / units.length };
+  const fronts = cache.sides[u.side];
+  let front = u.supportFront;
+  if (![0, 1].includes(front) || !fronts[front].length) {
+    front = fronts[0].length && fronts[1].length ? (u.z < 0 ? 0 : 1) : fronts[0].length ? 0 : 1;
+    u.supportFront = front;
+  }
+  const army = fronts[front];
+  if (!army.length) return null;
+  // Choose an actual soldier as anchor: an arithmetic centroid can be offshore.
+  const anchor = army[Math.floor((army.length - 1) / 2)];
+  return { x: anchor.x - (u.side % 2 === 0 ? 28 : -28), z: anchor.z + ((u.id % 3) - 1) * 8 };
 }
 
 function walkTo(s, u, point, stopAt = 3) {
@@ -106,15 +120,16 @@ function walkTo(s, u, point, stopAt = 3) {
   }
   const last = u.path?.at(-1);
   if (last && Math.hypot(last.x - point.x, last.z - point.z) < 12) return false;
-  const path = groundPath(s, u, point, d.size * 0.42);
-  if (path.length) {
-    u.path = path;
-    u.order = { x: point.x, z: point.z, mode: 'support' };
-  }
+  if ((u.supportRouteAt || 0) > s.time) return false;
+  u.supportRouteAt = s.time + 3;
+  const manual = u.supportManual;
+  orderGround(s, u.side, [u.id], { x: point.x, z: point.z, mode: 'move' }, { defer: true });
+  u.supportManual = manual;
   return false;
 }
 
 function medicTick(s, u, dt) {
+  if (u.boardingId) return;
   if (u.supportManual && u.path?.length) return;
   const list = woundedBySide(s)[u.side];
   let patient = list.find(
@@ -130,9 +145,7 @@ function medicTick(s, u, dt) {
       for (const v of list) {
         const score = Math.hypot(v.x - u.x, v.z - u.z) * (v.downed ? 0.55 : 1);
         // Another medic already on the way makes a patient less attractive.
-        const taken = s.groundUnits.some(
-          (m) => m !== u && m.patientId === v.id && m.hp > 0 && m.key === 'medic',
-        );
+        const taken = medicClaims.get(s)?.has(v.id);
         if (
           score < best &&
           score < (u.supportManual ? MEDIC_RANGE : 320) &&
@@ -144,16 +157,11 @@ function medicTick(s, u, dt) {
       }
     }
     u.patientId = patient?.id ?? null;
+    if (patient) medicClaims.get(s)?.add(patient.id);
     if (patient && !u.supportManual) walkTo(s, u, patient, MEDIC_RANGE - 3);
     else if (!patient && !u.supportManual && !u.path?.length) {
-      const army = centroid(
-        s.groundUnits.filter(
-          (v) =>
-            v.side === u.side && v.hp > 0 && !v.carrierId && isInfantry(v.key) && !isSupport(v),
-        ),
-      );
-      if (army)
-        walkTo(s, u, { x: army.x - (u.side % 2 === 0 ? 24 : -24), z: army.z + (u.id % 7) * 3 }, 30);
+      const camp = supportCamp(s, u);
+      if (camp) walkTo(s, u, camp, 30);
     }
   }
   if (!patient) return;
@@ -273,22 +281,55 @@ function truckTick(s, u, dt) {
     return;
   }
   if (u.path?.length) return;
-  const army = centroid(
-    s.groundUnits.filter(
-      (v) => v.side === u.side && v.hp > 0 && !v.carrierId && !isSupport(v) && !v.guard,
-    ),
-  );
-  const base = s.buildings.find((b) => b.side === u.side && b.key === 'hq' && b.hp > 0);
-  const rest = army || (base ? { x: base.x, z: base.z + 40 } : null);
-  if (rest) walkTo(s, u, { x: rest.x - (u.side % 2 === 0 ? 34 : -34), z: rest.z + 22 }, 40);
+  const rest = supportCamp(s, u);
+  if (rest) walkTo(s, u, rest, 35);
 }
 
+const medicClaims = new WeakMap();
 export function updateRear(s, dt) {
+  const claims = new Set();
+  for (const u of s.groundUnits)
+    if (u.hp > 0 && u.key === 'medic' && u.patientId) claims.add(u.patientId);
+  medicClaims.set(s, claims);
+  const passengersByTruck = new Map(),
+    medicsByCell = new Map();
+  for (const m of s.groundUnits) {
+    const carrier = m.carrierId || m.boardingId;
+    if (m.hp > 0 && carrier) {
+      if (!passengersByTruck.has(carrier)) passengersByTruck.set(carrier, []);
+      passengersByTruck.get(carrier).push(m);
+    }
+    if (m.key === 'medic' && m.hp > 0 && !m.supportManual && !m.patientId && !carrier) {
+      const cell = `${m.side}:${Math.floor(m.x / 40)}:${Math.floor(m.z / 40)}`;
+      if (!medicsByCell.has(cell)) medicsByCell.set(cell, []);
+      medicsByCell.get(cell).push(m);
+    }
+  }
   for (const u of s.groundUnits) {
-    if (u.hp <= 0 || u.carrierId || u.downed || s.sides[u.side].rearAuto === false) continue;
+    if (u.hp <= 0 || u.downed || s.sides[u.side].rearAuto === false) continue;
+    if (u.carrierId) continue;
     const kind = GROUND_UNITS[u.key]?.support;
     if (kind === 'medic') medicTick(s, u, dt);
-    else if (kind === 'supply') truckTick(s, u, dt);
+    else if (kind === 'supply') {
+      truckTick(s, u, dt);
+      if (u.supportManual) continue;
+      const passengers = passengersByTruck.get(u.id) || [];
+      if (passengers.some((m) => m.boardingId === u.id)) {
+        u.path = [];
+        continue;
+      }
+      if (passengers.length && !u.path?.length && !u.routeState) unloadGround(s, u.side, u.id);
+      if (!passengers.length && u.order && Math.hypot(u.order.x - u.x, u.order.z - u.z) > 120) {
+        let medic;
+        for (let dx = -1; dx <= 1 && !medic; dx++)
+          for (let dz = -1; dz <= 1 && !medic; dz++)
+            medic = medicsByCell
+              .get(`${u.side}:${Math.floor(u.x / 40) + dx}:${Math.floor(u.z / 40) + dz}`)
+              ?.find((m) => !m.carrierId && !m.boardingId && Math.hypot(m.x - u.x, m.z - u.z) < 35);
+        if (medic && typeof boardGround(s, u.side, [medic.id], u.id) === 'number')
+          medic.supportManual = false;
+      }
+    }
   }
 }
 

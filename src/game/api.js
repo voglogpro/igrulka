@@ -1,4 +1,8 @@
 export { ROAD_REQUIRED } from './city/rules.js';
+export { ELECTRONICS, electronicsFactoryStatus } from './city/electronics.js';
+export { radarFireSupport, radarAirWarning } from './combat/radar-support.js';
+export { weaponStoreStock, factoryWarehouseStatus } from './units/aviation/weapon-stores.js';
+export { weaponDeliveryStatus } from './city/weapon-delivery-status.js';
 export { FIELD_SUPPLY, fieldCrateStatus, damageAmmoCrates } from './city/field-ammo.js';
 export { updateFieldSupply } from './units/ground/field-supply.js';
 export {
@@ -43,6 +47,7 @@ export { setAutoDefense } from './defense/volunteers.js';
 export {
   defenseAttackStatus,
   launchDefenseAttack,
+  recallDefenseAttack,
   DEFENSE_ATTACK_PERCENT,
 } from './units/ground/defense-attack.js';
 export { frontlineReport } from './defense/frontline.js';

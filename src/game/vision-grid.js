@@ -3,7 +3,7 @@ import { buildingConnected } from './city/road-network.js';
 
 // Compatibility API for the retired map fog. Radar remains an AA targeting aid;
 // concealment of individual infantry is handled separately in infantry/cover.js.
-export const VISION = { radar: 320 };
+export const VISION = { radar: 850 };
 export const GRID = {
   cell: 40,
   cols: Math.ceil(MAP.width / 40),
@@ -14,7 +14,9 @@ export const GRID = {
 
 // Radars that actually work: they need power from the connected grid.
 export function radarSources(s, side) {
-  const buildings = s.buildings.filter((b) => b.side === side && b.hp > 0 && b.progress >= 1);
+  const buildings = s.buildings.filter(
+    (b) => b.side === side && b.hp > 0 && b.progress >= 1 && !b.demolished,
+  );
   let power = 10,
     demand = 0;
   for (const b of buildings) {
@@ -28,8 +30,16 @@ export function radarSources(s, side) {
   return power < demand * 0.5
     ? []
     : buildings
-        .filter((b) => b.key === 'radar')
-        .map((b) => ({ x: b.x, z: b.z, air: VISION.radar, kind: 'radar', id: b.id }));
+        .filter((b) => b.key === 'radar' && !b.demolished)
+        .map((b) => ({
+          x: b.x,
+          z: b.z,
+          air: VISION.radar * (1 + (b.level || 0) * 0.2),
+          control: 600 * (1 + (b.level || 0) * 0.15),
+          level: b.level || 0,
+          kind: 'radar',
+          id: b.id,
+        }));
 }
 
 // Rain, fog and night shrink every observation circle; radar is not affected.

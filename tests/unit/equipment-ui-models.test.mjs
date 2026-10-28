@@ -27,9 +27,11 @@ test('equipment inspector follows cash availability, paid tier and real launch c
   assert.equal(equipmentHTML(state, { ...unit, side: 1 }), '');
   const factory = { id: 999, key: 'factory', side: 0, hp: 100, progress: 1, level: 0 };
   state.buildings.push(factory);
-  assert.match(equipmentHTML(state, factory), /1 \/ 20 с → 1 \/ 15 с/);
+  assert.match(equipmentHTML(state, factory), /Выпуск/);
+  assert.doesNotMatch(equipmentHTML(state, factory), /Темп пуска/);
   factory.launchStore = { drone: 1, heavy: 0 };
-  assert.match(supplyHTML(state, factory), /Запас на площадке 1 \/ 2/);
+  assert.match(supplyHTML(state, factory), /Склад завода: 1/);
+  assert.doesNotMatch(supplyHTML(state, factory), /Пуск/);
 });
 
 test('supply refreshes preserve an unchanged upgrade button DOM subtree', () => {

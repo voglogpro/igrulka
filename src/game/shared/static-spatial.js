@@ -6,6 +6,20 @@
 // stay live through the indexed object references and need no copied snapshot.
 const CELL = 64;
 const indices = new WeakMap();
+const geometryRevisions = new WeakMap();
+
+export function staticGeometryRevision(s, field) {
+  return geometryRevisions.get(s)?.get(field) || 0;
+}
+
+// Canonical create/remove/reorder/move paths must invalidate geometry even
+// when replacing an entry at a fixed capacity. Ownership/progress stay live.
+export function invalidateStaticGeometry(s, field) {
+  let revisions = geometryRevisions.get(s);
+  if (!revisions) geometryRevisions.set(s, (revisions = new Map()));
+  revisions.set(field, staticGeometryRevision(s, field) + 1);
+  indices.get(s)?.delete(field);
+}
 function indexFor(s, field) {
   let stateIndices = indices.get(s);
   if (!stateIndices) {

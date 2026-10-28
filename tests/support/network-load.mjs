@@ -19,6 +19,7 @@ export function loadFixture(airCount = 100, { airHp = null } = {}) {
       z = side < 2 ? -1360 : 1360;
     s.sides[side].credits = 100000;
     s.sides[side].materials = 5000;
+    s.sides[side].components = 120;
     for (let i = 0; i < NETWORK_GROUND_PER_CITY; i++) {
       const key = roster[i % roster.length],
         u = E.makeGround(
@@ -39,8 +40,8 @@ export function loadFixture(airCount = 100, { airHp = null } = {}) {
       u.routeState = { status: 'moving', x: u.path.at(-1).x, z: u.z, retryAt: 30 };
       s.groundUnits.push(u);
     }
-    for (let i = 0; i < 5; i++) {
-      const key = ['barracks', 'vehiclebase', 'factory', 'silo', 'power'][i],
+    for (let i = 0; i < 6; i++) {
+      const key = ['barracks', 'vehiclebase', 'factory', 'silo', 'power', 'launcher'][i],
         d = E.BUILDINGS[key];
       const b = {
         id: s.nextId++,
@@ -59,12 +60,13 @@ export function loadFixture(airCount = 100, { airHp = null } = {}) {
       // Keep the historical 480-troop measurement stable independently of army caps.
       if (i === 2) b.queue = Array.from({ length: 4 }, () => ({ key: 'drone', progress: 0 }));
       s.buildings.push(b);
+      E.initLaunchStore(b);
       addRoad(s, side, hq.x, hq.z - 45, b.x, b.z + 20);
     }
   }
   for (let i = 0; i < airCount; i++) {
     const side = i % 4,
-      origin = s.buildings.find((b) => b.side === side && b.key === 'factory'),
+      origin = s.buildings.find((b) => b.side === side && b.key === 'launcher'),
       enemy = s.buildings.find((b) => b.side === (side ^ 1) && b.key === 'hq');
     const aim = {
       x: enemy.x,

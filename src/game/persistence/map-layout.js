@@ -10,6 +10,7 @@ import { GROUND_UNITS } from '../config.js';
 import { walkable, groundPath } from '../units/ground/navigation.js';
 import { basePosition } from '../units/aviation/flight.js';
 import { berthOf } from '../city/ports.js';
+import { invalidateStaticGeometry } from '../shared/static-spatial.js';
 
 const zFields = new Set([
   'z',
@@ -171,6 +172,7 @@ export function migrateMapLayout(s, sourceVersion) {
       ship.path[ship.path.length - 1] = berth;
   }
   for (const trench of s.trenches || []) Object.assign(trench, dryPoint(s, trench, 2, trench.side));
+  invalidateStaticGeometry(s, 'trenches');
   for (const u of s.groundUnits || []) {
     if (u.carrierId) continue;
     const radius = (GROUND_UNITS[u.key]?.size || 3) * 0.42;

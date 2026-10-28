@@ -11,6 +11,7 @@ import re
 import subprocess
 import time
 import base64
+import hashlib
 from playwright.sync_api import sync_playwright
 from support import ROOT, ARTIFACTS
 
@@ -21,7 +22,7 @@ parser.add_argument('--server-root',type=Path)
 parser.add_argument('--fixture-state',type=Path)
 parser.add_argument('--label',default='812-baseline')
 parser.add_argument('--seconds',type=int,default=30)
-parser.add_argument('--scenario',choices=['quiet','defense','battle','campaign','tour','late','retreat'],default='tour')
+parser.add_argument('--scenario',choices=['quiet','defense','battle','campaign','tour','late','retreat','actions'],default='tour')
 parser.add_argument('--units',type=int,default=90)
 parser.add_argument('--cpu-profile',action='store_true')
 parser.add_argument('--interactions',action='store_true')
@@ -52,6 +53,8 @@ server=None
 report={'label':args.label,'scenario':args.scenario,'requestedUnits':args.units,'errors':[],'consoleErrors':[],
         'cpuProfiling':args.cpu_profile,'browserPriority':args.browser_priority,
         'conditions':'Isolated hardware Chrome, '+args.browser_priority+' browser priority; BelowNormal helpers; default shipped render adaptation. Battle HP10000 endurance only.'}
+if args.target:
+    report['targetSha256']=hashlib.sha256(args.target.resolve().read_bytes()).hexdigest()
 try:
     if args.url:url=args.url
     elif args.target:url=args.target.resolve().as_uri()
@@ -130,7 +133,41 @@ try:
                     page.locator(f'[data-panel="{panel}"]').first.click();wait(1);page.keyboard.press('Escape');wait(.25)
                 for tab in ['army','military','city']:
                     page.locator(f'[data-tab="{tab}"]').click();wait(.5)
-            if args.scenario=='retreat':
+            if args.scenario=='actions':
+                page.add_script_tag(path=str(ROOT/'tests/browser/hitch_actions.js'))
+                pause(True);mark('action-fixture')
+                report['actionFixture']=page.evaluate('(count)=>hitchActions(count)',args.units)
+                pause(False);mark('action-idle');wait(args.seconds)
+                mark('native-road')
+                page.keyboard.press('g')
+                assert page.evaluate('skyfront.getWorld().buildKey')=='road'
+                before=page.evaluate('skyfront.getState().roads.filter(r=>!r.removed).length')
+                for x,z in [(-1140,65),(-920,65)]:
+                    point=page.evaluate('''p=>{const w=skyfront.getWorld(),v=w.camera.position.clone().set(p.x,w.height(p.x,p.z),p.z).project(w.camera);return {x:(v.x+1)*640,y:(1-v.y)*360};}''',{'x':x,'z':z})
+                    assert 200<point['x']<1200 and 100<point['y']<550,point
+                    page.mouse.click(point['x'],point['y']);wait(.5)
+                after=page.evaluate('skyfront.getState().roads.filter(r=>!r.removed).length')
+                report['nativeRoad']={'before':before,'after':after};assert after>before
+                page.keyboard.press('Escape');page.keyboard.press('Escape');wait(1)
+                assert page.evaluate('skyfront.getWorld().buildKey') is None
+                mark('native-upgrade')
+                gun=report['actionFixture']['gun']
+                point=page.evaluate('''id=>{const w=skyfront.getWorld(),u=w.state.buildings.find(b=>b.id===id),v=w.camera.position.clone().set(u.x,5,u.z).project(w.camera);return {x:(v.x+1)*640,y:(1-v.y)*360};}''',gun)
+                page.mouse.click(point['x'],point['y']);wait(.5)
+                assert page.evaluate('skyfront.getWorld().selected')==gun,point
+                page.locator(f'[data-upgrade="{gun}"]').first.click()
+                report['nativeUpgrade']=page.evaluate('(id)=>skyfront.getState().buildings.find(b=>b.id===id).level',gun)
+                assert report['nativeUpgrade']==1
+                page.keyboard.press('Escape');wait(2)
+                page.evaluate('()=>{const w=skyfront.getWorld();w.focus(1015,280,500,{instant:true});w.controls.update(3);}');wait(1)
+                report['actualLaunches']=[]
+                for key,site in report['actionFixture']['sites'].items():
+                    mark('actual-launch-'+key)
+                    result=page.evaluate('''({key,site})=>{const s=skyfront.getState();return skyfront.engine.launch(s,1,key,{x:-1015,z:0},1,site);}''',{'key':key,'site':site})
+                    assert result==1,(key,result)
+                    report['actualLaunches'].append(key);wait(3)
+                mark('action-camera');clicks();wait(args.seconds)
+            elif args.scenario=='retreat':
                 fixture();pause(True)
                 page.evaluate('''()=>{const w=skyfront.getWorld();skyfront.selectArmy(w.state.groundUnits.filter(u=>u.side===0&&u.hp>0).map(u=>u.id));}''')
                 wait(1);mark('retreat-click-paused')

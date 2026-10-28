@@ -45,7 +45,7 @@ export function launchSites(s, owner, key = null) {
   return s.buildings.filter(
     (b) =>
       b.side === owner &&
-      ['factory', 'launcher', 'silo'].includes(b.key) &&
+      ['launcher', 'silo'].includes(b.key) &&
       (key == null || launchSiteAllows(b, key)) &&
       !b.demolished &&
       b.hp > 0 &&
@@ -84,7 +84,7 @@ export function launchStatus(s, owner, key, aim, siteId = null) {
   if (!launchSites(s, owner, key).length)
     return ['cruise', 'ballistic'].includes(key)
       ? 'Постройте ракетную пусковую на суше'
-      : 'Постройте площадку или базу дронов';
+      : 'Постройте площадку запуска дронов';
   const origin = selectedLaunchSite(s, owner, siteId, key);
   if (!origin) return 'Выбранная пусковая недоступна';
   if (!availableLaunchStock(origin, key))

@@ -1,4 +1,4 @@
-﻿import {
+import {
   GUNS,
   gunshot,
   explosion,
@@ -8,7 +8,6 @@
   impulseResponse,
   sirenLoop,
   mopedLoop,
-  rainLoop,
 } from './synth.js';
 import { recordedEngineLoop } from './engines.js';
 import { recordedGroundSample } from './footsteps.js';
@@ -31,7 +30,6 @@ export function pcmCatalog(rate) {
   add('jet', () => recordedOrdnanceSample(rate, 'jet'), true);
   add('moped', () => recordedEngineLoop(rate, 'prop', mopedLoop(rate)), true);
   add('siren', () => sirenLoop(rate), true);
-  add('rain', () => rainLoop(rate), true);
   for (let i = 0; i < 3; i++) add('footstep', () => recordedGroundSample(rate, 'footstep', i));
   for (const key of ['rifle', 'mg', 'hmg', 'shilka', 'autocannon', 'blast', 'tank'])
     if (GUNS[key]) add(key, () => gunshot(rate, GUNS[key]));

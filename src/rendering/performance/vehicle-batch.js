@@ -18,6 +18,7 @@ export class VehicleBatch {
     this.frustum = new T.Frustum();
     this.sphere = new T.Sphere(new T.Vector3(), 30);
     this.visibleEntities = 0;
+    this.generation = 0;
   }
   groupFor(part) {
     const materials = Array.isArray(part.material) ? part.material : [part.material];
@@ -68,6 +69,7 @@ export class VehicleBatch {
     return parts;
   }
   sync(models, camera = null, include = null) {
+    const generation = ++this.generation;
     this.seen.clear();
     this.visibleEntities = 0;
     for (const group of this.groups.values()) group.count = 0;
@@ -87,7 +89,8 @@ export class VehicleBatch {
       }
       this.visibleEntities++;
       root.updateWorldMatrix(true, true);
-      for (const { mesh, group } of parts) {
+      for (const part of parts) {
+        const { mesh, group } = part;
         let shown = true;
         for (let parent = mesh.parent; parent && parent !== root; parent = parent.parent)
           if (!parent.visible) {
@@ -96,6 +99,36 @@ export class VehicleBatch {
           }
         if (!shown) continue;
         const count = mesh.isInstancedMesh ? mesh.count : 1;
+        // Generic CPU proxies may call setMatrixAt without needsUpdate. Only the
+        // drive producer opts into versioned input, keeping that old contract.
+        const stable =
+          mesh.isInstancedMesh && mesh.userData.versionedDrive
+            ? part.stable || (part.stable = { world: new Float64Array(16) })
+            : null;
+        const start = group.count;
+        // Culling can let another part overwrite this slot between emissions.
+        // Attribute IDs are immutable and avoid retaining retired grown buffers.
+        let unchanged =
+          stable &&
+          stable.generation === generation - 1 &&
+          stable.source === mesh.instanceMatrix &&
+          stable.array === mesh.instanceMatrix.array &&
+          stable.version === mesh.instanceMatrix.version &&
+          stable.count === count &&
+          stable.destinationId === group.mesh.instanceMatrix.id &&
+          stable.start === start;
+        if (unchanged)
+          for (let i = 0; i < 16; i++) {
+            if (stable.world[i] !== mesh.matrixWorld.elements[i]) {
+              unchanged = false;
+              break;
+            }
+          }
+        if (unchanged) {
+          group.count += count;
+          stable.generation = generation;
+          continue;
+        }
         for (let i = 0; i < count; i++) {
           if (group.count === group.capacity) {
             group.capacity *= 2;
@@ -106,6 +139,16 @@ export class VehicleBatch {
             this.matrix.multiplyMatrices(mesh.matrixWorld, this.local);
           } else this.matrix.copy(mesh.matrixWorld);
           writeInstanceMatrix(group.mesh, group.count++, this.matrix);
+        }
+        if (stable) {
+          stable.world.set(mesh.matrixWorld.elements);
+          stable.source = mesh.instanceMatrix;
+          stable.array = mesh.instanceMatrix.array;
+          stable.version = mesh.instanceMatrix.version;
+          stable.count = count;
+          stable.destinationId = group.mesh.instanceMatrix.id;
+          stable.start = start;
+          stable.generation = generation;
         }
       }
     }

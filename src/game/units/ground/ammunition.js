@@ -7,6 +7,7 @@ export const AMMUNITION = {
   cargo: { small: 120, shell: 12, rocket: 12, sam: 4 },
   batches: { small: 60, shell: 6, rocket: 6, sam: 2 },
   costs: { small: [12, 1, 0], shell: [24, 3, 0], rocket: [36, 4, 1], sam: [32, 4, 1] },
+  components: { small: 0, shell: 0, rocket: 1, sam: 1 },
   interval: 1,
   reserveCredits: 250,
   fleetLimit: 8,

@@ -67,6 +67,7 @@ export function applyStance(s, side, ids, stance) {
     (u) => u.side === side && u.hp > 0 && !u.carrierId && !u.downed && ids.includes(u.id),
   );
   if (!units.length) return 'Выберите доступные наземные отряды';
+  for (const u of units) delete u.defenseAttack;
   if (stance.mode === 'attack') {
     const pairedHQ = hqOf(s, pairedEnemy(s, side));
     const hq =

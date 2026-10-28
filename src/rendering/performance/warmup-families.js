@@ -3,28 +3,56 @@ import { BUILDINGS, GROUND_UNITS, WEAPONS, isInfantry } from '../../game/config.
 import { upgradeable } from '../../game/combat/upgrades.js';
 import { groundModel } from '../models/ground.js';
 import { aircraftModel } from '../models/aircraft.js';
+import { STATIC_BUILDING_KEYS } from '../models/buildings.js';
 
 const identity = new T.Matrix4();
 const noTrees = () => {};
 
-// One maximal equipment tier contains the base parts too. Paint changes uniform
-// values/vertex data, not shader defines, so do not cache every faction/tier
-// combination just to prepare the same GPU program hundreds of times.
-export function warmupModelJobs() {
-  const jobs = [];
+// Shader families share code, but model template keys also include exact tiers
+// and owners. Prepare common paid construction and own vehicle tiers explicitly;
+// retain bounded active-side air variants rather than all foreign ground tiers.
+export function warmupModelJobs(world) {
+  const jobs = [],
+    seen = new Set();
+  const add = (job) => {
+    const key = `${job.kind}/${job.key}/${job.side}/${job.level || 0}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    jobs.push(job);
+  };
   for (const [key, d] of Object.entries(BUILDINGS)) {
     if (d.retired || key === 'hq') continue;
-    jobs.push({ kind: 'building', key, side: 0, level: upgradeable({ key }) ? 2 : 0 });
+    add({ kind: 'building', key, side: 0, level: upgradeable({ key }) ? 2 : 0 });
   }
-  for (const [key] of Object.entries(GROUND_UNITS))
-    if (!isInfantry(key) || key === 'mog')
-      jobs.push({ kind: 'ground', key, side: 0, level: upgradeable({ key }) ? 2 : 0 });
-  for (const key of [...Object.keys(WEAPONS), 'fpv'])
-    jobs.push({ kind: 'air', key, side: 0, level: 0 });
+  const groundKeys = Object.keys(GROUND_UNITS).filter((key) => !isInfantry(key) || key === 'mog'),
+    airKeys = [...Object.keys(WEAPONS), 'fpv'];
+  for (const key of groundKeys)
+    add({ kind: 'ground', key, side: 0, level: upgradeable({ key }) ? 2 : 0 });
+  for (const key of airKeys) add({ kind: 'air', key, side: 0, level: 0 });
   for (const side of [1, 2, 3]) {
-    jobs.push({ kind: 'building', key: 'factory', side, level: 2 });
-    jobs.push({ kind: 'air', key: 'drone', side, level: 0 });
+    add({ kind: 'building', key: 'factory', side, level: 2 });
+    add({ kind: 'air', key: 'drone', side, level: 0 });
   }
+  // Match the cached building families in models/buildings.js. Dynamic uncached
+  // models need their own lifecycle and are not fixed by duplicate warmup jobs.
+  const cachedDefenses = new Set(['gun', 'sam', 'cannon', 'launcher', 'silo']);
+  for (const key of Object.keys(BUILDINGS))
+    if (upgradeable({ key }) && (STATIC_BUILDING_KEYS.has(key) || cachedDefenses.has(key)))
+      for (const level of [0, 1]) add({ kind: 'building', key, side: 0, level });
+  for (const key of groundKeys)
+    if (upgradeable({ key }))
+      for (const level of [0, 1]) add({ kind: 'ground', key, side: 0, level });
+  // A local two-city menu can join a four-owner co-op room after startup.
+  // Prepare the four supported visual colors without adding simulation owners.
+  const sideCount = 4;
+  for (let side = 1; side < sideCount; side++)
+    for (const key of airKeys) add({ kind: 'air', key, side, level: 0 });
+  // These are actual animated role buffers, not disposable prototypes. One
+  // role/side per scheduled job keeps construction inside the existing slices.
+  if (world?.infantry?.pool)
+    for (let side = 0; side < sideCount; side++)
+      for (const key of Object.keys(GROUND_UNITS).filter(isInfantry))
+        add({ kind: 'infantry', key, side, level: 0 });
   return jobs;
 }
 
@@ -109,6 +137,13 @@ export class WarmupFamilies {
   }
 
   prepare(job) {
+    if (job.kind === 'infantry') {
+      const pool = this.world.infantry.pool(job.key, job.side);
+      this.collectObject(pool.body, false);
+      this.collectObject(pool.legs, false);
+      this.prototypes++;
+      return;
+    }
     const world = this.world,
       scene = world.scene,
       clearTrees = world.clearTrees;

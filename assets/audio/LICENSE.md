@@ -1,3 +1,18 @@
+# Recorded rain, 8.13
+
+"Rain, Moderate, A.wav" by InspectorJ (www.jshaw.co.uk), Freesound #401277.
+Source: https://freesound.org/people/InspectorJ/sounds/401277/
+License: Creative Commons Attribution 4.0 International (CC BY 4.0),
+https://creativecommons.org/licenses/by/4.0/ (full text: CC-BY-4.0.txt).
+
+The author describes a Zoom H1 field recording made in Witley, England on
+2016-01-02. This game uses the public HQ MP3 preview, not the original WAV master.
+Changes: trim to seconds 1-59; 1.5-second equal-power tail/head crossfade using
+only recorded rain; attenuation by 2 dB; conversion to 56.5-second stereo Opus.
+The derived asset is `rain-inspectorj.opus`, bundled in `rain-recording.js` for
+offline playback. No generated rain was added. Credit does not imply endorsement.
+Machine-readable source, modifications and checksum: `rain-sources.json`.
+
 # Recorded aircraft engines, ground engine and footsteps
 
 ## Recorded rocket and artillery sounds, 8.11.2

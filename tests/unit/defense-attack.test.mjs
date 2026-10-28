@@ -1,7 +1,14 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
+import {
+  recallDefenseAttack,
+  updateDefenseAttacks,
+} from '../../src/game/units/ground/defense-attack.js';
 import { executeCommand } from '../../src/network/commands.js';
+import { launchAIAssault } from '../../src/game/ai/army-ai.js';
+import { enrollCityAssault } from '../../src/game/units/ground/defense-attack.js';
+import { depositFieldAmmo } from '../../src/game/city/field-ammo.js';
 import {
   updateGroundRoutes,
   GROUND_ROUTE_PATHS_PER_STEP,
@@ -43,6 +50,9 @@ test('30 percent attack leaves 14 of 20 defenders on each front and does no sync
     total: 40,
     eligible: 40,
     count: 12,
+    active: 0,
+    returning: 0,
+    initial: 0,
     reason: '',
     ok: true,
   });
@@ -131,4 +141,161 @@ test('cooperative attack commands own only their city and keep one defender per 
   small.groundUnits = small.groundUnits.slice(0, 2);
   assert.equal(E.defenseAttackStatus(small, 0).ok, false);
   assert.equal(typeof E.launchDefenseAttack(small, 0), 'string');
+});
+
+test('recall preserves positions, returns only own survivors, and manual commands detach membership', () => {
+  const s = fixture();
+  E.launchDefenseAttack(s, 0);
+  const attackers = s.groundUnits.filter((u) => u.defenseAttack);
+  assert.equal(E.defenseAttackStatus(s, 0).active, 12);
+  attackers[0].hp = 0;
+  const positions = attackers.slice(1).map((u) => [u.x, u.z]);
+  assert.equal(recallDefenseAttack(s, 1), 'Нет бойцов для отзыва');
+  assert.equal(recallDefenseAttack(s, 0), 11);
+  assert.deepEqual(
+    attackers.slice(1).map((u) => [u.x, u.z]),
+    positions,
+  );
+  assert.equal(E.defenseAttackStatus(s, 0).returning, 11);
+  const loaded = E.load(E.save(s));
+  assert.equal(E.defenseAttackStatus(loaded, 0).returning, 11);
+  const u = loaded.groundUnits.find((u) => u.hp > 0 && u.defenseAttack);
+  E.commandUnits(loaded, 0, [u.id], 'stop');
+  assert.equal(u.defenseAttack, undefined);
+  updateDefenseAttacks(loaded);
+  assert.equal(E.defenseAttackStatus(loaded, 0).returning, 0);
+});
+
+test('an operation continues against another public hostile building after its endpoint is destroyed', () => {
+  const s = fixture();
+  const building = E.build(s, 1, 'gun', 1150, 250);
+  assert.equal(typeof building, 'object');
+  building.progress = 1;
+  E.launchDefenseAttack(s, 0);
+  const u = s.groundUnits.find((u) => u.defenseAttack);
+  for (const v of s.groundUnits) if (v !== u) delete v.defenseAttack;
+  u.x = 950;
+  u.z = 250;
+  u.path = [];
+  u.routeQueue = [];
+  u.routeState = null;
+  s.time = 4;
+  updateDefenseAttacks(s);
+  const first = u.order.targetId;
+  assert.ok(first);
+  s.buildings.find((b) => b.id === first).hp = 0;
+  u.path = [];
+  u.routeState = null;
+  u.routeQueue = [];
+  s.time = 8;
+  updateDefenseAttacks(s);
+  assert.ok(u.order.targetId && u.order.targetId !== first);
+  assert.equal(u.defenseAttack.phase, 'active');
+  const own = s.buildings.find((b) => b.id === u.order.targetId);
+  assert.notEqual(own.side, u.side);
+});
+
+test('AI assaults share the thirty percent operation and cannot repeat over an active or returning wave', () => {
+  const s = fixture(undefined, 1);
+  assert.equal(launchAIAssault(s, 1), 0, 'early recruitment must establish its defense first');
+  s.time = 600;
+  assert.equal(launchAIAssault(s, 0), 0, 'the AI helper cannot issue human orders');
+  assert.equal(launchAIAssault(s, 1), 12);
+  assert.equal(E.defenseAttackStatus(s, 1).active, 12);
+  assert.equal(s.groundUnits.filter((u) => u.autoDefense).length, 28);
+  assert.equal(launchAIAssault(s, 1), 0);
+  recallDefenseAttack(s, 1);
+  assert.equal(launchAIAssault(s, 1), 0);
+});
+
+test('automatic attack recruits use persistent city missions while precise manual orders detach them', () => {
+  const s = E.createGame(813);
+  const u = E.makeGround(s, 0, 'armoredcar', -850, 250);
+  s.groundUnits.push(u);
+  u.stance = { mode: 'attack' };
+  assert.equal(enrollCityAssault(s, u), true);
+  assert.equal(u.defenseAttack.phase, 'active');
+  assert.equal(
+    E.load(E.save(s)).groundUnits.find((v) => v.id === u.id).defenseAttack.phase,
+    'active',
+  );
+  assert.equal(E.orderGround(s, 0, [u.id], { x: -700, z: 250, mode: 'move' }), 1);
+  assert.equal(u.defenseAttack, undefined);
+  u.stance = { mode: 'attack' };
+  enrollCityAssault(s, u);
+  assert.equal(E.appendGroundOrder(s, 0, [u.id], { x: -750, z: 280 }), 1);
+  assert.equal(u.defenseAttack, undefined);
+  u.stance = { mode: 'attack' };
+  enrollCityAssault(s, u);
+  assert.equal(E.guardGround(s, 0, [u.id], { x: -750, z: 280 }), 1);
+  assert.equal(u.defenseAttack, undefined);
+});
+
+test('an ordinary tank walks to ammunition then destroys two ordinary city buildings without relocation or free reloads', () => {
+  const s = E.createGame(813, { mode: 'multiplayer' });
+  s.rules.oil = false;
+  s.rules.rear = false;
+  const first = E.build(s, 1, 'launcher', 1000, 350);
+  const second = E.build(s, 1, 'launcher', 1180, 350);
+  assert.equal(typeof first, 'object');
+  assert.equal(typeof second, 'object');
+  for (const b of [first, second]) {
+    b.progress = 1;
+    b.hp = b.maxHp;
+  }
+  const u = E.makeGround(s, 0, 'leopard', 800, 350);
+  s.groundUnits.push(u);
+  // An exhausted paid load is the trigger. The only replacement ammunition is
+  // the finite physical crate, over the normal service radius away.
+  u.groundAmmo = 0;
+  u.ammoReserve = 0;
+  assert.equal(
+    depositFieldAmmo(s, {
+      side: 0,
+      x: 800,
+      z: 450,
+      fieldPoint: { x: 800, z: 450 },
+      cargo: { kind: 'ammo', key: 'shell', amount: 24 },
+    }),
+    24,
+  );
+  assert.equal(
+    E.orderGround(
+      s,
+      0,
+      [u.id],
+      { x: 900, z: 350, mode: 'attackmove', targetId: first.id },
+      { defer: true },
+    ),
+    1,
+  );
+  u.stance = { mode: 'attack' };
+  enrollCityAssault(s, u);
+  let sawSupply = false,
+    sawFirstThenSecond = false,
+    loaded;
+  const initialHp = u.maxHp;
+  for (let i = 0; i < 2400 && second.hp > 0; i++) {
+    E.step(s, 0.05);
+    sawSupply ||= !!u.supplyTrip;
+    if (!loaded && u.supplyTrip) loaded = E.load(E.save(s));
+    if (first.hp === 0 && second.hp > 0) sawFirstThenSecond = true;
+  }
+  assert.equal(sawSupply, true);
+  assert.ok(loaded, 'an active assault supply trip must survive loading');
+  assert.equal(sawFirstThenSecond, true);
+  assert.equal(first.hp, 0);
+  assert.equal(second.hp, 0);
+  assert.equal(u.maxHp, initialHp);
+  assert.ok(u.x > 900, 'the second target needs actual travel beyond the original point');
+  const remaining = s.ammoCrates[0].stock.shell + E.ammunitionStatus(s, u).total;
+  assert.ok(remaining < 24 && remaining >= 0);
+  assert.equal(u.defenseAttack.phase, 'active');
+  // Recall during the saved supply leg cancels that detour, preserving stock.
+  const returning = loaded.groundUnits.find((v) => v.id === u.id);
+  const position = { x: returning.x, z: returning.z };
+  assert.equal(recallDefenseAttack(loaded, 0), 1);
+  assert.equal(returning.supplyTrip, undefined);
+  assert.equal(returning.order.mode, 'retreat');
+  assert.deepEqual({ x: returning.x, z: returning.z }, position);
 });

@@ -42,6 +42,7 @@ export function appendGroundOrder(s, side, ids, point) {
     const radius = GROUND_UNITS[u.key].size * 0.42;
     if (!walkable(s, next.x, next.z, radius)) continue;
     if (u.routeState || (!u.guard && u.path?.length && u.order)) {
+      delete u.defenseAttack;
       u.routeQueue ||= [];
       u.routeQueue.push(next);
       u.routeState ||= { status: 'moving', retryAt: s.time };

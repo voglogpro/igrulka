@@ -16,6 +16,7 @@ function fresh() {
   for (const side of s.sides) {
     side.credits = 100000;
     side.materials = 10000;
+    side.components = 120;
   }
   return s;
 }
@@ -200,11 +201,13 @@ test('reaching stock stops purchases and a real launch triggers exactly one paid
   const s = fresh(),
     b = factory(s),
     f = s.sides[0];
-  const launcher = b; // launch directly from the paid connected factory rack
+  const launcher = ready(s, 'launcher', -850, 100);
   set(s, b, { target: 2 });
   E.advance(s, 30);
   assert.equal(E.weaponStock(s, 0, 'drone'), 2);
   assert.equal(status(s, b).status, 'stock');
+  while (!E.availableLaunchStock(launcher, 'drone') && s.time < 60) E.step(s, 0.05);
+  assert.ok(E.availableLaunchStock(launcher, 'drone') > 0);
   const materials = f.materials;
   assert.equal(E.launch(s, 0, 'drone', { x: 500, z: 400 }, 1, launcher.id), 1);
   assert.equal(E.weaponStock(s, 0, 'drone'), 1);
@@ -366,4 +369,29 @@ test('plan and paid progress survive save/load and complete with identical time 
     change(broken);
     assert.throws(() => E.load(E.save(broken)), /план/i);
   }
+});
+
+test('plans report missing electronics and full local warehouses without repeatedly charging or queuing', () => {
+  const s = fresh(),
+    b = factory(s),
+    f = s.sides[0];
+  s.rules.components = true;
+  f.components = 0;
+  set(s, b, { target: 30 });
+  assert.equal(status(s, b).status, 'components');
+  assert.match(status(s, b).reason, /электроники/);
+  const before = E.save(s);
+  for (let i = 0; i < 20; i++) E.updateFactoryPlans(s);
+  assert.equal(E.save(s), before);
+  f.components = E.WEAPONS.drone.components;
+  assert.equal(status(s, b).status, 'active');
+  E.updateFactoryPlans(s);
+  assert.equal(b.queue.length, 1);
+  assert.equal(f.components, 0);
+  b.queue = [];
+  E.acceptLaunchDelivery(b, 'heavy', E.launchStoreCapacity(b));
+  assert.equal(status(s, b).status, 'warehouse');
+  const full = E.save(s);
+  for (let i = 0; i < 20; i++) E.updateFactoryPlans(s);
+  assert.equal(E.save(s), full);
 });

@@ -4,7 +4,7 @@ import { trainRecruit } from './training.js';
 import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
 import { initializeAmmunition, reloadFromReserve } from './ammunition.js';
 import { fuelFactor } from '../../city/oil.js';
-import { GROUND_UNITS, BUILDINGS, isInfantry, defenseStats, groundHeight } from '../../config.js';
+import { GROUND_UNITS, BUILDINGS, isInfantry, groundHeight } from '../../config.js';
 import { groundPath, walkable } from './navigation.js';
 import { moveGroundUnit } from './movement.js';
 import { lineOfSight, recordFire } from '../infantry/cover.js';
@@ -13,6 +13,7 @@ import { updateAutomaticFPV } from '../infantry/fpv.js';
 import { buildingConnected } from '../../city/road-network.js';
 import { freeSpot } from '../vehicles/transport.js';
 import { updateTransportDeliveries } from '../vehicles/transport-orders.js';
+import { enrollCityAssault, updateDefenseAttacks } from './defense-attack.js';
 import { updateGroundRoutes } from './route-queue.js';
 import { makeGround, defaultRallyMode } from './recruitment.js';
 import { orderGround } from './orders.js';
@@ -66,15 +67,17 @@ export function tickUnit(s, u, dt, rates, hooks) {
   u.suppression = Math.max(0, (u.suppression || 0) - dt * 0.09 * (2 - veteranSuppression(u)));
   if (!d.range) u.heat = Math.max(0, (u.heat || 0) - (d.cooling || 0.12) * dt);
   u.groundCooldown = Math.max(0, (u.groundCooldown || 0) - dt);
-  const aaMagazine = (foot || u.key === 'gun') && d.range ? defenseStats(s.sides[u.side], u) : null,
-    maxMagazine = aaMagazine?.magazine || d.groundMagazine || 30;
+  const sharedAA = (foot || u.key === 'gun') && d.range,
+    aaMagazine = sharedAA ? Math.ceil(d.groundMagazine ?? d.magazine) : null,
+    aaReload = sharedAA ? (d.groundReload ?? d.reload) : null,
+    maxMagazine = aaMagazine || d.groundMagazine || 30;
   initializeAmmunition(u);
   u.groundAmmo ??= maxMagazine;
   if (d.groundRange && u.groundReload > 0) {
     u.groundReload = Math.max(0, u.groundReload - dt);
     if (!u.groundReload) u.groundAmmo = reloadFromReserve(u, 'ground');
   } else if (d.groundRange && !u.groundAmmo && u.ammoReserve > 0)
-    u.groundReload = aaMagazine?.reload || d.groundReload || 3;
+    u.groundReload = aaReload || d.groundReload || 3;
   if (u.boardingId) {
     const v = index.get(u.boardingId);
     if (!(v?.hp > 0) || !GROUND_UNITS[v.key]) {
@@ -103,7 +106,12 @@ export function tickUnit(s, u, dt, rates, hooks) {
   }
   const retreat = u.order?.mode === 'retreat';
   u.moving = false;
-  if (mobile && u.path?.length && (!stopToFight || u.order?.mode === 'cover')) {
+  if (
+    mobile &&
+    u.path?.length &&
+    (!stopToFight || u.order?.mode === 'cover') &&
+    !(u.key === 'mog' && u.airThreatAt >= s.time - 0.3 && !retreat && u.order?.mode !== 'move')
+  ) {
     const slow = retreat ? 1.3 : u.suppression > 0.8 ? 0.3 : u.suppression > 0.45 ? 0.65 : 1,
       speed =
         d.speed * (u.hp / u.maxHp < 0.3 ? 0.75 : 1) * slow * weatherSpeed(s) * fuelFactor(s, u);
@@ -184,7 +192,11 @@ export function tickUnit(s, u, dt, rates, hooks) {
   u.groundCooldown = (cooldown * (1 + u.suppression)) / equipmentModifiers(u).rate;
   u.groundAmmo--;
   if (d.heatPerShot)
-    u.heat = Math.min(1.5, (u.heat || 0) + (aaMagazine?.heatPerShot ?? d.heatPerShot));
+    u.heat = Math.min(
+      1.5,
+      (u.heat || 0) +
+        (sharedAA ? d.heatPerShot * (equipmentModifiers(u).heat || 1) : d.heatPerShot),
+    );
   u.targetX = tx;
   u.targetY = 2.5;
   u.targetZ = tz;
@@ -280,6 +292,7 @@ export function updateGround(s, rates, dt, hooks) {
             // Automatic recruits ignore combat stances; explicit paid destinations still apply.
           } else if (q.stance) {
             applyStance(s, b.side, [u.id], q.stance);
+            if (q.stance.mode === 'attack') enrollCityAssault(s, u);
           } else if (Object.hasOwn(q, 'destination')) {
             const arrival = squadArrivalPoint(q);
             if (arrival) {
@@ -298,8 +311,10 @@ export function updateGround(s, rates, dt, hooks) {
             }
           } else {
             const rallyMode = defaultRallyMode(s, b);
-            if (rallyMode === 'attack') applyStance(s, b.side, [u.id], { mode: 'attack' });
-            else if (rallyMode === 'defend')
+            if (rallyMode === 'attack') {
+              applyStance(s, b.side, [u.id], { mode: 'attack' });
+              enrollCityAssault(s, u);
+            } else if (rallyMode === 'defend')
               applyStance(s, b.side, [u.id], { mode: 'defend', post: 'auto' });
             else if (rallyMode === 'guard') {
               guardGround(s, b.side, [u.id], b.rally || p);
@@ -321,6 +336,7 @@ export function updateGround(s, rates, dt, hooks) {
   updateAutomaticFPV(s);
   for (const b of s.buildings)
     if (b.key === 'gun' && b.hp > 0 && b.progress >= 1) tickUnit(s, b, dt, rates, hooks);
+  updateDefenseAttacks(s);
   updateGroundRoutes(s);
   updateTransportDeliveries(s);
   s.groundUnits = s.groundUnits.filter((u) => u.hp > 0);

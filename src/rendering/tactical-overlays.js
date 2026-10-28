@@ -153,6 +153,10 @@ export class TacticalView {
       new T.MeshBasicMaterial({ color: '#ffffff', side: T.DoubleSide, depthTest: false }),
       120,
     );
+    // Allocate the real color attribute before startup collects shader variants.
+    // Later guard/preview updates reuse it instead of introducing a colored
+    // instancing program on the first mass selection.
+    this.postMarkers.setColorAt(0, this.postLine.material.color);
     this.postMarkers.frustumCulled = false;
     this.defenseLine.add(this.postLine, this.postMarkers);
   }

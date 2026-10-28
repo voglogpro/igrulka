@@ -1,8 +1,9 @@
+import { hasComponents, componentCost } from '../../city/electronics.js';
 import { sideIds } from '../../factions.js';
 import { oilCost, hasOil } from '../../city/oil.js';
 import { WEAPONS } from '../../config.js';
 import { produce } from './production.js';
-import { weaponStock } from './launch-supply.js';
+import { launchStoreCapacity, launchStoreTotal, weaponStock } from './launch-supply.js';
 
 const fields = ['key', 'target', 'reserveCredits', 'reserveMaterials', 'enabled'];
 const configured = (key) => typeof key === 'string' && Object.hasOwn(WEAPONS, key);
@@ -68,10 +69,12 @@ function status(s, b, counted) {
   else if (b.progress < 1) value = 'building';
   else if (!plan?.enabled) value = 'disabled';
   else if (stock >= plan.target) value = 'stock';
+  else if (launchStoreTotal(b) >= launchStoreCapacity(b)) value = 'warehouse';
   else if (factoryQueued || counted.total >= 24) value = 'queue';
   else if (f.credits - d.cost < plan.reserveCredits) value = 'credits';
   else if (f.materials - d.metal < plan.reserveMaterials) value = 'materials';
   else if (!hasOil(s, b.side, oilCost(plan.key))) value = 'oil';
+  else if (!hasComponents(s, b.side, componentCost(s, d))) value = 'components';
   else value = 'active';
   return {
     enabled: !!plan?.enabled,
@@ -80,6 +83,12 @@ function status(s, b, counted) {
     reserveCredits: plan?.reserveCredits || 0,
     reserveMaterials: plan?.reserveMaterials || 0,
     status: value,
+    reason:
+      value === 'components'
+        ? '\u041d\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u044d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u0438\u043a\u0438'
+        : value === 'warehouse'
+          ? '\u0421\u043a\u043b\u0430\u0434 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d'
+          : '',
     inventory,
     queued,
     stock,

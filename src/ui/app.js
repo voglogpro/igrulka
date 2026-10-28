@@ -1,3 +1,4 @@
+import { createAttackRecallAction } from './controllers/attack-recall.js';
 import { createCommandExecutor } from './session/command-executor.js';
 import { resolveArmySelection } from './selection.js';
 import { advanceSimulationFrame } from './session/simulation-budget.js';
@@ -25,7 +26,7 @@ import { DistrictHUD } from './districts.js';
 import { updateSettlementList } from './settlements.js';
 import { FrontlineHUD } from './frontline.js';
 import { executeCommand } from '../network/commands.js';
-import { $, num, time, rate, escape } from './format.js';
+import { $, num, time, rate, escape, price, deliveryText } from './format.js';
 import { icon, short } from './icons.js';
 import { gameLayout } from './layout.js';
 import { panelHTML } from './panels.js';
@@ -515,6 +516,7 @@ function updateHUD() {
   $('#metal-rate').textContent = rate(e.materials) + '/мин';
   $('#oil').textContent = `${num(f.oil ?? 0)} / ${num(E.oilStorage(state, 0))}`;
   $('#oil-rate').textContent = rate(f.oilRate || 0) + '/мин';
+  $('#components').textContent = num(f.components || 0) + ' эл.';
   $('#oil').parentElement.classList.toggle('low', (f.oil ?? 0) < 30);
   $('#power').textContent = `${Math.round(e.power)} / ${e.demand}`;
   $('#supply-status').textContent = e.isolated
@@ -530,17 +532,22 @@ function updateHUD() {
   if (!paused)
     $('#phase').textContent =
       day.daylight > 0.4 ? 'ДЕНЬ' : day.daylight > 0.05 ? 'СУМЕРКИ' : 'НОЧЬ';
-  $('#stock').textContent = Object.values(f.inventory).reduce((a, b) => a + b, 0);
+  $('#stock').textContent = Object.keys(E.WEAPONS).reduce(
+    (total, key) => total + E.weaponStock(state, 0, key),
+    0,
+  );
   $('#sound').style.opacity = settings.sound ? '1' : '.4';
-  const inbound = state.units.filter(
-    (u) => E.hostile(state, 0, u.side) && E.unitVisible(state, 0, u),
-  ).length;
+  const warning = E.radarAirWarning?.(state, 0);
+  const inbound = Math.max(
+    warning?.targets || 0,
+    state.units.filter((u) => E.hostile(state, 0, u.side) && E.unitVisible(state, 0, u)).length,
+  );
   if (inbound && state.time - lastRaid > 12) {
     lastRaid = state.time;
     toast(`Обнаружены воздушные цели: ${inbound}`, true);
   }
   $('#mission').textContent = inbound
-    ? `Воздушная тревога: ${inbound} целей. Прикройте снабжение и командный пункт.`
+    ? `Воздушная тревога: ${inbound}${warning?.bearing ? ` · ${warning.bearing}` : ''}${warning?.eta != null ? ` · подход ≈${Math.ceil(warning.eta)} с` : ''}${warning?.rangeBonus > 0 ? ` · Радар: ПВО +${Math.round((warning.rangeBonus || 0) * 100)}% дальности` : ''}`
     : `${state.sides.length === 4 ? 'Два союзных города против двух ботов. Уничтожьте оба вражеских штаба.' : 'Уничтожьте штаб врага.'} Склады: ${e.districts.owned}/${E.DISTRICTS.length} · работают ${e.districts.active}.`;
 }
 function updateBuildingPrices() {
@@ -554,7 +561,7 @@ function updateBuildingPrices() {
       label = document.createElement('small');
       button.append(label);
     }
-    label.textContent = `${quote.cost} ₡ · ${quote.metal} спл.`;
+    label.textContent = price(quote);
     button.dataset.priceFactor = quote.factor;
     button.title = `${d.description || d.name} Цена ${Math.round(quote.factor * 100)}% базовой; растёт только у этого типа зданий, максимум 150%.`;
   }
@@ -564,7 +571,7 @@ function buildList() {
     tab === 'city'
       ? ['road', 'housing', 'industry', 'power', 'market', 'service']
       : tab === 'oil'
-        ? ['oilwell', 'oiltank', 'port']
+        ? ['oilwell', 'oiltank', 'port', 'electronics']
         : tab === 'army'
           ? ['barracks', 'vehiclebase', 'training', 'ammofactory']
           : ['factory', 'launcher', 'silo', 'gun', 'sam', 'radar'];
@@ -572,7 +579,7 @@ function buildList() {
     keys
       .map((key) => {
         const d = E.BUILDINGS[key];
-        return `<button data-build="${key}" class="build-card ${tool === key ? 'selected' : ''}" title="${escape(d?.description || 'Связанная дорожная сеть снабжает город. Кликните начало и конец или протяните мышью.')}" aria-label="${d?.name || 'Дорога'}">${icon(key)}<span>${short[key]}<small>${d ? `${d.cost} ₡ · ${d.metal} спл.` : '0,8 ₡ / м'}</small></span></button>`;
+        return `<button data-build="${key}" class="build-card ${tool === key ? 'selected' : ''}" title="${escape(d?.description || 'Связанная дорожная сеть снабжает город. Кликните начало и конец или протяните мышью.')}" aria-label="${d?.name || 'Дорога'}">${icon(key)}<span>${short[key] || d?.name}<small>${d ? `${price(d)}` : '0,8 ₡ / м'}</small></span></button>`;
       })
       .join('') +
     (tab === 'army'
@@ -688,7 +695,7 @@ function previewBuilding(plan) {
   const quote = E.purchaseQuote(state, 0, 'building', tool);
   $('#tool-note').textContent =
     plan.error ||
-    `${d.name} · ${quote.cost + (plan.driveCost || 0)} ₡ · ${quote.metal} спл. · ${d.time} сек.${plan.near ? ' · подъезд подключится автоматически' : ''}`;
+    `${d.name} · ${price({ ...quote, cost: quote.cost + (plan.driveCost || 0) })} · ${d.time} сек.${plan.near ? ' · подъезд подключится автоматически' : ''}`;
   $('#tool-note').classList.toggle('warning', !!plan.error);
 }
 async function place(key, x, z, rotation) {
@@ -1189,7 +1196,9 @@ function updateLivePanel() {
         factoryQueue >= 24 ||
         f.credits < quote.cost ||
         f.materials < quote.metal ||
-        (f.oil || 0) < quote.oil;
+        (f.oil || 0) < quote.oil ||
+        (f.components || 0) < (quote.components || 0);
+      $(`[data-weapon="${key}"] small`).textContent = `${price(quote)} · ${E.WEAPONS[key].time} с`;
       $(`[data-weapon="${key}"]`).disabled = false;
     }
     $('#queue-status').textContent = factories.length
@@ -1215,8 +1224,11 @@ function updateLivePanel() {
     $('#launch-button').disabled = false;
     $('#route-status').textContent =
       `Радиус ${E.WEAPONS[strike.model.weapon].blast} · ${strike.model.count} за клик · очередь площадки до 12`;
-    $('#launch-status').textContent =
-      error || 'Выберите название вооружения — затем запускайте кликами по карте.';
+    const launchSite = E.selectedLaunchSite(state, 0, strike.model.launcherId, strike.model.weapon);
+    const delivery = launchSite && E.weaponDeliveryStatus?.(state, launchSite, strike.model.weapon);
+    $('#launch-status').textContent = delivery
+      ? deliveryText(delivery) + (error ? ` · ${error}` : '')
+      : error || 'Выберите вооружение — затем цель на карте.';
     $('#launch-status').classList.toggle('warning', !!error);
     updateFactoryPlansPanel(state);
   }
@@ -1237,6 +1249,7 @@ function updateLivePanel() {
       ['В том числе армия', '−' + Math.round(e.armyUpkeep * 60) + ' ₡/мин'],
       ['Население', e.population],
       ['Сплавы', rate(e.materials) + '/мин'],
+      ['Электроника на складе', num(f.components || 0) + ' эл.'],
       [
         'Жители / рабочие места',
         `${e.commute.homes} / ${e.commute.jobs} · на работу ездят ${e.commute.employed}`,
@@ -1312,6 +1325,13 @@ const actionRouter = createActionRouter({
   'army-stop': () => {
     troopCommand('stop');
   },
+  'attack-recall': createAttackRecallAction({
+    getEpoch: () => campaignEpoch,
+    execute,
+    persist,
+    refresh: updateLivePanel,
+    toast,
+  }),
   'defense-attack': async (button) => {
     if (defenseAttackPending) return;
     const epoch = campaignEpoch;

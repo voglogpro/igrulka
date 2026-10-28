@@ -8,3 +8,14 @@ export const escape = (s) =>
     /[&<>"']/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
   );
+
+export const price = (quote) =>
+  `${quote.cost} ₡ · ${quote.metal} спл.${quote.oil ? ` · ${quote.oil} нефти` : ''}${quote.components ? ` · ${quote.components} эл.` : ''}`;
+export const deliveryText = (status) => {
+  const reason =
+    status?.reason || (status?.stock > 0 ? `Готово ${status.stock}` : 'Нет местного запаса');
+  if (!(status?.inTransit > 0)) return reason;
+  return status.eta != null
+    ? `Едет ${status.inTransit} ≈${Math.ceil(status.eta)} с${status.stock ? ` · готово ${status.stock}` : ''}`
+    : `${reason} · груз ${status.inTransit}`;
+};

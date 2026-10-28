@@ -71,6 +71,8 @@ const licenses = await Promise.all(
     'assets/fonts/manrope-OFL.txt',
     'assets/audio/LICENSE.md',
     'assets/audio/CC0-1.0.txt',
+    'assets/audio/CC-BY-4.0.txt',
+    'assets/audio/rain-sources.json',
   ].map((name) => readFile(path.join(root, name), 'utf8')),
 );
 html +=

@@ -87,7 +87,7 @@ export function restoreFieldSupply(s, sourceVersion = s.version) {
       !point(t.home) ||
       u.order?.supplyId !== t.crateId ||
       !['resupply', 'resupplyReturn'].includes(u.order.mode) ||
-      !u.autoDefense ||
+      (!u.autoDefense && u.defenseAttack?.phase !== 'active') ||
       u.key === 'mog' ||
       !s.ammoCrates.some((c) => c.id === t.crateId && c.side === u.side)
     )

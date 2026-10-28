@@ -14,7 +14,20 @@ const PALETTE = ['#c9c4b1', '#8e9fa8', '#b47a68', '#6e8c70', '#d6c27a', '#58666d
 const key = (x, z) => `${Math.round(x * 2)},${Math.round(z * 2)}`;
 
 // Splits every street at the points where other streets touch it, then links consecutive points.
-function buildGraph(roads) {
+export function buildGraph(roads, project = projectPoint) {
+  // Endpoint projection accepts distances below 3m; crossing tests extend the
+  // other segment by 1%. Reject only pairs that cannot meet either condition.
+  const bounds = new Map();
+  for (const road of roads) {
+    if (bounds.has(road)) continue;
+    const padding = Math.max(3, Math.hypot(road.bx - road.ax, road.bz - road.az) * 0.01) + 1e-6;
+    bounds.set(road, {
+      minX: Math.min(road.ax, road.bx) - padding,
+      maxX: Math.max(road.ax, road.bx) + padding,
+      minZ: Math.min(road.az, road.bz) - padding,
+      maxZ: Math.max(road.az, road.bz) + padding,
+    });
+  }
   const nodes = new Map(),
     edges = new Map();
   const node = (x, z) => {
@@ -30,13 +43,22 @@ function buildGraph(roads) {
       dx = r.bx - r.ax,
       dz = r.bz - r.az,
       len2 = dx * dx + dz * dz || 1;
+    const rBounds = bounds.get(r);
     for (const o of roads) {
       if (o === r) continue;
+      const oBounds = bounds.get(o);
+      if (
+        rBounds.maxX < oBounds.minX ||
+        rBounds.minX > oBounds.maxX ||
+        rBounds.maxZ < oBounds.minZ ||
+        rBounds.minZ > oBounds.maxZ
+      )
+        continue;
       for (const p of [
         [o.ax, o.az],
         [o.bx, o.bz],
       ]) {
-        const q = projectPoint(p[0], p[1], r);
+        const q = project(p[0], p[1], r);
         if (q.distance < 3 && q.t > 0.01 && q.t < 0.99) cuts.push(q.t);
       }
       // Crossing streets.

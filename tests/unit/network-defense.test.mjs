@@ -24,8 +24,8 @@ function unit(s, side, x, z) {
   return u;
 }
 
-test('protocol eight auto-defense validates either owner, complete ownership and boolean before mutating any selection', () => {
-  assert.equal(PROTOCOL_VERSION, 13);
+test('current protocol auto-defense validates either owner, complete ownership and boolean before mutating any selection', () => {
+  assert.equal(PROTOCOL_VERSION, 14);
   const s = fresh(),
     troops = [unit(s, 0, -850, -270), unit(s, 1, 850, -270)];
   for (const side of [0, 1]) {

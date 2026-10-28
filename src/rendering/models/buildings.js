@@ -11,6 +11,7 @@ export const STATIC_BUILDING_KEYS = new Set([
   'industry',
   'power',
   'factory',
+  'electronics',
   'barracks',
   'vehiclebase',
   'market',
@@ -109,6 +110,23 @@ export function model(b) {
       emissive: '#e1b96f',
       emissiveIntensity: 0.6,
     });
+  } else if (b.key === 'electronics') {
+    // Compact clean assembly hall, restrained green cladding and rooftop air handling.
+    this.box(content, 0, 0.7, 0, 28, 12, 24, '#40594b');
+    this.box(content, 0, 12.7, 0, 30, 1, 26, '#293d35');
+    this.box(content, -8, 0.7, 7, 9, 8, 10, '#577062');
+    this.box(content, -8, 8.7, 7, 10, 0.7, 11, '#334b40');
+    for (const x of [-8, 1, 10]) {
+      this.box(content, x, 5.5, 12.1, 6, 2.8, 0.25, '#8da79a');
+      this.box(content, x, 9, 12.3, 6, 0.3, 0.3, accent);
+    }
+    this.box(content, 5, 0.8, 12.2, 5, 5, 0.4, '#2c4238');
+    for (const x of [-7, 6]) {
+      this.box(content, x, 13.7, -3, 7, 2.5, 9, '#788a7f');
+      for (let i = 0; i < 3; i++) this.box(content, x, 16.2, -6 + i * 3, 5.5, 0.2, 0.35, '#344b3f');
+    }
+    this.box(content, 13.9, 2, -5, 0.25, 7, 10, '#34483e');
+    for (let i = 0; i < 4; i++) this.box(content, 14.1, 3 + i * 1.5, -5, 0.2, 0.18, 8, '#829184');
   } else if (b.key === 'factory') {
     this.box(content, 0, 0.7, 0, 28, 15, 24, '#77817d');
     this.box(content, 0, 15.7, 0, 30, 1, 26, '#424e52');

@@ -1,5 +1,6 @@
 /* global __SKYFRONT_AUDIO_WORKER_SOURCE__ */
 import { pcmCatalog } from './pcm-catalog.js';
+import { prepareRecordedRain } from './ambience/rain.js';
 const rates = new Map(),
   contexts = new WeakMap();
 let worker,
@@ -150,7 +151,14 @@ export function audioBufferBank(context) {
     state.listeners.delete(convert);
     if (context.state === 'closed') resolveLoops();
   });
-  const result = { buffers, ready: state.ready, loopsReady };
+  const rainReady = prepareRecordedRain(context).then((buffer) => {
+    if (buffer) buffers.rain = buffer;
+  });
+  const result = {
+    buffers,
+    ready: Promise.all([state.ready, rainReady]),
+    loopsReady: Promise.all([loopsReady, rainReady]),
+  };
   contexts.set(context, result);
   return result;
 }

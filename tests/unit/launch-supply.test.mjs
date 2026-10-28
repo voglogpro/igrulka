@@ -10,6 +10,7 @@ function fresh() {
   for (const f of s.sides) {
     f.credits = 1e6;
     f.materials = 1e6;
+    f.components = 120;
   }
   return s;
 }
@@ -120,20 +121,17 @@ test('save/load preserves a partially consumed burst and upgrades never reschedu
   assert.equal(s.units.at(-1).delay, 20.8);
 });
 
-test('only a connected factory can stage its warehouse stock internally; factory launch is slow and drone-only', () => {
+test('a factory warehouses all four types and cannot launch any type directly', () => {
   const s = fresh(),
     b = site(s, 'factory', -1080, -10);
-  s.sides[0].inventory.drone = 7;
-  E.updateLaunchSupply(s);
-  assert.equal(E.availableLaunchStock(b, 'drone'), 2);
-  assert.equal(s.sides[0].inventory.drone, 5);
-  assert.equal(E.launch(s, 0, 'drone', { x: 900, z: 0 }, 2, b.id), 2);
-  assert.deepEqual(
-    s.units.map((u) => u.delay),
-    [0, 20],
-  );
-  assert.equal(E.launchSites(s, 0, 'ballistic').length, 0);
-  assert.equal(E.launchStoreCapacity(b, 'ballistic'), 0);
+  for (const key of Object.keys(E.WEAPONS)) {
+    assert.equal(E.acceptLaunchDelivery(b, key, 2), 2);
+    assert.equal(E.availableLaunchStock(b, key), 0);
+    assert.equal(E.launchStoreCapacity(b, key), 24);
+    assert.equal(typeof E.launch(s, 0, key, { x: 900, z: 0 }, 1, b.id), 'string');
+  }
+  assert.equal(E.launchStoreTotal(b), 8);
+  assert.equal(E.launchSites(s, 0).length, 0);
 });
 
 test('legacy stock staging conserves purchased weapons and preserves queued aircraft without duplicating reservations', () => {
@@ -173,8 +171,8 @@ test('factory plans count paid stock in local racks and in transit without buyin
   s.sides[0].inventory.drone = 0;
   E.acceptLaunchDelivery(rack, 'drone', 1);
   s.ammoVehicles = [
-    { side: 0, cargo: { kind: 'weapon', key: 'drone', amount: 1 } },
-    { side: 1, cargo: { kind: 'weapon', key: 'drone', amount: 9 } },
+    { side: 0, hp: 100, cargo: { kind: 'weapon', key: 'drone', amount: 1 } },
+    { side: 1, hp: 100, cargo: { kind: 'weapon', key: 'drone', amount: 9 } },
   ];
   assert.equal(E.weaponStock(s, 0, 'drone'), 2);
   assert.equal(

@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from '../../vendor/three/three.module.js';
 import * as E from '../../src/game/index.js';
+import { TacticalView } from '../../src/rendering/tactical-overlays.js';
+import { groundModel } from '../../src/rendering/models/ground.js';
+import { InfantryBatch } from '../../src/rendering/models/infantry/soldiers.js';
 import { RTSWorld } from '../../src/rendering/world.js';
 import {
   WarmupFamilies,
@@ -533,14 +536,17 @@ test('model preparation primes actual template caches with bounded shared assets
     realScene = f.world.scene,
     clearTrees = f.world.clearTrees,
     state = E.save(f.world.state),
-    jobs = warmupModelJobs();
-  assert.ok(jobs.length < 60, 'representative families, not every faction/tier permutation');
+    jobs = warmupModelJobs(f.world);
+  assert.ok(
+    jobs.length < 110,
+    'bounded own tiers and active-side air, not all foreign ground permutations',
+  );
   families.collectExisting();
   for (const job of jobs) families.prepare(job);
   const result = families.diagnostics();
   assert.equal(result.prototypes, jobs.length);
-  assert.ok(result.geometryBytes < 12 * 1024 * 1024, `${result.geometryBytes} bytes`);
-  assert.ok(result.representatives < 1000, `${result.representatives} representatives`);
+  assert.ok(result.geometryBytes < 16 * 1024 * 1024, `${result.geometryBytes} bytes`);
+  assert.ok(result.representatives < 1300, `${result.representatives} representatives`);
   assert.equal(f.world.scene, realScene);
   assert.equal(f.world.clearTrees, clearTrees);
   assert.equal(f.treeCuts(), 0);
@@ -560,6 +566,41 @@ test('model preparation primes actual template caches with bounded shared assets
   assert.equal(f.world.sharedGeometries.size, count, 'first real house reuses the warmed template');
 });
 
+test('every real infantry role and owner is prepared without phantom soldiers, game changes or disposable geometry', () => {
+  const f = modelFixture();
+  f.world.state = E.createGame(813, { mode: 'coop' });
+  f.world.infantry = new InfantryBatch(f.world);
+  const families = new WarmupFamilies(f.world),
+    before = E.save(f.world.state);
+  const jobs = warmupModelJobs(f.world).filter((job) => job.kind === 'infantry');
+  assert.equal(jobs.length, Object.keys(E.GROUND_UNITS).filter(E.isInfantry).length * 4);
+  for (const job of jobs) families.prepare(job);
+  assert.equal(f.world.infantry.pools.size, jobs.length);
+  let bytes = 0;
+  for (const job of jobs) {
+    const pool = f.world.infantry.pool(job.key, job.side);
+    assert.equal(pool.body.parent, f.world.scene);
+    assert.equal(pool.legs.parent, f.world.scene);
+    assert.equal(pool.body.count, 0);
+    assert.equal(pool.legs.count, 0);
+    assert.equal(families.transientGeometries.has(pool.body.geometry), false);
+    assert.ok(families.group.children.some((mesh) => mesh.geometry === pool.body.geometry));
+    bytes += pool.body.instanceMatrix.array.byteLength + pool.legs.instanceMatrix.array.byteLength;
+  }
+  assert.ok(bytes < 4 * 1024 * 1024, 'bounded matrices for four owners, not per-unit allocations');
+  assert.equal(E.save(f.world.state), before);
+  let disposed = 0;
+  for (const pool of f.world.infantry.pools.values())
+    pool.body.geometry.addEventListener('dispose', () => disposed++);
+  families.dispose();
+  assert.equal(disposed, 0, 'the live role buffer remains owned by InfantryBatch');
+  for (const job of jobs)
+    assert.equal(
+      f.world.infantry.pool(job.key, job.side),
+      f.world.infantry.pools.get(job.key + job.side),
+    );
+});
+
 test('throwing prototype construction restores the real builder destination and tree method', () => {
   const f = modelFixture(),
     families = new WarmupFamilies(f.world),
@@ -575,5 +616,195 @@ test('throwing prototype construction restores the real builder destination and 
   assert.equal(f.world.scene, scene);
   assert.equal(f.world.clearTrees, clearTrees);
   assert.equal(families.staging.children.length, 0);
+  families.dispose();
+});
+
+test('miniature priming draws actual empty instance attributes through hidden ancestors and restores them on failure', () => {
+  for (const fail of [false, true]) {
+    const f = fixture(),
+      outer = new T.Group(),
+      inner = new T.Group(),
+      unrelated = new T.Group();
+    outer.visible = inner.visible = unrelated.visible = false;
+    f.scene.add(outer, unrelated);
+    outer.add(inner);
+    inner.add(f.object);
+    const attribute = f.object.instanceMatrix,
+      array = attribute.array,
+      before = array.slice(),
+      version = attribute.version,
+      ranges = attribute.updateRanges.slice(),
+      geometryVersion = f.geometry.attributes.position.version,
+      empty = new T.InstancedMesh(f.geometry, f.object.material, 0);
+    empty.count = 0;
+    empty.visible = false;
+    f.scene.add(empty);
+    const initialChildren = f.scene.children.slice();
+    f.world.post.render = () => {
+      const drawn = [];
+      f.scene.traverseVisible((object) => {
+        if (object.isInstancedMesh && object.count > 0) drawn.push(object);
+      });
+      assert.ok(
+        drawn.includes(f.object),
+        'actual pool with its original matrix attribute reaches draw',
+      );
+      assert.equal(f.object.count, 1);
+      assert.equal(f.object.instanceMatrix, attribute);
+      assert.equal(f.object.instanceMatrix.array, array);
+      assert.equal(outer.visible, true);
+      assert.equal(inner.visible, true);
+      assert.equal(unrelated.visible, false, 'only required ancestor chains become visible');
+      assert.equal(empty.visible, false, 'zero-capacity mesh is never made drawable');
+      assert.equal(empty.count, 0);
+      if (fail) throw new Error('actual pool draw failed');
+    };
+    if (fail) assert.throws(() => drawWarmupFrame(f.world), /actual pool draw failed/);
+    else drawWarmupFrame(f.world);
+    assert.equal(f.object.count, 0);
+    assert.equal(f.object.visible, false);
+    assert.equal(outer.visible, false);
+    assert.equal(inner.visible, false);
+    assert.equal(f.object.frustumCulled, true);
+    assert.equal(f.object.instanceMatrix, attribute);
+    assert.equal(attribute.array, array);
+    assert.deepEqual(array, before);
+    assert.equal(attribute.version, version);
+    assert.deepEqual(attribute.updateRanges, ranges);
+    assert.equal(f.geometry.attributes.position.version, geometryVersion);
+    assert.deepEqual(f.geometry.drawRange, { start: 6, count: 18 });
+    assert.deepEqual(f.scene.children, initialChildren);
+    assert.equal(f.object.parent, inner);
+    assert.equal(inner.parent, outer);
+  }
+});
+
+test('tactical guard markers expose their colored-instance variant before startup and reuse the original color buffer', () => {
+  const f = fixture(),
+    tactical = new TacticalView(f.world),
+    source = tactical.postMarkers,
+    attribute = source.instanceColor,
+    originalColor = new T.Color();
+  assert.ok(attribute, 'real marker color allocation precedes family collection');
+  source.getColorAt(0, originalColor);
+  assert.ok(
+    originalColor
+      .toArray()
+      .every((v, i) => Math.abs(v - tactical.postLine.material.color.toArray()[i]) < 1e-6),
+  );
+  const families = new WarmupFamilies(f.world);
+  families.collectExisting();
+  assert.ok(
+    families.instances.some((mesh) => mesh.geometry === source.geometry && mesh.instanceColor),
+    'startup stages the instanced-color program for this exact geometry',
+  );
+  tactical.showGuardPosts([{ id: 9, hp: 100, guard: { x: 10, z: 20 } }]);
+  assert.equal(source.instanceColor, attribute);
+  source.getColorAt(0, originalColor);
+  assert.ok(
+    originalColor
+      .toArray()
+      .every((v, i) => Math.abs(v - tactical.postLine.material.color.toArray()[i]) < 1e-6),
+  );
+  assert.equal(source.count, 1);
+  families.dispose();
+});
+
+test('exact paid construction tiers and participating enemy aircraft have canonical bounded startup jobs', () => {
+  const f = modelFixture();
+  f.world.state = E.createGame(813, { mode: 'coop' });
+  f.world.infantry = new InfantryBatch(f.world);
+  const jobs = warmupModelJobs(f.world),
+    keys = jobs.map((job) => `${job.kind}/${job.key}/${job.side}/${job.level || 0}`),
+    families = new WarmupFamilies(f.world),
+    before = E.save(f.world.state);
+  assert.equal(new Set(keys).size, keys.length, 'each exact model key is prepared once');
+  for (const key of ['gun', 'sam', 'launcher', 'silo', 'factory', 'ammofactory'])
+    for (const level of [0, 1, 2]) assert.ok(keys.includes(`building/${key}/0/${level}`));
+  for (const key of ['leopard', 'gepard', 'shilka', 'mog'])
+    for (const level of [0, 1, 2]) assert.ok(keys.includes(`ground/${key}/0/${level}`));
+  for (const side of [0, 1, 2, 3])
+    for (const key of [...Object.keys(E.WEAPONS), 'fpv'])
+      assert.ok(keys.includes(`air/${key}/${side}/0`));
+  assert.ok(
+    !jobs.some((job) => job.kind === 'ground' && job.side !== 0),
+    'foreign vehicle tiers do not multiply the retained template budget',
+  );
+  for (const job of jobs) families.prepare(job);
+  const result = families.diagnostics();
+  assert.ok(jobs.length <= 134, `${jobs.length} bounded jobs`);
+  assert.ok(
+    result.geometryBytes < 16 * 1024 * 1024,
+    `${result.geometryBytes} unique geometry bytes`,
+  );
+  assert.equal(E.save(f.world.state), before);
+  families.dispose();
+});
+
+test('first paid base building and upgrades reuse actual warmed geometry after representative disposal', () => {
+  const f = modelFixture(),
+    s = f.world.state,
+    families = new WarmupFamilies(f.world);
+  s.mode = 'multiplayer';
+  s.rules.rear = false;
+  for (const job of warmupModelJobs(f.world)) families.prepare(job);
+  const warmed = new Set(families.geometries),
+    owned = new Set(f.world.sharedGeometries);
+  let disposed = 0;
+  for (const geometry of owned) geometry.addEventListener('dispose', () => disposed++);
+  families.dispose();
+  assert.equal(disposed, 0, 'template geometry must survive staging disposal');
+  const check = (root) =>
+    root.traverse((object) => {
+      if (object.geometry)
+        assert.ok(warmed.has(object.geometry), 'real model shares the warmed attribute owner');
+    });
+  const gun = E.build(s, 0, 'gun', -850, 100);
+  assert.equal(typeof gun, 'object', String(gun));
+  check(f.world.model(gun).root);
+  E.advance(s, E.BUILDINGS.gun.time + 0.1);
+  for (const level of [1, 2]) {
+    assert.equal(E.upgradeDefense(s, 0, gun.id), true);
+    assert.equal(gun.level, level);
+    check(f.world.model(gun).root);
+  }
+  const factory = E.build(s, 0, 'factory', -1080, -10);
+  assert.equal(typeof factory, 'object', String(factory));
+  check(f.world.model(factory).root);
+  for (const level of [0, 1, 2])
+    check(groundModel(f.world, { id: 900 + level, key: 'leopard', side: 0, level }));
+  assert.equal(
+    f.world.sharedGeometries.size,
+    owned.size,
+    'actual cache hits allocate no new model geometry',
+  );
+});
+
+test('a duel startup prepares future co-op air and empty infantry colors without changing owners, save or RNG', () => {
+  const f = modelFixture(),
+    s = f.world.state;
+  assert.equal(s.sides.length, 2);
+  f.world.infantry = new InfantryBatch(f.world);
+  const before = E.save(s),
+    sides = s.sides,
+    families = new WarmupFamilies(f.world),
+    jobs = warmupModelJobs(f.world),
+    future = jobs.filter((job) => job.side >= 2 && ['air', 'infantry'].includes(job.kind));
+  for (const side of [2, 3]) {
+    for (const key of [...Object.keys(E.WEAPONS), 'fpv'])
+      assert.ok(future.some((job) => job.kind === 'air' && job.side === side && job.key === key));
+    for (const key of Object.keys(E.GROUND_UNITS).filter(E.isInfantry))
+      assert.ok(
+        future.some((job) => job.kind === 'infantry' && job.side === side && job.key === key),
+      );
+  }
+  for (const job of future) families.prepare(job);
+  for (const pool of f.world.infantry.pools.values()) {
+    assert.equal(pool.body.count, 0);
+    assert.equal(pool.legs.count, 0);
+  }
+  assert.equal(s.sides, sides);
+  assert.equal(s.sides.length, 2);
+  assert.equal(E.save(s), before, 'render preparation cannot add game owners or advance saved RNG');
   families.dispose();
 });

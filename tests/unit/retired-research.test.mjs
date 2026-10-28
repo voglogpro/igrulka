@@ -116,15 +116,18 @@ test('legacy technology lists have no economic, weapon, magazine, armour or accu
   );
 });
 
-test('drones launch from a completed base and missiles use their stocked silo without research', () => {
+test('a factory physically supplies drone pads and missile silos without research', () => {
   const s = fresh(),
     factory = building(s, 'factory'),
-    silo = building(s, 'silo', 0, 200);
+    silo = building(s, 'silo', 0, 200),
+    launcher = building(s, 'launcher', 0, 320);
   for (const key of Object.keys(E.WEAPONS)) {
-    const source = ['drone', 'heavy'].includes(key) ? factory : silo;
-    s.sides[0].inventory[key] = 1;
-    E.initLaunchStore(source);
-    s.sides[0].inventory[key] -= E.acceptLaunchDelivery(source, key, 1);
+    const source = ['drone', 'heavy'].includes(key) ? launcher : silo;
+    assert.equal(E.acceptLaunchDelivery(factory, key, 1), 1);
+    E.requestWeaponDelivery(s, 0, source.id, key, 1);
+    const end = s.time + 60;
+    while (!E.availableLaunchStock(source, key) && s.time < end) E.step(s, 0.05);
+    assert.equal(E.availableLaunchStock(source, key), 1);
     assert.equal(launch(s, 0, key, { x: 900, z: 1360 }), 1);
     assert.equal(s.units.at(-1).sourceId, source.id);
     assert.equal(s.units.at(-1).maxHp, E.WEAPONS[key].hp);

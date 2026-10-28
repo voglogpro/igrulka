@@ -161,7 +161,8 @@ test('weapon cargo leaves the warehouse at pickup, reaches a silo physically, an
   E.step(s, 0.05);
   assert.equal(silo.launchStore.cruise, 0);
   assert.equal(s.sides[0].inventory.cruise, 0);
-  assert.equal(s.ammoVehicles.filter((v) => v.cargo?.key === 'cruise').length, 2);
+  assert.equal(s.ammoVehicles.filter((v) => v.cargo?.key === 'cruise').length, 1);
+  assert.equal(s.ammoVehicles.find((v) => v.cargo?.key === 'cruise').cargo.amount, 2);
   const loaded = E.load(E.save(s));
   while (silo.launchStore.cruise < 2 && s.time < 30) {
     E.step(s, 0.05);
@@ -178,7 +179,7 @@ test('weapon cargo leaves the warehouse at pickup, reaches a silo physically, an
   silo.hp = 0;
   E.advance(s, 1.1);
   assert.equal(s.sides[0].inventory.cruise, 0, 'target loss cannot teleport cargo back into stock');
-  until(s, () => s.sides[0].inventory.cruise === 1, 30);
+  until(s, () => factory.launchStore.cruise === 1, 30);
   assert.ok(Math.hypot(cargo.x - factory.x, cargo.z - factory.z) < 65);
 });
 

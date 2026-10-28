@@ -209,3 +209,19 @@ test('late launch replies cannot repaint a newer interaction; unlocked route edi
   await strike.chooseAimPoint({ x: 20, z: 20 });
   assert.deepEqual(f.calls, []);
 });
+
+test('reopening aiming controls never changes the physical supply preference', async () => {
+  const f = fixture();
+  f.controller.actions.aim();
+  await Promise.resolve();
+  f.controller.actions.launch();
+  await Promise.resolve();
+  f.controller.updateStrikeHUD();
+  assert.equal(f.calls.filter((c) => c[0] === 'execute').length, 0);
+  f.controller.armStrike('drone');
+  await Promise.resolve();
+  assert.deepEqual(
+    f.calls.filter((c) => c[0] === 'execute'),
+    [['execute', 'launch-supply', { id: 7, key: 'drone', count: 1 }]],
+  );
+});

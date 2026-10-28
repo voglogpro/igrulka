@@ -1,3 +1,4 @@
+import { deliveryText } from '../format.js';
 // Strike owns its bounded targeting model. No application globals are captured:
 // simulation/world reads, commands and cross-tool transitions are named ports.
 export function createStrikeController({
@@ -91,6 +92,7 @@ export function createStrikeController({
     query('#strike-name').textContent = d.name;
     query('#strike-stock').textContent =
       `На площадке: ${available} · всего ${game.weaponStock(getState(), 0, model.weapon)}`;
+    const delivery = site && game.weaponDeliveryStatus?.(getState(), site, model.weapon);
     for (const b of document.querySelectorAll('[data-salvo]'))
       b.classList.toggle('active', Number(b.dataset.salvo) === model.count);
     const distance = site ? game.flightRoute(site, attackAim(), model.weapon).at(-1).d : 0;
@@ -119,11 +121,12 @@ export function createStrikeController({
           ? `Кликайте точки пути: ${model.waypoints.length}/10. Затем «Готово» и цель.`
           : `Точек: ${model.waypoints.length}/10 · Shift + ЛКМ — добавить точку`;
     query('#strike-note').textContent =
+      (delivery && !delivery.ready ? deliveryText(delivery) : '') ||
       error ||
       `Радиус ${d.blast} · полёт ≈ ${Math.ceil(distance / d.speed)} с · за клик ×${Math.min(model.count, available, game.COMBAT.queueLimit - game.queuedLaunches(getState(), site))}`;
     query('#strike-note').classList.toggle('warning', !!error);
   }
-  function armStrike(key = model.weapon) {
+  function armStrike(key = model.weapon, { request = true } = {}) {
     interaction.clearTroopTarget();
     interaction.clearArmySelection();
     const d = game.WEAPONS[key];
@@ -145,7 +148,7 @@ export function createStrikeController({
     }
     updateStrikeHUD();
     refreshOrderPreview();
-    void requestSupply();
+    if (request) void requestSupply();
   }
   async function chooseAimPoint(p, modifiers = {}) {
     if (!getStarted() || !model.aiming) return;
@@ -220,8 +223,8 @@ export function createStrikeController({
         refreshOrderPreview();
         updateStrikeHUD();
       },
-      launch: () => armStrike(model.weapon),
-      aim: () => armStrike(model.weapon),
+      launch: () => armStrike(model.weapon, { request: false }),
+      aim: () => armStrike(model.weapon, { request: false }),
     },
   };
 }

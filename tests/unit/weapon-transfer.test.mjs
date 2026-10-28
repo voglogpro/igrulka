@@ -57,7 +57,9 @@ test('a full silo exchanges paid weapons through real pickup and delivery trips,
   });
   until(
     s,
-    () => silo.launchStore.ballistic === 2 && s.sides[0].inventory.cruise === 2,
+    () =>
+      silo.launchStore.ballistic === 2 &&
+      s.buildings.find((b) => b.key === 'factory').launchStore.cruise === 2,
     100,
     () => {
       E.step(loaded, 0.05);
@@ -91,9 +93,14 @@ test('reducing a request during pickup never withdraws more weapons than the new
   E.requestWeaponDelivery(s, 0, silo.id, 'ballistic', 2);
   E.advance(s, 1);
   E.requestWeaponDelivery(s, 0, silo.id, 'ballistic', 1);
-  until(s, () => silo.launchStore.ballistic >= 1 && s.sides[0].inventory.cruise >= 1);
+  until(
+    s,
+    () =>
+      silo.launchStore.ballistic >= 1 &&
+      s.buildings.find((b) => b.key === 'factory').launchStore.cruise >= 1,
+  );
   assert.equal(silo.launchStore.cruise, 3);
-  assert.equal(s.sides[0].inventory.cruise, 1);
+  assert.equal(s.buildings.find((b) => b.key === 'factory').launchStore.cruise, 1);
   assert.equal(E.weaponStock(s, 0, 'cruise'), 4);
 });
 
@@ -109,39 +116,27 @@ test('selecting a type before production retains its demand and keeps the curren
   assert.equal(silo.launchStore.cruise, 3);
 });
 
-test('a factory prepares its own desired bay locally and can exchange with another factory when its warehouse is empty', () => {
+test('a factory retains all paid warehouse types and rejects launch-rack delivery preferences', () => {
   const s = fresh(),
     a = ready(s, 'factory');
   E.acceptLaunchDelivery(a, 'drone', 2);
-  s.sides[0].inventory.heavy = 2;
-  assert.equal(E.requestWeaponDelivery(s, 0, a.id, 'heavy', 2), true);
+  E.acceptLaunchDelivery(a, 'heavy', 2);
+  assert.equal(typeof E.requestWeaponDelivery(s, 0, a.id, 'heavy', 2), 'string');
+  const before = structuredClone(a.launchStore);
   E.updateLaunchSupply(s);
-  assert.equal(a.launchStore.heavy, 2);
-  assert.equal(s.sides[0].inventory.drone, 2);
-  assert.equal(E.weaponStock(s, 0, 'drone'), 2);
-  assert.equal(E.weaponStock(s, 0, 'heavy'), 2);
-
-  assert.equal(typeof E.buildRoad(s, 0, -1105, -45, -1230, -45), 'object');
-  const other = ready(s, 'factory', -1200, -10);
-  E.acceptLaunchDelivery(other, 'drone', 2);
-  s.sides[0].inventory.drone = 0;
-  E.requestWeaponDelivery(s, 0, a.id, 'drone', 1);
-  until(s, () => a.launchStore.drone >= 1);
+  assert.deepEqual(a.launchStore, before);
   assert.equal(E.weaponStock(s, 0, 'drone'), 2);
   assert.equal(E.weaponStock(s, 0, 'heavy'), 2);
 });
 
-test('factory exchanges reserve distinct civic bays and an old occupied bay resumes the same paid delivery after loading', () => {
+test('launch deliveries reserve distinct civic bays and an old occupied bay resumes the same paid delivery after loading', () => {
   const s = fresh(),
-    a = ready(s, 'factory');
-  E.acceptLaunchDelivery(a, 'drone', 2);
-  s.sides[0].inventory.heavy = 2;
-  E.requestWeaponDelivery(s, 0, a.id, 'heavy', 2);
-  E.updateLaunchSupply(s);
+    depot = ready(s, 'factory'),
+    a = ready(s, 'launcher', -850, 100);
+  E.acceptLaunchDelivery(depot, 'heavy', 2);
   assert.equal(typeof E.buildRoad(s, 0, -1105, -45, -1230, -45), 'object');
   const b = ready(s, 'factory', -1200, -10);
   E.acceptLaunchDelivery(b, 'drone', 2);
-  s.sides[0].inventory.drone = 0;
   E.requestWeaponDelivery(s, 0, a.id, 'drone', 1);
   until(
     s,
@@ -161,7 +156,7 @@ test('factory exchanges reserve distinct civic bays and an old occupied bay resu
         'a delivery bay must not reuse another factory vehicle home',
       );
     }
-  const blocker = s.ammoVehicles.find((v) => v.depotId === a.id && v.status === 'idle');
+  const blocker = s.ammoVehicles.find((v) => v.status === 'idle');
   assert.ok(blocker);
   // This is the old saved trip that timed out: the paid destination is another
   // stationary van's exact home. Keep its cargo and let normal logistics retry.

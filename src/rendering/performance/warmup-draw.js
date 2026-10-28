@@ -11,6 +11,8 @@ export function drawWarmupFrame(world, { fullScene = false } = {}) {
     scissorTest = renderer.getScissorTest?.(),
     geometries = new Map(),
     frusta = new Map(),
+    instances = new Map(),
+    visibility = new Map(),
     targets = [];
   let rendered = false;
   try {
@@ -22,6 +24,17 @@ export function drawWarmupFrame(world, { fullScene = false } = {}) {
         // Warm far map tiles too: their real instance attributes stay uploaded
         // when the player first clicks a distant minimap location.
         object.frustumCulled = false;
+        // Representatives own different instance attributes. Draw each real pool
+        // once as well, including empty/offscreen pools, so its actual matrix
+        // buffer is allocated before the first camera visit. Never write matrices.
+        if (object.isInstancedMesh && object.instanceMatrix.count > 0) {
+          instances.set(object, object.count);
+          object.count = 1;
+          for (let ancestor = object; ancestor; ancestor = ancestor.parent) {
+            if (!visibility.has(ancestor)) visibility.set(ancestor, ancestor.visible);
+            ancestor.visible = true;
+          }
+        }
         const geometry = object.geometry;
         if (geometries.has(geometry)) return;
         geometries.set(geometry, {
@@ -53,6 +66,8 @@ export function drawWarmupFrame(world, { fullScene = false } = {}) {
       geometry.setDrawRange(previous.start, previous.count);
       if (geometry.isInstancedBufferGeometry) geometry.instanceCount = previous.instances;
     }
+    for (const [object, previous] of instances) object.count = previous;
+    for (const [object, previous] of visibility) object.visible = previous;
     for (const [object, previous] of frusta) object.frustumCulled = previous;
     for (const saved of targets) {
       saved.target.scissor.copy(saved.scissor);

@@ -2,7 +2,7 @@ import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
 // Equipment quotes and the army-wave command must match the client's rules.
-export const PROTOCOL_VERSION = 13;
+export const PROTOCOL_VERSION = 14;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -129,6 +129,9 @@ export function executeCommand(s, side, type, a = {}) {
       return unitsOwned(s, side, a.ids) && typeof a.enabled === 'boolean'
         ? E.setAutoDefense(s, side, a.ids, a.enabled)
         : invalid;
+    case 'attack-recall':
+      if (Object.keys(a).length) return invalid;
+      return E.recallDefenseAttack(s, side);
     case 'defense-attack':
       if (Object.keys(a).length) return invalid;
       return E.launchDefenseAttack(s, side);

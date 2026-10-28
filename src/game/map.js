@@ -1,4 +1,4 @@
-export const VERSION = 20;
+export const VERSION = 21;
 // A wide valley split by an inland sea. Two narrow land corridors at the northern and southern
 // ends are the only ground routes between the opposing banks; aircraft cross the water.
 export const MAP = { width: 4000, depth: 3200, riverWidth: 44 };

@@ -108,3 +108,35 @@ test('support units and wounded soldiers survive save and load, with older saves
   u.downed = { t: 'x', revive: 0 };
   assert.throws(() => E.load(E.save(s)));
 });
+
+test('medics keep healing past seventy percent and front camps stay on their own land crossing', () => {
+  const s = fresh();
+  const hurt = unit(s, 0, 'infantry', -800, -1350);
+  hurt.hp = hurt.maxHp * 0.72;
+  const medic = unit(s, 0, 'medic', -805, -1350);
+  unit(s, 0, 'infantry', -800, 1350);
+  const south = unit(s, 0, 'medic', -820, 1350);
+  E.advance(s, 4);
+  assert.ok(hurt.hp >= hurt.maxHp * 0.95);
+  assert.ok(medic.z < -1000 && south.z > 1000);
+  assert.equal(medic.supportFront, 0);
+  assert.equal(south.supportFront, 1);
+});
+
+test('supply truck transports a medic using real passenger seats then safely dismounts', () => {
+  const s = fresh();
+  unit(s, 0, 'infantry', -650, 250);
+  const truck = unit(s, 0, 'supplytruck', -1000, 250);
+  const medic = unit(s, 0, 'medic', -1008, 250);
+  E.advance(s, 1);
+  assert.ok(medic.boardingId === truck.id || medic.carrierId === truck.id);
+  E.advance(s, 2);
+  assert.equal(medic.carrierId, truck.id);
+  const loaded = E.load(E.save(s));
+  const passenger = loaded.groundUnits.find((u) => u.id === medic.id);
+  assert.equal(passenger.carrierId, truck.id);
+  E.advance(loaded, 35);
+  assert.equal(passenger.carrierId, null);
+  assert.equal(passenger.supportManual, false);
+  assert.ok(passenger.x > -850);
+});

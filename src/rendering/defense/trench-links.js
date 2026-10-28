@@ -12,35 +12,69 @@ const PIECE_LENGTH = 6,
 function template(stage) {
   const root = new T.Group(),
     geometry = new T.BoxGeometry(1, 1, 1),
+    rounded = new T.SphereGeometry(0.5, 7, 4),
     materials = new Map();
-  const box = (x, y, z, width, height, length, color) => {
+  const box = (x, y, z, width, height, length, color, earth = false) => {
     if (!materials.has(color))
       materials.set(color, new T.MeshStandardMaterial({ color, roughness: 0.96 }));
-    const mesh = new T.Mesh(geometry, materials.get(color));
+    const mesh = new T.Mesh(earth ? rounded : geometry, materials.get(color));
     mesh.position.set(x, y + height / 2, z);
     mesh.scale.set(width, height, length);
+    if (earth) mesh.rotation.y = Math.sin(x * 7 + z * 13) * 0.025;
     mesh.castShadow = mesh.receiveShadow = true;
     root.add(mesh);
   };
   if (stage === 0) {
-    box(0, 0, 0, 3.6, 0.08, 1, '#29322b');
+    // Short dark firing sections read separately. Shallow continuous earth
+    // between them still represents the unchanged continuous cover corridor.
+    box(0, 0, 0, 3.6, 0.09, 0.64, '#28271f');
     for (const side of [-1, 1]) {
-      box(side * 2.2, 0.08, 0, 1.05, 0.55, 1, '#6b6047');
-      box(side * 1.78, 0.08, 0, 0.14, 0.38, 1, '#443e31');
+      box(side * 2.16, 0.02, 0, 0.85, 0.1, 1, '#62553f');
+      box(side * 1.79, 0.08, 0, 0.16, 0.46, 0.64, '#352d23');
+      for (let i = 0; i < 5; i++) {
+        const z = -0.24 + i * 0.12,
+          offset = Math.sin(i * 2.7 + side) * 0.12;
+        box(
+          side * (2.2 + offset),
+          0.18,
+          z,
+          1.0 + offset,
+          0.35 + (i % 3) * 0.1,
+          i === 2 ? 0.075 : 0.105,
+          i % 2 ? '#6d5c40' : '#79684a',
+          true,
+        );
+        box(side * (2.6 + offset), 0.03, z, 0.7, 0.15, 0.11, '#62553d', true);
+      }
     }
+    for (let i = 0; i < 2; i++)
+      box(0.12 * Math.sin(i), 0.1, (i - 0.5) * 0.39, 2.7, 0.04, 0.045, '#514632');
   } else if (stage === 1) {
-    // Shallow seams separate bags without creating one draw per sandbag.
     for (const side of [-1, 1])
-      for (let i = 0; i < 3; i++)
-        box(side * 2.12, 0.63, (i - 1) / 3, 0.8, 0.34, 0.31, i % 2 ? '#7d7255' : '#8d7c5d');
+      for (const i of [0, 1, 3]) {
+        const z = -0.225 + i * 0.15;
+        box(
+          side * (2.13 + Math.sin(i * 3 + side) * 0.08),
+          0.65,
+          z,
+          0.78,
+          0.27 + (i % 2) * 0.06,
+          0.13,
+          i % 2 ? '#827356' : '#938363',
+          true,
+        );
+        if (i !== 1) box(side * 2.15, 0.94, z + 0.025, 0.69, 0.23, 0.12, '#7a6b4f', true);
+      }
   } else {
     for (const side of [-1, 1]) {
-      box(side * 1.72, 0.08, 0, 0.12, 0.62, 1, '#665b45');
-      box(side * 1.62, 0.08, 0, 0.16, 0.82, 0.055, '#4c4938');
+      for (let row = 0; row < 3; row++)
+        box(side * 1.72, 0.12 + row * 0.19, 0, 0.12, 0.16, 0.62, row % 2 ? '#66563e' : '#756247');
+      for (const z of [-0.25, 0.24]) box(side * 1.6, 0.08, z, 0.19, 0.92, 0.055, '#49402f');
     }
   }
   batchStatic(root);
   geometry.dispose();
+  rounded.dispose();
   for (const material of materials.values()) material.dispose();
   return root.children[0];
 }

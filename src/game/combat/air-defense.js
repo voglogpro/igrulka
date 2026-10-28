@@ -13,6 +13,7 @@ import { sensorSources, unitVisible } from '../visibility.js';
 import { random } from '../shared/random.js';
 import { COMBAT } from './config.js';
 import { recordFire } from '../units/infantry/cover.js';
+import { radarFireSupport } from './radar-support.js';
 import { weatherSpread } from '../weather.js';
 import {
   initializeAmmunition,
@@ -90,20 +91,11 @@ export function fireDefenses(s, rates, dt) {
     const base = BUILDINGS[b.key] || GROUND_UNITS[b.key];
     if (!base?.range || b.hp <= 0 || b.progress < 1) continue;
     const d = defenseCycle(s, b, dt);
-    if (
-      b.carrierId ||
-      b.holdFire ||
-      b.digging ||
-      b.order?.mode === 'retreat' ||
-      (b.key === 'mog' && (b.setup || 0) < 1)
-    )
-      continue;
+    if (b.carrierId || b.holdFire || b.digging || b.order?.mode === 'retreat') continue;
     const missile = b.key === 'sam',
       f = s.sides[b.side],
-      radar = sensors[b.side].some(
-        (r) => r.kind === 'radar' && Math.hypot(r.x - b.x, r.z - b.z) < 320,
-      ),
-      range = d.range * (radar ? 1.2 : 1),
+      radar = radarFireSupport(s, b.side, b.x, b.z, sensors[b.side]),
+      range = d.range * radar.rangeMultiplier,
       abm = missile;
     let u = null,
       bestScore = Infinity;
@@ -144,6 +136,8 @@ export function fireDefenses(s, rates, dt) {
       b.tracking = 0;
     }
     u.threatAt = s.time;
+    b.airThreatAt = s.time;
+    if (b.key === 'mog' && (b.setup || 0) < 1) continue;
     b.tracking = (b.tracking || 0) + dt;
     b.targetX = u.x;
     b.targetZ = u.z;
@@ -174,12 +168,12 @@ export function fireDefenses(s, rates, dt) {
         spread = missile
           ? 0
           : (fast ? 5 + Math.hypot(u.x - b.x, u.z - b.z) * 0.025 : 2.5) *
-            (radar ? 0.75 : 1) *
+            radar.spreadMultiplier *
             (b.tracking < 1.2 ? 1.5 : 1) *
             d.accuracy *
             weatherSpread(s) *
             (1 + Math.pow(b.heat, 2) * 3) *
-            (infantry && b.key !== 'mog' ? 1.7 : 1);
+            (infantry && !['mog', 'machinegunner'].includes(b.key) ? 1.7 : 1);
       aim.x += (random(s) - 0.5) * spread * 2;
       aim.y += (random(s) - 0.5) * spread * 1.2;
       aim.z += (random(s) - 0.5) * spread * 2;

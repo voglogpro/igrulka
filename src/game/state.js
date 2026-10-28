@@ -11,6 +11,8 @@ import { createSettlements } from './territory/settlements.js';
 export const newSide = () => ({
   credits: 3200,
   materials: 200,
+  components: 0,
+  componentProductionSpent: 0,
   science: 0,
   tech: [],
   research: null,

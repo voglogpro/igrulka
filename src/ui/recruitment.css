@@ -541,3 +541,19 @@
     text-align: right;
   }
 }
+
+#game .composition-actions [data-action='attack-recall'] {
+  min-height: 26px;
+  padding: 3px 9px;
+  font-size: 10px;
+}
+#attack-living {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.attack-mission {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

@@ -14,6 +14,9 @@ import { oilPlan } from './oil-ai.js';
 import { settlementRoadPlan } from './settlement-ai.js';
 import { weaponStock } from '../units/aviation/launch-supply.js';
 import { armyProductionReserve, infrastructureReserve } from './depot-doctrine.js';
+import { launchAIAssault } from './army-ai.js';
+import { componentCost, hasComponents } from '../city/electronics.js';
+import { hasOil } from '../city/oil.js';
 
 // Rebuild once per second and persist the decision window, so loading midway
 // through it cannot spend a different budget or consume different random draws.
@@ -67,13 +70,15 @@ export function ai(s, side = 1) {
             ? 'industry'
             : s.time > level.armyFrom - 90 && !active('barracks').length
               ? 'barracks'
-              : !active('factory').length
-                ? 'factory'
-                : !active('launcher').length
-                  ? 'launcher'
-                  : active('gun').length < 3
-                    ? 'gun'
-                    : null;
+              : !active('electronics').length
+                ? 'electronics'
+                : !active('factory').length
+                  ? 'factory'
+                  : !active('launcher').length
+                    ? 'launcher'
+                    : active('gun').length < 3
+                      ? 'gun'
+                      : null;
     if (!key && !oilBusy) {
       const goals = [
         ['barracks', s.time > level.armyFrom - 90 ? 1 : 0],
@@ -81,6 +86,7 @@ export function ai(s, side = 1) {
         ['vehiclebase', s.time > level.armyFrom + 20 ? 1 : 0],
         ['housing', Math.min(9, 3 + Math.floor(s.time / 130))],
         ['industry', Math.min(5, 2 + Math.floor(s.time / 250))],
+        ['electronics', s.time > 600 ? 2 : 1],
         ['radar', s.time > 220 ? 1 : 0],
         ['sam', s.time > 220 ? 2 : 0],
         ['launcher', s.time > 600 ? 2 : 1],
@@ -145,16 +151,28 @@ export function ai(s, side = 1) {
         infrastructureReserve(s, side, memory.plannedBuild) || 150,
         groundBudget(s, side),
       );
-    if (queued < 3 && stock < 7 && f.credits > reserve + 90 && f.materials > 30) {
+    if (
+      queued < 3 &&
+      stock < 7 &&
+      f.credits > reserve + 90 &&
+      f.materials > 30 &&
+      hasComponents(s, side, componentCost(s, WEAPONS.drone))
+    ) {
       let key = random(s) > 0.5 ? 'cruise' : random(s) > 0.5 ? 'heavy' : 'drone';
       if (random(s) > 0.75) key = 'ballistic';
-      if (f.credits < reserve + WEAPONS[key].cost) key = 'drone';
-      if (f.credits >= reserve + WEAPONS[key].cost) produce(s, side, key);
+      const affordable = (key) =>
+        f.credits >= reserve + WEAPONS[key].cost &&
+        f.materials >= WEAPONS[key].metal &&
+        hasOil(s, side, WEAPONS[key].oil) &&
+        hasComponents(s, side, componentCost(s, WEAPONS[key]));
+      if (!affordable(key)) key = 'drone';
+      if (affordable(key)) produce(s, side, key);
     }
   }
   if (s.time >= memory.nextAttack) {
     memory.nextAttack =
       s.time + difficultyOf(s).attackEvery + random(s) * difficultyOf(s).attackJitter;
+    launchAIAssault(s, side);
     const enemies = knownTargets(s, side);
     const local = enemies.filter((b) => b.side === pairedEnemy(s, side));
     const front = local.length ? local : enemies;

@@ -55,7 +55,10 @@ export function boardGround(s, side, ids, carrierId) {
         count++;
       }
     }
-  if (count) clearAutoDefense(vehicle);
+  if (count) {
+    clearAutoDefense(vehicle);
+    delete vehicle.defenseAttack;
+  }
   return count || 'Не хватает мест или нет доступных бойцов';
 }
 

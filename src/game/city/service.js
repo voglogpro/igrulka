@@ -1,6 +1,11 @@
 import { BUILDINGS } from '../config.js';
 import { passable, dirtyNetwork, projectPoint } from './road-network.js';
-import { serviceFieldRoute, serviceParking, servicePathClear } from './service-field-routes.js';
+import {
+  serviceFieldRoute,
+  serviceParking,
+  serviceParkingClear,
+  servicePathClear,
+} from './service-field-routes.js';
 import { weatherSpeed } from '../weather.js';
 import { moveCivicVehicle } from '../units/ground/movement.js';
 
@@ -45,7 +50,7 @@ function routeToJob(s, v, target) {
   return eligible(t, v.side, target.kind) ? serviceFieldRoute(s, v, t, target.kind) : null;
 }
 function sendHome(s, v, b) {
-  const home = serviceParking(s, b, v.id % settings().vehicles);
+  const home = serviceParking(s, b, v.id % settings().vehicles, v);
   const route =
     home &&
     serviceFieldRoute(
@@ -80,7 +85,13 @@ function think(s, v, b) {
     ['outbound', 'repairing'].includes(v.state)
   )
     return;
-  if (routeClear && v.state === 'returning' && v.path.length) return;
+  if (
+    routeClear &&
+    v.state === 'returning' &&
+    v.path.length &&
+    serviceParkingClear(s, v.path.at(-1), v)
+  )
+    return;
   if (!active(s, b)) {
     sendHome(s, v, b);
     return;
@@ -226,11 +237,11 @@ export function updateServices(s, dt) {
       cfg.sideLimit - s.serviceVehicles.filter((v) => v.side === b.side).length,
     );
     if (available <= 0) continue;
-    const home = serviceParking(s, b);
-    if (!home) continue;
     for (let i = 0; i < available; i++) {
-      const id = s.nextId++,
-        parked = serviceParking(s, b, id % cfg.vehicles) || home;
+      const id = s.nextId,
+        parked = serviceParking(s, b, id % cfg.vehicles);
+      if (!parked) break;
+      s.nextId++;
       s.serviceVehicles.push({
         id,
         side: b.side,

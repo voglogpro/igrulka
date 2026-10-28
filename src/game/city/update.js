@@ -1,3 +1,6 @@
+import { equipmentModifiers } from '../combat/upgrade-tiers.js';
+import { acceptLaunchDelivery } from '../units/aviation/launch-supply.js';
+import { updateElectronics } from './electronics.js';
 import { BUILDINGS, WEAPONS } from '../config.js';
 import { event } from '../shared/events.js';
 import { supplyFactor } from './economy.js';
@@ -20,14 +23,22 @@ export function updateConstruction(s, rates, dt) {
     b.launchCooldown = Math.max(0, (b.launchCooldown || 0) - dt);
     if (b.key === 'factory' && b.queue?.length) {
       const q = b.queue[0];
-      q.progress += (dt * rates[b.side].productivity * supplyFactor(s, b)) / WEAPONS[q.key].time;
-      if (q.progress >= 1) {
+      q.progress = Math.min(
+        1,
+        q.progress +
+          (dt *
+            rates[b.side].productivity *
+            supplyFactor(s, b) *
+            equipmentModifiers(b).production) /
+            WEAPONS[q.key].time,
+      );
+      if (q.progress >= 1 && acceptLaunchDelivery(b, q.key, 1)) {
         b.queue.shift();
-        s.sides[b.side].inventory[q.key]++;
         event(s, 'produced', { side: b.side, key: q.key, x: b.x, z: b.z });
       }
     }
   }
+  updateElectronics(s, rates, dt);
   for (const r of s.roads)
     if (r.repairing && !r.removed) {
       const before = passable(r);

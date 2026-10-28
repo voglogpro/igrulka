@@ -310,7 +310,7 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
 
 test('old protocols are explicitly refused and the current protocol creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 13);
+  assert.equal(PROTOCOL_VERSION, 14);
   const host = await connect();
   host.send({ type: 'create', protocol: 10, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
@@ -563,6 +563,7 @@ test('both WebSocket players use private paid factory plans, preserve reserves a
     launchers.push(ready(side, 'launcher', sign * (E.HQ_X - 65), -10));
     room.state.sides[side].credits = 5000;
     room.state.sides[side].materials = 116;
+    room.state.sides[side].components = E.WEAPONS.drone.components * 3;
   }
   const plan = {
     key: 'drone',
@@ -584,6 +585,8 @@ test('both WebSocket players use private paid factory plans, preserve reserves a
   ]) {
     const f = room.state.sides[side];
     assert.equal(E.weaponStock(room.state, side, 'drone'), 2);
+    assert.equal(f.inventory.drone, 0, 'paid output is stored physically');
+    assert.equal(f.components, E.WEAPONS.drone.components);
     assert.equal(factories[side].queue.length, 0);
     near(f.materials, 100);
     assert.ok(f.credits >= plan.reserveCredits);
@@ -596,6 +599,10 @@ test('both WebSocket players use private paid factory plans, preserve reserves a
     assert.equal(Object.hasOwn(opponent, 'productionPlan'), false);
     assert.equal(Object.hasOwn(opponent, 'queue'), false);
   }
+  assert.ok(
+    E.availableLaunchStock(launchers[1], 'drone') >= 1,
+    'a real van has stocked the launcher',
+  );
   const launch = await command(b, 'launch', {
     key: 'drone',
     aim: { x: -800, z: 400 },

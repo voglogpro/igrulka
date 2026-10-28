@@ -10,6 +10,7 @@ function fresh() {
   s.sides[1].credits = 100000;
   s.sides[1].science = 10000;
   s.sides[1].materials = 1000;
+  s.sides[1].components = 30;
   return s;
 }
 function building(s, key, x, progress = 1) {

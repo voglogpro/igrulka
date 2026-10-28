@@ -1,4 +1,4 @@
-import { FIELD } from '../config.js';
+import { FIELD, GROUND_UNITS } from '../config.js';
 import {
   AMMUNITION as C,
   createAmmoStock,
@@ -35,6 +35,37 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
       throw Error('Повреждена статистика производства боеприпасов');
   }
   for (const u of [...s.buildings, ...s.groundUnits]) {
+    if (u.defenseAttack != null) {
+      const op = u.defenseAttack;
+      if (
+        !GROUND_UNITS[u.key] ||
+        GROUND_UNITS[u.key].support ||
+        u.civil ||
+        !record(op) ||
+        !['active', 'returning'].includes(op.phase) ||
+        !point(op.home) ||
+        !whole(op.initial, 100000) ||
+        !whole(op.wave, Number.MAX_SAFE_INTEGER) ||
+        !Number.isFinite(op.nextAt) ||
+        op.nextAt < 0 ||
+        op.nextAt > s.time + 10 ||
+        Object.keys(op).some((k) => !['phase', 'home', 'initial', 'wave', 'nextAt'].includes(k))
+      )
+        throw Error('Повреждена наземная операция');
+    }
+    if (
+      u.supportFront != null &&
+      (!['medic', 'supplytruck'].includes(u.key) || ![0, 1].includes(u.supportFront))
+    )
+      throw Error('Invalid support front');
+    if (
+      u.supportRouteAt != null &&
+      (!['medic', 'supplytruck'].includes(u.key) ||
+        !Number.isFinite(u.supportRouteAt) ||
+        u.supportRouteAt < 0 ||
+        u.supportRouteAt > s.time + 5)
+    )
+      throw Error('Invalid support route');
     const profile = ammunitionProfile(u);
     if (sourceVersion < 15 && profile) {
       delete u.ammoReserve;
@@ -207,7 +238,7 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
               v.cargo.amount > FIELD_SUPPLY.load[v.cargo.key]
             : depot.key !== 'factory' ||
               !['drone', 'heavy', 'cruise', 'ballistic'].includes(v.cargo.key) ||
-              v.cargo.amount > 1))) ||
+              v.cargo.amount > (['drone', 'heavy'].includes(v.cargo.key) ? 4 : 2)))) ||
       (v.pickup != null &&
         (!record(v.pickup) ||
           depot.key !== 'factory' ||

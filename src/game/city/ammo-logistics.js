@@ -16,9 +16,12 @@ import {
   launchStoreTotal,
   acceptLaunchDelivery,
   availableLaunchStock,
+  weaponStoreStock,
+  launchSiteAllows,
 } from '../units/aviation/launch-supply.js';
 import { collectionRequest, collectWeapon, deliverySpace } from './weapon-transfer.js';
 import { fieldSupplyJobs, depositFieldAmmo } from './field-ammo.js';
+export { weaponDeliveryStatus } from './weapon-delivery-status.js';
 export { requestWeaponDelivery } from './weapon-transfer.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -185,7 +188,7 @@ function returnHome(s, v) {
 function jobs(s, v, depot) {
   const f = s.sides[v.side],
     result = [];
-  const weaponAvailable = (key) => (f.inventory[key] || 0) + availableLaunchStock(depot, key);
+  const weaponAvailable = (key) => (f.inventory[key] || 0) + weaponStoreStock(depot, key);
   if (depot.key === 'factory') {
     for (const site of s.buildings) {
       if (site.side !== v.side || !ammoDepotReady(site)) continue;
@@ -210,7 +213,7 @@ function jobs(s, v, depot) {
         });
     const requests = launchSupplyRequests(s, v.side);
     for (const b of s.buildings)
-      if (b.side === v.side && ammoDepotReady(b))
+      if (b.side === v.side && b.key !== 'factory' && ammoDepotReady(b))
         for (const [key, amount] of Object.entries(b.weaponDemand || {}))
           if (amount > availableLaunchStock(b, key) + incoming(s, b.id, 'weapon', key))
             requests.unshift({ siteId: b.id, key, amount, manual: true });
@@ -222,7 +225,7 @@ function jobs(s, v, depot) {
       if (seen.has(signature)) continue;
       seen.add(signature);
       const t = s.buildings.find((b) => b.id === id && b.side === v.side && ammoDepotReady(b));
-      if (!t || t.id === depot.id || !launchStoreCapacity(t, key)) continue;
+      if (!t || t.id === depot.id || !launchSiteAllows(t, key)) continue;
       const allIncoming = (s.ammoVehicles || []).reduce(
         (n, car) =>
           n +
@@ -235,7 +238,7 @@ function jobs(s, v, depot) {
         0,
       );
       const amount = Math.min(
-        1,
+        ['drone', 'heavy'].includes(key) ? 4 : 2,
         weaponAvailable(key),
         launchStoreCapacity(t) - launchStoreTotal(t) - allIncoming,
         request.manual
@@ -304,8 +307,17 @@ function storeAtHome(s, v) {
     const f = s.sides[v.side],
       c = v.cargo;
     if (c.kind === 'weapon') {
-      f.inventory[c.key] += c.amount;
-      v.cargo = null;
+      const warehouse = s.buildings.find(
+        (b) =>
+          b.side === v.side &&
+          b.key === 'factory' &&
+          ammoDepotReady(b) &&
+          distance(v, b) <= C.reach + BUILDINGS.factory.size * 0.5,
+      );
+      if (warehouse) {
+        c.amount -= acceptLaunchDelivery(warehouse, c.key, c.amount);
+        if (!c.amount) v.cargo = null;
+      }
     } else {
       f.ammoStock ||= createAmmoStock();
       const stored = Math.min(c.amount, C.stock[c.key] - f.ammoStock[c.key]);
@@ -362,8 +374,10 @@ export function updateAmmoLogistics(s, dt) {
         if (!v.cargo) break;
         if (v.cargo.kind === 'ammo') f.ammoStock[v.cargo.key] -= v.cargo.amount;
         else {
-          if (f.inventory[v.cargo.key] > 0) f.inventory[v.cargo.key] -= v.cargo.amount;
-          else depot.launchStore[v.cargo.key] -= v.cargo.amount;
+          const legacy = Math.min(f.inventory[v.cargo.key] || 0, v.cargo.amount);
+          f.inventory[v.cargo.key] -= legacy;
+          const local = v.cargo.amount - legacy;
+          if (local) depot.launchStore[v.cargo.key] -= local;
         }
         break;
       }

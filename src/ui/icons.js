@@ -1,4 +1,5 @@
 const paths = {
+  electronics: 'M6 6h12v12H6zM9 9h6v6H9zM9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4',
   ammofactory: 'M3 21V8h18v13M6 21V12h5v9m3 0v-9h4v9M6 5h12M9 3v2m6-2v2',
   silo: 'M3 21h18M5 21V9l3-5 3 5v12m2 0V9l3-5 3 5v12M5 12h6m2 0h6',
   service: 'M3 20V9l9-6 9 6v11M7 20v-8h10v8M10 15h4m-2-2v4',
@@ -26,6 +27,7 @@ const paths = {
 export const icon = (key) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[key] || paths.launcher}"/></svg>`;
 export const short = {
+  electronics: 'Электроника',
   ammofactory: 'Боеприпасы',
   silo: 'Ракетная шахта',
   housing: 'Жильё',

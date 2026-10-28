@@ -30,6 +30,10 @@ export function purchaseQuote(s, side, kind, key, count = 1) {
     cost: d.cost || 0,
     metal: d.metal || 0,
     oil: kind === 'building' || s.rules?.oil === false ? 0 : d.oil || 0,
+    components:
+      s.rules?.components === false || (s.rules?.oil === false && s.rules?.components !== true)
+        ? 0
+        : d.components || 0,
   };
   const purchased = kind === 'building' ? buildingPurchases(s, side, key) : 0;
   const factorAt = (offset) => (kind === 'building' ? purchaseFactor(purchased + offset) : 1);
@@ -37,6 +41,7 @@ export function purchaseQuote(s, side, kind, key, count = 1) {
     cost: 0,
     metal: 0,
     oil: 0,
+    components: 0,
     count,
     factor: factorAt(0),
     lastFactor: factorAt(count - 1),
@@ -44,7 +49,7 @@ export function purchaseQuote(s, side, kind, key, count = 1) {
     baseCost,
   };
   for (let index = 0; index < count; index++)
-    for (const resource of ['cost', 'metal', 'oil'])
+    for (const resource of ['cost', 'metal', 'oil', 'components'])
       quote[resource] += Math.round(baseCost[resource] * factorAt(index));
   return quote;
 }
