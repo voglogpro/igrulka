@@ -79,14 +79,25 @@ export function batchStatic(root, excluded = new Set()) {
       for (let i = 0; i < (indices?.count || p.count); i++, cursor++) {
         const index = indices ? indices.getX(i) : i;
         point.fromBufferAttribute(p, index).applyMatrix4(matrix);
-        positions.set([point.x, point.y, point.z], cursor * 3);
+        const vertex = cursor * 3;
+        positions[vertex] = point.x;
+        positions[vertex + 1] = point.y;
+        positions[vertex + 2] = point.z;
         if (n) {
           normal.fromBufferAttribute(n, index).applyNormalMatrix(nm);
-          normals.set([normal.x, normal.y, normal.z], cursor * 3);
+          normals[vertex] = normal.x;
+          normals[vertex + 1] = normal.y;
+          normals[vertex + 2] = normal.z;
         }
-        if (uv) uvs.set([uv.getX(index), uv.getY(index)], cursor * 2);
-        if (colors)
-          colors.set([m.material.color.r, m.material.color.g, m.material.color.b], cursor * 3);
+        if (uv) {
+          uvs[cursor * 2] = uv.getX(index);
+          uvs[cursor * 2 + 1] = uv.getY(index);
+        }
+        if (colors) {
+          colors[vertex] = m.material.color.r;
+          colors[vertex + 1] = m.material.color.g;
+          colors[vertex + 2] = m.material.color.b;
+        }
       }
     }
     const geometry = new T.BufferGeometry();

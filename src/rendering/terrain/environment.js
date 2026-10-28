@@ -3,6 +3,8 @@ import { clamp } from '../../game/shared/math.js';
 import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
 import { tileInstances } from './instance-tiles.js';
+import { treesNear } from '../performance/tree-index.js';
+const clearedTreeMatrix = new T.Matrix4().makeScale(0, 0, 0);
 // The island with the neutral trading harbour in the middle of the sea. Only the picture raises
 // it: in the rules it is open water, so armies cannot walk or build there.
 export const ISLAND = { x: 0, z: 0, r: 62 };
@@ -439,13 +441,12 @@ export function landmarks() {
 
 export function clearTrees(x, z, radius) {
   if (!this.trees) return;
-  const zero = new T.Matrix4().makeScale(0, 0, 0);
   let changed = false;
-  for (const tree of this.trees)
+  for (const tree of treesNear(this, x, z, radius))
     if (!tree.cleared && Math.hypot(x - tree.x, z - tree.z) < radius) {
       tree.cleared = true;
       for (const mesh of tree.meshes) {
-        mesh.setMatrixAt(tree.index, zero);
+        mesh.setMatrixAt(tree.index, clearedTreeMatrix);
         mesh.instanceMatrix.needsUpdate = true;
       }
       changed = true;

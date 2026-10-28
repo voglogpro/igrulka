@@ -3,6 +3,7 @@ import { resolveArmySelection } from './selection.js';
 import { advanceSimulationFrame } from './session/simulation-budget.js';
 import { createFrameTasks } from './session/frame-tasks.js';
 import { createAutosave } from './session/autosave.js';
+import { bindStartupReadiness, prepareStartupAudio } from './session/startup-readiness.js';
 import { openMultiplayerEntry } from './session/multiplayer-entry.js';
 import { createStrikeController } from './controllers/strike-controller.js';
 import { createActionRouter } from './controllers/action-router.js';
@@ -152,6 +153,7 @@ try {
     onRoadPreview: previewRoad,
     onPlacementPreview: previewBuilding,
     onEvent: handleEvent,
+    isNetwork: () => !!network,
     isModal: () => !started || panel === 'settings' || lobby?.host.hidden === false,
   });
 } catch (e) {
@@ -160,6 +162,17 @@ try {
   throw e;
 }
 world.shakeStrength = settings.shake;
+const startupStatus = document.createElement('div');
+startupStatus.className = 'startup-status glass';
+startupStatus.setAttribute('role', 'status');
+startupStatus.innerHTML =
+  '<span>Подготовка города…</span><progress aria-label="Подготовка города"></progress>';
+$('#game').append(startupStatus);
+const startup = bindStartupReadiness({
+  button: $('#welcome [data-action="start"]'),
+  status: startupStatus,
+  warmup: Promise.allSettled([world.shaderWarmup, prepareStartupAudio(() => audio.prepare())]),
+});
 lobby = new MultiplayerUI({
   onEnter: enterNetwork,
   onState: applyNetworkState,
@@ -376,6 +389,7 @@ function renderOpponentRule() {
     `${state.mode === 'multiplayer' ? 'ДУЭЛЬ · БЕЗ БОТОВ' : (state.sides.length === 4 ? 'ДВА БОТА: ' : 'БОТ: ') + d.name.toUpperCase()} <i>${state.mode !== 'multiplayer' && d.bonus > 1 ? 'ДОХОД +' + Math.round((d.bonus - 1) * 100) + '%' : 'БЕЗ БОНУСА'}</i>`;
 }
 function begin() {
+  if (!startup.ready) return;
   // A fresh, untouched campaign takes the difficulty chosen on the start screen.
   if (!resumed && !network && state.time === 0) state.difficulty = chosenDifficulty;
   started = true;
@@ -1373,7 +1387,9 @@ bindPointerActivity({
   setBusy: (value) => {
     pointerBusy = value;
   },
-  unlockAudio: () => audio.unlock(),
+  unlockAudio: () => {
+    if (startup.ready) audio.unlock();
+  },
 });
 document.addEventListener('click', async (ev) => {
   const b = ev.target.closest('button');

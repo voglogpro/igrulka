@@ -10,34 +10,35 @@ export function loadCampaign(storage, game) {
     const raw = storage.getItem(SAVE);
     if (raw) {
       state = game.load(raw);
+      const version = JSON.parse(raw).version;
       resumed = state.time > 0 || state.buildings.length > 2;
-      if (JSON.parse(raw).version < 10 && !storage.getItem(SAVE + '-before-deployment10')) {
+      if (version < 10 && !storage.getItem(SAVE + '-before-deployment10')) {
         storage.setItem(SAVE + '-before-deployment10', raw);
         loadNotice =
           'Пополнение обновлено: выберите тип бойца и укажите место назначения на карте.';
       }
-      if (JSON.parse(raw).version < 9 && !storage.getItem(SAVE + '-before-districts9')) {
+      if (version < 9 && !storage.getItem(SAVE + '-before-districts9')) {
         storage.setItem(SAVE + '-before-districts9', raw);
         loadNotice =
           'Открыты стратегические районы: захватывайте пехотой, защищайте доход и инфраструктуру.';
       }
-      if (JSON.parse(raw).version < 8) {
+      if (version < 8) {
         storage.setItem(SAVE + '-before-infantry8', raw);
         loadNotice = 'Пехота и группы обновлены. Старые пушки заменены на МОГ с компенсацией.';
       }
-      if (JSON.parse(raw).version === 6) {
+      if (version === 6) {
         storage.setItem(SAVE + '-before-army7', raw);
         loadNotice = 'Кампания обновлена: армия, маршруты, перегрев ПВО и смена суток.';
       }
-      if (JSON.parse(raw).version < 6) {
+      if (version < 6) {
         storage.setItem(SAVE + '-before-combat6', raw);
         loadNotice =
           'Карта полностью открыта. Разведчики убраны, ресурсы возвращены. Сохранение обновлено.';
       }
-      if (JSON.parse(raw).version === 4) {
+      if (version === 4) {
         storage.setItem(SAVE + '-before-recon', raw);
       }
-      if (JSON.parse(raw).version === 3) {
+      if (version === 3) {
         storage.setItem(SAVE + '-before-roads', raw);
         loadNotice = 'Дорожная система обновлена. Подведите улицы к старым предприятиям.';
       }

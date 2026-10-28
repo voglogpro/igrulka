@@ -7,6 +7,13 @@ export const sensorSources = radarSources;
 export const pointVisible = () => true;
 export const unitVisible = (_s, _side, u) => u.delay <= 0 && (u.hp > 0 || u.status === 'falling');
 export const eventVisible = () => true;
+const roadTarget = (r) => ({
+  ...r,
+  key: 'road',
+  x: (r.ax + r.bx) / 2,
+  z: (r.az + r.bz) / 2,
+  progress: 1,
+});
 export function observedTarget(s, side, id) {
   const crate = s.ammoCrates?.find((c) => c.id === Number(id) && c.hp > 0);
   if (crate) {
@@ -29,11 +36,15 @@ export function observedTarget(s, side, id) {
   const b = s.buildings.find((b) => b.id === Number(id));
   if (b) return b.demolished ? null : b;
   const r = s.roads.find((r) => r.id === Number(id) && !r.removed);
-  return r ? { ...r, key: 'road', x: (r.ax + r.bx) / 2, z: (r.az + r.bz) / 2, progress: 1 } : null;
+  return r ? roadTarget(r) : null;
 }
 export function knownTargets(s, side) {
-  return [...s.buildings, ...s.roads]
-    .filter((b) => hostile(s, b.side, side))
-    .map((b) => observedTarget(s, side, b.id))
-    .filter((b) => b && b.hp > 0);
+  // These two collections are public city targets. Their type is already known:
+  // do not search the entire army/crate/city arrays again for each catalogue row.
+  const targets = [];
+  for (const b of s.buildings)
+    if (hostile(s, b.side, side) && !b.demolished && b.hp > 0) targets.push(b);
+  for (const r of s.roads)
+    if (hostile(s, r.side, side) && !r.removed && r.hp > 0) targets.push(roadTarget(r));
+  return targets;
 }

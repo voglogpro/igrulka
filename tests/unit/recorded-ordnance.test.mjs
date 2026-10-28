@@ -64,6 +64,7 @@ test('real simulation launch, MLRS fire and artillery approach events route excl
   const samples = [],
     audio = new GameAudio();
   audio.context = { currentTime: 0 };
+  audio.unlock(audio.context);
   audio.sample = (name) => samples.push(name);
   const resetAudio = () => {
     samples.length = 0;
@@ -160,6 +161,7 @@ test('a recorded missile remains audible in a full rifle pool with at most 44 vo
   const audio = new GameAudio(),
     context = sampleContext();
   audio.context = context;
+  audio.unlock(context);
   audio.buffers = { rifle: [{}], ballisticLaunch: [{}] };
   for (let i = 0; i < 44; i++) audio.sample('rifle', 0, 0, 1, { delay: 1 });
   const first = context.sources[0];
@@ -185,6 +187,7 @@ test('an inaudible far launch cannot evict an audible rifle and a full priority 
   const audio = new GameAudio(),
     context = sampleContext();
   audio.context = context;
+  audio.unlock(context);
   audio.buffers = { rifle: [{}], rocketLaunch: [{}] };
   for (let i = 0; i < 44; i++) audio.sample('rifle', 0, 0, 1);
   audio.sample('rocketLaunch', 1e9, 0, 1);

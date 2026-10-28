@@ -4,6 +4,7 @@ import { groundVisible } from '../../../game/units/infantry/cover.js';
 import { buildInfantryAT } from './anti-tank.js';
 import { infantryEquipmentGeometry } from '../equipment.js';
 import { upgradeable } from '../../../game/combat/upgrades.js';
+import { writeInstanceMatrix, finishInstanceUpdates } from '../../performance/instance-updates.js';
 const CORPSE_LIFE = 40,
   CORPSE_FALL = 0.45,
   CORPSE_LIMIT = 90;
@@ -27,14 +28,7 @@ function reserveInstances(mesh, count) {
   mesh.instanceMatrix = matrix;
 }
 function uploadInstances(mesh) {
-  mesh.visible = mesh.count > 0;
-  // Rendering is manually culled. Aggregate bounds are needed only on a click,
-  // where Three.js computes them lazily; invalidation preserves moving picking.
-  mesh.boundingSphere = null;
-  if (!mesh.count) return;
-  mesh.instanceMatrix.clearUpdateRanges();
-  mesh.instanceMatrix.addUpdateRange(0, mesh.count * 16);
-  mesh.instanceMatrix.needsUpdate = true;
+  finishInstanceUpdates(mesh, mesh.count);
 }
 // Centre-based helper: the shared world.box places boxes by their base.
 function part(w, root, x, y, z, sx, sy, sz, color, rx = 0, ry = 0, rz = 0) {
@@ -294,7 +288,7 @@ export class InfantryBatch {
     if (!upgradeable(u) || !(u.level > 0)) return;
     const mesh = this.equipment[Math.min(2, u.level) - 1];
     reserveInstances(mesh, mesh.count + 1);
-    mesh.setMatrixAt(mesh.count, matrix);
+    writeInstanceMatrix(mesh, mesh.count, matrix);
     mesh.userData.unitIds[mesh.count++] = u.id;
   }
   sync(units, time, visibleIds = null) {
@@ -352,7 +346,7 @@ export class InfantryBatch {
           temp.rotation.set((-Math.PI / 2) * t + side * t, angle + u.id * 0.3, 0.15 * t, 'YXZ');
           temp.scale.set(1, 1, 1);
           temp.updateMatrix();
-          pool.body.setMatrixAt(index, temp.matrix);
+          writeInstanceMatrix(pool.body, index, temp.matrix);
           pool.body.userData.unitIds[index] = u.id;
           this.stampEquipment(u, temp.matrix);
           for (let leg = 0; leg < 2; leg++) {
@@ -364,7 +358,7 @@ export class InfantryBatch {
             temp.rotation.set((-Math.PI / 2) * t, angle, (leg ? 1 : -1) * 0.2 * t, 'YXZ');
             temp.scale.set(0.31, 1.22, 0.37);
             temp.updateMatrix();
-            pool.legs.setMatrixAt(index * 2 + leg, temp.matrix);
+            writeInstanceMatrix(pool.legs, index * 2 + leg, temp.matrix);
             pool.legs.userData.unitIds[index * 2 + leg] = u.id;
           }
           continue;
@@ -379,7 +373,7 @@ export class InfantryBatch {
         temp.rotation.set(u.moving ? 0.065 : aiming ? 0.09 : 0, angle, stride * 0.018);
         temp.scale.set(1, height, 1);
         temp.updateMatrix();
-        pool.body.setMatrixAt(index, temp.matrix);
+        writeInstanceMatrix(pool.body, index, temp.matrix);
         pool.body.userData.unitIds[index] = u.id;
         this.stampEquipment(u, temp.matrix);
         for (let leg = 0; leg < 2; leg++) {
@@ -392,7 +386,7 @@ export class InfantryBatch {
           temp.rotation.set(swing, angle, 0);
           temp.scale.set(0.31, 1.22 * height, 0.37);
           temp.updateMatrix();
-          pool.legs.setMatrixAt(index * 2 + leg, temp.matrix);
+          writeInstanceMatrix(pool.legs, index * 2 + leg, temp.matrix);
           pool.legs.userData.unitIds[index * 2 + leg] = u.id;
         }
       }
@@ -402,7 +396,7 @@ export class InfantryBatch {
         temp.rotation.set(-Math.PI / 2, 0, 0);
         temp.scale.setScalar(u.key === 'mog' ? 7 : u.key === 'assault' ? 4.5 : 1.8);
         temp.updateMatrix();
-        this.selected.setMatrixAt(selected++, temp.matrix);
+        writeInstanceMatrix(this.selected, selected++, temp.matrix);
       }
     }
     this.corpses = this.corpses.filter((c) => time - c.at < CORPSE_LIFE && time >= c.at - 1);
@@ -426,7 +420,7 @@ export class InfantryBatch {
         temp.rotation.set((-Math.PI / 2) * t + c.tilt * t, c.yaw + m, c.roll * t, 'YXZ');
         temp.scale.set(1, 1, 1);
         temp.updateMatrix();
-        pool.body.setMatrixAt(index, temp.matrix);
+        writeInstanceMatrix(pool.body, index, temp.matrix);
         pool.body.userData.unitIds[index] = -1;
         for (let leg = 0; leg < 2; leg++) {
           temp.position.set(
@@ -437,7 +431,7 @@ export class InfantryBatch {
           temp.rotation.set((-Math.PI / 2) * t, c.yaw, (leg ? 1 : -1) * 0.2 * t, 'YXZ');
           temp.scale.set(0.31, 1.22, 0.37);
           temp.updateMatrix();
-          pool.legs.setMatrixAt(index * 2 + leg, temp.matrix);
+          writeInstanceMatrix(pool.legs, index * 2 + leg, temp.matrix);
           pool.legs.userData.unitIds[index * 2 + leg] = -1;
         }
       }
@@ -454,7 +448,7 @@ export class InfantryBatch {
         temp.rotation.set(-Math.PI / 2, 0, 0);
         temp.scale.setScalar(Math.max(4, GROUND_UNITS[u.key].size * 0.72));
         temp.updateMatrix();
-        this.selected.setMatrixAt(selected++, temp.matrix);
+        writeInstanceMatrix(this.selected, selected++, temp.matrix);
       }
     for (const mesh of this.equipment) uploadInstances(mesh);
     for (const p of this.pools.values()) {

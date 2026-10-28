@@ -1,4 +1,5 @@
 import * as T from '../../../vendor/three/three.module.js';
+import { writeInstanceMatrix, finishInstanceUpdates } from './instance-updates.js';
 
 // The original hierarchy remains a logical/picking proxy. Its turret, pitch, recoil and
 // muzzle matrices keep their contracts, while shared geometry is drawn once per part.
@@ -104,15 +105,13 @@ export class VehicleBatch {
             mesh.getMatrixAt(i, this.local);
             this.matrix.multiplyMatrices(mesh.matrixWorld, this.local);
           } else this.matrix.copy(mesh.matrixWorld);
-          group.mesh.setMatrixAt(group.count++, this.matrix);
+          writeInstanceMatrix(group.mesh, group.count++, this.matrix);
         }
       }
     }
     for (const root of this.records.keys()) if (!this.seen.has(root)) this.records.delete(root);
     for (const group of this.groups.values()) {
-      group.mesh.count = group.count;
-      group.mesh.visible = group.count > 0;
-      if (group.count) group.mesh.instanceMatrix.needsUpdate = true;
+      finishInstanceUpdates(group.mesh, group.count);
     }
   }
   diagnostics() {

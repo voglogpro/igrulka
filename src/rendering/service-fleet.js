@@ -1,6 +1,7 @@
 import * as T from '../../vendor/three/three.module.js';
 import { batchStatic } from './mesh-utils.js';
 import { ContactShadows } from './performance/contact-shadows.js';
+import { finishInstanceUpdates, writeInstanceMatrix } from './performance/instance-updates.js';
 
 const PER_SIDE = 8;
 const CAPACITY = PER_SIDE * 4;
@@ -119,7 +120,7 @@ export class ServiceFleet {
   }
 
   // Call on a new simulation snapshot, or once per frame if positions are interpolated elsewhere.
-  sync(state) {
+  sync(state, time = state.time) {
     if (this.disposed) return;
     const counts = [0, 0, 0, 0];
     let count = 0;
@@ -148,17 +149,16 @@ export class ServiceFleet {
       d.rotation.set(0, yaw, 0);
       d.scale.set(1, 1, 1);
       d.updateMatrix();
-      this.body.setMatrixAt(count, d.matrix);
-      this.lamps.setMatrixAt(count, d.matrix);
+      writeInstanceMatrix(this.body, count, d.matrix);
+      writeInstanceMatrix(this.lamps, count, d.matrix);
       count++;
     }
     this.count = count;
     this.shadowUnits.length = count;
     this.shadows.sync(this.shadowUnits, this.shadowIds);
-    this.body.count = this.lamps.count = count;
-    this.body.instanceMatrix.needsUpdate = true;
-    this.lamps.instanceMatrix.needsUpdate = true;
-    this.update(Number.isFinite(state.time) ? state.time : 0);
+    finishInstanceUpdates(this.body, count);
+    finishInstanceUpdates(this.lamps, count);
+    this.update(time);
   }
 
   // The supplied battle clock freezes both the beacon and the repair marker during pause.
@@ -179,19 +179,17 @@ export class ServiceFleet {
       d.rotation.set(0, yaw + clock * 5 + i * 0.7, 0);
       d.scale.setScalar(active ? 1 : 0.45);
       d.updateMatrix();
-      this.beacons.setMatrixAt(i, d.matrix);
+      writeInstanceMatrix(this.beacons, i, d.matrix);
       if (!working) continue;
       d.position.set(x + Math.sin(yaw) * 4.7, level + ROAD_LEVEL + 0.2, z + Math.cos(yaw) * 4.7);
       d.rotation.set(-Math.PI / 2, 0, clock * 0.8);
       d.scale.setScalar(1 + Math.sin(clock * 5 + i) * 0.1);
       d.updateMatrix();
-      this.work.setMatrixAt(repairing++, d.matrix);
+      writeInstanceMatrix(this.work, repairing++, d.matrix);
     }
     this.repairing = repairing;
-    this.beacons.count = this.count;
-    this.work.count = repairing;
-    this.beacons.instanceMatrix.needsUpdate = true;
-    this.work.instanceMatrix.needsUpdate = true;
+    finishInstanceUpdates(this.beacons, this.count);
+    finishInstanceUpdates(this.work, repairing);
   }
 
   diagnostics() {

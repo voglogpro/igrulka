@@ -1,5 +1,6 @@
 import * as T from '../../../vendor/three/three.module.js';
 import { groundHeight, isInfantry, GROUND_UNITS } from '../../game/config.js';
+import { finishInstanceUpdates, writeInstanceMatrix } from './instance-updates.js';
 
 export class ContactShadows {
   constructor(scene, capacity = 240) {
@@ -44,11 +45,9 @@ export class ContactShadows {
       this.dummy.rotation.set(0, u.yaw || 0, 0);
       this.dummy.scale.set(size * (infantry ? 1 : 1.1), 1, size * (infantry ? 1 : 1.5));
       this.dummy.updateMatrix();
-      this.mesh.setMatrixAt(count++, this.dummy.matrix);
+      writeInstanceMatrix(this.mesh, count++, this.dummy.matrix);
     }
-    this.mesh.count = count;
-    this.mesh.visible = count > 0;
-    if (count) this.mesh.instanceMatrix.needsUpdate = true;
+    finishInstanceUpdates(this.mesh, count);
   }
   dispose() {
     this.mesh.removeFromParent();

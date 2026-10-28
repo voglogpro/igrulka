@@ -51,6 +51,9 @@ export function restoreDefense(s) {
       throw Error('Повреждён такт усиления обороны');
     return { nextThink: memory.nextThink, nextReinforce: memory.nextReinforce ?? 0, seen };
   });
+  // A load validates one unchanged map. Reuse its corridor geometry for every
+  // post of the same owner instead of tracing the coastline per soldier.
+  const linesBySide = new Map();
   for (const u of s.groundUnits) {
     if (s.version < 20) u.defenseMission = null;
     if (u.defenseMission != null) {
@@ -101,7 +104,8 @@ export function restoreDefense(s) {
       throw Error('Повреждено ожидание резерва');
     if (u.defensePost != null) {
       const post = u.defensePost;
-      const line = corridorGeometry(s, u.side).find((v) => v.id === post.corridorId);
+      if (!linesBySide.has(u.side)) linesBySide.set(u.side, corridorGeometry(s, u.side));
+      const line = linesBySide.get(u.side).find((v) => v.id === post.corridorId);
       if (
         !object(post) ||
         !line ||

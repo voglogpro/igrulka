@@ -8,14 +8,28 @@ mkdirSync(directory, { recursive: true });
 for (const seed of [81, 810, 8100]) {
   let s = E.createGame(seed, { mode: 'coop' });
   for (const side of [0, 2]) E.hqOf(s, side).hp = E.hqOf(s, side).maxHp = 1e8;
+  const observed = E.sideIds(s).map(() => ({
+    flights: new Set(),
+    launches: new Set(),
+    paidAmmo: 0,
+  }));
   let reloads = 0;
   for (let seconds = 0; seconds < 1200; seconds += 5) {
     E.advance(s, 5);
+    for (const unit of s.units) if (unit.launched) observed[unit.side].flights.add(unit.id);
+    for (const event of s.events)
+      if (event.type === 'launch') observed[event.side].launches.add(event.id);
     assert.equal(s.result, null, 'both passive human cities survive the full simulation');
     for (const side of E.sideIds(s)) {
       for (const key of ['credits', 'materials', 'oil'])
         assert.ok(Number.isFinite(s.sides[side][key]) && s.sides[side][key] >= 0);
       assert.ok(s.ammoVehicles.filter((v) => v.side === side).length <= E.AMMUNITION.fleetLimit);
+      const paidAmmo = s.sides[side].ammoProductionSpent;
+      assert.ok(
+        Number.isFinite(paidAmmo) && paidAmmo >= observed[side].paidAmmo,
+        `seed${seed} owner${side} paid ammunition production is finite and never refunded`,
+      );
+      observed[side].paidAmmo = paidAmmo;
     }
     for (const entity of [...s.buildings, ...s.groundUnits, ...s.units, ...s.ammoVehicles]) {
       assert.ok(E.validSide(s, entity.side));
@@ -46,7 +60,15 @@ for (const seed of [81, 810, 8100]) {
       s.settlements.some((d) => d.owner === side),
       `seed${seed} bot${side} connected a settlement`,
     );
-    assert.ok(s.sides[side].spentAmmo > 0, `seed${seed} bot${side} launched paid aircraft`);
+    // spentAmmo counts ground/AA shots, not aircraft production or actual takeoff.
+    // Passive human cities need not fire back, so an active air campaign can
+    // correctly leave that counter at zero. Observe the physical launches.
+    assert.ok(observed[side].flights.size > 0, `seed${seed} bot${side} flew actual aircraft`);
+    assert.ok(observed[side].launches.size > 0, `seed${seed} bot${side} emitted actual launches`);
+    assert.ok(
+      s.sides[side].ammoProductionSpent > 0,
+      `seed${seed} bot${side} paid for actual ammunition production`,
+    );
   }
   reports.push({
     seed,
@@ -58,6 +80,9 @@ for (const seed of [81, 810, 8100]) {
     bots: [1, 3].map((side) => ({
       side,
       spentAmmo: s.sides[side].spentAmmo,
+      ammoProductionSpent: s.sides[side].ammoProductionSpent,
+      flightsObserved: observed[side].flights.size,
+      launchesObserved: observed[side].launches.size,
       credits: s.sides[side].credits,
     })),
   });

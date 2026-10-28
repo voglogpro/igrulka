@@ -54,7 +54,15 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false, defer = 
     }
     const radius = GROUND_UNITS[u.key].size * 0.42,
       path = queued ? [] : groundPath(s, u, destination, radius);
-    if (queued ? !walkable(s, destination.x, destination.z, radius) : !path.length) continue;
+    // A retreat names the centre of its friendly base. Like the synchronous
+    // pathfinder, queued planning must allow that solid endpoint and approach
+    // its nearest reachable cell instead of rejecting the entire retreat.
+    if (
+      queued
+        ? aim.mode !== 'retreat' && !walkable(s, destination.x, destination.z, radius)
+        : !path.length
+    )
+      continue;
     delete u.supplyTrip;
     if (['medic', 'supply'].includes(GROUND_UNITS[u.key].support)) u.supportManual = true;
     if (!preserveRoute) clearGroundRoute(u);
@@ -122,7 +130,17 @@ export function commandUnits(s, side, ids, command) {
       (u) => u.side === side && u.hp > 0 && !u.downed && selected.has(u.id),
     ),
     fireState = !units.every((u) => u.holdFire),
-    camoState = !units.filter((u) => isInfantry(u.key) && !u.carrierId).every((u) => u.camouflaged);
+    camoState = !units.filter((u) => isInfantry(u.key) && !u.carrierId).every((u) => u.camouflaged),
+    retreatBases =
+      command === 'retreat'
+        ? s.buildings.filter(
+            (b) =>
+              b.side === side &&
+              b.hp > 0 &&
+              (b.key === 'hq' || (b.key === 'barracks' && b.progress >= 1)),
+          )
+        : [],
+    deferRetreat = command === 'retreat' && units.filter((u) => !u.carrierId).length >= 16;
   let changed = 0;
   for (const u of units) {
     if (command === 'stop') {
@@ -175,18 +193,24 @@ export function commandUnits(s, side, ids, command) {
       }
     }
     if (command === 'retreat' && !u.carrierId) {
-      const bases = s.buildings
-        .filter(
-          (b) =>
-            b.side === side &&
-            b.hp > 0 &&
-            (b.key === 'hq' || (b.key === 'barracks' && b.progress >= 1)),
-        )
-        .sort((a, b) => Math.hypot(a.x - u.x, a.z - u.z) - Math.hypot(b.x - u.x, b.z - u.z));
+      let base = null,
+        nearest = Infinity;
+      for (const candidate of retreatBases) {
+        const distance = Math.hypot(candidate.x - u.x, candidate.z - u.z);
+        if (!base || distance < nearest) {
+          base = candidate;
+          nearest = distance;
+        }
+      }
       if (
-        bases[0] &&
-        typeof orderGround(s, side, [u.id], { x: bases[0].x, z: bases[0].z, mode: 'retreat' }) ===
-          'number'
+        base &&
+        typeof orderGround(
+          s,
+          side,
+          [u.id],
+          { x: base.x, z: base.z, mode: 'retreat' },
+          { defer: deferRetreat },
+        ) === 'number'
       )
         changed++;
     }

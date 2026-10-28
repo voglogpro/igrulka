@@ -1,4 +1,4 @@
-import { FIELD, BUILDINGS, riverDistance, CORRIDORS } from '../../config.js';
+import { FIELD, BUILDINGS, GROUND_UNITS, riverDistance, CORRIDORS } from '../../config.js';
 import { activeSettlementFootprints } from '../../territory/settlements.config.js';
 import { GROUND_COMMAND_LIMIT } from './limits.js';
 // The ground crossings between the cities. The name stays for older code and saves: since the sea
@@ -14,6 +14,16 @@ const CELL = 24,
   DEPTH = Math.floor((FIELD.z - OZ) / CELL) + 1;
 const masks = new WeakMap();
 const movementObstacles = new WeakMap();
+const DIRECTIONS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
+];
 const OBSTACLE_CELL = 64,
   OBSTACLE_STRIDE = Math.ceil((FIELD.x * 2) / OBSTACLE_CELL) + 1;
 const obstacleColumn = (x) => Math.floor((x + FIELD.x) / OBSTACLE_CELL);
@@ -53,16 +63,106 @@ function movementBuckets(s) {
 // Terrain does not change during a campaign. Reuse it across factions and campaigns;
 // new buildings only stamp their small bounding rectangles onto a copied mask.
 const terrainMasks = new Map();
+let terrainDistances = null,
+  terrainEdgeDistances = null;
+function staticTerrainDistances() {
+  if (terrainDistances) return terrainDistances;
+  const values = new Float64Array(WIDTH * DEPTH);
+  for (let row = 0; row < DEPTH; row++)
+    for (let col = 0; col < WIDTH; col++)
+      values[row * WIDTH + col] = riverDistance(OX + col * CELL, OZ + row * CELL);
+  terrainDistances = values;
+  return values;
+}
+function staticTerrainEdgeDistance(a, b, current, bit) {
+  terrainEdgeDistances ||= {
+    checked: new Uint8Array(WIDTH * DEPTH),
+    minimum: new Float64Array(WIDTH * DEPTH * 8),
+  };
+  const { checked, minimum } = terrainEdgeDistances,
+    index = current * 8 + (31 - Math.clz32(bit));
+  if (!(checked[current] & bit)) {
+    const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 3);
+    let distance = Infinity;
+    for (let i = 0; i <= n; i++) {
+      const sampled = riverDistance(a.x + ((b.x - a.x) * i) / n, a.z + ((b.z - a.z) * i) / n);
+      if (sampled < distance) distance = sampled;
+      if (distance === 0) break;
+    }
+    minimum[index] = distance;
+    checked[current] |= bit;
+  }
+  return minimum[index];
+}
+
+// The loading screen can advance this iterator between browser tasks. It only
+// prepares derived navigation data: no simulation step, orders or paid state.
+// Terrain work is chunked; subsequent turns make at most one representative
+// path query so all footprint/component masks do not block the same frame.
+export function* navigationWarmup(s, { radii = null, terrainBatch = 1024 } = {}) {
+  const buildings = s.buildings,
+    sides = s.sides,
+    settlements = s.settlements,
+    seed = s.seed,
+    mode = s.mode,
+    currentCampaign = () =>
+      s.buildings === buildings &&
+      s.sides === sides &&
+      s.settlements === settlements &&
+      s.seed === seed &&
+      s.mode === mode;
+  const footprints = [
+    ...new Set(
+      (radii || [3, ...Object.values(GROUND_UNITS).map((d) => d.size * 0.42)])
+        .filter((r) => Number.isFinite(r) && r > 0)
+        .map((r) => Math.ceil(r * 2) / 2),
+    ),
+  ].sort((a, b) => a - b);
+  const jobs = [];
+  for (const hq of s.buildings.filter((b) => b.key === 'hq' && b.hp > 0)) {
+    const crossings = s.sides.length > 2 ? [hq.z < 0 ? CORRIDORS[0] : CORRIDORS[1]] : CORRIDORS;
+    for (const radius of footprints)
+      for (const z of crossings)
+        jobs.push({
+          from: { x: hq.x + (hq.side % 2 ? -100 : 100), z: hq.z },
+          to: { x: 0, z },
+          radius,
+        });
+  }
+  const batch = Math.max(64, Math.min(4096, Math.floor(terrainBatch) || 1024)),
+    terrainTurns = terrainDistances ? 0 : Math.ceil((WIDTH * DEPTH) / batch),
+    total = terrainTurns + jobs.length;
+  let completed = 0;
+  yield { phase: 'terrain', completed, total };
+  if (!currentCampaign()) return;
+  if (!terrainDistances) {
+    // Keep an incomplete field local. A cancelled preparation cannot publish
+    // zero-filled cells to an ordinary synchronous groundPath call.
+    const values = new Float64Array(WIDTH * DEPTH);
+    for (let start = 0; start < values.length && !terrainDistances; start += batch) {
+      if (!currentCampaign()) return;
+      const end = Math.min(values.length, start + batch);
+      for (let i = start; i < end; i++)
+        values[i] = riverDistance(OX + (i % WIDTH) * CELL, OZ + Math.floor(i / WIDTH) * CELL);
+      if (end === values.length) terrainDistances ||= values;
+      completed++;
+      yield { phase: 'terrain', completed, total };
+    }
+  }
+  completed = terrainTurns;
+  for (const job of jobs) {
+    if (!currentCampaign()) return;
+    groundPath(s, job.from, job.to, job.radius);
+    completed++;
+    yield { phase: 'paths', completed, total };
+  }
+}
 function compileMask(s, radius) {
   let terrain = terrainMasks.get(radius);
   if (!terrain) {
-    terrain = new Uint8Array(WIDTH * DEPTH);
-    for (let row = 0; row < DEPTH; row++)
-      for (let col = 0; col < WIDTH; col++) {
-        const x = OX + col * CELL,
-          z = OZ + row * CELL;
-        terrain[row * WIDTH + col] = riverDistance(x, z) < 77 + radius;
-      }
+    const distances = staticTerrainDistances();
+    terrain = new Uint8Array(distances.length);
+    for (let i = 0; i < distances.length; i++) terrain[i] = distances[i] < 77 + radius;
     terrain = {
       blocked: terrain,
       checked: new Uint8Array(terrain.length),
@@ -164,14 +264,10 @@ function clearGridEdge(grid, a, b, size, current, bit) {
   const terrain = grid.terrain;
   if (!(terrain.checked[current] & bit)) {
     terrain.checked[current] |= bit;
-    const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 3);
-    let dry = true;
-    for (let i = 0; i <= n; i++)
-      if (riverDistance(a.x + ((b.x - a.x) * i) / n, a.z + ((b.z - a.z) * i) / n) < 77 + size) {
-        dry = false;
-        break;
-      }
-    if (dry) terrain.edges[current] |= bit;
+    // These are the same directed samples and strict comparison as before.
+    // Their minimum is independent of vehicle size and city construction;
+    // changing either still rebuilds the appropriate obstacle/footprint mask.
+    if (!(staticTerrainEdgeDistance(a, b, current, bit) < 77 + size)) terrain.edges[current] |= bit;
   }
   if (!(terrain.edges[current] & bit)) return false;
   for (let row = obstacleRow(Math.min(a.z, b.z)); row <= obstacleRow(Math.max(a.z, b.z)); row++)
@@ -229,6 +325,7 @@ export function groundPath(s, from, to, radius = 3) {
   };
   if (clear(from, to)) return [{ x: to.x, z: to.z }];
   const point = (i) => ({ x: OX + (i % WIDTH) * CELL, z: OZ + Math.floor(i / WIDTH) * CELL });
+  const footprints = activeSettlementFootprints(s);
   let cache = masks.get(s);
   const signature =
     s.networkRevision +
@@ -238,8 +335,13 @@ export function groundPath(s, from, to, radius = 3) {
     (s.settlementHouseMask ?? 65535) +
     ':' +
     (s.settlementLayoutMask ?? 16777215);
-  if (!cache || cache.signature !== signature) {
-    cache = { signature, grids: new Map() };
+  if (
+    !cache ||
+    cache.signature !== signature ||
+    cache.buildings !== s.buildings ||
+    cache.footprints !== footprints
+  ) {
+    cache = { signature, buildings: s.buildings, footprints, grids: new Map() };
     masks.set(s, cache);
   }
   const size = Math.ceil(radius * 2) / 2;
@@ -311,8 +413,9 @@ export function groundPath(s, from, to, radius = 3) {
     goal = point(end),
     heap = [];
   const heuristic = (i) => {
-    const p = point(i);
-    return Math.hypot(goal.x - p.x, goal.z - p.z);
+    const x = OX + (i % WIDTH) * CELL,
+      z = OZ + Math.floor(i / WIDTH) * CELL;
+    return Math.hypot(goal.x - x, goal.z - z);
   };
   // Min-heap of [score, cell]; stale entries are skipped when popped.
   const push = (score, i) => {
@@ -325,10 +428,14 @@ export function groundPath(s, from, to, radius = 3) {
         (heap[parent][0] === heap[k][0] && heap[parent][1] <= heap[k][1])
       )
         break;
-      [heap[parent], heap[k]] = [heap[k], heap[parent]];
+      const previous = heap[parent];
+      heap[parent] = heap[k];
+      heap[k] = previous;
       k = parent;
     }
   };
+  const less = (a, b) =>
+    heap[a][0] < heap[b][0] || (heap[a][0] === heap[b][0] && heap[a][1] < heap[b][1]);
   const pop = () => {
     const top = heap[0],
       last = heap.pop();
@@ -339,12 +446,12 @@ export function groundPath(s, from, to, radius = 3) {
         const l = k * 2 + 1,
           r = l + 1;
         let m = k;
-        const less = (a, b) =>
-          heap[a][0] < heap[b][0] || (heap[a][0] === heap[b][0] && heap[a][1] < heap[b][1]);
         if (l < heap.length && less(l, m)) m = l;
         if (r < heap.length && less(r, m)) m = r;
         if (m === k) break;
-        [heap[m], heap[k]] = [heap[k], heap[m]];
+        const previous = heap[m];
+        heap[m] = heap[k];
+        heap[k] = previous;
         k = m;
       }
     }
@@ -368,18 +475,10 @@ export function groundPath(s, from, to, radius = 3) {
     closed[current] = 1;
     const cx = current % WIDTH,
       cz = Math.floor(current / WIDTH);
-    let direction = -1;
-    for (const [dx, dz] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-      [1, 1],
-      [1, -1],
-      [-1, 1],
-      [-1, -1],
-    ]) {
-      direction++;
+    let currentPoint = null;
+    for (let direction = 0; direction < DIRECTIONS.length; direction++) {
+      const dx = DIRECTIONS[direction][0],
+        dz = DIRECTIONS[direction][1];
       const nx = cx + dx,
         nz = cz + dz;
       if (nx < 0 || nx >= WIDTH || nz < 0 || nz >= DEPTH) continue;
@@ -395,7 +494,8 @@ export function groundPath(s, from, to, radius = 3) {
       const bit = 1 << direction;
       if (!(checked[current] & bit)) {
         checked[current] |= bit;
-        if (clearGridEdge(grid, point(current), point(next), size, current, bit))
+        currentPoint ||= point(current);
+        if (clearGridEdge(grid, currentPoint, point(next), size, current, bit))
           edges[current] |= bit;
       }
       if (!(edges[current] & bit)) continue;

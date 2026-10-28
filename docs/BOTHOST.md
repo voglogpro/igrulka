@@ -15,7 +15,7 @@
 | `PUBLIC_URL` | Обязательно: `https://ваш-домен` — origin без пути, credentials, query и fragment                                     |
 | `PORT`       | `8080`, должен совпадать с внутренним портом панели                                                                   |
 | `HOST`       | `0.0.0.0`                                                                                                             |
-| `CLIENT_URL` | Необязательно: `https://voglogpro.github.io/igrulka/releases/8.12.0/`; без значения клиент отдаётся с игрового домена |
+| `CLIENT_URL` | Необязательно: `https://voglogpro.github.io/igrulka/releases/8.12.1/`; без значения клиент отдаётся с игрового домена |
 | `MAX_ROOMS`  | `2` по умолчанию; допустимо 1..16, поднимать только после нагрузки                                                    |
 
 `PUBLIC_URL` никогда не вычисляется из Host/X-Forwarded-Host. TLS завершается на reverse proxy платформы; контейнер принимает HTTP/1.1 и WebSocket Upgrade. Существующий протокол, delta-снимки и negotiated permessage-deflate используются без отдельного прокси-процесса. Конфигурация не меняет локальный `server/index.mjs` и internet launcher.

@@ -34,6 +34,8 @@ test('distance shaping preserves delayed dark distant shots and hard voice admis
   assert.ok(far.dry < near.dry && far.cutoff < near.cutoff && far.delay > near.delay);
   assert.ok(far.echo > near.echo);
   const audio = new GameAudio();
+  audio.context = { currentTime: 0 };
+  audio.unlock(audio.context);
   audio.voices = 44;
   audio.buffers = { blast: [{}] };
   audio.sample('blast', 0, 0, 1);

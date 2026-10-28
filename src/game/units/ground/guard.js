@@ -7,6 +7,7 @@ import { clearGroundRoute } from './route-queue.js';
 import { clearAutoDefense } from '../../defense/volunteers.js';
 import { invalidateFrontline } from '../../defense/cache.js';
 import { ENGAGEMENT_CELL, prepareGroundEngagement } from './engagement.js';
+import { CandidateBuffer } from './candidate-buffer.js';
 
 const GUARD_RADIUS = 95;
 const ALLY_RADIUS = 68;
@@ -54,6 +55,7 @@ function frame(s) {
     count: s.groundUnits.length,
     revision: s.networkRevision,
     engagement,
+    candidates: value?.candidates || new CandidateBuffer(),
     extras: new Map(),
     posts: null,
     selected: new Set(),
@@ -341,15 +343,16 @@ function threats(s, u) {
   // A guard needs the nearest visible threat, not a line-of-sight result for
   // every soldier in the opposing platoon each time its think clock fires.
   const f = frame(s),
-    cache = f.engagement;
-  const candidates = [];
+    cache = f.engagement,
+    candidates = f.candidates;
+  candidates.reset();
   const offer = (enemy) => {
     f.metrics.enemyChecks++;
     if (!GROUND_UNITS[enemy.key]) return;
     if (!hostile(s, enemy.side, u.side) || enemy.hp <= 0 || enemy.carrierId) return;
     const range = distance(enemy, u.guard);
     if (range > MAX_LEASH || (range > GUARD_RADIUS && !assists(s, f, u, enemy))) return;
-    candidates.push({ enemy, range });
+    candidates.add(enemy, range);
   };
   for (
     let z = Math.floor((u.guard.z - MAX_LEASH - MOVEMENT_MARGIN) / ENGAGEMENT_CELL);
@@ -365,8 +368,9 @@ function threats(s, u) {
         for (const enemy of cache.sideBuckets[side].get(`${x},${z}`) || []) offer(enemy);
         for (const enemy of f.extras.get(`${side}:${x},${z}`) || []) offer(enemy);
       }
-  candidates.sort((a, b) => a.range - b.range || a.enemy.id - b.enemy.id);
-  for (const { enemy } of candidates) {
+  candidates.heapify();
+  while (candidates.order.length) {
+    const enemy = candidates.pop();
     f.metrics.visibilityTests++;
     if (!groundVisible(s, u.side, enemy)) continue;
     f.metrics.lineTests++;

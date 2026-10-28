@@ -119,6 +119,7 @@ export {
   recruit,
   orderGround,
   groundPath,
+  navigationWarmup,
   walkable,
   BRIDGES,
   GROUND_LIMIT,

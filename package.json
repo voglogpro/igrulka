@@ -1,6 +1,6 @@
 {
   "name": "skyfront-city-defense",
-  "version": "8.12.0",
+  "version": "8.12.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "multiplayer:internet": "node server/index.mjs --internet",
     "multiplayer:hosted": "node server/hosted.mjs",
     "build": "node scripts/build-portable.mjs",
-    "test": "node --test tests/unit/*.test.mjs tests/legacy/*.test.mjs",
+    "test": "node --test --test-concurrency=4 tests/unit/*.test.mjs tests/legacy/*.test.mjs",
     "test:soak": "node tests/soak/campaign.mjs",
     "test:browser": "python tests/browser/run.py",
     "format": "prettier --write .",

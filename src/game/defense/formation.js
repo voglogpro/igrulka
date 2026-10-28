@@ -47,13 +47,15 @@ export function assignDefensePost(s, u, point, snap = false) {
 function assignedCorridor(u, lines) {
   if (lines.some((line) => line.id === u.defensePost?.corridorId)) return u.defensePost.corridorId;
   if (!u.guard) return null;
-  return (
-    lines
-      .slice()
-      .sort(
-        (a, b) => Math.abs(a.z - u.guard.z) - Math.abs(b.z - u.guard.z) || a.id.localeCompare(b.id),
-      )[0]?.id ?? null
-  );
+  let closest = null;
+  for (const line of lines)
+    if (
+      !closest ||
+      (Math.abs(line.z - u.guard.z) - Math.abs(closest.z - u.guard.z) ||
+        line.id.localeCompare(closest.id)) < 0
+    )
+      closest = line;
+  return closest?.id ?? null;
 }
 
 function corridorCounts(own, lines, key = null) {
@@ -109,11 +111,14 @@ function postCandidates(u, own, volunteers, lines, direction, corridorId = null)
   const roleCounts = corridorCounts(own, lines, u.key),
     totalCounts = corridorCounts(own, lines);
   const ranks = new Map(lines.map((line) => [line.id, layerRanks(u, line, volunteers)]));
+  const orders = new Map(
+    lines.map((line) => [line.id, spreadOrder(line.slots.length, volunteers.length < 4)]),
+  );
   const pool = [];
   for (let row = isInfantry(u.key) ? 0 : 1; row < C.maxRows; row += 2)
     for (const line of lines) {
       if (corridorId && line.id !== corridorId) continue;
-      const order = spreadOrder(line.slots.length, volunteers.length < 4);
+      const order = orders.get(line.id);
       for (let rank = 0; rank < order.length; rank++) {
         const slot = order[rank];
         if (occupied.has(`${line.id}:${row}:${slot}`)) continue;

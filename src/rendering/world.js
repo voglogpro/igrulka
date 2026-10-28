@@ -48,7 +48,8 @@ import { BuildingBatch } from './performance/building-batch.js';
 import { ContactShadows } from './performance/contact-shadows.js';
 import { ShadowBudget } from './performance/shadow-budget.js';
 import { freezeStaticScenery } from './performance/static-scenery.js';
-import { warmSceneShaders } from './performance/shader-warmup.js';
+import { warmStartupScene } from './performance/startup-prewarm.js';
+import { bindShadowRestore } from './performance/context-recovery.js';
 import { DeploymentPreview } from './deployment-preview.js';
 import * as E from '../game/index.js';
 import { BUILDINGS, riverX } from '../game/index.js';
@@ -298,6 +299,7 @@ export class RTSWorld {
     Object.assign(this.sun.shadow.camera, { left: -480, right: 480, top: 480, bottom: -480 });
     this.sun.shadow.normalBias = 0.35;
     this.sun.shadow.bias = -0.00012;
+    bindShadowRestore(this.renderer, [this.sun]);
     this.post = new EveningPost(this.renderer);
     this.post.resize(host.clientWidth, host.clientHeight);
     this.resizeObserver = new ResizeObserver(() => {
@@ -340,14 +342,12 @@ export class RTSWorld {
     this.sync();
     this.shadersReady = false;
     this.shaderWarmupStatus = 'warming';
-    this.shaderWarmup = warmSceneShaders(this.renderer, this.scene, this.camera, this.post).then(
-      (result) => {
-        this.shaderWarmupStatus = result.status;
-        this.shadersReady = true;
-        this.last = performance.now();
-        return result;
-      },
-    );
+    this.shaderWarmup = warmStartupScene(this).then((result) => {
+      this.shaderWarmupStatus = result.status;
+      this.shadersReady = true;
+      this.last = performance.now();
+      return result;
+    });
     // Let the app finish wiring its UI before the first GPU frame.
     this.frame = requestAnimationFrame(this.animate);
   }
@@ -501,10 +501,10 @@ export class RTSWorld {
       disposeTree(child, this.sharedGeometries, this.sharedMaterials);
     root.clear();
   }
-  sync(...args) {
-    const result = syncForWorld.call(this, ...args);
-    this.serviceFleet.sync(this.state);
-    this.ammoFleet.sync(this.state);
+  sync({ fleetTime } = {}) {
+    const result = syncForWorld.call(this);
+    this.serviceFleet.sync(this.state, fleetTime);
+    this.ammoFleet.sync(this.state, fleetTime);
     this.ammoCrates.sync(this.state);
     this.settlementView.sync(this.state);
     this.buildingBatch.sync(this.models, this.camera, this.sun);
@@ -543,10 +543,14 @@ export class RTSWorld {
   resizeRender() {
     const { clientWidth: width, clientHeight: height } = this.host;
     if (!width || !height) return;
-    this.renderer.setPixelRatio(
-      renderPixelRatio(width, height, devicePixelRatio, this.renderBudget.scale),
-    );
-    this.renderer.setSize(width, height);
+    const ratio = renderPixelRatio(width, height, devicePixelRatio, this.renderBudget.scale),
+      size = this.renderer.getSize(new T.Vector2());
+    if (size.x === width && size.y === height && this.renderer.getPixelRatio() === ratio) return;
+    // setPixelRatio already calls setSize in Three. Set all three dimensions
+    // together so each real change resizes the canvas only once.
+    this.renderer.setDrawingBufferSize(width, height, ratio);
+    this.renderer.domElement.style.width = width + 'px';
+    this.renderer.domElement.style.height = height + 'px';
     this.post.resize(width, height, this.renderBudget.scale);
   }
   updateMinimap(...args) {
@@ -658,14 +662,12 @@ export class RTSWorld {
     if (this.beacon)
       this.beacon.intensity =
         E.dayPhase(this.state.time).night * (Math.sin(this.battleTime * 2.2) > 0.6 ? 900 : 0);
-    this.sync();
+    this.sync({ fleetTime: this.battleTime });
     if (this.frontlineView.enabled) this.frontlineView.update(E.frontlineReport(this.state, 0));
     this.weatherFX.update(this.visualDt, this.controls.target, this.state.weather);
     this.combatFX.emit(this.state, this.visualDt, (u) => E.unitVisible(this.state, 0, u));
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);
     this.traffic.update(this.state, this.visualDt, this.combatFX);
-    this.serviceFleet.update(this.battleTime);
-    this.ammoFleet.update(this.battleTime);
     this.ships.update(
       this.state,
       this.battleTime,

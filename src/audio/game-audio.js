@@ -93,6 +93,7 @@ export function ordnanceMix(distance, loudness = 1) {
 export class GameAudio {
   constructor() {
     this.enabled = true;
+    this.activated = false;
     this.volume = 0.35;
     this.last = {};
     this.voices = 0;
@@ -104,14 +105,18 @@ export class GameAudio {
     this.footsteps = new FootstepScheduler();
     if (typeof window !== 'undefined') warmAudioPCM();
   }
-  // An OfflineAudioContext may be passed to render the mix to a file for listening tests.
-  unlock(context = null) {
-    if (!this.context) {
-      const Audio = window.AudioContext || window.webkitAudioContext;
-      if (!context && !Audio) return;
-      const c = (this.context = context || new Audio());
+  // Build the existing graph behind the loading screen, without user activation.
+  // Injected/offline contexts remain under their caller's transport control.
+  prepare(context = null) {
+    if (this.context) return this.preparation || this.ready;
+    const Audio =
+      typeof window === 'undefined' ? null : window.AudioContext || window.webkitAudioContext;
+    if (!context && !Audio) return Promise.resolve();
+    let c;
+    try {
+      c = this.context = context || new Audio();
       this.master = c.createGain();
-      this.master.gain.value = this.enabled ? this.volume : 0;
+      this.master.gain.value = 0;
       this.compressor = c.createDynamicsCompressor();
       this.compressor.threshold.value = -14;
       this.compressor.knee.value = 12;
@@ -158,6 +163,30 @@ export class GameAudio {
       tone.connect(this.master);
       tone.connect(this.reverbIn);
       this.buffers = this.renderBuffers();
+      const suspended = !context && c.suspend ? c.suspend().catch(() => {}) : Promise.resolve();
+      this.preparation = Promise.all([this.ready, suspended]);
+      return this.preparation;
+    } catch (error) {
+      this.master?.disconnect();
+      if (!context) c?.close?.().catch(() => {});
+      this.context = this.master = this.buffers = this.preparation = this.ready = null;
+      this.activated = false;
+      throw error;
+    }
+  }
+  // An OfflineAudioContext may be passed to render the unchanged mix for listening tests.
+  unlock(context = null) {
+    try {
+      this.prepare(context)?.catch(() => {});
+    } catch {
+      // Audio is optional. A denied device must not block starting a campaign;
+      // the next trusted gesture can retry the original lazy initialization.
+      return;
+    }
+    if (!this.context) return;
+    if (!this.activated) {
+      this.activated = true;
+      if (this.master) this.master.gain.value = this.enabled ? this.volume : 0;
     }
     if (!context) this.context.resume().catch(() => {});
   }
@@ -165,7 +194,7 @@ export class GameAudio {
     const context = this.context,
       bank = audioBufferBank(context);
     const enginesReady = bank.loopsReady.then(() => {
-      if (context.state === 'closed') return;
+      if (this.context !== context || context.state === 'closed') return;
       this.reverb.buffer = bank.buffers.impulse;
       this.createEngines();
     });
@@ -175,12 +204,14 @@ export class GameAudio {
   set(enabled, volume = this.volume) {
     this.enabled = enabled;
     this.volume = volume;
-    if (this.master)
-      this.master.gain.setTargetAtTime(enabled ? volume : 0, this.context.currentTime, 0.05);
+    if (this.master) {
+      if (!this.activated) this.master.gain.value = 0;
+      else this.master.gain.setTargetAtTime(enabled ? volume : 0, this.context.currentTime, 0.05);
+    }
   }
   // Interface blips stay synthetic and centred; they are not part of the battlefield.
   tone(freq, end, length, gain = 0.1, type = 'sine') {
-    if (!this.context || !this.enabled || this.voices >= 40) return;
+    if (!this.activated || !this.context || !this.enabled || this.voices >= 40) return;
     const c = this.context,
       t = c.currentTime,
       o = c.createOscillator(),
@@ -204,6 +235,7 @@ export class GameAudio {
   }
   // One positioned battlefield sound: buffer → distance filter → dry/pan + reverb + echo sends.
   sample(name, distance, pan, loudness, options = {}) {
+    if (!this.activated) return;
     const list = this.buffers?.[name];
     if (!list || !this.enabled) return;
     const priority = options.priority || ORDNANCE.has(name);
@@ -275,7 +307,7 @@ export class GameAudio {
     return true;
   }
   play(e, distance = 0, pan = 0) {
-    if (!this.context || !this.enabled) return;
+    if (!this.activated || !this.context || !this.enabled) return;
     const where = this.locate(e, distance, pan);
     if (e.type === 'shot') {
       const kind = soundClass(e);
@@ -470,7 +502,7 @@ export class GameAudio {
     if (this.whistled.size > 200) this.whistled.clear();
   }
   update(state, camera, paused, side = 0) {
-    if (!this.context) return;
+    if (!this.activated || !this.context) return;
     const c = this.context,
       t = c.currentTime,
       m = camera.matrixWorld.elements;
@@ -609,7 +641,7 @@ export class GameAudio {
     this.activeEngines = active;
   }
   focus(visible) {
-    if (!this.context) return;
+    if (!this.activated || !this.context) return;
     if (visible) this.context.resume().catch(() => {});
     else this.context.suspend().catch(() => {});
   }

@@ -108,6 +108,78 @@ test('all four city fleets are visible and independently bounded in the same sha
   fleet.dispose();
 });
 
+test('empty and paused fleets retain GPU data and hide zero-count meshes without losing later arrivals', () => {
+  const fleet = new ServiceFleet(new T.Scene()),
+    meshes = [...fleet.meshes, fleet.shadows.mesh],
+    state = { time: 7.25, serviceVehicles: [] };
+  fleet.sync(state, 4.2);
+  const emptyVersions = meshes.map((m) => m.instanceMatrix.version);
+  for (let i = 0; i < 60; i++) fleet.sync(state, 4.2);
+  assert.deepEqual(
+    meshes.map((m) => m.instanceMatrix.version),
+    emptyVersions,
+  );
+  assert.ok(meshes.every((m) => m.count === 0 && !m.visible));
+  state.serviceVehicles = [vehicle(12, 0, 'repairing')];
+  fleet.sync(state, 4.2);
+  assert.ok(meshes.every((m) => m.count === 1 && m.visible));
+  for (const mesh of meshes) {
+    mesh.computeBoundingSphere();
+    mesh.instanceMatrix.clearUpdateRanges();
+  }
+  const versions = meshes.map((m) => m.instanceMatrix.version),
+    data = meshes.map((m) => m.instanceMatrix.array.slice()),
+    bounds = meshes.map((m) => m.boundingSphere);
+  for (let i = 0; i < 60; i++) fleet.sync(state, 4.2);
+  assert.deepEqual(
+    meshes.map((m) => m.instanceMatrix.version),
+    versions,
+  );
+  assert.deepEqual(
+    meshes.map((m) => m.instanceMatrix.array),
+    data,
+  );
+  assert.deepEqual(
+    meshes.map((m) => m.boundingSphere),
+    bounds,
+  );
+  fleet.update(4.3);
+  assert.deepEqual(
+    meshes.slice(0, 2).map((m) => m.instanceMatrix.version),
+    versions.slice(0, 2),
+  );
+  assert.ok(fleet.beacons.instanceMatrix.version > versions[2]);
+  assert.ok(fleet.work.instanceMatrix.version > versions[3]);
+  assert.deepEqual(fleet.beacons.instanceMatrix.updateRanges, [{ start: 0, count: 16 }]);
+  state.serviceVehicles = [];
+  fleet.sync(state, 4.3);
+  assert.ok(meshes.every((m) => !m.visible && m.count === 0));
+  fleet.dispose();
+});
+
+test('one final battle-clock fleet sync matches the former snapshot-then-animation poses exactly', () => {
+  const old = new ServiceFleet(new T.Scene()),
+    current = new ServiceFleet(new T.Scene()),
+    vehicles = [vehicle(12, 0, 'repairing'), vehicle(55, 1, 'outbound')],
+    state = { time: 1000, serviceVehicles: vehicles };
+  for (const time of [0, 0.016, 4.2, 4.2, 9.33]) {
+    old.sync(state);
+    old.update(time);
+    current.sync(state, time);
+    assert.deepEqual(
+      [...current.meshes, current.shadows.mesh].map((m) => m.instanceMatrix.array),
+      [...old.meshes, old.shadows.mesh].map((m) => m.instanceMatrix.array),
+    );
+    assert.deepEqual(current.diagnostics(), old.diagnostics());
+  }
+  // Existing callers without a visual clock keep snapshot-time animation.
+  old.sync(state);
+  current.sync(state);
+  assert.deepEqual(current.beacons.instanceMatrix.array, old.beacons.instanceMatrix.array);
+  old.dispose();
+  current.dispose();
+});
+
 test('service fleet retains shared buffers across snapshots and disposes every resource once', () => {
   const scene = new T.Scene(),
     fleet = new ServiceFleet(scene);

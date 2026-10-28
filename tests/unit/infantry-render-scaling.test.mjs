@@ -118,3 +118,46 @@ test('animation invalidates picking bounds without aggregate matrix scans in eve
   assert.equal(pool.body.boundingSphere, null);
   assert.ok(pick(), 'lazy bounds are refreshed after moving out of the previous sphere');
 });
+
+test('500 paused equipped soldiers reuse GPU data and bounds while a real pose change updates only its instances', () => {
+  const { units, world, batch, visible } = fixture(500);
+  batch.sync(units, 0, visible);
+  const pool = batch.pools.get('infantry0'),
+    meshes = [pool.body, pool.legs, batch.equipment[0], batch.selected];
+  for (const mesh of meshes) {
+    mesh.instanceMatrix.clearUpdateRanges();
+    mesh.computeBoundingSphere();
+  }
+  const versions = meshes.map((m) => m.instanceMatrix.version),
+    spheres = meshes.map((m) => m.boundingSphere),
+    arrays = meshes.map((m) => m.instanceMatrix.array.slice());
+  for (let i = 0; i < 30; i++) batch.sync(units, 0, visible);
+  assert.deepEqual(
+    meshes.map((m) => m.instanceMatrix.version),
+    versions,
+  );
+  assert.deepEqual(
+    meshes.map((m) => m.boundingSphere),
+    spheres,
+  );
+  assert.ok(meshes.every((m, i) => m.instanceMatrix.array.every((v, j) => v === arrays[i][j])));
+  units[0].x = 900;
+  batch.sync(units, 0, visible);
+  assert.deepEqual(
+    meshes.map((m) => m.instanceMatrix.updateRanges),
+    [
+      [{ start: 0, count: 16 }],
+      [{ start: 0, count: 32 }],
+      [{ start: 0, count: 16 }],
+      [{ start: 0, count: 16 }],
+    ],
+  );
+  assert.ok(meshes.every((m) => m.boundingSphere === null));
+  world.scene.updateMatrixWorld(true);
+  const ray = new T.Raycaster(new T.Vector3(900, 30, units[0].z), new T.Vector3(0, -1, 0));
+  assert.ok(
+    ray
+      .intersectObjects(batch.meshes)
+      .some((hit) => hit.object.userData.unitIds[hit.instanceId] === units[0].id),
+  );
+});

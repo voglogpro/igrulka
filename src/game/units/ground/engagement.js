@@ -2,6 +2,7 @@ import { hostile, sideIds } from '../../factions.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry } from '../../config.js';
 import { groundVisible, lineOfSight } from '../infantry/cover.js';
 import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
+import { CandidateBuffer } from './candidate-buffer.js';
 
 export const ENGAGEMENT_CADENCE = 0.3;
 export const ENGAGEMENT_LOS_BUDGET = 8;
@@ -402,7 +403,8 @@ export function groundEngagement(s, u) {
   if (!valid) target = null;
   if ((u.nextThink || 0) <= s.time) {
     cache.metrics.searches++;
-    const candidates = [];
+    const candidates = (cache.candidates ||= new CandidateBuffer(true));
+    candidates.reset();
     const margin = range + 4;
     for (
       let z = Math.floor((u.z - margin) / ENGAGEMENT_CELL);
@@ -416,17 +418,17 @@ export function groundEngagement(s, u) {
       )
         for (const side of cache.enemies[u.side] || [])
           for (const t of cache.sideBuckets[side].get(`${x},${z}`) || [])
-            if (inRange(s, u, t, range, minRange))
-              candidates.push({ unit: t, score: rank(u, t, range, cache) });
-    cache.metrics.candidates += candidates.length;
-    candidates.sort((a, b) => b.score - a.score || a.unit.id - b.unit.id);
-    const head = candidates.slice(0, 2);
-    const tail = candidates.slice(2);
-    const width = ENGAGEMENT_LOS_BUDGET - head.length;
-    const batches = Math.max(1, Math.ceil(tail.length / width));
+            if (inRange(s, u, t, range, minRange)) candidates.add(t, rank(u, t, range, cache));
+    cache.metrics.candidates += candidates.count;
+    const order = candidates.sortedOrder(),
+      head = Math.min(2, order.length),
+      tail = order.length - head;
+    const width = ENGAGEMENT_LOS_BUDGET - head;
+    const batches = Math.max(1, Math.ceil(tail / width));
     const offset = (Math.floor(s.time / ENGAGEMENT_CADENCE) % batches) * width;
-    for (const entry of [...head, ...tail.slice(offset, offset + width)]) {
-      const candidate = entry.unit;
+    const inspected = head + Math.min(width, tail - offset);
+    for (let i = 0; i < inspected; i++) {
+      const candidate = candidates.units[order[i < head ? i : i + offset]];
       if (
         !visible(s, cache, u.side, candidate) ||
         (!indirect && !clearLine(s, cache, u, candidate))

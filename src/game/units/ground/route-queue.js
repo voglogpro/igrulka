@@ -146,9 +146,17 @@ export function updateGroundRoutes(s) {
   }
   for (const { u, route, arrived, next } of selected) {
     if (
-      walkable(s, next.x, next.z, GROUND_UNITS[u.key].size * 0.42) &&
+      (next.mode === 'retreat' || walkable(s, next.x, next.z, GROUND_UNITS[u.key].size * 0.42)) &&
       typeof orderGround(s, u.side, [u.id], next, { preserveRoute: true }) === 'number'
     ) {
+      if (next.mode === 'retreat') {
+        // The base centre is solid. The original immediate retreat also ends
+        // at groundPath's safe final cell; use it as the arrival marker so the
+        // pending planner finishes and later Shift-orders remain usable.
+        const endpoint = u.path.at(-1);
+        u.order.x = endpoint.x;
+        u.order.z = endpoint.z;
+      }
       if (arrived) u.routeQueue.shift();
       route.status = 'moving';
     } else route.status = 'blocked';

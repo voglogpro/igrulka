@@ -148,6 +148,40 @@ test('shared vehicle draws preserve turret matrices, visibility, proxy ray picki
   material.dispose();
 });
 
+test('unchanged vehicle batches retain GPU matrices and a turret updates only its shared slot', () => {
+  const scene = new T.Scene(),
+    geometry = new T.BoxGeometry(),
+    material = new T.MeshStandardMaterial(),
+    models = new Map();
+  for (let i = 0; i < 250; i++) {
+    const root = new T.Group(),
+      turret = new T.Group();
+    root.position.x = i * 12;
+    root.add(new T.Mesh(geometry, material));
+    turret.position.y = 2;
+    turret.add(new T.Mesh(geometry, material));
+    root.add(turret);
+    root.userData.turret = turret;
+    scene.add(root);
+    models.set(i, root);
+  }
+  const batch = new VehicleBatch(scene);
+  batch.sync(models);
+  const mesh = [...batch.groups.values()][0].mesh,
+    version = mesh.instanceMatrix.version;
+  mesh.instanceMatrix.clearUpdateRanges();
+  for (let i = 0; i < 30; i++) batch.sync(models);
+  assert.equal(mesh.instanceMatrix.version, version);
+  assert.deepEqual(mesh.instanceMatrix.updateRanges, []);
+  models.get(0).userData.turret.rotation.y = 0.4;
+  batch.sync(models);
+  assert.deepEqual(mesh.instanceMatrix.updateRanges, [{ start: 16, count: 16 }]);
+  const expected = models.get(0).userData.turret.children[0].matrixWorld;
+  assert.deepEqual(mesh.instanceMatrix.array.slice(16, 32), new Float32Array(expected.elements));
+  assert.equal(mesh.count, 500);
+  batch.dispose();
+});
+
 test('contact shadows follow movement every sync and never become delayed sun-map casters', () => {
   const scene = new T.Scene(),
     shadows = new ContactShadows(scene, 2);

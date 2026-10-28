@@ -12,7 +12,7 @@ export { redeployMOG } from '../infantry/mog.js';
 export { launchFPV } from '../infantry/fpv.js';
 export { damageGround, impactGround } from './combat.js';
 export { updateGround } from './update.js';
-export { groundPath, walkable, GROUND_LIMIT, BRIDGES } from './navigation.js';
+export { groundPath, walkable, navigationWarmup, GROUND_LIMIT, BRIDGES } from './navigation.js';
 export { GROUND_COMMAND_LIMIT, ARMY_TARGET_MAX } from './limits.js';
 export { guardGround, defendLineGround } from './guard.js';
 export {

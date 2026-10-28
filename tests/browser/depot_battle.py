@@ -17,7 +17,7 @@ if os.name == 'nt':
 
 game = ROOT / 'play' / 'Skyfront.html'
 title = re.search(r'<title>(.*?)</title>', game.read_text(encoding='utf8'), re.DOTALL).group(1)
-assert '8.12.0' in title, title
+assert '8.12.1' in title, title
 report = {
     'title': title,
     'errors': [],

@@ -1,5 +1,63 @@
 # Карта кода
 
+## Короткие остановки и подготовка 8.12.1
+
+Формат состояния 20 и протокол 13 сохранены. Новые кеши — производные данные;
+их не включают в сохранения или снимки сети. Подготовка не тратит ресурсы,
+не отдаёт приказы и не продвигает время/RNG игры.
+
+| Что проверять/менять                                                                    | Точка кода                                                                                                                                             |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Подготовка до Start, ограничение времени, смена кампании во время загрузки              | `src/rendering/performance/startup-prewarm.js`, связка `world.shaderWarmup` в `world.js`                                                               |
+| Реальные семейства моделей/материалов, обычные и instanced-варианты, теневые программы  | `rendering/performance/warmup-families.js`, `warmup-draw.js`, `shader-warmup.js`                                                                       |
+| Индикатор загрузки, заблокированный Start, ограниченная необязательная подготовка аудио | `src/ui/session/startup-readiness.js`, связка в `app.js`                                                                                               |
+| Прежний аудиограф заранее без звука; включение только жестом                            | `src/audio/game-audio.js`: `prepare`, `unlock`; банк PCM по-прежнему `sample-bank.js`/`pcm-worker.js`                                                  |
+| Только изменённые Float32-матрицы, диапазоны GPU upload, актуальные bounds выбора       | `rendering/performance/instance-updates.js`; потребители — `models/infantry/soldiers.js`, `vehicle-batch.js`, `contact-shadows.js`, `service-fleet.js` |
+| Локальная очистка леса под дорогой/стройкой без полного обхода                          | `rendering/performance/tree-index.js`, `rendering/terrain/environment.js`: `clearTrees`                                                                |
+| Статическая геометрия без больших временных JS-массивов                                 | `src/rendering/mesh-utils.js`: `batchStatic`                                                                                                           |
+| Общий неизменный рельеф, маски радиусов и расстояния вдоль рёбер сетки                  | `src/game/units/ground/navigation.js`; `navigationWarmup` — итератор подготовки                                                                        |
+| Береговая геометрия один раз на проход распределения/проверки постов                    | `src/game/defense/formation.js`, `persistence.js`                                                                                                      |
+| Каталог публичных зданий/дорог без повторного поиска через армию                        | `src/game/visibility.js`: `knownTargets`; правила скрытых целей — прежний `observedTarget`                                                             |
+| Единственный разбор версии после загрузки, прежние raw-резервные копии                  | `src/ui/session/campaign-store.js`: `loadCampaign`                                                                                                     |
+
+`tree-index.js` сохраняет порядок исходного массива, а живые флаги очистки
+проверяются в момент запроса. Индекс заменяется при смене массива или длины.
+`navigation.js` отделяет постоянный рельеф от меняющихся зданий; маски препятствий
+по-прежнему зависят от кампании и `networkRevision`. Локальная подготовка путей
+пропускается у сетевого клиента: авторитетная навигация работает на сервере.
+
+`game/units/ground/candidate-buffer.js` переиспользует массивы ссылок, оценок и
+индексов при поиске наземных целей. `guard.js` извлекает ближайшие цели из кучи
+и проверяет видимость по очереди. `engagement.js` сохраняет полный порядок по
+оценке/ID и прежнее окно из двух первых и шести сменяемых кандидатов. Равные
+ключи сохраняют исходный порядок. Буферы принадлежат производным кешам подсистем,
+живут вне состояния игры и не входят в сохранения или сетевые снимки.
+
+Короткие регрессии — `tests/unit/instance-updates.test.mjs`, `tree-index.test.mjs`,
+`static-mesh-output.test.mjs`, `navigation-terrain-cache.test.mjs`,
+`navigation-warmup.test.mjs`, `startup-prewarm.test.mjs`, `startup-readiness.test.mjs`,
+`audio-startup.test.mjs`, `city-target-performance.test.mjs`,
+`candidate-buffer.test.mjs`, `ground-engagement.test.mjs`,
+`guard-sight-performance.test.mjs`. Реальный ввод и причины
+долгих кадров — `tests/browser/hitch_hunt.py`, `hitch_probe.js`, `hitch_summary.py`.
+Замеры требуют одинаковых сценариев без параллельной нагрузки. План —
+[PLAN-8121.md](PLAN-8121.md); цифры приёмки ведутся отдельно.
+
+`world.js:resizeRender` меняет canvas одним `setDrawingBufferSize` только при
+новых размерах/DPR/масштабе. `performance/context-recovery.js` восстанавливает
+статическую тень после замены WebGL-контекста. `warmup-draw.js` сначала готовит
+семейства, затем целую настоящую сцену во внутренних буферах. Неблокирующий GPU
+fence в `startup-prewarm.js` ожидается через loading RAF, с тем же общим дедлайном.
+Тесты жизненного цикла — `render-resize-lifecycle.test.mjs`,
+`startup-prewarm.test.mjs`; отчёт — [qa/FREEZES-8121.md](qa/FREEZES-8121.md).
+
+Массовое ручное отступление — `game/units/ground/orders.js:commandUnits`, порог
+16 доступных бойцов. Маршруты получает прежняя очередь
+`game/units/ground/route-queue.js` (два поиска за шаг). Для центра здания базы
+планировщик сохраняет прежнюю безопасную конечную ячейку `groundPath` как маркер
+прибытия. Проверки — `tests/unit/manual-retreat.test.mjs`; native-клик —
+`hitch_hunt.py --scenario retreat --units 90 --seconds 10 --require-ready`.
+
 ## Автономная боёвка 8.12
 
 Единая доктрина для игрока, кооператива и ботов — `src/game/defense/`:

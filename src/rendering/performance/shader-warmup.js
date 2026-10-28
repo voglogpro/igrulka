@@ -17,7 +17,7 @@ export function warmSceneShaders(renderer, scene, camera, post, { timeoutMs = 30
     canvas?.addEventListener?.('webglcontextlost', contextLost, { once: true });
     timer = setTimeout(
       () => finish('timeout'),
-      Number.isFinite(timeoutMs) ? Math.max(0, Math.min(3000, timeoutMs)) : 3000,
+      Number.isFinite(timeoutMs) ? Math.max(0, Math.min(30000, timeoutMs)) : 3000,
     );
     let previous = null,
       savedTarget = false;
