@@ -1,3 +1,30 @@
+# Recorded explosion, 8.13.1
+
+"Dynamite explosion in the mountain" by Felix Blume, Freesound #251401.
+Source: https://freesound.org/people/felix.blume/sounds/251401/
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/ (CC0-1.0.txt).
+This is the author's actual recording of a rock-breaking blast in Bolivia,
+not a recording of a particular military weapon. No endorsement is implied.
+
+The public HQ MP3 preview was downloaded anonymously; the original WAV was not
+downloaded. Source SHA-256 and all edits are in `explosion-sources.json`.
+The first 4.4 seconds contain the blast and its recorded decay. Processing:
+28 Hz high-pass, 6500 Hz low-pass, mono 16 kHz PCM16, DC removal, peak 0.72,
+3 ms attack and 400 ms tail fades. The three runtime blast profiles crop/fade
+the same recording; they do not add generated noise or oscillator layers.
+Rifle/vehicle presets which were already synthetic remain identified as such.
+This release does not claim that all existing gunfire has become a field recording.
+
+Reproduce after downloading the public preview to a local source file:
+
+```sh
+python assets/audio/prepare-explosion.py --source path/to/251401-hq.mp3
+node assets/audio/encode-samples.mjs
+```
+
+The derivative `explosion-field.wav` is 140,844 bytes, SHA-256
+`39d5e33bff0e102b0b43140e201c903ff8440d1a43d419ce78bdbdbe3c88efa6`.
+
 # Recorded rain, 8.13
 
 "Rain, Moderate, A.wav" by InspectorJ (www.jshaw.co.uk), Freesound #401277.

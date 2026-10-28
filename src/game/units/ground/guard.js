@@ -8,6 +8,9 @@ import { clearAutoDefense } from '../../defense/volunteers.js';
 import { invalidateFrontline } from '../../defense/cache.js';
 import { ENGAGEMENT_CELL, prepareGroundEngagement } from './engagement.js';
 import { CandidateBuffer } from './candidate-buffer.js';
+import { availableTrenchSlots, trenchContested } from '../../defense/positions.js';
+import { TRENCH_FOOTPRINT, trenchContains } from '../../defense/trench-footprint.js';
+import { staticObjectsInBounds } from '../../shared/static-spatial.js';
 
 const GUARD_RADIUS = 95;
 const ALLY_RADIUS = 68;
@@ -239,11 +242,41 @@ function guardCandidates(s, u, p) {
       (a, b) => Number(b.nearby) - Number(a.nearby) || b.score - a.score || a.distance - b.distance,
     );
 }
-function coveredPost(s, u, p, candidateCache = null) {
+function coveredPost(
+  s,
+  u,
+  p,
+  candidateCache = null,
+  tryTrenches = true,
+  pathBudget = GUARD_PATH_ATTEMPTS,
+) {
   // Static terrain/cover scores are shared only within this one group order.
   // Occupied posts are rechecked after every assignment, preserving separation.
+  // Reaffirming an already reached post must not move it to the slightly offset dig centre.
+  if (u.guard && distance(u.guard, p) < 1e-6 && distance(u, p) <= 3) return { point: p, path: [] };
+  const trenchRadius = TRENCH_FOOTPRINT.queryRadius + 4;
+  const trenchCandidates =
+    tryTrenches && isInfantry(u.key)
+      ? staticObjectsInBounds(
+          s,
+          'trenches',
+          p.x - trenchRadius,
+          p.z - trenchRadius,
+          p.x + trenchRadius,
+          p.z + trenchRadius,
+        )
+          .filter(
+            (t) =>
+              t.progress >= 1 &&
+              trenchContains(t, p.x, p.z, 4) &&
+              !trenchContested(s, t, u.side, u.id, true),
+          )
+          .flatMap((t) => availableTrenchSlots(s, u, t).map((point) => ({ ...point, trench: t })))
+          .sort((a, b) => distance(a, p) - distance(b, p))
+      : [];
+  const usingTrenchSlots = trenchCandidates.length > 0;
   const key = `${u.key}:${p.x}:${p.z}`;
-  let candidates = candidateCache?.get(key);
+  let candidates = usingTrenchSlots ? trenchCandidates : candidateCache?.get(key);
   if (!candidates) {
     candidates = guardCandidates(s, u, p);
     candidateCache?.set(key, candidates);
@@ -260,14 +293,22 @@ function coveredPost(s, u, p, candidateCache = null) {
     occupied.every(
       ({ unit, point }) =>
         distance(candidate, point) >=
-        (size + GROUND_UNITS[unit.key].size) * 0.5 + GUARD_POST_CLEARANCE - 1e-6,
+        (size + GROUND_UNITS[unit.key].size) * 0.5 +
+          (candidate.trench && trenchContains(candidate.trench, point.x, point.z)
+            ? 0
+            : GUARD_POST_CLEARANCE) -
+          1e-6,
     ),
   );
-  for (const candidate of ranked.slice(0, GUARD_PATH_ATTEMPTS)) {
+  let attempted = 0;
+  for (const candidate of ranked.slice(0, pathBudget)) {
     if (distance(u, candidate) <= 3) return { point: candidate, path: [] };
+    attempted++;
     const path = groundPath(s, u, candidate, GROUND_UNITS[u.key].size * 0.42);
     if (path.length) return { point: candidate, path };
   }
+  if (usingTrenchSlots && attempted < pathBudget)
+    return coveredPost(s, u, p, candidateCache, false, pathBudget - attempted);
   return null;
 }
 

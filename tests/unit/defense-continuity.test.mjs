@@ -244,6 +244,7 @@ test('distant position planning uses observed memory rather than the actual loca
 
 test('completed adjacent trenches form actual continuous cover, with bounded persistent links', () => {
   const s = fresh();
+  const baseCover = E.coverInfo(s, { key: 'infantry', x: -900, z: -180 }).cover;
   const a = { id: s.nextId++, side: 0, x: -900, z: -220, progress: 1, fortificationWork: 30 };
   const b = { id: s.nextId++, side: 0, x: -900, z: -140, progress: 1, fortificationWork: 90 };
   s.trenches.push(a, b);
@@ -252,13 +253,13 @@ test('completed adjacent trenches form actual continuous cover, with bounded per
   assert.equal(links[0].a, a);
   assert.equal(links[0].b, b);
   const point = { key: 'infantry', x: -900, z: -180 };
-  assert.equal(E.coverInfo(s, point).cover, 0.78);
+  assert.equal(E.coverInfo(s, point).cover, Math.max(baseCover, 0.78 * 0.45));
   s.time += 1;
   assert.equal(trenchLinks(s), links, 'unit movement/time does not rebuild static earthworks');
   b.side = 1;
   invalidateTrenchLinks(s);
   assert.equal(trenchLinks(s)[0].side, null);
-  assert.equal(E.coverInfo(s, { ...point }).cover, 0.78);
+  assert.equal(E.coverInfo(s, { ...point }).cover, Math.max(baseCover, 0.78 * 0.45));
   s.buildings.push({
     id: s.nextId++,
     side: 1,

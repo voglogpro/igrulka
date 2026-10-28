@@ -1,14 +1,13 @@
 import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
 import { FORTIFICATION } from '../../game/defense/config.js';
+import { trenchRenderPieces } from '../../game/defense/trench-footprint.js';
+export { trenchEndTrim, trenchRenderPieces } from '../../game/defense/trench-footprint.js';
 import { fortificationStatus } from '../../game/defense/fortifications.js';
 import { trenchLinks, TRENCH_LINK_MAX_SPAN } from '../../game/defense/trench-links.js';
 
-const PIECE_LENGTH = 6,
-  END_TRIM = 1.6;
+const PIECE_LENGTH = 6;
 
-// Three shared unit-length sections: the ditch and berms, a bag parapet,
-// then timber retaining walls. Earth colours stay neutral after a capture.
 function template(stage) {
   const root = new T.Group(),
     geometry = new T.BoxGeometry(1, 1, 1),
@@ -20,56 +19,38 @@ function template(stage) {
     const mesh = new T.Mesh(earth ? rounded : geometry, materials.get(color));
     mesh.position.set(x, y + height / 2, z);
     mesh.scale.set(width, height, length);
-    if (earth) mesh.rotation.y = Math.sin(x * 7 + z * 13) * 0.025;
     mesh.castShadow = mesh.receiveShadow = true;
     root.add(mesh);
   };
   if (stage === 0) {
-    // Short dark firing sections read separately. Shallow continuous earth
-    // between them still represents the unchanged continuous cover corridor.
-    box(0, 0, 0, 3.6, 0.09, 0.64, '#28271f');
+    box(0, 0, 0, 3.52, 0.1, 1, '#28271f');
     for (const side of [-1, 1]) {
-      box(side * 2.16, 0.02, 0, 0.85, 0.1, 1, '#62553f');
-      box(side * 1.79, 0.08, 0, 0.16, 0.46, 0.64, '#352d23');
-      for (let i = 0; i < 5; i++) {
-        const z = -0.24 + i * 0.12,
-          offset = Math.sin(i * 2.7 + side) * 0.12;
+      box(side * 1.74, 0.1, 0, 0.15, 0.54, 1, '#65543d');
+      for (let i = 0; i < 4; i++) {
+        const z = -0.375 + i * 0.25,
+          offset = Math.sin(i * 2.7 + side) * 0.13;
         box(
           side * (2.2 + offset),
-          0.18,
+          0.02,
           z,
-          1.0 + offset,
-          0.35 + (i % 3) * 0.1,
-          i === 2 ? 0.075 : 0.105,
+          1.25,
+          0.48 + (i % 3) * 0.07,
+          0.34,
           i % 2 ? '#6d5c40' : '#79684a',
           true,
         );
-        box(side * (2.6 + offset), 0.03, z, 0.7, 0.15, 0.11, '#62553d', true);
       }
+      for (const z of [-0.34, 0.34]) box(side * 1.62, 0.08, z, 0.18, 0.76, 0.035, '#493e2d');
     }
-    for (let i = 0; i < 2; i++)
-      box(0.12 * Math.sin(i), 0.1, (i - 0.5) * 0.39, 2.7, 0.04, 0.045, '#514632');
   } else if (stage === 1) {
     for (const side of [-1, 1])
-      for (const i of [0, 1, 3]) {
-        const z = -0.225 + i * 0.15;
-        box(
-          side * (2.13 + Math.sin(i * 3 + side) * 0.08),
-          0.65,
-          z,
-          0.78,
-          0.27 + (i % 2) * 0.06,
-          0.13,
-          i % 2 ? '#827356' : '#938363',
-          true,
-        );
-        if (i !== 1) box(side * 2.15, 0.94, z + 0.025, 0.69, 0.23, 0.12, '#7a6b4f', true);
-      }
+      for (const z of [-0.35, -0.12, 0.35])
+        box(side * 2.15, 0.6, z, 0.68, 0.3, 0.19, '#827356', true);
   } else {
     for (const side of [-1, 1]) {
-      for (let row = 0; row < 3; row++)
-        box(side * 1.72, 0.12 + row * 0.19, 0, 0.12, 0.16, 0.62, row % 2 ? '#66563e' : '#756247');
-      for (const z of [-0.25, 0.24]) box(side * 1.6, 0.08, z, 0.19, 0.92, 0.055, '#49402f');
+      for (let row = 0; row < 2; row++)
+        box(side * 1.74, 0.68 + row * 0.2, 0, 0.15, 0.17, 1, row % 2 ? '#66563e' : '#756247');
+      box(side * 1.6, 0.08, 0, 0.21, 1.14, 0.035, '#49402f');
     }
   }
   batchStatic(root);
@@ -85,7 +66,8 @@ export class TrenchLinkView {
     this.records = new Map();
     this.seen = new Set();
     this.dummy = new T.Object3D();
-    this.capacity = FORTIFICATION.maxPositions * 2 * Math.ceil(TRENCH_LINK_MAX_SPAN / PIECE_LENGTH);
+    this.capacity =
+      FORTIFICATION.maxPositions * 2 * (Math.ceil(TRENCH_LINK_MAX_SPAN / PIECE_LENGTH) + 10);
     this.rebuilds = 0;
     this.pools = Array.from({ length: 3 }, (_, stage) => {
       const source = template(stage),
@@ -112,14 +94,29 @@ export class TrenchLinkView {
       let record = this.records.get(link.id);
       if (
         !record ||
+        record.a !== a ||
+        record.b !== b ||
         record.level !== level ||
         record.side !== link.side ||
         record.ax !== a.x ||
         record.az !== a.z ||
         record.bx !== b.x ||
-        record.bz !== b.z
+        record.bz !== b.z ||
+        record.ayaw !== (a.yaw || 0) ||
+        record.byaw !== (b.yaw || 0)
       ) {
-        record = { ax: a.x, az: a.z, bx: b.x, bz: b.z, level, side: link.side };
+        record = {
+          a,
+          b,
+          ax: a.x,
+          az: a.z,
+          bx: b.x,
+          bz: b.z,
+          level,
+          side: link.side,
+          ayaw: a.yaw || 0,
+          byaw: b.yaw || 0,
+        };
         this.records.set(link.id, record);
         dirty = true;
       }
@@ -136,12 +133,12 @@ export class TrenchLinkView {
       const dx = record.bx - record.ax,
         dz = record.bz - record.az,
         length = Math.hypot(dx, dz),
-        usable = Math.max(0, length - END_TRIM * 2),
-        pieces = Math.ceil(usable / PIECE_LENGTH),
+        pieces = trenchRenderPieces(record.a, record.b),
         yaw = Math.atan2(dx, dz);
-      for (let i = 0; i < pieces && counts[0] < this.capacity; i++) {
-        const from = (END_TRIM + usable * (i / pieces)) / length,
-          to = (END_TRIM + usable * ((i + 1) / pieces)) / length,
+      for (const piece of pieces) {
+        if (counts[0] >= this.capacity) break;
+        const from = piece.from / length,
+          to = piece.to / length,
           ax = record.ax + dx * from,
           az = record.az + dz * from,
           bx = record.ax + dx * to,
@@ -152,11 +149,11 @@ export class TrenchLinkView {
           d = this.dummy;
         d.position.set((ax + bx) / 2, (ay + by) / 2 + 0.09, (az + bz) / 2);
         d.rotation.set(-Math.atan2(by - ay, flat), yaw, 0, 'YXZ');
-        d.scale.set(1, 1, Math.hypot(flat, by - ay));
+        d.scale.set(piece.narrow ? 0.45 : 1, piece.narrow ? 0.45 : 1, Math.hypot(flat, by - ay));
         d.updateMatrix();
         this.pools[0].setMatrixAt(counts[0]++, d.matrix);
-        if (record.level >= 2) this.pools[1].setMatrixAt(counts[1]++, d.matrix);
-        if (record.level >= 3) this.pools[2].setMatrixAt(counts[2]++, d.matrix);
+        if (!piece.narrow && record.level >= 2) this.pools[1].setMatrixAt(counts[1]++, d.matrix);
+        if (!piece.narrow && record.level >= 3) this.pools[2].setMatrixAt(counts[2]++, d.matrix);
       }
     }
     for (let i = 0; i < this.pools.length; i++) {

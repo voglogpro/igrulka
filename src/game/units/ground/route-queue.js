@@ -41,7 +41,17 @@ export function appendGroundOrder(s, side, ids, point) {
     const next = { ...points[i], mode: point.mode || 'move' };
     const radius = GROUND_UNITS[u.key].size * 0.42;
     if (!walkable(s, next.x, next.z, radius)) continue;
-    if (u.routeState || (!u.guard && u.path?.length && u.order)) {
+    if (u.supplyTrip) {
+      // Shift extends the confirmed route after the physical supply leg. Do
+      // not admit it to the route scheduler while that leg owns the order.
+      u.routeQueue ||= [];
+      u.routeQueue.push(next);
+      // An operation with no earlier combat waypoint keeps trip membership
+      // until its queued manual move takes over at the end of the supply leg.
+      if (u.autoDefense || u.guard || u.routeQueue.some((p) => p.mode === 'attackmove'))
+        delete u.defenseAttack;
+      count++;
+    } else if (u.routeState || (!u.guard && u.path?.length && u.order)) {
       delete u.defenseAttack;
       u.routeQueue ||= [];
       u.routeQueue.push(next);

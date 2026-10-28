@@ -5,6 +5,7 @@ import { groundFormationDestinations, orderGround } from './orders.js';
 import { groundVisible } from '../infantry/cover.js';
 import { clearGroundRoute } from './route-queue.js';
 import { walkable } from './navigation.js';
+import { assaultAmmunition, holdAssaultForSupply } from './assault-supply.js';
 
 export const DEFENSE_ATTACK_PERCENT = 30;
 const enemyHQ = (s, side) => {
@@ -23,12 +24,18 @@ function attackPlan(s, side) {
   const waves = new Map();
   let total = 0,
     active = 0,
-    returning = 0;
+    returning = 0,
+    preparing = 0,
+    resupplying = 0;
   for (const u of s.groundUnits) {
     if (u.side !== side || u.hp <= 0) continue;
     if (u.defenseAttack) {
       if (u.defenseAttack.phase === 'active') active++;
       else if (u.defenseAttack.phase === 'returning') returning++;
+      if (u.defenseAttack.phase === 'active') {
+        if (u.supplyTrip) resupplying++;
+        else if (assaultAmmunition(s, u).low) preparing++;
+      }
       waves.set(
         u.defenseAttack.wave,
         Math.max(waves.get(u.defenseAttack.wave) || 0, u.defenseAttack.initial || 0),
@@ -95,7 +102,7 @@ function attackPlan(s, side) {
       .slice(0, b.take),
   }));
   const initial = [...waves.values()].reduce((sum, n) => sum + n, 0);
-  return { total, eligible, count, groups, active, returning, initial };
+  return { total, eligible, count, groups, active, returning, initial, preparing, resupplying };
 }
 
 export function defenseAttackStatus(s, side) {
@@ -116,6 +123,8 @@ export function defenseAttackStatus(s, side) {
     active: plan.active,
     returning: plan.returning,
     initial: plan.initial,
+    preparing: plan.preparing || 0,
+    resupplying: plan.resupplying || 0,
     reason,
     ok: !reason,
   };
@@ -192,6 +201,7 @@ export function launchDefenseAttack(s, side) {
       };
       u.stance = { mode: 'attack' };
       u.routeQueue = [{ ...goalsById.get(u.id), mode: 'attackmove' }];
+      holdAssaultForSupply(s, u);
       accepted++;
     }
   }
@@ -222,6 +232,7 @@ export function enrollCityAssault(s, u) {
     wave: s.nextId++,
     nextAt: s.time + 3,
   };
+  holdAssaultForSupply(s, u);
   return true;
 }
 
@@ -266,6 +277,7 @@ export function updateDefenseAttacks(s) {
       }
       continue;
     }
+    if (holdAssaultForSupply(s, u)) continue;
     if (
       u.path?.length ||
       u.routeQueue?.length ||

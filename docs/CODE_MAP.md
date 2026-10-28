@@ -1,5 +1,22 @@
 # Карта кода
 
+## Изменения 8.13.1
+
+| Механика                                                 | Основные файлы                                                                                         |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Проект экономики и статический расчёт рецептов           | `docs/design/ECONOMY.md`, `scripts/economy-report.mjs`                                                 |
+| Дальние залпы, бас, отражения, ограничение одного залпа  | `src/audio/battle-mix.js`, `game-audio.js`                                                             |
+| Настоящий взрыв и воспроизводимая подготовка             | `src/audio/explosions.js`, `assets/audio/prepare-explosion.py`, `explosion-sources.json`, `LICENSE.md` |
+| Общая 18-метровая форма, места, длинные секции и проходы | `src/game/defense/trench-footprint.js`                                                                 |
+| Укрытие/занятие/повторное использование                  | `defense/positions.js`, `fortifications.js`, `units/infantry/cover.js`, `units/ground/guard.js`        |
+| Шесть графических batches окопов, наклон на склоне       | `src/rendering/defense/fortifications.js`, `trench-links.js`                                           |
+| Подготовка атаки и наземный боезапас                     | `src/game/units/ground/assault-supply.js`, `defense-attack.js`                                         |
+| Поход к конечному ящику/возврат к приказу                | `units/ground/field-supply.js`, `city/field-ammo.js`, `persistence/field-supply.js`                    |
+
+Сохранение 21, протокол 15. Проектные цены из `ECONOMY.md` не применяются
+автоматически. Реальная оплата по-прежнему находится в существующих командах и
+производстве; нельзя списывать рецепт второй раз при выдаче уже оплаченного груза.
+
 ## Армия, склады и электроника 8.13
 
 Состояние 21, протокол 14. `city/electronics.js` — рецепт, предел запаса,

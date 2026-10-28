@@ -2,84 +2,96 @@ import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
 import { FORTIFICATION } from '../../game/defense/config.js';
 import { fortificationStatus } from '../../game/defense/fortifications.js';
+import { TRENCH_FOOTPRINT } from '../../game/defense/trench-footprint.js';
 import { TrenchLinkView } from './trench-links.js';
 
 function template(stage) {
   const root = new T.Group(),
     box = new T.BoxGeometry(1, 1, 1),
-    bag = new T.SphereGeometry(1, 8, 4),
-    materials = new Map();
+    earth = new T.SphereGeometry(0.5, 8, 4),
+    materials = new Map(),
+    half = TRENCH_FOOTPRINT.length / 2,
+    width = TRENCH_FOOTPRINT.halfWidth;
   const add = (x, y, z, w, h, d, color, rounded = false) => {
     if (!materials.has(color))
-      materials.set(color, new T.MeshStandardMaterial({ color, roughness: 0.94 }));
-    const mesh = new T.Mesh(rounded ? bag : box, materials.get(color));
+      materials.set(color, new T.MeshStandardMaterial({ color, roughness: 0.96 }));
+    const mesh = new T.Mesh(rounded ? earth : box, materials.get(color));
     mesh.position.set(x, y + h / 2, z);
     mesh.scale.set(w, h, d);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.castShadow = mesh.receiveShadow = true;
     root.add(mesh);
   };
   if (stage === 0) {
-    add(0, 0, 0, 6.4, 0.12, 3.8, '#28271f');
-    for (let i = 0; i < 5; i++) {
-      add(-2.7 + i * 1.3, 0.13, 0.1 * Math.sin(i), 0.17, 0.05, 3.1, '#554832');
-      for (const side of [-1, 1]) {
-        const offset = Math.sin(i * 2.3 + side) * 0.16;
-        add(-2.7 + i * 1.3, 0.05, side * (2.15 + offset), 1.45, 0.38, 1.5, '#625239', true);
-        if (i !== 2)
-          add(
-            -2.7 + i * 1.3,
-            0.27,
-            side * (2.2 + offset),
-            1.3,
-            0.43,
-            0.86,
-            i % 2 ? '#786648' : '#6b593d',
-            true,
-          );
-        add(-2.7 + i * 1.3, 0.1, side * 1.73, 1.24, 0.48, 0.13, '#40372a');
+    // Continuous open floor: straight core and rounded ends match the game capsule.
+    add(0, 0, 0, TRENCH_FOOTPRINT.halfCore * 2, 0.1, width * 1.6, '#28271f');
+    for (const end of [-1, 1])
+      add(end * TRENCH_FOOTPRINT.halfCore, 0, 0, width * 2, 0.12, width * 1.6, '#28271f', true);
+    for (const side of [-1, 1]) {
+      // Long retaining boards are not stretched bags; the interior stays readable.
+      for (let row = 0; row < 3; row++)
+        add(
+          0,
+          0.12 + row * 0.21,
+          side * width * 0.79,
+          14.2,
+          0.17,
+          0.15,
+          row % 2 ? '#65543d' : '#786348',
+        );
+      for (let i = 0; i < 12; i++) {
+        const x = -half + 0.7 + i * ((TRENCH_FOOTPRINT.length - 1.4) / 11),
+          taper = Math.abs(x) > TRENCH_FOOTPRINT.halfCore ? 0.68 : 1,
+          offset = Math.sin(i * 2.7 + side) * 0.18;
+        add(
+          x,
+          0.02,
+          side * (width + offset) * taper,
+          1.9,
+          0.45 + (i % 3) * 0.08,
+          1.25,
+          i % 2 ? '#6d5c40' : '#79684a',
+          true,
+        );
+        if (i % 2 === 0) add(x, 0.08, side * width * 0.73 * taper, 0.18, 0.78, 0.2, '#493e2d');
       }
     }
-    for (const side of [-1, 1]) {
-      for (const end of [-1, 1]) add(side * 3.4, 0.04, end * 1.6, 1.0, 0.5, 1.1, '#6b6047', true);
-      for (let i = 0; i < 6; i++)
-        add(-3 + i * 1.2, 0.13, side * 2.1, 0.69, 0.42, 0.53, i % 2 ? '#817258' : '#736447', true);
-    }
+    for (let i = 0; i < 9; i++) add(-6.4 + i * 1.6, 0.11, 0, 0.16, 0.035, 2.7, '#514632');
   } else if (stage === 1) {
     for (const side of [-1, 1])
-      for (let row = 0; row < 2; row++) {
-        for (let i = 0; i < 6; i++)
-          add(
-            -3 + i * 1.2 + (row ? 0.25 : 0),
-            0.55 + row * 0.55,
-            side * 2.1,
-            0.7,
-            0.34,
-            0.5,
-            i % 2 ? '#7d7255' : '#8d7c5d',
-            true,
-          );
-        for (const i of [0, 2])
-          add(side * 3.5, 0.55 + row * 0.55, -1.2 + i * 1.2, 0.5, 0.34, 0.7, '#786b51', true);
+      for (let i = 0; i < 15; i++) {
+        const x = -7.7 + i * 1.1;
+        if (i % 5 === 2) continue;
+        add(
+          x,
+          0.6,
+          side * (width + Math.sin(i + side) * 0.12),
+          1.13,
+          0.3,
+          0.68,
+          i % 2 ? '#827356' : '#938363',
+          true,
+        );
+        if (i % 3 === 0) add(x + 0.2, 0.86, side * width, 0.95, 0.25, 0.61, '#7a6b4f', true);
       }
   } else {
     for (const side of [-1, 1]) {
-      add(side * 3.3, 0.1, -2.7, 0.22, 1.35, 0.22, '#53594d');
-      add(side * 3.3, 0.1, -0.4, 0.22, 1.2, 0.22, '#53594d');
-      add(side * 3.1, 0.15, 2.8, 0.24, 1.8, 0.24, '#71644b');
+      for (let row = 0; row < 2; row++)
+        add(
+          0,
+          0.7 + row * 0.2,
+          side * width * 0.79,
+          14.2,
+          0.17,
+          0.16,
+          row % 2 ? '#66563e' : '#756247',
+        );
+      for (const x of [-6.6, -3.3, 0, 3.3, 6.6])
+        add(x, 0.08, side * width * 0.72, 0.21, 1.14, 0.21, '#49402f');
     }
-    // Short open timber sections keep occupants readable from above.
-    for (const side of [-1, 1]) {
-      for (let row = 0; row < 4; row++)
-        add(side * 3.1, 0.12 + row * 0.26, -0.7, 0.17, 0.21, 2.5, row % 2 ? '#6a5940' : '#776448');
-      add(side * 2.6, 1.22, -2.35, 1.8, 0.35, 0.7, '#7f7154', true);
-    }
-    add(-2.3, 0.3, -2.5, 1.5, 0.7, 1, '#655c46');
-    add(2.3, 0.3, -2.5, 1.1, 0.9, 0.8, '#4c5948');
   }
   batchStatic(root);
   box.dispose();
-  bag.dispose();
+  earth.dispose();
   for (const material of materials.values()) material.dispose();
   return root.children[0];
 }
@@ -130,6 +142,22 @@ export class FortificationView {
           previous.level !== status.level ||
           previous.side !== t.side ||
           Math.floor(previous.progress * 3) !== Math.floor(status.progress * 3);
+        let pose = previous;
+        if (moved) {
+          const half = TRENCH_FOOTPRINT.length / 2,
+            dx = Math.cos(yaw) * half,
+            dz = -Math.sin(yaw) * half,
+            low = Math.max(0, this.height(t.x - dx, t.z - dz)),
+            high = Math.max(0, this.height(t.x + dx, t.z + dz)),
+            centre = Math.max(0, this.height(t.x, t.z)),
+            rise = high - low;
+          pose = {
+            y: (low + high) / 2 + 0.07,
+            roll: Math.atan2(rise, TRENCH_FOOTPRINT.length),
+            stretch: Math.hypot(TRENCH_FOOTPRINT.length, rise) / TRENCH_FOOTPRINT.length,
+            terrainDeviation: Math.abs(centre - (low + high) / 2),
+          };
+        }
         this.models.set(t.id, {
           level: status.level,
           x: t.x,
@@ -137,7 +165,10 @@ export class FortificationView {
           yaw,
           side: t.side,
           progress: status.progress,
-          y: moved ? Math.max(0, this.height(t.x, t.z)) + 0.07 : previous.y,
+          y: pose.y,
+          roll: pose.roll,
+          stretch: pose.stretch,
+          terrainDeviation: pose.terrainDeviation,
         });
         dirty = true;
       }
@@ -152,11 +183,11 @@ export class FortificationView {
       for (const record of this.models.values()) {
         const d = this.dummy;
         d.position.set(record.x, record.y, record.z);
-        d.rotation.set(0, record.yaw, 0);
-        d.scale.set(1, 0.15 + record.progress * 0.85, 1);
+        d.rotation.set(0, record.yaw, record.roll, 'YXZ');
+        d.scale.set(record.stretch, 0.15 + record.progress * 0.85, 1);
         d.updateMatrix();
         this.pools[0].setMatrixAt(counts[0]++, d.matrix);
-        d.scale.set(1, 1, 1);
+        d.scale.set(record.stretch, 1, 1);
         d.updateMatrix();
         if (record.level >= 2) this.pools[1].setMatrixAt(counts[1]++, d.matrix);
         if (record.level >= 3) this.pools[2].setMatrixAt(counts[2]++, d.matrix);
@@ -181,6 +212,10 @@ export class FortificationView {
       positions: this.models.size,
       stages: this.pools.map((p) => p.count),
       capacity: this.capacity,
+      terrainDeviation: Math.max(
+        0,
+        ...Array.from(this.models.values(), (record) => record.terrainDeviation),
+      ),
       links: this.links.diagnostics(),
       batches: 6,
     };

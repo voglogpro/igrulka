@@ -6,6 +6,7 @@ import { clearGroundRoute } from './route-queue.js';
 import { clearAutoDefense } from '../../defense/volunteers.js';
 import { invalidateFrontline } from '../../defense/cache.js';
 import { hostile } from '../../factions.js';
+import { trenchContains } from '../../defense/trench-footprint.js';
 import { trenchContested } from '../../defense/positions.js';
 import { invalidateTrenchLinks } from '../../defense/trench-links.js';
 import { invalidateStaticGeometry } from '../../shared/static-spatial.js';
@@ -174,7 +175,7 @@ export function commandUnits(s, side, ids, command) {
       changed++;
     }
     if (command === 'dig' && isInfantry(u.key) && !u.carrierId) {
-      let t = (s.trenches ||= []).find((t) => Math.hypot(t.x - u.x, t.z - u.z) < 4);
+      let t = (s.trenches ||= []).find((t) => trenchContains(t, u.x, u.z));
       if (t && trenchContested(s, t, side, u.id)) continue;
       delete u.supplyTrip;
       clearAutoDefense(u);

@@ -6,7 +6,7 @@ import json
 import os
 import wave
 from playwright.sync_api import sync_playwright
-from audio import sources
+from audio import sources, VOICE_CAP_RENDER, validate_cap
 from support import ARTIFACTS
 
 if os.name == 'nt':
@@ -32,7 +32,7 @@ RENDER = r'''async ({url,wav})=>{
   if(mode==='incoming')audio.incoming({...empty,units:[{id:99,key:'ballistic',hp:10,total:100,travelled:10,speed:90,delay:0,tx:0,tz:0}]});
   if(mode==='flight')audio.update({...empty,units:[{id:99,key:'cruise',hp:10,delay:0,status:'flying',x:0,y:160,z:0,vx:50,vy:0,vz:0}]},camera,false);
   if(mode==='pressure'){
-   for(let i=0;i<44;i++)audio.sample('rifle',10,0,.5,{delay:1});
+   for(let i=0;i<8;i++)audio.sample('rifle',10,0,.5,{delay:1});
    audio.play(launch);
    result.priorityAdmitted=[...audio.activeSamples].filter(voice=>voice.name==='ballisticLaunch').length;
    result.pressureVoices=audio.voices;
@@ -64,11 +64,14 @@ args = parser.parse_args()
 with sync_playwright() as p:
     browser = p.chromium.launch(channel='chrome', headless=True, args=['--disable-gpu'])
     try:
-        result = browser.new_page().evaluate(RENDER, {'url': sources(), 'wav': args.wav})
+        page = browser.new_page()
+        result = page.evaluate(RENDER, {'url': sources(), 'wav': args.wav})
+        result['voiceCap'] = page.evaluate(VOICE_CAP_RENDER, sources())
+        validate_cap(result['voiceCap'])
     finally:
         browser.close()
-assert result['priorityAdmitted'] == 1 and result['pressureVoices'] == 44
-assert result['stressVoices'] == 44
+assert result['priorityAdmitted'] == 1 and result['pressureVoices'] == 9
+assert result['stressVoices'] == 12
 for name in ['mlrs', 'artillery', 'ballistic', 'cruise', 'incoming', 'farBallistic', 'flight', 'pressure', 'stress']:
     assert .0005 < result[name]['rms'] < .4, (name, result[name])
     assert 0 < result[name]['peak'] <= .99, (name, result[name])

@@ -184,8 +184,12 @@ export function updateArmyRecruitment({
     : attack.reason ||
       `Отправить ${attack.count} из ${attack.eligible} готовых защитников. Без доплаты; остальные держат оборону.`;
   attackButton.setAttribute('aria-label', `Отправить 30% обороны в атаку: ${attack.count} бойцов`);
+  const supplyWaiting = (attack.preparing || 0) + (attack.resupplying || 0);
   $('#attack-living').textContent =
-    `В атаке ${attack.active || 0} · возврат ${attack.returning || 0}`;
+    `В атаке ${attack.active || 0}${supplyWaiting ? ` · пополняются ${supplyWaiting}` : ''} · возврат ${attack.returning || 0}`;
+  $('#attack-living').title = supplyWaiting
+    ? 'Бойцы получают боеприпасы или идут к своему ящику; после пополнения продолжат атаку.'
+    : 'Живые участники операции и бойцы, возвращающиеся после отзыва.';
   const recallButton = $('[data-action="attack-recall"]');
   recallButton.disabled = !!recallButton.dataset.pending || !(attack.active > 0);
   recallButton.title = 'Вернуть живых участников атаки к своим постам';

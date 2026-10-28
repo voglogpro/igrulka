@@ -53,6 +53,8 @@ test('30 percent attack leaves 14 of 20 defenders on each front and does no sync
     active: 0,
     returning: 0,
     initial: 0,
+    preparing: 0,
+    resupplying: 0,
     reason: '',
     ok: true,
   });
@@ -255,9 +257,9 @@ test('an ordinary tank walks to ammunition then destroys two ordinary city build
       x: 800,
       z: 450,
       fieldPoint: { x: 800, z: 450 },
-      cargo: { kind: 'ammo', key: 'shell', amount: 24 },
+      cargo: { kind: 'ammo', key: 'shell', amount: 48 },
     }),
-    24,
+    48,
   );
   assert.equal(
     E.orderGround(
@@ -289,7 +291,7 @@ test('an ordinary tank walks to ammunition then destroys two ordinary city build
   assert.equal(u.maxHp, initialHp);
   assert.ok(u.x > 900, 'the second target needs actual travel beyond the original point');
   const remaining = s.ammoCrates[0].stock.shell + E.ammunitionStatus(s, u).total;
-  assert.ok(remaining < 24 && remaining >= 0);
+  assert.ok(remaining < 48 && remaining >= 0);
   assert.equal(u.defenseAttack.phase, 'active');
   // Recall during the saved supply leg cancels that detour, preserving stock.
   const returning = loaded.groundUnits.find((v) => v.id === u.id);

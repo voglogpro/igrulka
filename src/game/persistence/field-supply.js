@@ -87,8 +87,15 @@ export function restoreFieldSupply(s, sourceVersion = s.version) {
       !point(t.home) ||
       u.order?.supplyId !== t.crateId ||
       !['resupply', 'resupplyReturn'].includes(u.order.mode) ||
-      (!u.autoDefense && u.defenseAttack?.phase !== 'active') ||
-      u.key === 'mog' ||
+      (!u.autoDefense &&
+        u.defenseAttack?.phase !== 'active' &&
+        !(
+          point(u.guard) &&
+          ['guard', 'guardReturn', 'guardIntercept', 'wait', 'resupply', 'resupplyReturn'].includes(
+            u.order?.mode,
+          )
+        ) &&
+        !u.routeQueue?.some((p) => p.mode === 'attackmove')) ||
       !s.ammoCrates.some((c) => c.id === t.crateId && c.side === u.side)
     )
       throw Error('Поврежден маршрут пополнения');

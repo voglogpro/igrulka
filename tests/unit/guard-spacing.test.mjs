@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as game from '../../src/game/index.js';
+import { trenchContains } from '../../src/game/defense/trench-footprint.js';
 import { GUARD_POST_CLEARANCE, GUARD_POST_RADIUS } from '../../src/game/units/ground/guard.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -78,9 +79,16 @@ function separated({ s, rally, units }) {
   }
   for (let i = 0; i < units.length; i++)
     for (let j = i + 1; j < units.length; j++) {
+      const samePhysicalTrench = s.trenches.some(
+        (t) =>
+          t.progress >= 1 &&
+          [units[i], units[j]].every(
+            (u) => game.isInfantry(u.key) && trenchContains(t, u.guard.x, u.guard.z),
+          ),
+      );
       const required =
         (game.GROUND_UNITS[units[i].key].size + game.GROUND_UNITS[units[j].key].size) * 0.5 +
-        GUARD_POST_CLEARANCE;
+        (samePhysicalTrench ? 0 : GUARD_POST_CLEARANCE);
       assert.ok(distance(units[i].guard, units[j].guard) >= required - 1e-6);
       assert.ok(distance(units[i], units[j]) > 2, 'settled recruits must not overlap');
     }

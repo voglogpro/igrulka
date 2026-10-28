@@ -7,6 +7,7 @@ const ordnance = [
   'artillery-shot',
   'missile-flight',
   'missile-approach',
+  'explosion-field',
 ];
 for (const name of [
   'fpv-rotor',

@@ -46,7 +46,17 @@ export function fieldSupplyJobs(s, side) {
       if (need <= 0) continue;
       const staticTarget =
         !GROUND_UNITS[target.key] || target.key === 'mog' || !GROUND_UNITS[target.key].speed;
-      needs.push({ target, kind: p.kind, need, empty: report.total === 0, staticTarget });
+      const groundCapacity = p.dual ? p.groundCapacity : p.capacity;
+      const groundTotal = (p.dual ? report.groundLoaded : report.loaded) + report.reserve;
+      // A depleted operation returning home requests delivery at that fixed
+      // rendezvous, not at a position it will leave before the van arrives.
+      const anchor =
+        target.defenseAttack?.phase === 'active' &&
+        groundTotal < groundCapacity &&
+        target.order?.mode === 'move'
+          ? target.defenseAttack.home
+          : target;
+      needs.push({ target, anchor, kind: p.kind, need, empty: groundTotal === 0, staticTarget });
     }
     needs.sort(
       (a, b) =>
@@ -61,18 +71,22 @@ export function fieldSupplyJobs(s, side) {
         Math.floor(p.z / FIELD_SUPPLY.clusterRadius),
       ];
     for (const need of needs) {
-      const [cx, cz] = cell(need.target);
+      const [cx, cz] = cell(need.anchor);
       let group = null;
       for (let dz = -1; dz <= 1 && !group; dz++)
         for (let dx = -1; dx <= 1 && !group; dx++)
           group = (cells.get(`${cx + dx},${cz + dz}`) || []).find(
             (g) =>
-              distance(g, need.target) <=
+              distance(g, need.anchor) <=
               (need.staticTarget ? FIELD_SUPPLY.serviceRadius - 8 : FIELD_SUPPLY.clusterRadius),
           );
       if (!group) {
         const size = BUILDINGS[need.target.key]?.size || 0;
-        let point = depotSupplyPoint(s, need.target, FIELD_SUPPLY.serviceRadius);
+        let point = depotSupplyPoint(
+          s,
+          { ...need.target, ...need.anchor },
+          FIELD_SUPPLY.serviceRadius,
+        );
         for (const [dx, dz] of [
           [12, 12],
           [-12, 12],
@@ -84,10 +98,10 @@ export function fieldSupplyJobs(s, side) {
           [0, -size * 0.6 - 8],
         ]) {
           if (point) break;
-          const p = { x: need.target.x + dx, z: need.target.z + dz };
+          const p = { x: need.anchor.x + dx, z: need.anchor.z + dz };
           if (
             walkable(s, p.x, p.z, 3) &&
-            distance(p, need.target) <= FIELD_SUPPLY.serviceRadius - 4
+            distance(p, need.anchor) <= FIELD_SUPPLY.serviceRadius - 4
           ) {
             point = p;
             break;

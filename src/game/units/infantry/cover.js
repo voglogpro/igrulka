@@ -11,8 +11,13 @@ import { COVER_PATCHES } from '../../map.js';
 import { segmentDistance } from '../../city/road-network.js';
 import { fortificationStatus } from '../../defense/fortifications.js';
 import { FORTIFICATION } from '../../defense/config.js';
-import { staticObjectsInBounds } from '../../shared/static-spatial.js';
+import { staticObjectsInBounds, staticGeometryRevision } from '../../shared/static-spatial.js';
 import { trenchLinksAt } from '../../defense/trench-links.js';
+import {
+  TRENCH_FOOTPRINT,
+  trenchContains,
+  trenchLinkCoverFactor,
+} from '../../defense/trench-footprint.js';
 // Forests and thickets are generated with the terrain so hills and woods line up.
 export { COVER_PATCHES };
 const coverCache = new WeakMap();
@@ -64,6 +69,9 @@ export function coverInfo(s, u, from = null) {
     previous &&
     previous.time === s.time &&
     previous.revision === s.networkRevision &&
+    previous.trenchRevision === staticGeometryRevision(s, 'trenches') &&
+    previous.trenches === s.trenches &&
+    previous.trenchCount === s.trenches.length &&
     previous.x === u.x &&
     previous.z === u.z
   )
@@ -114,26 +122,36 @@ export function coverInfo(s, u, from = null) {
   for (const t of staticObjectsInBounds(
     s,
     'trenches',
-    u.x - FORTIFICATION.coverRadius,
-    u.z - FORTIFICATION.coverRadius,
-    u.x + FORTIFICATION.coverRadius,
-    u.z + FORTIFICATION.coverRadius,
+    u.x - TRENCH_FOOTPRINT.queryRadius,
+    u.z - TRENCH_FOOTPRINT.queryRadius,
+    u.x + TRENCH_FOOTPRINT.queryRadius,
+    u.z + TRENCH_FOOTPRINT.queryRadius,
   ))
-    if (t.progress >= 1 && Math.hypot(t.x - u.x, t.z - u.z) < FORTIFICATION.coverRadius) {
+    if (t.progress >= 1 && trenchContains(t, u.x, u.z)) {
       const fortification = fortificationStatus(t);
       cover = Math.max(cover, fortification.cover);
       concealment = Math.max(concealment, FORTIFICATION.concealment[fortification.level]);
       kind = 'Окоп';
     }
-  for (const { a, b } of trenchLinksAt(s, u.x, u.z, FORTIFICATION.coverRadius))
-    if (segmentDistance(u.x, u.z, a.x, a.z, b.x, b.z) < FORTIFICATION.coverRadius) {
-      const level = Math.min(fortificationStatus(a).level, fortificationStatus(b).level);
-      cover = Math.max(cover, FORTIFICATION.cover[level]);
-      concealment = Math.max(concealment, FORTIFICATION.concealment[level]);
-      kind = 'Окоп';
-    }
+  for (const { a, b } of trenchLinksAt(s, u.x, u.z, TRENCH_FOOTPRINT.halfWidth)) {
+    const factor = trenchLinkCoverFactor(a, b, u.x, u.z);
+    if (!factor) continue;
+    const level = Math.min(fortificationStatus(a).level, fortificationStatus(b).level);
+    cover = Math.max(cover, FORTIFICATION.cover[level] * factor);
+    concealment = Math.max(concealment, FORTIFICATION.concealment[level] * factor);
+    kind = '\u041e\u043a\u043e\u043f';
+  }
   const value = { cover, concealment, kind, wall };
-  cache.set(u, { time: s.time, revision: s.networkRevision, x: u.x, z: u.z, value });
+  cache.set(u, {
+    time: s.time,
+    revision: s.networkRevision,
+    trenchRevision: staticGeometryRevision(s, 'trenches'),
+    trenches: s.trenches,
+    trenchCount: s.trenches.length,
+    x: u.x,
+    z: u.z,
+    value,
+  });
   return coverForDirection(value, from, u);
 }
 // Widest building footprint used as a cheap bounding-box reject before the exact segment test.

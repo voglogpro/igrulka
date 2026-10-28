@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import * as T from '../../vendor/three/three.module.js';
 import * as E from '../../src/game/index.js';
 import { FortificationView } from '../../src/rendering/defense/fortifications.js';
+import { trenchEndTrim, trenchRenderPieces } from '../../src/rendering/defense/trench-links.js';
+import { TRENCH_FOOTPRINT } from '../../src/game/defense/trench-footprint.js';
 import { invalidateTrenchLinks } from '../../src/game/defense/trench-links.js';
 
 function fixture({ visible = () => true, height = () => 0 } = {}) {
@@ -47,7 +49,7 @@ test('continuous earthwork pieces meet end to end, conform to terrain and use th
   assert.equal(link.records.size, 1);
   assert.deepEqual(
     pools.map((p) => p.count),
-    [13, 13, 0],
+    [14, 12, 0],
   );
   assert.deepEqual(view.diagnostics().stages, [2, 2, 1]);
   const matrix = new T.Matrix4();
@@ -64,10 +66,10 @@ test('continuous earthwork pieces meet end to end, conform to terrain and use th
         from.distanceTo(previous) < 1e-4,
         'Float32 section ends meet within a tenth of a millimetre',
       );
-    else assert.ok(Math.abs(from.z - 201.6) < 1e-4);
+    else assert.ok(Math.abs(from.z - 209) < 1e-4);
     previous = to;
   }
-  assert.ok(Math.abs(previous.z - 278.4) < 1e-4);
+  assert.ok(Math.abs(previous.z - 271) < 1e-4);
   for (const mesh of pools) {
     assert.ok(mesh.geometry.attributes.color);
     assert.ok(mesh.geometry.attributes.position.array.every(Number.isFinite));
@@ -79,7 +81,7 @@ test('continuous earthwork pieces meet end to end, conform to terrain and use th
   assert.equal(view.sync(state), true);
   assert.deepEqual(
     pools.map((p) => p.count),
-    [13, 13, 13],
+    [14, 12, 12],
   );
 });
 
@@ -184,6 +186,7 @@ test('a full defensive line keeps six fixed draws and uploads nothing when only 
     meshes.map((p) => p.instanceMatrix.version),
     versions,
   );
+  assert.equal(view.links.capacity, 19200);
   assert.ok(view.links.pools.every((p) => p.count <= view.links.capacity));
   const before = E.save(state);
   view.sync(state);
@@ -210,50 +213,144 @@ test('irregular earthwork templates stay bounded, open above occupants and reuse
   assert.equal(scene.children.length, 0);
 });
 
-test('short firing sections leave real gaps in dark excavation, tall berms, bags and timber while low earth stays continuous', () => {
+test('long firing sections remain continuous through hidden terrain subdivisions and have narrow connecting walks', () => {
   const { view } = fixture();
   for (const [stage, mesh] of view.links.pools.entries()) {
     const positions = mesh.geometry.attributes.position,
       colors = mesh.geometry.attributes.color,
-      darkFloor = new T.Color('#28271f');
-    let darkVertices = 0;
-    let upperMin = Infinity,
-      upperMax = -Infinity,
-      lowEnds = 0;
+      dark = new T.Color('#28271f');
+    let darkMin = Infinity,
+      darkMax = -Infinity,
+      timberMin = Infinity,
+      timberMax = -Infinity;
     for (let i = 0; i < positions.count; i++) {
-      const y = positions.getY(i),
-        z = positions.getZ(i);
+      const z = positions.getZ(i);
       if (
         stage === 0 &&
-        Math.abs(colors.getX(i) - darkFloor.r) < 1e-6 &&
-        Math.abs(colors.getY(i) - darkFloor.g) < 1e-6 &&
-        Math.abs(colors.getZ(i) - darkFloor.b) < 1e-6
+        Math.abs(colors.getX(i) - dark.r) < 1e-6 &&
+        Math.abs(colors.getY(i) - dark.g) < 1e-6 &&
+        Math.abs(colors.getZ(i) - dark.b) < 1e-6
       ) {
-        darkVertices++;
-        assert.ok(Math.abs(z) <= 0.321, 'dark excavation cannot continue across the upper gap');
+        darkMin = Math.min(darkMin, z);
+        darkMax = Math.max(darkMax, z);
       }
-      if (stage > 0 || y > 0.13) {
-        upperMin = Math.min(upperMin, z);
-        upperMax = Math.max(upperMax, z);
-        assert.ok(Math.abs(z) <= 0.34, `stage${stage} upper section bridges the gap at ${z}`);
-      }
-      if (stage === 0 && Math.abs(z) > 0.49) {
-        lowEnds++;
-        assert.ok(
-          y <= 0.13,
-          'continuous linking earth must remain low, without tall or dark walls',
-        );
+      if (positions.getY(i) > 0.7 && stage === 2) {
+        timberMin = Math.min(timberMin, z);
+        timberMax = Math.max(timberMax, z);
       }
     }
-    assert.ok(upperMax > upperMin);
-    assert.ok(
-      (1 - (upperMax - upperMin)) * 6 > 1.8,
-      'a six-metre piece has a readable upper interruption',
-    );
     if (stage === 0) {
-      assert.ok(darkVertices > 0, 'test locates the actual dark floor in merged vertex colors');
-      assert.ok(lowEnds > 0, 'subtle earth still represents continuous game cover');
+      assert.equal(darkMin, -0.5);
+      assert.equal(darkMax, 0.5);
+    }
+    if (stage === 2) {
+      assert.equal(timberMin, -0.5);
+      assert.equal(timberMax, 0.5);
     }
   }
+  for (const length of [34, 40, 62, 80, 120, 180]) {
+    const pieces = trenchRenderPieces({ x: 0, z: 0, yaw: 0 }, { x: 0, z: length, yaw: 0 });
+    let run = 0;
+    const runs = [];
+    for (const [i, piece] of pieces.entries()) {
+      assert.ok(piece.to - piece.from <= 6 + 1e-9);
+      if (i) assert.ok(Math.abs(piece.from - pieces[i - 1].to) < 1e-9);
+      if (piece.narrow) {
+        if (run) runs.push(run);
+        run = 0;
+      } else run += piece.to - piece.from;
+    }
+    if (run) runs.push(run);
+    assert.ok(runs.length > 0);
+    assert.ok(runs.every((length) => length >= 15 - 1e-9 && length <= 20 + 1e-9));
+    assert.ok(pieces.length <= 40, 'fixed per-link instance budget');
+  }
+  view.dispose();
+});
+
+test('standalone excavation matches the shared eighteen metre capsule without stretched sandbags', () => {
+  const { view } = fixture(),
+    mesh = view.pools[0],
+    positions = mesh.geometry.attributes.position,
+    colors = mesh.geometry.attributes.color,
+    dark = new T.Color('#28271f');
+  let min = Infinity,
+    max = -Infinity;
+  for (let i = 0; i < positions.count; i++)
+    if (
+      Math.abs(colors.getX(i) - dark.r) < 1e-6 &&
+      Math.abs(colors.getY(i) - dark.g) < 1e-6 &&
+      Math.abs(colors.getZ(i) - dark.b) < 1e-6
+    ) {
+      min = Math.min(min, positions.getX(i));
+      max = Math.max(max, positions.getX(i));
+      assert.ok(Math.abs(positions.getZ(i)) <= TRENCH_FOOTPRINT.halfWidth);
+    }
+  assert.ok(
+    Math.abs(max - min - TRENCH_FOOTPRINT.length) < 0.12,
+    'rounded low-poly endcaps span eighteen metres',
+  );
+  assert.equal(trenchEndTrim({ yaw: 0 }, 1, 0), 9);
+  assert.equal(trenchEndTrim({ yaw: 0 }, 0, 1), 2.2);
+  assert.ok(Math.abs(trenchEndTrim({ yaw: Math.PI / 2 }, 0, 1) - 9) < 1e-9);
+  const pieces = trenchRenderPieces({ x: 0, z: 0, yaw: Math.PI / 2 }, { x: 0, z: 80, yaw: 0 });
+  assert.ok(Math.abs(pieces[0].from - 9) < 1e-9);
+  assert.ok(Math.abs(pieces.at(-1).to - 77.8) < 1e-9);
+  view.dispose();
+});
+
+test('all supported link spans and post orientations stay inside the forty-piece bound', () => {
+  for (const length of [10, 18, 34, 40, 62, 80, 120, 160, 180])
+    for (let angle = 0; angle < 24; angle++) {
+      const yaw = (angle * Math.PI) / 12,
+        pieces = trenchRenderPieces(
+          { x: 0, z: 0, yaw },
+          { x: length, z: 0, yaw: yaw + Math.PI / 4 },
+        );
+      assert.ok(pieces.length <= 40);
+      for (const piece of pieces) {
+        assert.ok(Number.isFinite(piece.from) && Number.isFinite(piece.to));
+        assert.ok(piece.to > piece.from && piece.to - piece.from <= 6 + 1e-9);
+        assert.ok(piece.from >= 0 && piece.to <= length);
+      }
+    }
+});
+
+test('long standalone shelters follow endpoint terrain slope with identical stage poses and no idle resampling', () => {
+  let reads = 0;
+  const height = (x, z) => {
+      reads++;
+      return 40 + (x + 1300) * 0.13 + (z - 200) * 0.07;
+    },
+    { state, view } = fixture({ height });
+  state.trenches[1].fortificationWork = 90;
+  view.sync(state);
+  const base = new T.Matrix4(),
+    other = new T.Matrix4();
+  for (let i = 0; i < 2; i++) {
+    const post = state.trenches[i];
+    view.pools[0].getMatrixAt(i, base);
+    for (const sign of [-1, 1]) {
+      const end = new T.Vector3(sign * 9, 0, 0).applyMatrix4(base);
+      assert.ok(Math.abs(Math.hypot(end.x - post.x, end.z - post.z) - 9) < 1e-4);
+      assert.ok(Math.abs(end.y - height(end.x, end.z) - 0.07) < 1e-4);
+    }
+    for (const pool of view.pools.slice(1)) {
+      pool.getMatrixAt(i, other);
+      assert.deepEqual(other.elements, base.elements);
+    }
+  }
+  const before = reads,
+    versions = view.pools.map((pool) => pool.instanceMatrix.version);
+  view.sync(state);
+  assert.equal(reads, before);
+  assert.deepEqual(
+    view.pools.map((pool) => pool.instanceMatrix.version),
+    versions,
+  );
+  state.trenches[0].yaw = 0;
+  view.sync(state);
+  assert.ok(reads > before, 'yaw change refreshes endpoints');
+  assert.ok(view.diagnostics().terrainDeviation < 1e-10, 'linear terrain fits exactly');
   view.dispose();
 });

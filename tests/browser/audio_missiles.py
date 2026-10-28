@@ -3,7 +3,7 @@ import base64
 import json
 import wave
 from playwright.sync_api import sync_playwright
-from audio import sources
+from audio import sources, VOICE_CAP_RENDER, validate_cap
 from support import ARTIFACTS
 
 RENDER=r'''async url=>{
@@ -41,9 +41,13 @@ RENDER=r'''async url=>{
 
 with sync_playwright() as p:
     browser=p.chromium.launch(channel='chrome',headless=True,args=['--disable-gpu'])
-    try: result=browser.new_page().evaluate(RENDER,sources())
+    try:
+        page=browser.new_page()
+        result=page.evaluate(RENDER,sources())
+        result['voiceCap']=page.evaluate(VOICE_CAP_RENDER,sources())
+        validate_cap(result['voiceCap'])
     finally: browser.close()
-assert result['admitted']==44
+assert result['admitted']==12
 assert result['diveAdmitted']==1
 assert all(result[name]['voices']==0 for name in ['rocket','ballistic','dive','stress'])
 assert .05<result['stress']['peak']<=.99

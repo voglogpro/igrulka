@@ -10,6 +10,7 @@ import {
 import { allied } from '../factions.js';
 import { trenchContested } from './positions.js';
 import { invalidateTrenchLinks } from './trench-links.js';
+import { TRENCH_FOOTPRINT, trenchContains } from './trench-footprint.js';
 const workTimes = new WeakMap();
 const nearbyGeometry = new WeakMap();
 const labels = ['Земляные работы', 'Окоп', 'Укреплённый окоп', 'Блокпост'];
@@ -60,6 +61,7 @@ export function prepareDefensivePosition(s, u) {
     return null;
   }
   const revision = staticGeometryRevision(s, 'trenches');
+  const radius = TRENCH_FOOTPRINT.queryRadius + C.postRadius;
   let cached = nearbyGeometry.get(u);
   if (
     !cached ||
@@ -82,15 +84,15 @@ export function prepareDefensivePosition(s, u) {
       nearby: staticObjectsInBounds(
         s,
         'trenches',
-        u.x - C.postRadius,
-        u.z - C.postRadius,
-        u.x + C.postRadius,
-        u.z + C.postRadius,
-      ).filter((t) => Math.hypot(t.x - u.x, t.z - u.z) < C.postRadius),
+        u.x - radius,
+        u.z - radius,
+        u.x + radius,
+        u.z + radius,
+      ),
     };
     nearbyGeometry.set(u, cached);
   }
-  const nearby = cached.nearby;
+  const nearby = cached.nearby.filter((t) => trenchContains(t, u.x, u.z, C.postRadius));
   let t =
     nearby.find((t) => t.side === u.side) ||
     nearby.find((t) => !trenchContested(s, t, u.side, u.id));
