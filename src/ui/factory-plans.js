@@ -4,6 +4,8 @@ import { $ } from './format.js';
 const sites = (state) =>
   state.buildings.filter((b) => b.side === 0 && b.key === 'factory' && b.hp > 0);
 const labels = {
+  orders: 'Конечный заказ уже ожидает выпуска',
+  oil: 'Ожидание нефти',
   disabled: 'План выключен',
   stock: 'Целевой запас собран — ожидание расхода',
   queue: 'Выполняется оплаченная очередь',
@@ -65,7 +67,7 @@ export function updateFactoryPlansPanel(state) {
   $('#factory-plan-save').textContent = current?.enabled ? 'Применить изменения' : 'Включить план';
   $('#factory-plan-stop').disabled = !current?.enabled;
   $('#factory-plan-status').textContent = current
-    ? `${labels[current.status] || 'Ожидание'}${current.key ? ` · ${E.WEAPONS[current.key].name}: ${current.inventory} на складе + ${current.queued} в очередях / цель ${current.target}` : ''}`
+    ? `${labels[current.status] || 'Ожидание'}${current.key ? ` · ${E.WEAPONS[current.key].name}: ${current.inventory} на складе + ${current.queued} оплачено${current.pending ? ` + ${current.pending} ждут оплаты` : ''} / цель ${current.target}` : ''}`
     : 'Сначала постройте сборочный завод у дороги';
 }
 

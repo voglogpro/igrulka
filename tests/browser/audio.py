@@ -27,7 +27,8 @@ def sources(revision=None):
             raise ValueError('Invalid revision')
         cache = ARTIFACTS / 'audio-source-cache' / sha
         assert cache.resolve().is_relative_to(ARTIFACTS.resolve())
-        paths = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', sha, 'src/audio'], cwd=ROOT).decode().splitlines()
+        # The audio graph also uses the small shared team/ownership helper.
+        paths = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', sha, 'src/audio', 'src/game/factions.js'], cwd=ROOT).decode().splitlines()
         for name in paths:
             target = cache / name
             assert target.resolve().is_relative_to(cache.resolve())

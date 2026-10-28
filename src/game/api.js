@@ -58,12 +58,25 @@ export { DIFFICULTY, DEFAULT_DIFFICULTY, difficultyOf } from './ai/difficulty.co
 export { supplyFactor, economy, buildingOutput } from './city/economy.js';
 export { placementPlan, canPlace, build, demolish, repair } from './city/construction.js';
 export { roadPreview, buildRoad } from './city/roads.js';
+export {
+  HEADQUARTERS_INCOME,
+  roadRecoveryStatus,
+  startRoadRecovery,
+  setRoadRecoveryEnabled,
+  cancelRoadRecovery,
+} from './city/road-recovery.js';
 export { targetById, targetName } from './targets.js';
 export { research, researchProjects, researchStatus } from './research/research.js';
 export { purchaseQuote } from './city/pricing.js';
 export { recruitmentFacility } from './units/ground/recruitment.js';
 export { setArmyTarget, armyCompositionStatus } from './units/ground/composition.js';
 export { produce } from './units/aviation/production.js';
+export {
+  queueFactoryOrder,
+  cancelFactoryOrders,
+  factoryOrderStatus,
+  restoreFactoryOrders,
+} from './units/aviation/factory-orders.js';
 export {
   setFactoryPlan,
   factoryPlanStatus,

@@ -20,7 +20,15 @@ export function campRoads(s) {
   }
 }
 
-export function roadPreview(s, owner, ax, az, bx, bz) {
+export function roadPreview(
+  s,
+  owner,
+  ax,
+  az,
+  bx,
+  bz,
+  { ignoreCredits = false, ignoreRoadId = null } = {},
+) {
   if (!validSide(s, owner)) return { error: 'Неизвестный город' };
   if (![ax, az, bx, bz].every(Number.isFinite)) return { error: 'Некорректная дорога' };
   const length = Math.hypot(bx - ax, bz - az),
@@ -36,7 +44,7 @@ export function roadPreview(s, owner, ax, az, bx, bz) {
     if (groundHeight(x, z) > 1.2)
       return { error: 'Улица не поднимается на холм: ведите её по равнине', length, cost };
   }
-  if (overlappingRoad(s, ax, az, bx, bz))
+  if (overlappingRoad(s, ax, az, bx, bz, ignoreRoadId))
     return {
       error: 'Здесь уже есть дорога. Продолжите её от края или постройте перекрёсток',
       length,
@@ -56,7 +64,8 @@ export function roadPreview(s, owner, ax, az, bx, bz) {
     )
   )
     return { error: 'На пути здание', length, cost };
-  if (s.sides[owner].credits < cost) return { error: 'Недостаточно денег', length, cost };
+  if (!ignoreCredits && s.sides[owner].credits < cost)
+    return { error: 'Недостаточно денег', length, cost };
   return { length, cost };
 }
 

@@ -548,6 +548,50 @@ select:focus-visible {
   gap: 9px;
   background: #cee8c503;
 }
+.factory-order-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+  font-size: 10px;
+}
+.factory-order-controls input {
+  width: 48px;
+  padding: 3px;
+}
+.factory-order-controls button {
+  padding: 4px 7px;
+  border: 1px solid #82958e45;
+}
+.factory-order-controls small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.weapon-order-actions {
+  display: grid;
+  grid-template-columns: 38px auto;
+  align-items: center;
+  gap: 2px;
+}
+#game .weapon-order-actions .order {
+  width: 38px;
+}
+.weapon-order-actions span {
+  grid-column: 1 / -1;
+  font-size: 8px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.weapon-order-actions span:empty {
+  display: none;
+}
+.weapon-order-actions [data-cancel-production] {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 2px;
+  font-size: 13px;
+}
 .weapon-row.chosen {
   border-color: #acd4b45c;
   background: #c9e4bf0b;
@@ -2525,4 +2569,41 @@ body {
   bottom: calc(100% + 12px);
   right: 0;
   max-height: min(420px, calc(100dvh - 300px));
+}
+
+.road-recovery {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #9ebda24d;
+  border-radius: 12px;
+  background: #27382c66;
+}
+.road-recovery h3 {
+  margin: 0 0 8px;
+}
+.road-recovery label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.road-recovery select {
+  min-width: 0;
+  width: 100%;
+}
+.road-recovery progress {
+  width: 100%;
+  height: 9px;
+  margin-top: 10px;
+  accent-color: #a9c795;
+}
+.road-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.road-recovery small {
+  color: #abb7a9;
+  font-size: 11px;
+  line-height: 1.4;
 }

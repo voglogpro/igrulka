@@ -1,3 +1,4 @@
+import { ImpactReturn, IMPACT_RETURNS, impactReturnGain } from './impact-return.js';
 import { uavEngineMix } from './engines.js';
 import { FootstepScheduler } from './footsteps.js';
 import { recordedJetMix } from './ordnance.js';
@@ -94,6 +95,7 @@ export class GameAudio {
   constructor() {
     this.enabled = true;
     this.activated = false;
+    this.paused = false;
     this.volume = 0.35;
     this.last = {};
     this.voices = 0;
@@ -162,6 +164,7 @@ export class GameAudio {
       feedback.connect(delay);
       tone.connect(this.master);
       tone.connect(this.reverbIn);
+      this.impactReturn = new ImpactReturn(c, this.dry);
       this.buffers = this.renderBuffers();
       const suspended = !context && c.suspend ? c.suspend().catch(() => {}) : Promise.resolve();
       this.preparation = Promise.all([this.ready, suspended]);
@@ -202,12 +205,21 @@ export class GameAudio {
     return bank.buffers;
   }
   set(enabled, volume = this.volume) {
+    if (!enabled && this.enabled) this.clearImpactAudio();
     this.enabled = enabled;
     this.volume = volume;
     if (this.master) {
       if (!this.activated) this.master.gain.value = 0;
       else this.master.gain.setTargetAtTime(enabled ? volume : 0, this.context.currentTime, 0.05);
     }
+  }
+  clearImpactAudio() {
+    if (!this.context) return;
+    for (const voice of [...this.activeSamples]) {
+      voice.source.stop(this.context.currentTime);
+      voice.finish();
+    }
+    this.impactReturn?.clear();
   }
   // Interface blips stay synthetic and centred; they are not part of the battlefield.
   tone(freq, end, length, gain = 0.1, type = 'sine') {
@@ -235,7 +247,7 @@ export class GameAudio {
   }
   // One positioned battlefield sound: buffer → distance filter → dry/pan + reverb + echo sends.
   sample(name, distance, pan, loudness, options = {}) {
-    if (!this.activated) return;
+    if (!this.activated || this.paused) return;
     const list = this.buffers?.[name];
     if (!list || !this.enabled) return;
     const priority = options.priority || ORDNANCE.has(name);
@@ -276,6 +288,15 @@ export class GameAudio {
     wet.connect(this.reverbIn);
     filter.connect(echo);
     echo.connect(this.echoIn);
+    // The original dry/filter/wet/echo path above is unchanged from 8.13.2.
+    // Tee only significant admitted events into the prebuilt parallel return.
+    let impact = null;
+    if (this.impactReturn && IMPACT_RETURNS.has(name)) {
+      impact = c.createGain();
+      impact.gain.value = impactReturnGain(mix);
+      filter.connect(impact);
+      impact.connect(this.impactReturn.input);
+    }
     source.start(at, options.offset ?? 0);
     this.voices++;
     const voice = { name, source, priority, finished: false, finish: null };
@@ -285,6 +306,7 @@ export class GameAudio {
       this.voices--;
       this.activeSamples.delete(voice);
       for (const node of [source, filter, dry, wet, echo, stereo]) node.disconnect();
+      impact?.disconnect();
     };
     this.activeSamples.add(voice);
     source.onended = voice.finish;
@@ -514,7 +536,9 @@ export class GameAudio {
       rightX: m[0],
       rightZ: m[2],
     };
-    if (!paused) this.incoming(state);
+    if (paused && !this.paused) this.clearImpactAudio();
+    this.paused = paused;
+    if (!paused && this.enabled) this.incoming(state);
     const walker = this.footsteps.take(
       state.groundUnits || [],
       this.listener,
@@ -644,7 +668,10 @@ export class GameAudio {
   focus(visible) {
     if (!this.activated || !this.context) return;
     if (visible) this.context.resume().catch(() => {});
-    else this.context.suspend().catch(() => {});
+    else {
+      this.clearImpactAudio();
+      this.context.suspend().catch(() => {});
+    }
   }
   diagnostics() {
     return {

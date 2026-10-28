@@ -17,13 +17,13 @@ export const passable = (r) => !r.removed && !r.blocked && r.hp > (r.maxHp || RO
 function cross(ax, az, bx, bz) {
   return ax * bz - az * bx;
 }
-export function overlappingRoad(s, ax, az, bx, bz) {
+export function overlappingRoad(s, ax, az, bx, bz, ignoreRoadId = null) {
   const length = Math.hypot(bx - ax, bz - az);
   if (length < 1) return null;
   const ux = (bx - ax) / length,
     uz = (bz - az) / length;
   for (const r of s.roads) {
-    if (r.removed) continue;
+    if (r.removed || r.id === ignoreRoadId) continue;
     const dx = r.bx - r.ax,
       dz = r.bz - r.az,
       rl = Math.hypot(dx, dz);

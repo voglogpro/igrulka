@@ -1,6 +1,8 @@
 import { price } from './format.js';
 import { recruitmentHTML } from './army-recruitment.js';
 import { factoryPlansHTML } from './factory-plans.js';
+import { factoryOrderControlsHTML } from './factory-orders.js';
+import { roadRecoveryHTML } from './road-recovery.js';
 import * as E from '../game/index.js';
 export function panelHTML({
   panel,
@@ -15,15 +17,15 @@ export function panelHTML({
 }) {
   let html = `<div class="panel-head"><span class="eyebrow">${{ attack: 'АРСЕНАЛ И АТАКА', economy: 'ЭКОНОМИКА', settings: 'НАСТРОЙКИ', help: 'ПРАВИЛА', army: 'НАЗЕМНАЯ АРМИЯ' }[panel]}</span><button data-action="close-panel" aria-label="Закрыть">×</button></div>`;
   if (panel === 'attack') {
-    html += `<p class="pipeline">Производство → склад → машина снабжения → местный запас площадки</p><div class="weapons">${Object.entries(
+    html += `<p class="pipeline">Производство → склад → машина снабжения → местный запас площадки</p>${factoryOrderControlsHTML()}<div id="queue-status" class="small-muted"></div><div class="weapons">${Object.entries(
       E.WEAPONS,
     )
       .map(([key, d]) => {
-        return `<div class="weapon-row" data-row="${key}"><button class="weapon-choice ${key === weapon ? 'active' : ''}" data-weapon="${key}"><b>${d.name}</b><small>${price(E.purchaseQuote(state, 0, 'weapon', key))} · ${d.time} с</small></button><strong data-stock="${key}">0</strong><button class="order" data-produce="${key}" title="Добавить в очередь завода">+1</button></div>`;
+        return `<div class="weapon-row" data-row="${key}"><button class="weapon-choice ${key === weapon ? 'active' : ''}" data-weapon="${key}"><b>${d.name}</b><small>${price(E.purchaseQuote(state, 0, 'weapon', key))} · ${d.time} с</small></button><strong data-stock="${key}">0</strong><div class="weapon-order-actions"><button class="order" data-produce="${key}" title="Добавить конечный заказ">+1</button><span data-production-pending="${key}"></span><button data-cancel-production="${key}" title="Отменить только неоплаченные единицы" aria-label="Отменить неоплаченные единицы" hidden>×</button></div></div>`;
       })
       .join(
         '',
-      )}</div><div id="queue-status" class="small-muted"></div><div class="attack-controls"><label>Пусковая<select id="launch-site" aria-label="Пусковая установка"></select></label><label class="aim-label">Точка / объекты карты<select id="attack-target"></select></label><div class="salvo-row"><label>В залпе<input id="salvo-count" type="number" min="1" max="6" value="${count}"></label><button data-action="aim">Наводить мышью ↗</button></div><button class="primary attack-button" data-action="launch" id="launch-button">Выбрать и наводить</button><p id="route-status" class="status-note"></p><p id="launch-status" class="status-note"></p><div class="quick-build"><button data-build="factory">+ База дронов</button><button data-build="launcher">+ Пусковая дронов</button><button data-build="silo">+ Ракетная шахта</button></div></div>`;
+      )}</div><div class="attack-controls"><label>Пусковая<select id="launch-site" aria-label="Пусковая установка"></select></label><label class="aim-label">Точка / объекты карты<select id="attack-target"></select></label><div class="salvo-row"><label>В залпе<input id="salvo-count" type="number" min="1" max="6" value="${count}"></label><button data-action="aim">Наводить мышью ↗</button></div><button class="primary attack-button" data-action="launch" id="launch-button">Выбрать и наводить</button><p id="route-status" class="status-note"></p><p id="launch-status" class="status-note"></p><div class="quick-build"><button data-build="factory">+ База дронов</button><button data-build="launcher">+ Пусковая дронов</button><button data-build="silo">+ Ракетная шахта</button></div></div>`;
   }
   if (panel === 'attack') html += factoryPlansHTML();
   if (panel === 'army') {
@@ -36,7 +38,7 @@ export function panelHTML({
     });
   }
   if (panel === 'economy') {
-    html += `<h2>Город и снабжение</h2><div id="economy-values"></div><div id="economy-buildings"></div><div id="economy-settlements"></div><p class="status-note">Предприятие у связанной со штабом дороги работает на 100%. При разрыве пути его выпуск падает до 20%. Дефицит электричества и повреждения снижают его дополнительно.</p><p class="status-note">Площадки и шахты ставятся на свободной суше. Машины доставляют готовый запас по полю. Дороги нужны для производства и экономики; их можно чинить или обходить новой улицей. Бонус бота зависит от сложности (0–45%) и действует только на поступления ресурсов; цены совпадают.</p>`;
+    html += `<h2>Город и снабжение</h2>${roadRecoveryHTML()}<div id="economy-values"></div><div id="economy-buildings"></div><div id="economy-settlements"></div><p class="status-note">Предприятие у связанной со штабом дороги работает на 100%. При разрыве пути его выпуск падает до 20%. Дефицит электричества и повреждения снижают его дополнительно.</p><p class="status-note">Площадки и шахты ставятся на свободной суше. Машины доставляют готовый запас по полю. Дороги нужны для производства и экономики; их можно чинить или обходить новой улицей. При нулевом бюджете выберите утраченный участок в блоке восстановления: штаб оплатит подряд своим доходом. Бонус бота зависит от сложности (0–45%) и действует только на поступления ресурсов; цены совпадают.</p>`;
   }
   if (panel === 'settings') {
     html += `<div class="setting"><span>Графика</span><b>УЛЬТРА</b></div><label class="setting">Громкость<input id="volume" type="range" min="0" max="100" value="${settings.volume * 100}"></label><label class="setting">Сотрясение камеры<input id="shake" type="range" min="0" max="100" value="${settings.shake * 100}"></label><div class="settings-list"><button data-action="save">Сохранить</button><button data-action="export">Экспорт кампании</button><button data-action="import">Импорт кампании</button><button data-panel="help">Управление и правила</button><button data-action="new-confirm">Новая игра</button></div><p class="small-muted">Автосохранение каждые 10 секунд. Пробел — пауза. При скрытии вкладки время останавливается.</p>`;

@@ -1,3 +1,5 @@
+import { factoryOrderQuantity, updateFactoryOrderRows } from './factory-orders.js';
+import { createRoadRecoveryActions, updateRoadRecoveryPanel } from './road-recovery.js';
 import { createAttackRecallAction } from './controllers/attack-recall.js';
 import { createCommandExecutor } from './session/command-executor.js';
 import { resolveArmySelection } from './selection.js';
@@ -1179,8 +1181,8 @@ function updateLivePanel() {
     const factories = state.buildings.filter(
       (b) => b.side === 0 && b.key === 'factory' && b.hp > 0 && !b.demolished,
     );
-    const facility = factories.some((b) => b.progress >= 1);
-    const factoryQueue = factories.reduce((n, b) => n + (b.queue?.length || 0), 0);
+
+    const productionOrders = updateFactoryOrderRows(state);
     for (const key of Object.keys(E.WEAPONS)) {
       const stock = $(`[data-stock="${key}"]`);
       if (stock) {
@@ -1190,14 +1192,6 @@ function updateLivePanel() {
       const row = $(`[data-row="${key}"]`);
       row?.classList.toggle('chosen', strike.model.weapon === key);
       const quote = E.purchaseQuote(state, 0, 'weapon', key);
-      $(`[data-produce="${key}"]`).disabled =
-        !!state.result ||
-        !facility ||
-        factoryQueue >= 24 ||
-        f.credits < quote.cost ||
-        f.materials < quote.metal ||
-        (f.oil || 0) < quote.oil ||
-        (f.components || 0) < (quote.components || 0);
       $(`[data-weapon="${key}"] small`).textContent = `${price(quote)} · ${E.WEAPONS[key].time} с`;
       $(`[data-weapon="${key}"]`).disabled = false;
     }
@@ -1212,6 +1206,10 @@ function updateLivePanel() {
           )
           .join(' · ')
       : 'Для производства нужна база дронов';
+    if (productionOrders.unpaid) {
+      const reason = productionOrders.orders[0]?.reason || '';
+      $('#queue-status').textContent += ` · ожидают оплаты ${productionOrders.unpaid}: ${reason}`;
+    }
     const error = E.launchStatus(
       state,
       0,
@@ -1242,10 +1240,14 @@ function updateLivePanel() {
   }
   if (panel === 'economy') {
     const e = E.economy(state, 0);
+    updateRoadRecoveryPanel(state);
     $('#economy-values').innerHTML = [
       ['Доход до содержания', rate(e.gross) + ' ₡/мин'],
       ['Содержание', '−' + Math.round(e.upkeep * 60) + ' ₡/мин'],
       ['Чистый баланс', rate(e.net) + ' ₡/мин'],
+      ...(e.roadRecovery > 0
+        ? [['Подряд дороги из дохода штаба', '−' + Math.round(e.roadRecovery * 60) + ' ₡/мин']]
+        : []),
       ['В том числе армия', '−' + Math.round(e.armyUpkeep * 60) + ' ₡/мин'],
       ['Население', e.population],
       ['Сплавы', rate(e.materials) + '/мин'],
@@ -1319,6 +1321,14 @@ const campaignActions = createCampaignActions({
 });
 // Add new data-action commands here; modules receive only their named ports.
 const actionRouter = createActionRouter({
+  ...createRoadRecoveryActions({
+    getState: () => state,
+    getEpoch: () => campaignEpoch,
+    execute,
+    persist,
+    refresh: updateLivePanel,
+    toast,
+  }),
   ...campaignActions.actions,
   ...strike.actions,
   ...armyNavigation.actions,
@@ -1537,11 +1547,30 @@ document.addEventListener('click', async (ev) => {
     updateStrikeHUD();
     void strike.requestSupply();
   }
-  if (d.produce) {
-    const r = await execute('produce', { key: d.produce });
+  if (d.factoryOrderQuantity) {
+    $('#factory-order-count').value = d.factoryOrderQuantity;
+    updateLivePanel();
+  }
+  if (d.produce || d.cancelProduction) {
+    const input = $('#factory-order-count');
+    const quantity = factoryOrderQuantity(input);
+    if (d.produce && !quantity) {
+      input.reportValidity();
+      return;
+    }
+    const epoch = campaignEpoch;
+    const r = await execute(
+      d.produce ? 'factory-order' : 'factory-order-cancel',
+      d.produce ? { key: d.produce, count: quantity } : { key: d.cancelProduction },
+    );
+    if (epoch !== campaignEpoch) return;
     if (typeof r === 'string') toast(r, true);
     else {
-      toast('Добавлено в очередь завода');
+      toast(
+        d.produce
+          ? 'Заказ добавлен; оплата по одной единице'
+          : 'Неоплаченный заказ отменён; оплаченный выпуск сохранён',
+      );
       persist();
       updateLivePanel();
     }
@@ -1623,6 +1652,7 @@ document.addEventListener('click', async (ev) => {
   await actionRouter.dispatch(a, b, ev);
 });
 document.addEventListener('input', (ev) => {
+  if (ev.target.id === 'factory-order-count') updateFactoryOrderRows(state);
   if (ev.target.id === 'shake') {
     settings.shake = Number(ev.target.value) / 100;
     world.shakeStrength = settings.shake;

@@ -310,12 +310,15 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
 
 test('old protocols are explicitly refused and the current protocol creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 15);
+  assert.equal(PROTOCOL_VERSION, 16);
   const host = await connect();
   host.send({ type: 'create', protocol: 10, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
   assert.equal(server.rooms.size, 0);
   host.send({ type: 'create', protocol: 14, name: 'Previous 8.13 host' });
+  assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
+  assert.equal(server.rooms.size, 0);
+  host.send({ type: 'create', protocol: 15, name: 'Previous 8.13.2 host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
   assert.equal(server.rooms.size, 0);
   host.send({ type: 'create', protocol: PROTOCOL_VERSION, name: 'Current host' });

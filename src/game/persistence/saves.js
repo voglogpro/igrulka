@@ -8,6 +8,7 @@ import { createWeather, validWeather } from '../weather.js';
 import { validStance } from '../units/ground/stance.js';
 import { RALLY_MODES } from '../units/ground/recruitment.js';
 import { isFactoryPlan } from '../units/aviation/factory-plans.js';
+import { restoreFactoryOrders } from '../units/aviation/factory-orders.js';
 import { validateSquadMetadata } from './squads.js';
 import { restoreServices } from './services.js';
 import { restoreDefense } from '../defense/persistence.js';
@@ -24,6 +25,7 @@ import { sideIds, validSide } from '../factions.js';
 import { restoreSettlements } from '../territory/settlements.js';
 import { restoreAI } from './ai.js';
 import { restoreFieldSupply } from './field-supply.js';
+import { restoreRoadRecovery } from '../city/road-recovery.js';
 export const SAVE_GROUND_MAX = 20000;
 const configured = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export function save(s) {
@@ -36,7 +38,7 @@ export function load(raw) {
   const s = JSON.parse(raw);
   const sourceVersion = s.version;
   if (
-    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, VERSION].includes(
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, VERSION].includes(
       s.version,
     ) ||
     !Array.isArray(s.buildings) ||
@@ -451,11 +453,13 @@ export function load(raw) {
   migrateMapLayout(s, sourceVersion);
   restoreDefense(s);
   restoreEconomy(s, sourceVersion);
+  restoreRoadRecovery(s, sourceVersion);
   restoreElectronics(s, sourceVersion);
   restoreRetiredResearch(s, sourceVersion);
   restoreArmyComposition(s, sourceVersion);
   restoreGroundScars(s, sourceVersion);
   restoreLaunchSupply(s, sourceVersion);
+  restoreFactoryOrders(s);
   restoreAmmunition(s, sourceVersion);
   restoreFieldSupply(s, sourceVersion);
   delete s.ai.nextResearch;

@@ -78,7 +78,8 @@ function fakeContext() {
       attack: param(),
       release: param(),
     });
-  context.createBiquadFilter = () => node('filter', { frequency: param(), Q: param() });
+  context.createBiquadFilter = () =>
+    node('filter', { frequency: param(), Q: param(), gain: param() });
   context.createWaveShaper = () => node('ceiling');
   context.createConvolver = () => node('reverb');
   context.createDelay = () => node('delay', { delayTime: param() });
@@ -145,6 +146,14 @@ test('loading prepares the exact shared graph once, muted and suspended, without
     assert.equal(filters[1].frequency.value, 1300);
     assert.equal(context.nodes.find((node) => node.kind === 'delay').delayTime.value, 0.46);
     assert.equal(audio.reverbIn.gain.value, 0.9);
+    assert.equal(audio.impactReturn.output.gain.value, 1);
+    assert.deepEqual(
+      audio.impactReturn.nodes
+        .filter((node) => node.kind === 'delay')
+        .map((node) => node.delayTime.value),
+      [0.38, 0.83],
+    );
+    assert.equal(audio.impactReturn.nodes.find((node) => node.type === 'lowshelf').gain.value, 3);
     assert.ok(context.connections.some(([from, to]) => from === audio.master && to === filters[0]));
     assert.ok(
       context.connections.some(([from, to]) => from === ceiling && to === context.destination),

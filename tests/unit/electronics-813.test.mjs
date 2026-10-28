@@ -161,7 +161,7 @@ test('schema21 preserves assembly phase and rejects corrupt new fields; schema20
   }
   const before = old.sides.map((side) => [side.credits, side.materials, side.oil]);
   const migrated = E.load(JSON.stringify(old));
-  assert.equal(migrated.version, 21);
+  assert.equal(migrated.version, E.VERSION);
   assert.deepEqual(
     migrated.sides.map((side) => [side.credits, side.materials, side.oil]),
     before,

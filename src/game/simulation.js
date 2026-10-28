@@ -1,4 +1,5 @@
 import { economy } from './city/economy.js';
+import { updateRoadRecovery } from './city/road-recovery.js';
 import { updateArmyComposition } from './units/ground/composition.js';
 import { updateLaunchSupply } from './units/aviation/launch-supply.js';
 import { updateAmmoProduction } from './city/ammo-production.js';
@@ -28,13 +29,14 @@ export function step(s, dt) {
   dt = Math.min(0.1, dt);
   s.time += dt;
   updateWeather(s, dt);
-  const rates = sideIds(s).map((side) => economy(s, side));
+  const rates = sideIds(s).map((side) => economy(s, side, dt));
   for (const owner of sideIds(s)) {
     const f = s.sides[owner],
       e = rates[owner];
     f.credits = Math.max(0, f.credits + e.net * dt);
     f.materials += e.materials * dt;
   }
+  updateRoadRecovery(s, dt);
   updateFactoryPlans(s);
   updateConstruction(s, rates, dt);
   updateLaunchSupply(s);

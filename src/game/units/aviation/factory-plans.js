@@ -4,6 +4,7 @@ import { oilCost, hasOil } from '../../city/oil.js';
 import { WEAPONS } from '../../config.js';
 import { produce } from './production.js';
 import { launchStoreCapacity, launchStoreTotal, weaponStock } from './launch-supply.js';
+import { updateFactoryOrders } from './factory-orders.js';
 
 const fields = ['key', 'target', 'reserveCredits', 'reserveMaterials', 'enabled'];
 const configured = (key) => typeof key === 'string' && Object.hasOwn(WEAPONS, key);
@@ -44,6 +45,7 @@ function counts(s) {
   const sides = sideIds(s).map(() => ({
     total: 0,
     weapons: Object.fromEntries(Object.keys(WEAPONS).map((key) => [key, 0])),
+    pending: Object.fromEntries(Object.keys(WEAPONS).map((key) => [key, 0])),
   }));
   for (const b of s.buildings) {
     if (b.key !== 'factory' || b.hp <= 0 || b.demolished) continue;
@@ -51,6 +53,8 @@ function counts(s) {
       sides[b.side].total++;
       if (configured(q.key)) sides[b.side].weapons[q.key]++;
     }
+    for (const q of b.productionOrders || [])
+      if (configured(q.key)) sides[b.side].pending[q.key] += q.remaining;
   }
   return sides;
 }
@@ -61,16 +65,17 @@ function status(s, b, counted) {
   const d = plan ? WEAPONS[plan.key] : null;
   const inventory = plan ? weaponStock(s, b.side, plan.key) : 0;
   const queued = plan ? counted.weapons[plan.key] : 0;
-  const stock = inventory + queued;
+  const pending = plan ? counted.pending[plan.key] : 0;
+  const stock = inventory + queued + pending;
   const factoryQueued = b.queue?.length || 0;
   let value;
   if (s.result) value = 'finished';
   else if (b.hp <= 0 || b.demolished) value = 'ruined';
   else if (b.progress < 1) value = 'building';
   else if (!plan?.enabled) value = 'disabled';
-  else if (stock >= plan.target) value = 'stock';
+  else if (stock >= plan.target) value = inventory + queued >= plan.target ? 'stock' : 'orders';
   else if (launchStoreTotal(b) >= launchStoreCapacity(b)) value = 'warehouse';
-  else if (factoryQueued || counted.total >= 24) value = 'queue';
+  else if (factoryQueued || b.productionOrders?.length || counted.total >= 24) value = 'queue';
   else if (f.credits - d.cost < plan.reserveCredits) value = 'credits';
   else if (f.materials - d.metal < plan.reserveMaterials) value = 'materials';
   else if (!hasOil(s, b.side, oilCost(plan.key))) value = 'oil';
@@ -91,6 +96,7 @@ function status(s, b, counted) {
           : '',
     inventory,
     queued,
+    pending,
     stock,
     factoryQueued,
     sideQueued: counted.total,
@@ -104,6 +110,7 @@ export function factoryPlanStatus(s, side, id) {
 }
 
 export function updateFactoryPlans(s) {
+  updateFactoryOrders(s);
   if (s.result) return;
   const counted = counts(s);
   for (const b of s.buildings) {

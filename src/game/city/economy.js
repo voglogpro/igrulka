@@ -5,6 +5,7 @@ import { districtIncome } from '../territory/districts.js';
 import { difficultyOf } from '../ai/difficulty.config.js';
 import { aiSides } from '../factions.js';
 import { settlementIncome, settlementOperational } from '../territory/settlements.js';
+import { HEADQUARTERS_INCOME, roadRecoveryFundingRate } from './road-recovery.js';
 export function supplyFactor(s, b) {
   if (b.settlementId)
     return settlementOperational(s, b.settlementId, b.side) &&
@@ -15,12 +16,12 @@ export function supplyFactor(s, b) {
 }
 
 export const COMMUTE_INCOME = 0.07;
-export function economy(s, owner) {
+export function economy(s, owner, dt = 0) {
   const alive = s.buildings.filter((b) => b.side === owner && b.hp > 0 && b.progress >= 1);
   let power = 10,
     demand = 0,
     upkeep = 0,
-    income = 1.8,
+    income = HEADQUARTERS_INCOME,
     materials = 0,
     science = 0,
     connected = 0,
@@ -76,10 +77,12 @@ export function economy(s, owner) {
   materials += districts.materials;
   science += districts.science;
   const bonus = aiSides(s).includes(owner) ? difficultyOf(s).bonus : 1;
+  const roadRecovery = roadRecoveryFundingRate(s, owner, dt);
   return {
-    gross: income * bonus,
+    gross: income * bonus - roadRecovery,
     upkeep,
-    net: income * bonus - upkeep,
+    net: income * bonus - upkeep - roadRecovery,
+    roadRecovery,
     materials: materials * bonus,
     science: science * bonus,
     power,

@@ -1,8 +1,8 @@
 import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
-// Equipment quotes and the army-wave command must match the client's rules.
-export const PROTOCOL_VERSION = 15;
+// Production orders and earmarked road payments must match the client's rules.
+export const PROTOCOL_VERSION = 16;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -40,6 +40,14 @@ export function executeCommand(s, side, type, a = {}) {
     case 'road':
       if (!point(a.a) || !point(a.b)) return invalid;
       return E.buildRoad(s, side, a.a.x, a.a.z, a.b.x, a.b.z);
+    case 'road-recovery':
+      return validId(a.id) ? E.startRoadRecovery(s, side, a.id) : invalid;
+    case 'road-recovery-toggle':
+      return typeof a.enabled === 'boolean'
+        ? E.setRoadRecoveryEnabled(s, side, a.enabled)
+        : invalid;
+    case 'road-recovery-cancel':
+      return E.cancelRoadRecovery(s, side);
     case 'repair':
     case 'demolish':
     case 'upgrade':
@@ -51,6 +59,18 @@ export function executeCommand(s, side, type, a = {}) {
       return E.redeployMOG(s, side, a.id);
     case 'produce':
       return configured(E.WEAPONS, a.key) ? E.produce(s, side, a.key) : invalid;
+    case 'factory-order':
+      return configured(E.WEAPONS, a.key) &&
+        Number.isSafeInteger(a.count) &&
+        a.count >= 1 &&
+        a.count <= 100 &&
+        (a.id == null || (validId(a.id) && own(s, side, a.id)))
+        ? E.queueFactoryOrder(s, side, a.key, a.count, a.id ?? null)
+        : invalid;
+    case 'factory-order-cancel':
+      return configured(E.WEAPONS, a.key) && (a.id == null || (validId(a.id) && own(s, side, a.id)))
+        ? E.cancelFactoryOrders(s, side, a.key, a.id ?? null)
+        : invalid;
     case 'factory-plan':
       return validId(a.id) && own(s, side, a.id) && object(a.plan)
         ? E.setFactoryPlan(s, side, a.id, a.plan)
