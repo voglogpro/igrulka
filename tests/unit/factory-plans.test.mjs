@@ -74,7 +74,7 @@ test('factory plans validate strict bounded fields and store only their configur
 test('produce targets the selected factory, preserves legacy calls and rejects prototype keys without charging', () => {
   const s = fresh(),
     a = factory(s),
-    b = ready(s, 'factory', -950, -10);
+    b = ready(s, 'factory', -1142, -10);
   const credits = s.sides[0].credits;
   assert.equal(E.produce(s, 0, 'drone', 2, b.id), true);
   assert.equal(a.queue.length, 0);
@@ -93,7 +93,7 @@ test('produce targets the selected factory, preserves legacy calls and rejects p
 test('the shared cap and stock include paid queues at all live factories, including an unfinished one', () => {
   const s = fresh(),
     a = factory(s),
-    b = ready(s, 'factory', -950, -10);
+    b = ready(s, 'factory', -1142, -10);
   b.progress = 0.5;
   b.queue = Array.from({ length: 23 }, () => ({ key: 'drone', progress: 0 }));
   set(s, a, { target: 30 });
@@ -116,7 +116,7 @@ test('the shared cap and stock include paid queues at all live factories, includ
 test('two planned factories never buy beyond the common target or insert more than one item per empty factory', () => {
   const s = fresh(),
     a = factory(s),
-    b = ready(s, 'factory', -950, -10);
+    b = ready(s, 'factory', -1142, -10);
   set(s, a, { target: 1 });
   set(s, b, { target: 1 });
   const before = s.sides[0].credits;
@@ -201,7 +201,7 @@ test('reaching stock stops purchases and a real launch triggers exactly one paid
   const s = fresh(),
     b = factory(s),
     f = s.sides[0];
-  const launcher = ready(s, 'launcher', -850, 100);
+  const launcher = ready(s, 'launcher', -1042, 100);
   set(s, b, { target: 2 });
   E.advance(s, 30);
   assert.equal(E.weaponStock(s, 0, 'drone'), 2);
@@ -209,7 +209,7 @@ test('reaching stock stops purchases and a real launch triggers exactly one paid
   while (!E.availableLaunchStock(launcher, 'drone') && s.time < 60) E.step(s, 0.05);
   assert.ok(E.availableLaunchStock(launcher, 'drone') > 0);
   const materials = f.materials;
-  assert.equal(E.launch(s, 0, 'drone', { x: 500, z: 400 }, 1, launcher.id), 1);
+  assert.equal(E.launch(s, 0, 'drone', { x: 692, z: 400 }, 1, launcher.id), 1);
   assert.equal(E.weaponStock(s, 0, 'drone'), 1);
   E.advance(s, 15);
   assert.equal(E.weaponStock(s, 0, 'drone'), 2);

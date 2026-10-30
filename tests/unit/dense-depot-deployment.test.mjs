@@ -30,12 +30,12 @@ function separation(units) {
 test('two moving heavy units bypass their shared intermediate vertex and cold-save replay retains final orders', () => {
   const s = fresh(),
     settings = [
-      ['ifv', -882.8296449332062, -122.00351196031042, { x: -780, z: -220 }],
-      ['mlrs', -889.8215642865649, -118.51572579759736, { x: -800, z: -240 }],
+      ['ifv', -1074.829644933206, -122.00351196031042, { x: -972, z: -220 }],
+      ['mlrs', -1081.8215642865648, -118.51572579759736, { x: -992, z: -240 }],
     ];
   for (const [key, x, z, goal] of settings) {
     const u = E.makeGround(s, 0, key, x, z);
-    u.path = [{ x: -888, z: -120 }, { x: -864, z: -144 }, { ...goal }];
+    u.path = [{ x: -1080, z: -120 }, { x: -1056, z: -144 }, { ...goal }];
     u.order = { ...goal, mode: 'move', targetId: null };
     s.groundUnits.push(u);
   }
@@ -89,7 +89,7 @@ test('the actual dense8m mixed HQ deployment reaches every depot post by170s wit
       'mlrs',
     ];
   const troops = keys.map((key, i) => {
-    const u = E.makeGround(s, 0, key, -900 - (i % 5) * 8, (Math.floor(i / 5) - 4) * 8);
+    const u = E.makeGround(s, 0, key, -1092 - (i % 5) * 8, (Math.floor(i / 5) - 4) * 8);
     u.holdFire = true;
     s.groundUnits.push(u);
     return u;

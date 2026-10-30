@@ -13,7 +13,7 @@ function quiet() {
 for (const key of ['machinegunner', 'assault']) {
   test(`${key} keeps its actual shared magazine size after reloading`, () => {
     const s = quiet(),
-      u = E.makeGround(s, 0, key, -820, 0);
+      u = E.makeGround(s, 0, key, -1012, 0);
     s.groundUnits.push(u);
     const expected = E.GROUND_UNITS[key].groundMagazine;
     assert.equal(u.groundAmmo, expected);
@@ -35,7 +35,7 @@ for (const [key, expected] of [
     s.mode = 'multiplayer';
     s.sides[0].credits = 10000;
     s.sides[0].materials = 1000;
-    const b = E.build(s, 0, 'barracks', -1080, -10);
+    const b = E.build(s, 0, 'barracks', -1272, -10);
     assert.notEqual(typeof b, 'string', b);
     b.progress = 1;
     b.hp = b.maxHp;
@@ -60,9 +60,9 @@ for (const [key, expected] of [
 test('configured shared magazines preserve the separate sniper, APC and AA-only weapon cycles', () => {
   const s = quiet();
   s.mode = 'multiplayer';
-  const sniper = E.makeGround(s, 0, 'sniper', -830, 250);
-  const apc = E.makeGround(s, 0, 'apc', -850, 250);
-  const shilka = E.makeGround(s, 0, 'shilka', -870, 250);
+  const sniper = E.makeGround(s, 0, 'sniper', -1022, 250);
+  const apc = E.makeGround(s, 0, 'apc', -1042, 250);
+  const shilka = E.makeGround(s, 0, 'shilka', -1062, 250);
   s.groundUnits.push(sniper, apc, shilka);
   assert.equal(sniper.groundAmmo, 5);
   assert.equal(apc.groundAmmo, 80);
@@ -81,7 +81,7 @@ test('configured shared magazines preserve the separate sniper, APC and AA-only 
 
 test('ground-only sniper cools down without needing an airborne target or an AA weapon', () => {
   const s = quiet(),
-    u = E.makeGround(s, 0, 'sniper', -820, 0);
+    u = E.makeGround(s, 0, 'sniper', -1012, 0);
   s.groundUnits.push(u);
   u.heat = 1;
   E.advance(s, 6);
@@ -136,7 +136,7 @@ test('the last ground projectile step lands on its actual destination without ov
       domain: 'ground',
       kind: 'bullet',
       targetId: null,
-      x: -900,
+      x: -1092,
       z: 100,
       y: 2,
       px: -500,
@@ -145,7 +145,7 @@ test('the last ground projectile step lands on its actual destination without ov
       vx: 270,
       vz: 0,
       vy: 0,
-      tx: -869,
+      tx: -1061,
       tz: 100,
       damage: 4,
       flight: 31 / 270,

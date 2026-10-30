@@ -19,7 +19,7 @@ function fresh() {
   }
   return s;
 }
-function building(s, key, x = -1080, z = -10) {
+function building(s, key, x = -1272, z = -10) {
   const b = E.build(s, 0, key, x, z);
   assert.equal(typeof b, 'object', String(b));
   b.progress = 1;
@@ -37,14 +37,14 @@ function shipment(kind = 'ammo') {
     depot = building(s, kind === 'ammo' ? 'ammofactory' : 'factory');
   let target;
   if (kind === 'ammo') {
-    target = E.makeGround(s, 0, 'infantry', -1450, 250);
+    target = E.makeGround(s, 0, 'infantry', -1642, 250);
     target.groundAmmo = 0;
     target.ammoReserve = 0;
     target.holdFire = true;
     s.groundUnits.push(target);
     s.sides[0].ammoStock.small = E.ammunitionStatus(s, target).capacity;
   } else {
-    target = building(s, 'silo', -1450, 250);
+    target = building(s, 'silo', -1642, 250);
     s.sides[0].inventory.cruise = 1;
     target.weaponDemand = { cruise: 1 };
   }
@@ -134,14 +134,14 @@ test('blast falloff affects both sides while actual artillery impact preserves e
     cargo: null,
     path: [],
   });
-  const own = van(s.nextId++, 0, -1300),
-    enemy = van(s.nextId++, 1, -1275);
+  const own = van(s.nextId++, 0, -1492),
+    enemy = van(s.nextId++, 1, -1467);
   s.ammoVehicles = [own, enemy];
-  E.applyBlast(s, -1300, 250, 100, 20);
+  E.applyBlast(s, -1492, 250, 100, 20);
   assert.equal(own.hp, 900);
   assert.equal(enemy.hp, 980);
   own.hp = enemy.hp = 1000;
-  enemy.x = -1294;
+  enemy.x = -1486;
   impactGround(s, {
     side: 0,
     shooterKey: 'howitzer',
@@ -150,7 +150,7 @@ test('blast falloff affects both sides while actual artillery impact preserves e
     source: 999,
     originX: -1340,
     originZ: 250,
-    tx: -1300,
+    tx: -1492,
     tz: 250,
   });
   assert.equal(own.hp, 1000);
@@ -163,14 +163,14 @@ test('blast falloff affects both sides while actual artillery impact preserves e
 
 test('far fleet death events remain public on the open map and cargo labels are readable', () => {
   const s = fresh();
-  const van = { id: s.nextId++, side: 1, x: 1500, z: 700, hp: C.hp, status: 'idle' };
+  const van = { id: s.nextId++, side: 1, x: 1692, z: 700, hp: C.hp, status: 'idle' };
   s.ammoVehicles = [van];
   damageAmmoVehicle(s, van, C.hp);
   const event = s.events.find((e) => e.unitId === van.id);
   assert.deepEqual(event.visibleTo, [0, 1]);
   assert.ok(playerView(s, 0).events.some((e) => e.id === event.id));
   assert.ok(playerView(s, 1).events.some((e) => e.id === event.id));
-  const truck = E.makeGround(s, 0, 'supplytruck', -1300, 250);
+  const truck = E.makeGround(s, 0, 'supplytruck', -1492, 250);
   truck.ammoCargo = { small: 120, shell: 12, rocket: 0, sam: 4 };
   s.groundUnits.push(truck);
   const html = supplyHTML(s, truck);
@@ -182,8 +182,8 @@ test('far fleet death events remain public on the open map and cargo labels are 
 
 test('tank splash respects intervening walls and ordinary rifle impact does not add direct van targeting', () => {
   const s = fresh(),
-    wall = building(s, 'launcher', -1370, 250),
-    van = { id: s.nextId++, side: 1, x: -1300, z: 250, hp: 1000, status: 'idle' };
+    wall = building(s, 'launcher', -1562, 250),
+    van = { id: s.nextId++, side: 1, x: -1492, z: 250, hp: 1000, status: 'idle' };
   s.ammoVehicles = [van];
   const shot = {
     side: 0,
@@ -191,9 +191,9 @@ test('tank splash respects intervening walls and ordinary rifle impact does not 
     kind: 'shell',
     damage: 100,
     source: 999,
-    originX: -1420,
+    originX: -1612,
     originZ: 250,
-    tx: -1300,
+    tx: -1492,
     tz: 250,
   };
   impactGround(s, shot);

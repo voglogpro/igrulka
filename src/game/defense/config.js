@@ -1,14 +1,22 @@
 import { CORRIDORS } from '../map.js';
 
+// A position keeps growing while it is manned: a scrape becomes a trench, a revetted trench,
+// a checkpoint, a covered strongpoint with a log roof, and finally a concrete fort.
+// Work thresholds are cumulative builder-seconds; the last two stages cost more per second.
 export const FORTIFICATION = Object.freeze({
   baseSeconds: 12,
   engineerSpeed: 2,
   secondLevel: 30,
-  maxWork: 90,
-  cover: [0, 0.72, 0.78, 0.82],
-  concealment: [0, 0.55, 0.6, 0.65],
+  thresholds: [30, 90, 210, 390],
+  maxWork: 390,
+  cover: [0, 0.72, 0.78, 0.82, 0.86, 0.9],
+  concealment: [0, 0.55, 0.6, 0.65, 0.7, 0.74],
   creditsPerWork: 0.2,
   materialsPerWork: 0.015,
+  // Timber and concrete for the strongpoint and fort stages, from 90 work onward.
+  heavyFrom: 90,
+  heavyCreditsPerWork: 0.4,
+  heavyMaterialsPerWork: 0.035,
   postRadius: 4,
   coverRadius: 5,
   suppressionLimit: 0.3,
@@ -33,7 +41,9 @@ export const FRONTLINE = Object.freeze({
   maxDuty: 24,
   calmSeconds: 6,
   cooldown: 12,
-  homeLineX: 180,
+  // The unsecured home line holds the inner tree line in front of each bank.
+  homeLineX: 330,
+  treeSnap: 20,
   territoryAdvance: 40,
   postGap: 80,
   edgeCoverage: 48,

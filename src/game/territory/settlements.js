@@ -1,6 +1,6 @@
 import { buildingConnected, segmentDistance } from '../city/road-network.js';
 import { BUILDINGS } from '../city/buildings.config.js';
-import { expandLegacyX, expandLegacyZ } from '../map.js';
+import { expandLegacyX, expandLegacyZ, expandV23X } from '../map.js';
 import { allied, hostile, hqOf, sideIds, teamOf, validSide } from '../factions.js';
 import { GROUND_UNITS, isInfantry } from '../units/ground/types.js';
 import { event } from '../shared/events.js';
@@ -55,7 +55,7 @@ function legacyHouseMask(
   const point = (p) =>
     p && Number.isFinite(p.x) && Number.isFinite(p.z)
       ? {
-          x: sourceVersion < 15 ? expandLegacyX(p.x) : p.x,
+          x: sourceVersion < 15 ? expandV23X(expandLegacyX(p.x)) : p.x,
           z: sourceVersion < 14 ? expandLegacyZ(p.z) : p.z,
         }
       : null;

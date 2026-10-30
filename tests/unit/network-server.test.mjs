@@ -125,8 +125,8 @@ test('internet WebSocket compression negotiates and keeps authoritative snapshot
   assert.ok(pair.b.socket.extensions.includes('permessage-deflate'));
   const { viewA, viewB } = await startPair(pair);
   assert.equal(viewA.state.mode, 'multiplayer');
-  assert.equal(viewB.state.buildings.find((b) => b.key === 'hq' && b.side === 0).x, 1015);
-  const result = await command(pair.a, 'build', { key: 'power', x: -1070, z: -80 });
+  assert.equal(viewB.state.buildings.find((b) => b.key === 'hq' && b.side === 0).x, 1207);
+  const result = await command(pair.a, 'build', { key: 'power', x: -1262, z: -80 });
   assert.ok(result.result?.id);
   const [updatedA, updatedB] = await tickSnapshots(pair, 20);
   assert.equal(updatedA.state.time, updatedB.state.time);
@@ -170,8 +170,8 @@ test('two clients start one authoritative match; side 1 owns its commands and se
   assert.equal(economy(room.state, 1).bonus, 1);
   assert.deepEqual(room.state.sides[0], room.state.sides[1]);
 
-  const own = makeGround(room.state, 1, 'infantry', 730, 510);
-  const foe = makeGround(room.state, 0, 'infantry', 790, 510);
+  const own = makeGround(room.state, 1, 'infantry', 922, 510);
+  const foe = makeGround(room.state, 0, 'infantry', 982, 510);
   room.state.groundUnits.push(own, foe);
   b.send({
     type: 'command',
@@ -193,7 +193,7 @@ test('two clients start one authoritative match; side 1 owns its commands and se
     sequence: 2,
     side: 0,
     command: 'order',
-    args: { ids: [foe.id], aim: { x: 750, z: 510, mode: 'move' } },
+    args: { ids: [foe.id], aim: { x: 942, z: 510, mode: 'move' } },
   });
   assert.ok((await b.next((m) => m.type === 'ack' && m.sequence === 2)).error);
   assert.equal(foe.order, null);
@@ -310,7 +310,7 @@ test('WebSocket payload and per-second message limits close abusive sockets', as
 
 test('old protocols are explicitly refused and the current protocol creates and joins a real room', async (t) => {
   const { server, connect } = await fixture(t);
-  assert.equal(PROTOCOL_VERSION, 16);
+  assert.equal(PROTOCOL_VERSION, 17);
   const host = await connect();
   host.send({ type: 'create', protocol: 10, name: 'Old host' });
   assert.match((await host.next((m) => m.type === 'error')).message, /Версии/);
@@ -355,8 +355,8 @@ test('WebSocket auto-defense belongs to each owner and snapshots preserve only o
     return u;
   });
   const observed = [
-    ground(pair, 0, 'infantry', { x: -850, z: -270 }),
-    ground(pair, 1, 'infantry', { x: -800, z: -270 }),
+    ground(pair, 0, 'infantry', { x: -1042, z: -270 }),
+    ground(pair, 1, 'infantry', { x: -992, z: -270 }),
   ];
   for (const u of defenders) {
     u.guard = { x: u.x, z: u.z };
@@ -489,12 +489,12 @@ test('side one queues routes and delivers real passengers over WebSocket without
   const pair = await joinedPair(t);
   await startPair(pair);
   const { a, b, room } = pair;
-  const walker = ground(pair, 1, 'infantry', { x: 730, z: 510 });
-  const apc = ground(pair, 1, 'apc', { x: 730, z: 390 });
-  const passenger = ground(pair, 1, 'infantry', { x: 724, z: 390 });
-  ground(pair, 0, 'infantry', { x: 790, z: 510 });
-  const first = { x: 850, z: 510, mode: 'move' };
-  const second = { x: 850, z: 430, mode: 'move' };
+  const walker = ground(pair, 1, 'infantry', { x: 922, z: 510 });
+  const apc = ground(pair, 1, 'apc', { x: 922, z: 390 });
+  const passenger = ground(pair, 1, 'infantry', { x: 916, z: 390 });
+  ground(pair, 0, 'infantry', { x: 982, z: 510 });
+  const first = { x: 1042, z: 510, mode: 'move' };
+  const second = { x: 1042, z: 430, mode: 'move' };
   assert.ok((await command(a, 'route-add', { ids: [walker.id], aim: first })).error);
   assert.equal(walker.order, null);
   assert.equal((await command(b, 'route-add', { ids: [walker.id], aim: first })).result, 1);
@@ -507,7 +507,7 @@ test('side one queues routes and delivers real passengers over WebSocket without
   assert.equal((await command(b, 'board', { ids: [passenger.id], id: apc.id })).result, 1);
   await tickSnapshots(pair, 2);
   assert.equal(passenger.carrierId, apc.id);
-  const deliveryPoint = { x: 880, z: 390 };
+  const deliveryPoint = { x: 1072, z: 390 };
   assert.ok((await command(a, 'deliver', { id: apc.id, point: deliveryPoint })).error);
   assert.equal(apc.delivery, undefined);
   const delivered = await command(b, 'deliver', { id: apc.id, point: deliveryPoint });
@@ -611,7 +611,7 @@ test('both WebSocket players use private paid factory plans, preserve reserves a
   );
   const launch = await command(b, 'launch', {
     key: 'drone',
-    aim: { x: -800, z: 400 },
+    aim: { x: -992, z: 400 },
     count: 1,
     siteId: launchers[1].id,
   });
@@ -665,7 +665,7 @@ test('cooperative room has four independent cities, private allied economies, tw
   const hqs = [0, 1, 2, 3].map((side) => E.hqOf(room.state, side));
   assert.equal(E.hqOf(viewA.state, 0).id, hqs[0].id);
   assert.equal(E.hqOf(viewB.state, 0).id, hqs[2].id);
-  assert.deepEqual([E.hqOf(viewB.state, 0).x, E.hqOf(viewB.state, 0).z], [-1015, 1015]);
+  assert.deepEqual([E.hqOf(viewB.state, 0).x, E.hqOf(viewB.state, 0).z], [-1207, 1015]);
   for (const side of [0, 2])
     Object.assign(room.state.sides[side], { credits: 20000, materials: 2000 });
   const firstBudget = structuredClone(room.state.sides[0]);
@@ -683,14 +683,14 @@ test('cooperative room has four independent cities, private allied economies, tw
   assert.match((await command(a, 'demolish', { id: placed.result.id })).error, /принадлежит/);
   assert.equal(room.state.buildings.find((x) => x.id === placed.result.id).demolished, undefined);
   const alliedUnit = ground(pair, 2, 'infantry', { x: hqs[2].x, z: hqs[2].z + 60 });
-  alliedUnit.order = { mode: 'move', x: -800, z: 900 };
-  alliedUnit.path = [{ x: -900, z: 1000 }];
+  alliedUnit.order = { mode: 'move', x: -992, z: 900 };
+  alliedUnit.path = [{ x: -1092, z: 1000 }];
   assert.ok(
-    (await command(a, 'order', { ids: [alliedUnit.id], aim: { x: -900, z: 900, mode: 'move' } }))
+    (await command(a, 'order', { ids: [alliedUnit.id], aim: { x: -1092, z: 900, mode: 'move' } }))
       .error,
   );
   assert.equal(
-    (await command(b, 'order', { ids: [alliedUnit.id], aim: { x: -900, z: 900, mode: 'move' } }))
+    (await command(b, 'order', { ids: [alliedUnit.id], aim: { x: -1092, z: 900, mode: 'move' } }))
       .error,
     undefined,
   );

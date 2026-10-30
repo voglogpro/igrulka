@@ -46,7 +46,7 @@ test('ordinary simulation completes an earmarked road payment across actual save
   assert.ok(s.sides[0].roadRecovery.paid > 17.99);
   const saved = E.save(s);
   s = E.load(saved);
-  assert.equal(s.version, 22);
+  assert.equal(s.version, E.VERSION);
   E.advance(s, 20);
   assert.equal(s.sides[0].roadRecovery, null);
   const restored = s.roads.find((r) => r.id === id);

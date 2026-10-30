@@ -93,7 +93,7 @@ export function renderArmyControls({ state, armySelection }, primary) {
   if (position) {
     const status = E.fortificationStatus(position);
     $('#army-detail-text').textContent +=
-      ` ${status.label}: ${status.level}/3${status.level < 3 ? ` · следующий этап ${Math.round(status.nextProgress * 100)}%` : ''}. Защита позиции ${Math.round(status.cover * 100)}%. Улучшение требует времени, денег и сплавов.`;
+      ` ${status.label}: ${status.level}/${E.FORTIFICATION_TOP}${status.level < E.FORTIFICATION_TOP ? ` · следующий этап ${Math.round(status.nextProgress * 100)}%` : ''}. Защита позиции ${Math.round(status.cover * 100)}%. Пока бойцы держат позицию, она растёт до опорного пункта и форта; работа требует времени, денег и сплавов.`;
   }
   if (units.length === 1 && d.capacity) {
     const seats = (field) =>

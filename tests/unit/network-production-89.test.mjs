@@ -7,7 +7,7 @@ import { event } from '../../src/game/shared/events.js';
 
 test('army composition commands are bounded, atomic and apply only to the authenticated side', () => {
   const s = E.createGame(89);
-  assert.equal(PROTOCOL_VERSION, 16);
+  assert.equal(PROTOCOL_VERSION, 17);
   assert.equal(executeCommand(s, 1, 'army-target', { key: 'infantry', count: 50, side: 0 }), true);
   assert.deepEqual(s.sides[0].armyComposition.targets, {});
   assert.deepEqual(s.sides[1].armyComposition.targets, { infantry: 50 });
@@ -77,7 +77,7 @@ test('both owners see the complete physical fleet while cargo, collection jobs a
     status: 'outbound',
     depotId: 1,
     targetId: 999,
-    path: [{ x: 900, z: 100 }],
+    path: [{ x: 1092, z: 100 }],
     cargo: { kind: 'weapon', key: 'ballistic', amount: 1 },
     hp: E.AMMUNITION.vehicle.hp,
     maxHp: E.AMMUNITION.vehicle.hp,

@@ -88,7 +88,7 @@ test('eight neutral cities reuse ordinary housing and industry, keep stable mesh
       settlementLayout(SETTLEMENTS[i]).components.map((c) => c.key),
     );
   }
-  const ray = new T.Raycaster(new T.Vector3(-1515, 150, -1415), new T.Vector3(0, -1, 0));
+  const ray = new T.Raycaster(new T.Vector3(-1707, 150, -1415), new T.Vector3(0, -1, 0));
   w.scene.updateMatrixWorld(true);
   assert.equal(view.pick(ray), 'north-village-1');
 });

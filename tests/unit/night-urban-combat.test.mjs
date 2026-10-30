@@ -14,7 +14,7 @@ function fresh() {
 }
 
 function building(s, key = 'launcher') {
-  const b = game.build(s, 0, key, -750, 100);
+  const b = game.build(s, 0, key, -942, 100);
   assert.notEqual(typeof b, 'string', b);
   b.progress = 1;
   b.hp = b.maxHp;

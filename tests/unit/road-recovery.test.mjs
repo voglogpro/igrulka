@@ -29,7 +29,7 @@ function lost(s, side = 0) {
 }
 function paidCity() {
   const s = E.createGame(8133, { mode: 'multiplayer' });
-  const trunk = E.buildRoad(s, 0, -1015, -45, -1015, -645);
+  const trunk = E.buildRoad(s, 0, -1207, -45, -1207, -645);
   assert.equal(typeof trunk, 'object');
   for (const key of [
     'housing',
@@ -49,7 +49,7 @@ function paidCity() {
     let building;
     for (let retry = 0; retry < 30 && !building; retry++) {
       for (let z = -165; z >= -615 && !building; z -= 45)
-        for (const x of [-1045, -985]) {
+        for (const x of [-1237, -1177]) {
           if (E.canPlace(s, key, x, z, 0)) continue;
           const result = E.build(s, 0, key, x, z);
           if (typeof result === 'object') {

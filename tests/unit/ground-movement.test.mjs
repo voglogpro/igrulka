@@ -65,8 +65,8 @@ function wall(s, x, z, r = 10) {
 
 test('a vehicle physically goes around a stationary deployed MOG without moving its post', () => {
   const s = fresh(),
-    mog = unit(s, 'mog', -1200, -400),
-    tank = unit(s, 'leopard', -1280, -400, { x: -1120, z: -400 });
+    mog = unit(s, 'mog', -1392, -400),
+    tank = unit(s, 'leopard', -1472, -400, { x: -1312, z: -400 });
   mog.setup = 1;
   mog.moving = false;
   mog.guard = { x: mog.x, z: mog.z };
@@ -83,8 +83,8 @@ test('a vehicle physically goes around a stationary deployed MOG without moving 
 
 test('opposing allied vehicles keep right and both reach their original destinations', () => {
   const s = fresh(true),
-    a = unit(s, 'leopard', -1300, -400, { x: -1100, z: -400 }),
-    b = unit(s, 'leopard', -1100, -400, { x: -1300, z: -400 }, 2);
+    a = unit(s, 'leopard', -1492, -400, { x: -1292, z: -400 }),
+    b = unit(s, 'leopard', -1292, -400, { x: -1492, z: -400 }, 2);
   tick(s, 15, () => separated([a, b]));
   assert.ok(distance(a, a.order) <= 1, JSON.stringify(a));
   assert.ok(distance(b, b.order) <= 1, JSON.stringify(b));
@@ -92,8 +92,8 @@ test('opposing allied vehicles keep right and both reach their original destinat
 
 test('an occupied intermediate waypoint is bypassed while the final player goal is retained', () => {
   const s = fresh(),
-    mog = unit(s, 'mog', -1200, -400),
-    tank = unit(s, 'leopard', -1280, -400, { x: -1120, z: -450 });
+    mog = unit(s, 'mog', -1392, -400),
+    tank = unit(s, 'leopard', -1472, -400, { x: -1312, z: -450 });
   tank.path = [{ x: mog.x, z: mog.z }, { ...tank.path[0] }];
   const goal = structuredClone(tank.order);
   tick(s, 15, () => separated([tank, mog]));
@@ -104,12 +104,12 @@ test('an occupied intermediate waypoint is bypassed while the final player goal 
 
 test('a single-file choke yields by reversing rather than phasing or deadlocking', () => {
   const s = fresh();
-  for (let x = -1280; x <= -1120; x += 20) {
+  for (let x = -1472; x <= -1312; x += 20) {
     wall(s, x, -416);
     wall(s, x, -384);
   }
-  const a = unit(s, 'leopard', -1320, -400, { x: -1080, z: -400 }),
-    b = unit(s, 'leopard', -1080, -400, { x: -1320, z: -400 });
+  const a = unit(s, 'leopard', -1512, -400, { x: -1272, z: -400 }),
+    b = unit(s, 'leopard', -1272, -400, { x: -1512, z: -400 });
   let reversed = false,
     previous = b.x;
   tick(s, 40, () => {
@@ -124,17 +124,17 @@ test('a single-file choke yields by reversing rather than phasing or deadlocking
 
 test('two opposing columns clear a choke even when the rear units are processed first', () => {
   const s = fresh();
-  for (let x = -1280; x <= -1120; x += 20) {
+  for (let x = -1472; x <= -1312; x += 20) {
     wall(s, x, -416);
     wall(s, x, -384);
   }
   for (const direction of [-1, 1])
     for (let i = 0; i < 4; i++) {
-      const u = unit(s, 'leopard', direction < 0 ? -1080 + i * 20 : -1320 - i * 20, -400, {
-        x: direction < 0 ? -1400 : -1000,
+      const u = unit(s, 'leopard', direction < 0 ? -1272 + i * 20 : -1512 - i * 20, -400, {
+        x: direction < 0 ? -1592 : -1192,
         z: -460 + i * 20,
       });
-      u.path.unshift({ x: direction < 0 ? -1320 : -1080, z: -400 });
+      u.path.unshift({ x: direction < 0 ? -1512 : -1272, z: -400 });
     }
   s.groundUnits.reverse();
   tick(s, 50, () => separated(s.groundUnits));
@@ -143,15 +143,15 @@ test('two opposing columns clear a choke even when the rear units are processed 
 
 test('an allied column passes a fixed gun group without changing manual mission metadata', () => {
   const s = fresh(),
-    mog = unit(s, 'mog', -1240, -400),
+    mog = unit(s, 'mog', -1432, -400),
     tanks = Array.from({ length: 8 }, (_, i) =>
-      unit(s, 'leopard', -1340 - i * 18, -400, { x: -1000 - i * 18, z: -400 }),
+      unit(s, 'leopard', -1532 - i * 18, -400, { x: -1192 - i * 18, z: -400 }),
     ),
     mission = tanks[4];
   mission.routeState = { status: 'moving', retryAt: 5 };
   mission.routeQueue = [{ x: -900, z: -300, mode: 'move' }];
-  mission.supplyTrip = { crateId: 44, returnX: -1200, returnZ: -500 };
-  mission.delivery = { x: -1072, z: -400, status: 'moving', retryAt: 5 };
+  mission.supplyTrip = { crateId: 44, returnX: -1392, returnZ: -500 };
+  mission.delivery = { x: -1264, z: -400, status: 'moving', retryAt: 5 };
   const saved = structuredClone({
     order: mission.order,
     routeState: mission.routeState,
@@ -166,9 +166,9 @@ test('an allied column passes a fixed gun group without changing manual mission 
 
 test('static recovery is globally budgeted and retries retain blocked manual routes', () => {
   const s = fresh();
-  for (let z = -700; z <= -200; z += 20) wall(s, -1200, z);
+  for (let z = -700; z <= -200; z += 20) wall(s, -1392, z);
   const units = Array.from({ length: 12 }, (_, i) =>
-    unit(s, 'leopard', -1214, -680 + i * 40, { x: -1160, z: -680 + i * 40 }),
+    unit(s, 'leopard', -1406, -680 + i * 40, { x: -1352, z: -680 + i * 40 }),
   );
   const attempted = new Set();
   tick(s, 2, () => {
@@ -187,7 +187,7 @@ test('static recovery is globally budgeted and retries retain blocked manual rou
 test('five hundred marching units use local buckets and no per-unit A* recovery', () => {
   const s = fresh(),
     units = Array.from({ length: 500 }, (_, i) => {
-      const x = -1750 + (i % 20) * 24,
+      const x = -1942 + (i % 20) * 24,
         z = -850 + Math.floor(i / 20) * 24;
       return unit(s, i % 5 ? 'infantry' : 'leopard', x, z, { x: x + 150, z });
     });
@@ -202,8 +202,8 @@ test('five hundred marching units use local buckets and no per-unit A* recovery'
 
 test('save/load does not change derived avoidance, boarding clearance or a manual stop', () => {
   const s = fresh(),
-    a = unit(s, 'leopard', -1300, -400, { x: -1100, z: -400 }),
-    b = unit(s, 'leopard', -1100, -400, { x: -1300, z: -400 });
+    a = unit(s, 'leopard', -1492, -400, { x: -1292, z: -400 }),
+    b = unit(s, 'leopard', -1292, -400, { x: -1492, z: -400 });
   tick(s, 4);
   const loaded = E.load(E.save(s));
   tick(s, 8);
@@ -212,13 +212,13 @@ test('save/load does not change derived avoidance, boarding clearance or a manua
     const copy = loaded.groundUnits.find((v) => v.id === u.id);
     assert.deepEqual([copy.x, copy.z, copy.path, copy.yaw], [u.x, u.z, u.path, u.yaw]);
   }
-  const passenger = unit(s, 'infantry', -1400, -400, { x: -1380, z: -400 }),
-    carrier = unit(s, 'apc', -1380, -400);
+  const passenger = unit(s, 'infantry', -1592, -400, { x: -1572, z: -400 }),
+    carrier = unit(s, 'apc', -1572, -400);
   passenger.boardingId = carrier.id;
   passenger.order.mode = 'board';
   tick(s, 1);
   assert.ok(distance(passenger, carrier) < 4, 'boarding is handled by the existing 15 m gate');
-  const manual = unit(s, 'leopard', -1600, -400, { x: -1550, z: -400 });
+  const manual = unit(s, 'leopard', -1792, -400, { x: -1742, z: -400 });
   tick(s, 0.1);
   assert.ok(manual.path.length);
   assert.equal(E.commandUnits(s, 0, [manual.id], 'stop'), 1);
@@ -233,12 +233,12 @@ test('the real simulation tick moves two mixed columns past each other and fixed
     movers = [];
   for (let row = 0; row < 5; row++) {
     const z = -650 + row * 40;
-    unit(s, 'mog', -1240, z);
+    unit(s, 'mog', -1432, z);
     for (let col = 0; col < 4; col++) {
       const key = col % 2 ? 'infantry' : 'leopard';
       movers.push(
-        unit(s, key, -1360 - col * 20, z, { x: -1100 - col * 20, z }),
-        unit(s, key, -1120 + col * 20, z, { x: -1380 + col * 20, z }),
+        unit(s, key, -1552 - col * 20, z, { x: -1292 - col * 20, z }),
+        unit(s, key, -1312 + col * 20, z, { x: -1572 + col * 20, z }),
       );
     }
   }
@@ -254,29 +254,29 @@ test('the real simulation tick moves two mixed columns past each other and fixed
     separated(s.groundUnits);
   }
   assert.ok(movers.every((u) => distance(u, u.order) <= 1));
-  assert.ok(s.groundUnits.filter((u) => u.key === 'mog').every((u) => u.x === -1240));
+  assert.ok(s.groundUnits.filter((u) => u.key === 'mog').every((u) => u.x === -1432));
 });
 
 test('a tactical vehicle backs away while keeping its hull facing a recent threat', () => {
   const s = fresh(),
-    u = unit(s, 'leopard', -1200, -400, { x: -1250, z: -400 });
+    u = unit(s, 'leopard', -1392, -400, { x: -1442, z: -400 });
   u.order.mode = 'cover';
-  u.threatX = -1100;
+  u.threatX = -1292;
   u.threatZ = -400;
   u.threatAt = s.time;
   tick(s, 1);
-  assert.ok(u.x < -1200);
+  assert.ok(u.x < -1392);
   assert.ok(Math.abs(u.yaw - Math.PI / 2) < 1e-6);
 });
 
 test('swept steps cannot jump a ruin or shoreline even when both endpoints are free', () => {
   const s = fresh();
-  wall(s, -1200, -400, 3);
+  wall(s, -1392, -400, 3);
   s.buildings.at(-1).hp = 0;
-  assert.ok(E.walkable(s, -1210, -400, 1));
-  assert.ok(E.walkable(s, -1190, -400, 1));
-  assert.equal(groundStepClear(s, { x: -1210, z: -400 }, { x: -1190, z: -400 }, 1), false);
-  assert.ok(E.walkable(s, -800, 0, 3));
-  assert.ok(E.walkable(s, 800, 0, 3));
-  assert.equal(groundStepClear(s, { x: -800, z: 0 }, { x: 800, z: 0 }, 3), false);
+  assert.ok(E.walkable(s, -1402, -400, 1));
+  assert.ok(E.walkable(s, -1382, -400, 1));
+  assert.equal(groundStepClear(s, { x: -1402, z: -400 }, { x: -1382, z: -400 }, 1), false);
+  assert.ok(E.walkable(s, -992, 0, 3));
+  assert.ok(E.walkable(s, 992, 0, 3));
+  assert.equal(groundStepClear(s, { x: -992, z: 0 }, { x: 992, z: 0 }, 3), false);
 });

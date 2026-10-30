@@ -48,10 +48,10 @@ function serviceTime(s, seconds) {
 test('the station requires an actual street, pays normal construction and upkeep, and only completed stations get a limited fleet', () => {
   const s = fresh(),
     before = s.sides[0].credits;
-  assert.match(E.canPlace(s, 'service', -700, 250), /улицей/);
+  assert.match(E.canPlace(s, 'service', -892, 250), /улицей/);
   const quote = E.purchaseQuote(s, 0, 'building', 'service');
-  const plan = E.placementPlan(s, 0, 'service', -1080, -80);
-  const b = E.build(s, 0, 'service', -1080, -80);
+  const plan = E.placementPlan(s, 0, 'service', -1272, -80);
+  const b = E.build(s, 0, 'service', -1272, -80);
   assert.equal(typeof b, 'object');
   assert.equal(before - s.sides[0].credits, quote.cost + plan.driveCost);
   assert.equal(s.sides[0].materials, 3000 - quote.metal);
@@ -159,7 +159,7 @@ test('empty resources halt repair and fractional reserves buy only affordable ac
 test('a broken street does not block field travel, but zero materials prevents any free HP', () => {
   const { s, b, t } = town();
   E.advance(s, 0.5);
-  const cut = s.roads.find((r) => r.camp && r.side === 0 && r.ax === -1045);
+  const cut = s.roads.find((r) => r.camp && r.side === 0 && r.ax === -1237);
   E.damageRoad(s, cut, 120);
   assert.equal(E.network(s, 0).connected.length, 0);
   s.sides[0].materials = 0;
@@ -183,7 +183,7 @@ test('a broken street does not block field travel, but zero materials prevents a
 
 test('a removed street is never reconstructed while a house beyond the gap is repaired over the field', () => {
   const { s, t } = town();
-  const gap = s.roads.find((r) => r.camp && r.side === 0 && r.ax === -1045);
+  const gap = s.roads.find((r) => r.camp && r.side === 0 && r.ax === -1237);
   gap.removed = true;
   gap.hp = 0;
   dirtyNetwork(s);
@@ -240,9 +240,9 @@ test('storms slow the same physical field journey without disabling or replacing
 
 test('destroyed and unfinished buildings and enemy property are never repaired; station loss removes its dependent fleet', () => {
   const { s, b, t } = town();
-  const enemy = build(s, 1, 'launcher', -960, 80);
+  const enemy = build(s, 1, 'launcher', -1152, 80);
   enemy.hp -= 50;
-  const unfinished = E.build(s, 0, 'launcher', -850, 80);
+  const unfinished = E.build(s, 0, 'launcher', -1042, 80);
   const removed = s.roads.find((r) => r.side === 1);
   removed.hp = 0;
   E.advance(s, 3);
@@ -277,11 +277,11 @@ test('manual prepaid repair stays separate and the city service cannot charge fo
 
 test('the field route bends around a building and every travelled segment stays outside its walls', () => {
   const s = fresh();
-  const from = { x: -1050, z: 250 },
-    target = { ax: -850, az: 250, bx: -850, bz: 250 },
+  const from = { x: -1242, z: 250 },
+    target = { ax: -1042, az: 250, bx: -1042, bz: 250 },
     oldRoute = serviceFieldRoute(s, from, target, 'road');
   assert.ok(servicePathClear(s, from, oldRoute.path));
-  const obstacle = build(s, 0, 'launcher', -950, 250);
+  const obstacle = build(s, 0, 'launcher', -1142, 250);
   assert.equal(
     servicePathClear(s, from, oldRoute.path),
     false,
@@ -304,13 +304,13 @@ test('the field route bends around a building and every travelled segment stays 
     }
     previous = point;
   }
-  assert.deepEqual(route.path.at(-1), { x: -850, z: 250 });
+  assert.deepEqual(route.path.at(-1), { x: -1042, z: 250 });
 });
 
 test('fleet limits are configured, shared per owner and independent between multiplayer sides', () => {
   const s = fresh();
   for (const side of [0, 1]) {
-    const first = build(s, side, 'service', side ? 1080 : -1080, -80);
+    const first = build(s, side, 'service', side ? 1272 : -1272, -80);
     for (let i = 0; i < 4; i++) s.buildings.push({ ...first, id: s.nextId++ });
     s.sides[side].purchases.building.service = 5;
   }
@@ -334,8 +334,8 @@ function waterJobs(s, count) {
     const road = {
       ...template,
       id: s.nextId++,
-      ax: -500,
-      bx: -450,
+      ax: -692,
+      bx: -642,
       az: -150 + i * 50,
       bz: -150 + i * 50,
       hp: 0,
@@ -367,7 +367,7 @@ test('an unreachable water target is never remotely repaired and blocked crews r
 
 test('six closer unreachable jobs cannot starve a farther reachable house', () => {
   const { s, t } = town();
-  t.x = -1800;
+  t.x = -1992;
   t.z = 700;
   const unreachable = waterJobs(s, 6);
   dirtyNetwork(s);
@@ -490,7 +490,7 @@ test('old campaigns migrate with an empty fleet; malformed, foreign and wrong-ty
 
 test('optional ballistic projectile fields retain old saves and reject nonphysical imported values', () => {
   const s = fresh();
-  const p = { x: -800, y: 2, z: 0, vx: 10, vy: 1, vz: 0, speed: 10, life: 0, maxLife: 10 };
+  const p = { x: -992, y: 2, z: 0, vx: 10, vy: 1, vz: 0, speed: 10, life: 0, maxLife: 10 };
   s.projectiles.push(p);
   assert.equal(E.load(E.save(s)).projectiles.length, 1);
   Object.assign(p, { originY: 2, gravity: 18, arc: 150 });

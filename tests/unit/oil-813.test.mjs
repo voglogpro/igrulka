@@ -48,7 +48,7 @@ test('ammo delivery consumes fuel during a route and stops at parking or death',
 
 test('real civilian repair vehicles without combat HP consume fuel on travel and stop when parked', () => {
   const s = fresh();
-  const station = E.build(s, 0, 'service', -1080, -10);
+  const station = E.build(s, 0, 'service', -1272, -10);
   assert.equal(typeof station, 'object', String(station));
   Object.assign(station, { progress: 1, hp: station.maxHp });
   updateServices(s, 0.05);
@@ -70,12 +70,12 @@ test('a zero-oil zero-electronics city can pay for road and well and recover oil
   f.components = 0;
   const initialCredits = f.credits,
     initialMetal = f.materials;
-  const road = E.buildRoad(s, 0, -1105, -45, -1266, -228);
+  const road = E.buildRoad(s, 0, -1297, -45, -1458, -228);
   assert.equal(typeof road, 'object', String(road));
   const quote = E.purchaseQuote(s, 0, 'building', 'oilwell');
   assert.equal(quote.oil, 0);
   assert.equal(quote.components, 0);
-  const well = E.build(s, 0, 'oilwell', -1280, -250);
+  const well = E.build(s, 0, 'oilwell', -1472, -250);
   assert.equal(typeof well, 'object', String(well));
   assert.equal(f.oil, 0);
   assert.equal(f.components, 0);

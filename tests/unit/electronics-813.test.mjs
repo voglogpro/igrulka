@@ -8,7 +8,7 @@ function fixture() {
   const s = E.createGame(813, { mode: 'multiplayer' });
   s.rules.rear = false;
   Object.assign(s.sides[0], { credits: 10000, materials: 1000, oil: 150 });
-  const b = E.build(s, 0, 'electronics', -1080, -10);
+  const b = E.build(s, 0, 'electronics', -1272, -10);
   assert.equal(typeof b, 'object', String(b));
   b.progress = 1;
   b.hp = b.maxHp;
@@ -60,7 +60,7 @@ test('electronics preserves an operating reserve and stops for missing inputs, d
 
 test('multiple shops share a bounded stock, never duplicate a last component, and resume after use', () => {
   const { s, b, f } = fixture();
-  const other = E.build(s, 0, 'electronics', -950, -10);
+  const other = E.build(s, 0, 'electronics', -1142, -10);
   assert.equal(typeof other, 'object', String(other));
   Object.assign(other, { progress: 1, hp: other.maxHp });
   f.components = E.ELECTRONICS.capacity - 1;
@@ -77,7 +77,7 @@ test('multiple shops share a bounded stock, never duplicate a last component, an
 test('all four weapons require and pay their electronics once, before the existing paid timed queue', () => {
   for (const key of Object.keys(E.WEAPONS)) {
     const { s, f } = fixture();
-    const factory = E.build(s, 0, 'factory', -950, -10);
+    const factory = E.build(s, 0, 'factory', -1142, -10);
     assert.equal(typeof factory, 'object', String(factory));
     Object.assign(factory, { progress: 1, hp: factory.maxHp });
     const d = E.WEAPONS[key];
@@ -97,10 +97,10 @@ test('all four weapons require and pay their electronics once, before the existi
 
 test('guided AA ammunition consumes electronics only after an available paid component', () => {
   const { s, f } = fixture();
-  const plant = E.build(s, 0, 'ammofactory', -950, -10);
+  const plant = E.build(s, 0, 'ammofactory', -1142, -10);
   assert.equal(typeof plant, 'object', String(plant));
   Object.assign(plant, { progress: 1, hp: plant.maxHp });
-  const sam = E.build(s, 0, 'sam', -850, 250);
+  const sam = E.build(s, 0, 'sam', -1042, 250);
   assert.equal(typeof sam, 'object', String(sam));
   Object.assign(sam, { progress: 1, hp: sam.maxHp });
   f.ammoStock = E.createAmmoStock();
@@ -123,10 +123,10 @@ test('ordinary rifle and tank-shell ammunition can be produced with zero electro
     ['leopard', 'shell'],
   ]) {
     const { s, f } = fixture();
-    const plant = E.build(s, 0, 'ammofactory', -950, -10);
+    const plant = E.build(s, 0, 'ammofactory', -1142, -10);
     assert.equal(typeof plant, 'object', String(plant));
     Object.assign(plant, { progress: 1, hp: plant.maxHp });
-    s.groundUnits.push(E.makeGround(s, 0, key, -850, 250));
+    s.groundUnits.push(E.makeGround(s, 0, key, -1042, 250));
     f.ammoStock = E.createAmmoStock();
     const before = f.credits;
     updateAmmoProduction(s);
@@ -175,7 +175,7 @@ test('schema21 preserves assembly phase and rejects corrupt new fields; schema20
 test('oil-off isolated scenarios remain compatible, with an explicit component rule available', () => {
   const { s } = fixture();
   s.rules.oil = false;
-  const factory = E.build(s, 0, 'factory', -950, -10);
+  const factory = E.build(s, 0, 'factory', -1142, -10);
   factory.progress = 1;
   assert.equal(E.produce(s, 0, 'drone'), true);
   s.rules.components = true;

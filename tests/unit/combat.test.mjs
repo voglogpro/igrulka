@@ -31,7 +31,7 @@ function ready(s, side, key, x, z) {
   b.hp = b.maxHp;
   return b;
 }
-function airborne(s, x = -1015, z = -80) {
+function airborne(s, x = -1207, z = -80) {
   const d = E.WEAPONS.drone,
     u = {
       id: s.nextId++,
@@ -116,17 +116,17 @@ test('right click cancels once, right drag only orbits, and pointer loss cannot 
 });
 test('autonomous launchers accept repeated targets, reserve stock once, and enforce independent queue capacity', () => {
   const s = fresh(),
-    a = ready(s, 0, 'launcher', -730, 170),
-    b = ready(s, 0, 'launcher', -850, 190);
+    a = ready(s, 0, 'launcher', -922, 170),
+    b = ready(s, 0, 'launcher', -1042, 190);
   s.sides[0].inventory.drone = 20;
   assert.equal(a.roadLink, undefined);
   assert.equal(E.supplyFactor(s, a), 1);
   stage(s, a, 'drone', 5);
-  assert.equal(E.launch(s, 0, 'drone', { x: 1015, z: 0 }, 5, a.id), 5);
+  assert.equal(E.launch(s, 0, 'drone', { x: 1207, z: 0 }, 5, a.id), 5);
   stage(s, a, 'drone', 5);
-  assert.equal(E.launch(s, 0, 'drone', { x: 1015, z: 80 }, 5, a.id), 5);
+  assert.equal(E.launch(s, 0, 'drone', { x: 1207, z: 80 }, 5, a.id), 5);
   stage(s, a, 'drone', 2);
-  assert.equal(E.launch(s, 0, 'drone', { x: 1015, z: 120 }, 5, a.id), 2);
+  assert.equal(E.launch(s, 0, 'drone', { x: 1207, z: 120 }, 5, a.id), 2);
   assert.equal(s.sides[0].inventory.drone, 8);
   stage(s, a, 'drone', 1);
   assert.match(E.launch(s, 0, 'drone', 2, 1, a.id), /Очередь/);
@@ -151,7 +151,7 @@ test('autonomous launchers accept repeated targets, reserve stock once, and enfo
 });
 test('a destroyed legacy launcher returns only its old global reservations to stock', () => {
   const s = fresh(),
-    site = ready(s, 0, 'launcher', -730, 170);
+    site = ready(s, 0, 'launcher', -922, 170);
   s.sides[0].inventory.drone = 5;
   stage(s, site, 'drone', 5);
   E.launch(s, 0, 'drone', 2, 5, site.id);
@@ -167,7 +167,7 @@ test('a destroyed legacy launcher returns only its old global reservations to st
 });
 test('ruins block construction until cleared, remove the driveway and remain cleared after reload', () => {
   const s = fresh(),
-    b = ready(s, 0, 'industry', -960, -80),
+    b = ready(s, 0, 'industry', -1152, -80),
     road = s.roads.find((r) => r.connectorTo === b.id);
   E.damageBuilding(s, b, 10000);
   assert.match(E.canPlace(s, 'industry', b.x, b.z), /руины/);
@@ -184,19 +184,19 @@ test('roads reject identical, reversed, partial and close parallel overlays with
   const s = fresh(),
     cash = s.sides[0].credits;
   for (const p of [
-    [-1105, -45, -1045, -45],
-    [-1045, -45, -1105, -45],
-    [-1135, -45, -1060, -45],
-    [-1105, -42, -1045, -42],
+    [-1297, -45, -1237, -45],
+    [-1237, -45, -1297, -45],
+    [-1327, -45, -1252, -45],
+    [-1297, -42, -1237, -42],
   ])
     assert.match(E.buildRoad(s, 0, ...p), /уже есть дорога/);
   assert.equal(s.sides[0].credits, cash);
-  assert.equal(typeof E.buildRoad(s, 0, -1105, -45, -1200, -45), 'object');
-  assert.equal(typeof E.buildRoad(s, 0, -1090, -45, -1090, -160), 'object');
+  assert.equal(typeof E.buildRoad(s, 0, -1297, -45, -1392, -45), 'object');
+  assert.equal(typeof E.buildRoad(s, 0, -1282, -45, -1282, -160), 'object');
 });
 test('interception can leave a falling wingless aircraft; the crash damages the actual roof underneath once', () => {
   const s = fresh(),
-    b = ready(s, 0, 'housing', -1015, -80),
+    b = ready(s, 0, 'housing', -1207, -80),
     u = airborne(s);
   s.rng = 1;
   E.damageAircraft(s, u, 100, 0);
@@ -218,7 +218,7 @@ test('interception can leave a falling wingless aircraft; the crash damages the 
 });
 test('the other interception outcome is an airburst without a ground blast', () => {
   const s = fresh(),
-    b = ready(s, 0, 'housing', -1015, -80),
+    b = ready(s, 0, 'housing', -1207, -80),
     u = airborne(s);
   s.rng = 1100;
   E.damageAircraft(s, u, 100, 0);
@@ -231,7 +231,7 @@ test('the other interception outcome is an airburst without a ground blast', () 
 });
 test('a falling aircraft round trips without losing velocity, collision or damage state', () => {
   const s = fresh();
-  ready(s, 0, 'housing', -1015, -80);
+  ready(s, 0, 'housing', -1207, -80);
   const u = airborne(s);
   s.rng = 1;
   E.damageAircraft(s, u, 100, 0);
@@ -246,16 +246,16 @@ test('a falling aircraft round trips without losing velocity, collision or damag
 });
 test('bullet motion has vertical acceleration and never bends horizontally toward a target', () => {
   const s = fresh(),
-    u = airborne(s, -400, 0);
+    u = airborne(s, -592, 0);
   u.hp = u.maxHp = 10000;
   const p = {
     id: s.nextId++,
     side: 0,
     kind: 'bullet',
-    x: -1100,
+    x: -1292,
     y: 90,
     z: 0,
-    px: -1100,
+    px: -1292,
     py: 90,
     pz: 0,
     vx: 300,
@@ -270,7 +270,7 @@ test('bullet motion has vertical acceleration and never bends horizontally towar
   };
   s.projectiles.push(p);
   E.advance(s, 0.1);
-  assert.ok(Math.abs(p.x + 1070) < 1e-8);
+  assert.ok(Math.abs(p.x + 1262) < 1e-8);
   assert.ok(Math.abs(p.y - (90 + 15 * 0.1 - 0.5 * E.COMBAT.gravity * 0.1 * 0.1)) < 1e-8);
   assert.ok(Math.abs(p.vy - (15 - E.COMBAT.gravity * 0.1)) < 1e-8);
   assert.equal(p.vz, 0);
@@ -278,17 +278,17 @@ test('bullet motion has vertical acceleration and never bends horizontally towar
 });
 test('open map shows far aircraft and vehicles without an observer while buildings stay known', () => {
   const s = fresh(),
-    u = airborne(s, 700, 300);
+    u = airborne(s, 892, 300);
   assert.equal(E.WEAPONS.scout, undefined);
   assert.equal(E.unitVisible(s, 0, u), true);
   assert.equal(E.unitVisible(s, 1, u), true);
   assert.ok(E.knownTargets(s, 0).some((t) => t.id === 2));
   assert.equal(E.observedTarget(s, 0, 2).hp, 1100);
-  assert.equal(E.pointVisible(s, 0, 700, 300), true);
-  const tank = E.makeGround(s, 1, 'leopard', 800, 100);
+  assert.equal(E.pointVisible(s, 0, 892, 300), true);
+  const tank = E.makeGround(s, 1, 'leopard', 992, 100);
   s.groundUnits.push(tank);
   assert.equal(E.groundVisible(s, 0, tank), true);
-  const scout = E.makeGround(s, 0, 'sniper', 700, 100);
+  const scout = E.makeGround(s, 0, 'sniper', 892, 100);
   s.groundUnits.push(scout);
   s.time += 1;
   assert.equal(E.groundVisible(s, 0, tank), true);
@@ -299,10 +299,10 @@ test('open map shows far aircraft and vehicles without an observer while buildin
 });
 test('removing a working radar does not hide ordinary aircraft or vehicles', () => {
   const s = fresh(),
-    u = airborne(s, 700, 300),
-    tank = E.makeGround(s, 1, 'leopard', 900, -300);
+    u = airborne(s, 892, 300),
+    tank = E.makeGround(s, 1, 'leopard', 1092, -300);
   s.groundUnits.push(tank);
-  const radar = ready(s, 0, 'radar', -960, 120);
+  const radar = ready(s, 0, 'radar', -1152, 120);
   s.time += 1;
   assert.equal(E.sensorSources(s, 0).length, 1);
   assert.equal(E.unitVisible(s, 0, u), true);
@@ -314,7 +314,7 @@ test('removing a working radar does not hide ordinary aircraft or vehicles', () 
 });
 test('version 5 removes recon missions and production, refunds their exact costs and preserves the campaign', () => {
   const s = fresh(),
-    factory = ready(s, 0, 'factory', -1080, -10);
+    factory = ready(s, 0, 'factory', -1272, -10);
   s.version = 5;
   s.sides[0].inventory.scout = 2;
   factory.queue = [{ key: 'scout', progress: 0.5 }];
@@ -340,9 +340,9 @@ test('legacy overlapping streets are split into uncovered sections while preserv
   s.roads.push({
     id: s.nextId++,
     side: 0,
-    ax: -1215,
+    ax: -1407,
     az: -45,
-    bx: -815,
+    bx: -1007,
     bz: -45,
     hp: 120,
     maxHp: 120,

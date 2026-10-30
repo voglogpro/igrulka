@@ -153,7 +153,7 @@ test('production stops without roads but paid stock still travels across real dr
 test('weapon cargo leaves the warehouse at pickup, reaches a silo physically, and returns physically when its target is destroyed', () => {
   const s = fresh(),
     factory = building(s, 'factory');
-  const silo = E.build(s, 0, 'silo', -800, 250);
+  const silo = E.build(s, 0, 'silo', -992, 250);
   assert.equal(typeof silo, 'object', silo);
   silo.hp = silo.maxHp;
   silo.progress = 1;
@@ -260,10 +260,10 @@ test('FPV launches consume existing local charges without double billing and a p
 
 test('a full eight-slot fleet replaces one destroyed slot only after its delay and paid reserves', () => {
   const s = fresh();
-  assert.equal(typeof E.buildRoad(s, 0, -1105, -45, -1115, -45), 'object');
-  assert.equal(typeof E.buildRoad(s, 0, -1115, -45, -1115, 260), 'object');
+  assert.equal(typeof E.buildRoad(s, 0, -1297, -45, -1307, -45), 'object');
+  assert.equal(typeof E.buildRoad(s, 0, -1307, -45, -1307, 260), 'object');
   for (const z of [-10, 70, 150, 230]) {
-    const b = E.build(s, 0, 'ammofactory', -1080, z);
+    const b = E.build(s, 0, 'ammofactory', -1272, z);
     assert.equal(typeof b, 'object', b);
     b.progress = 1;
     b.hp = b.maxHp;
@@ -314,7 +314,7 @@ test('an inaccessible recipient does not consume stock; relocation retries, zero
   assert.equal(s.sides[0].ammoStock.small, 30);
   assert.ok(s.ammoVehicles.every((v) => !v.cargo));
   assert.equal(E.ammoLogisticsStatus(s, 0, u.id).status, 'blocked');
-  u.x = -900;
+  u.x = -1092;
   u.z = 250;
   E.advance(s, 1.1);
   const car = s.ammoVehicles.find((v) => v.cargo);
@@ -412,8 +412,8 @@ test('already loaded ground and AA rounds fire with an empty wallet, a miss cann
 test('an empty distant silo gets a first shipment before a nearby partially stocked launcher is filled', () => {
   const s = fresh();
   building(s, 'factory');
-  const launcher = E.build(s, 0, 'launcher', -950, 200),
-    silo = E.build(s, 0, 'silo', -820, 400);
+  const launcher = E.build(s, 0, 'launcher', -1142, 200),
+    silo = E.build(s, 0, 'silo', -1012, 400);
   for (const b of [launcher, silo]) {
     assert.equal(typeof b, 'object', b);
     b.progress = 1;

@@ -1,16 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
-import { LEGACY_OIL_FIELDS, expandLegacyX, expandLegacyZ } from '../../src/game/map.js';
+import { LEGACY_OIL_FIELDS, expandLegacyX, expandV23X, expandLegacyZ } from '../../src/game/map.js';
+const migrateX = (x) => expandV23X(expandLegacyX(x));
 
 function legacy(version = 14) {
   const s = E.createGame(8914);
   s.version = version;
   s.mode = 'multiplayer';
-  for (const b of s.buildings) b.x -= Math.sign(b.x) * 400;
+  for (const b of s.buildings) b.x -= Math.sign(b.x) * 592;
   for (const r of s.roads) {
-    r.ax -= Math.sign(r.ax) * 400;
-    r.bx -= Math.sign(r.bx) * 400;
+    r.ax -= Math.sign(r.ax) * 592;
+    r.bx -= Math.sign(r.bx) * 592;
   }
   return s;
 }
@@ -93,7 +94,7 @@ for (const version of [13, 14])
       assert.ok(Math.abs(current.z - field.z - 8) < 1e-9);
       assert.ok(Math.abs(link.bx - current.x - (road.bx - b.x)) < 1e-9);
       assert.ok(Math.abs(link.bz - current.z - (road.bz - b.z)) < 1e-9);
-      assert.equal(link.ax, expandLegacyX(road.ax), 'junction stays on the transformed main road');
+      assert.equal(link.ax, migrateX(road.ax), 'junction stays on the transformed main road');
       const again = E.load(E.save(loaded)).buildings.find((v) => v.id === b.id);
       assert.deepEqual(again, current);
     }
@@ -125,7 +126,7 @@ test('v14 shore ports remain on the new shore across both z grids, preserving ID
     assert.equal(current.side, b.side);
     assert.ok(Math.abs(link.bx - current.x - (road.bx - b.x)) < 1e-8);
     assert.ok(Math.abs(link.bz - current.z - (road.bz - b.z)) < 1e-8);
-    assert.equal(link.ax, expandLegacyX(road.ax));
+    assert.equal(link.ax, migrateX(road.ax));
     assert.ok(E.seaDistance(E.berthOf(current).x, E.berthOf(current).z) < 0);
     const again = E.load(E.save(loaded)).buildings.find((v) => v.id === b.id);
     assert.deepEqual(again, current, 'v15 import must never move the port a second time');

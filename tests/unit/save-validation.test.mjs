@@ -5,11 +5,11 @@ import * as game from '../../src/game/index.js';
 function campaign() {
   const s = game.createGame(39);
   s.mode = 'multiplayer';
-  const b = game.build(s, 0, 'barracks', -1080, -10);
+  const b = game.build(s, 0, 'barracks', -1272, -10);
   assert.notEqual(typeof b, 'string', b);
   b.progress = 1;
   b.hp = b.maxHp;
-  s.groundUnits.push(game.makeGround(s, 0, 'infantry', -900, -40));
+  s.groundUnits.push(game.makeGround(s, 0, 'infantry', -1092, -40));
   return { s, b, u: s.groundUnits[0] };
 }
 
@@ -19,7 +19,7 @@ const fields = {
   'army queue': ({ b }, key) => (b.armyQueue = [{ key, progress: 0 }]),
   'guarded ground unit': ({ u }, key) => {
     u.key = key;
-    u.guard = { x: -900, z: -40 };
+    u.guard = { x: -1092, z: -40 };
   },
   building: ({ b }, key) => (b.key = key),
   'active research': ({ s }, key) => (s.sides[0].research = { key, progress: 0 }),
@@ -60,7 +60,7 @@ for (const [label, change] of Object.entries(fields))
 
 test('composition, rally and guard fields survive import, one tick and another save', () => {
   const { s, b, u } = campaign();
-  const rally = { x: -900, z: -40 };
+  const rally = { x: -1092, z: -40 };
   assert.equal(game.setRally(s, 0, b.id, rally), true);
   assert.equal(game.setRallyMode(s, 0, b.id, 'guard'), true);
   assert.equal(game.setArmyTarget(s, 0, 'infantry', 2), true);
@@ -100,8 +100,8 @@ test('malformed rally values cannot enter an imported campaign', () => {
 
 test('rally import preserves actual setRally boundaries and older absent/null rally fields', () => {
   for (const rally of [
-    { x: 1264, z: 584 },
-    { x: -1264, z: -584 },
+    { x: 1456, z: 584 },
+    { x: -1456, z: -584 },
   ]) {
     const { s, b } = campaign();
     assert.equal(game.setRally(s, 0, b.id, rally), true);

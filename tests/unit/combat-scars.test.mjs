@@ -18,7 +18,7 @@ test('a paid tank consumes local ammunition without a second charge and its shal
   s.rules.rear = false;
   s.sides[0].credits = 100000;
   s.sides[0].materials = 10000;
-  const base = E.build(s, 0, 'vehiclebase', -1080, -10);
+  const base = E.build(s, 0, 'vehiclebase', -1272, -10);
   assert.equal(typeof base, 'object', String(base));
   base.progress = 1;
   base.hp = base.maxHp;
@@ -28,10 +28,10 @@ test('a paid tank consumes local ammunition without a second charge and its shal
   base.armyQueue[0].progress = 1;
   E.step(s, 0.05);
   const tank = s.groundUnits.find((u) => u.key === 'leopard' && u.side === 0),
-    target = E.makeGround(s, 1, 'leopard', -900, 250);
+    target = E.makeGround(s, 1, 'leopard', -1092, 250);
   assert.ok(tank, 'the ordinarily paid production queue must produce the tank');
   Object.assign(tank, {
-    x: -1000,
+    x: -1192,
     z: 250,
     path: [],
     order: null,
@@ -78,7 +78,7 @@ test('persistent cosmetic scars are deterministic, ignore bullets/water, and bou
       type: 'impact',
       key: i % 2 ? 'drone' : 'tank',
       side: 0,
-      x: -600,
+      x: -792,
       z: 250,
       time: 0,
       radius: 12,
@@ -88,11 +88,11 @@ test('persistent cosmetic scars are deterministic, ignore bullets/water, and bou
   assert.ok(s.groundScars.every((scar) => scar.radius >= 0.8 && scar.radius <= 12));
   const before = structuredClone(s.groundScars);
   for (const e of [
-    { key: 'infantry', x: -600, z: 250 },
+    { key: 'infantry', x: -792, z: 250 },
     { key: 'drone', x: 0, z: 0 },
   ])
     recordGroundScar(s, { id: 999, type: 'impact', side: 0, time: 0, ...e });
-  recordGroundScar(s, { id: 300, type: 'impact', key: 'tank', side: 0, x: -600, z: 250, time: 0 });
+  recordGroundScar(s, { id: 300, type: 'impact', key: 'tank', side: 0, x: -792, z: 250, time: 0 });
   assert.deepEqual(s.groundScars, before);
   const copy = structuredClone(s);
   restoreGroundScars(copy, 15);
@@ -117,7 +117,7 @@ test('real drone impacts and shot-down ground crashes both leave bounded cosmeti
     id: s.nextId++,
     side: 0,
     key: 'drone',
-    x: -600,
+    x: -792,
     z: 250,
     y: 30,
     hp: 10,
@@ -127,7 +127,7 @@ test('real drone impacts and shot-down ground crashes both leave bounded cosmeti
     launched: true,
     travelled: 100,
     total: 100,
-    tx: -600,
+    tx: -792,
     tz: 250,
     vx: 10,
     vy: 0,
@@ -178,13 +178,13 @@ test('crater batch reuses one mesh, fades old and overflow scars, and hides afte
 test('repeated drone crashes keep a bounded long-lived small smoke pool without per-impact scene objects', () => {
   const scene = new Scene(),
     camera = new PerspectiveCamera();
-  camera.position.set(-600, 100, 250);
+  camera.position.set(-792, 100, 250);
   camera.updateMatrixWorld();
   const fx = new CombatEffects({ scene, camera, height: () => 0 });
   const objects = scene.children.length,
     geometry = fx.scars.mesh.geometry;
   for (let i = 0; i < 100; i++)
-    fx.handle({ id: i, type: i % 2 ? 'crash' : 'impact', key: 'drone', x: -600, z: 250, y: 2 });
+    fx.handle({ id: i, type: i % 2 ? 'crash' : 'impact', key: 'drone', x: -792, z: 250, y: 2 });
   assert.equal(scene.children.length, objects);
   assert.equal(fx.wrecks.length, 40);
   assert.ok(fx.wrecks.every((w) => w.smolder && w.life === 45));
@@ -216,8 +216,8 @@ test('distant blasts admit fewer particles and do not consume the shared close-r
   };
   const near = make(-600),
     far = make(2000);
-  near.explode(-600, 2, 250, 1);
-  far.explode(-600, 2, 250, 1);
+  near.explode(-792, 2, 250, 1);
+  far.explode(-792, 2, 250, 1);
   const particles = (fx) =>
     fx.smoke.slots.filter((p) => p.life > 0).length +
     fx.glow.slots.filter((p) => p.life > 0).length;

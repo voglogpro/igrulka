@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
+import { toV22Layout } from '../support/v22-layout.mjs';
 import { addRoad } from '../../src/game/city/roads.js';
 import { dirtyNetwork } from '../../src/game/city/road-network.js';
 import { damageBuilding } from '../../src/game/combat/damage.js';
@@ -270,7 +271,7 @@ test('v17 migration clears only conflicting new components, keeps paid buildings
     sides: s.sides,
     nextId: s.nextId,
   });
-  const loaded = E.load(E.save(s));
+  const loaded = E.load(E.save(toV22Layout(s)));
   assert.equal(loaded.version, E.VERSION);
   assert.equal(loaded.settlementHouseMask, 65535);
   assert.equal(settlementComponentEnabled(loaded, site, 0), false);
@@ -293,7 +294,7 @@ test('v17 migration clears only conflicting new components, keeps paid buildings
 test('legacy field delivery keeps paid cargo and exact position instead of becoming trapped under a larger town building', () => {
   const s = fresh(),
     component = settlementLayout(SETTLEMENTS[1]).components[2];
-  ordinary(s, 0, 'ammofactory', -1080, -80);
+  ordinary(s, 0, 'ammofactory', -1272, -80);
   E.updateAmmoLogistics(s, 0.05);
   const van = s.ammoVehicles[0];
   assert.ok(van);
@@ -316,7 +317,7 @@ test('legacy field delivery keeps paid cargo and exact position instead of becom
   }
   delete s.settlementLayoutMask;
   const snapshot = structuredClone(van);
-  const loaded = E.load(E.save(s)),
+  const loaded = E.load(E.save(toV22Layout(s))),
     same = loaded.ammoVehicles.find((v) => v.id === van.id);
   assert.deepEqual(same, snapshot);
   assert.equal(settlementComponentEnabled(loaded, SETTLEMENTS[1], 2), false);

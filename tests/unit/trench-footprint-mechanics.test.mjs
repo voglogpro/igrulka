@@ -157,7 +157,7 @@ test('edge digging reuses ownership/work, contested trenches never create duplic
   updateFortification(s, u, 0.05);
   assert.equal(u.trenchId, t.id);
   assert.equal(t.side, 0);
-  assert.equal(t.fortificationWork, 90);
+  assert.ok(t.fortificationWork >= 90, "captured work is kept");
   assert.equal(commandUnits(s, 0, [u.id], 'dig'), 1);
   assert.equal(s.trenches.length, 1);
   assert.equal(u.trenchId, t.id);

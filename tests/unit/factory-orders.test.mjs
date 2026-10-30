@@ -138,7 +138,7 @@ test('paid queue24 and full local warehouse block payment without rejecting an u
 test('finite side pending prevents duplicate automatic stock orders and has priority at its own factory', () => {
   const s = fresh(),
     a = factory(s),
-    b = E.build(s, 0, 'factory', -950, -10);
+    b = E.build(s, 0, 'factory', -1142, -10);
   assert.notEqual(typeof b, 'string', b);
   b.progress = 1;
   b.hp = b.maxHp;

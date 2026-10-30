@@ -51,7 +51,7 @@ test('continuous earthwork pieces meet end to end, conform to terrain and use th
     pools.map((p) => p.count),
     [14, 12, 0],
   );
-  assert.deepEqual(view.diagnostics().stages, [2, 2, 1]);
+  assert.deepEqual(view.diagnostics().stages, [2, 2, 1, 0, 0]);
   const matrix = new T.Matrix4();
   let previous = null;
   for (let i = 0; i < pools[0].count; i++) {
@@ -174,7 +174,7 @@ test('a full defensive line keeps six fixed draws and uploads nothing when only 
     versions = meshes.map((p) => p.instanceMatrix.version),
     rebuilds = view.links.rebuilds,
     reads = heightReads;
-  assert.equal(scene.children.length, 6);
+  assert.equal(scene.children.length, 8);
   for (let i = 0; i < 120; i++) {
     soldier.x += 1;
     state.time += 0.05;
@@ -194,14 +194,14 @@ test('a full defensive line keeps six fixed draws and uploads nothing when only 
   let disposals = 0;
   for (const mesh of meshes) mesh.geometry.addEventListener('dispose', () => disposals++);
   view.dispose();
-  assert.equal(disposals, 6);
+  assert.equal(disposals, 8);
   assert.equal(scene.children.length, 0);
 });
 
 test('irregular earthwork templates stay bounded, open above occupants and reuse six shared geometries', () => {
   const { state, scene, view } = fixture();
   view.sync(state);
-  assert.equal(scene.children.filter((child) => child.isInstancedMesh).length, 6);
+  assert.equal(scene.children.filter((child) => child.isInstancedMesh).length, 8);
   for (const mesh of [...view.pools, ...view.links.pools]) {
     const position = mesh.geometry.attributes.position;
     assert.ok(position.count < 20000, 'bounded shared geometry');
@@ -335,7 +335,7 @@ test('long standalone shelters follow endpoint terrain slope with identical stag
       assert.ok(Math.abs(Math.hypot(end.x - post.x, end.z - post.z) - 9) < 1e-4);
       assert.ok(Math.abs(end.y - height(end.x, end.z) - 0.07) < 1e-4);
     }
-    for (const pool of view.pools.slice(1)) {
+    for (const pool of view.pools.slice(1, 3)) {
       pool.getMatrixAt(i, other);
       assert.deepEqual(other.elements, base.elements);
     }

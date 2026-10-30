@@ -27,8 +27,8 @@ test('the global rear switch stops automatic work and movement, preserves manual
   const s = fresh(),
     truck = unit(s, 'supplytruck'),
     apc = unit(s, 'apc', 0, -990),
-    medic = unit(s, 'medic', 0, -1000, 280),
-    rifle = unit(s, 'infantry', 0, -995, 280);
+    medic = unit(s, 'medic', 0, -1192, 280),
+    rifle = unit(s, 'infantry', 0, -1187, 280);
   apc.hp = 40;
   rifle.hp = 10;
   assert.equal(executeCommand(s, 0, 'rear-auto', { enabled: false }), true);
@@ -37,7 +37,7 @@ test('the global rear switch stops automatic work and movement, preserves manual
   assert.equal(rifle.hp, 10);
   assert.equal(truck.path.length, 0);
   assert.equal(medic.path.length, 0);
-  assert.equal(E.orderGround(s, 0, [truck.id], { x: -1040, z: 300 }), 1);
+  assert.equal(E.orderGround(s, 0, [truck.id], { x: -1232, z: 300 }), 1);
   const order = structuredClone(truck.order);
   E.advance(s, 1);
   assert.notEqual(truck.x, -1000);
@@ -99,12 +99,12 @@ function groundAdvance(s, seconds, onTick = () => {}) {
 
 test('a truck carrying spare shells physically fetches missing rifle rounds and conserves paid cargo across save/load', () => {
   const s = fresh(),
-    plant = E.build(s, 0, 'ammofactory', -1080, -10);
+    plant = E.build(s, 0, 'ammofactory', -1272, -10);
   assert.equal(typeof plant, 'object');
   plant.progress = 1;
   plant.hp = plant.maxHp;
   const truck = unit(s, 'supplytruck'),
-    rifle = unit(s, 'infantry', 0, -1000, 265);
+    rifle = unit(s, 'infantry', 0, -1192, 265);
   truck.ammoCargo.shell = 6;
   rifle.groundAmmo = 0;
   rifle.ammoReserve = 0;
@@ -154,12 +154,12 @@ test('a truck carrying spare shells physically fetches missing rifle rounds and 
 
 test('a missing ammo class without warehouse stock does not cause repeated useless depot trips', () => {
   const s = fresh(),
-    plant = E.build(s, 0, 'ammofactory', -1080, -10);
+    plant = E.build(s, 0, 'ammofactory', -1272, -10);
   assert.equal(typeof plant, 'object');
   plant.progress = 1;
   plant.hp = plant.maxHp;
   const truck = unit(s, 'supplytruck'),
-    rifle = unit(s, 'infantry', 0, -1000, 265);
+    rifle = unit(s, 'infantry', 0, -1192, 265);
   truck.ammoCargo.shell = 6;
   rifle.groundAmmo = 0;
   rifle.ammoReserve = 0;
@@ -167,20 +167,20 @@ test('a missing ammo class without warehouse stock does not cause repeated usele
   assert.equal(s.sides[0].ammoStock.small, 0);
   assert.equal(truck.ammoCargo.shell, 6);
   assert.ok(!truck.order || Math.hypot(truck.order.x - plant.x, truck.order.z - plant.z) > 100);
-  assert.ok(Math.hypot(truck.x + 1000, truck.z - 250) < 80);
+  assert.ok(Math.hypot(truck.x + 1192, truck.z - 250) < 80);
 });
 
 test('paid medic and truck deployments obey near and far destinations before explicit automatic support resumes', () => {
   for (const key of ['medic', 'supplytruck'])
     for (const point of [
-      { x: -1040, z: 80 },
-      { x: -800, z: 300 },
+      { x: -1232, z: 80 },
+      { x: -992, z: 300 },
     ]) {
       const s = fresh(),
         facility = E.recruitmentFacility(key);
       for (const [type, x, z] of [
-        [facility, -1080, -10],
-        ['power', -1080, -80],
+        [facility, -1272, -10],
+        ['power', -1272, -80],
       ]) {
         const b = E.build(s, 0, type, x, z);
         assert.equal(typeof b, 'object', b);

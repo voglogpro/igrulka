@@ -1,5 +1,5 @@
 import { BUILDINGS, GROUND_UNITS, isInfantry } from '../../config.js';
-import { CORRIDORS } from '../../map.js';
+import { CORRIDORS, expandV23X } from '../../map.js';
 import { hqOf, hostile, pairedEnemy, validSide } from '../../factions.js';
 import { groundFormationDestinations, orderGround } from './orders.js';
 import { groundVisible } from '../infantry/cover.js';
@@ -183,7 +183,7 @@ export function launchDefenseAttack(s, side) {
       side,
       [...goalsById.keys()],
       {
-        x: direction * 650,
+        x: direction * expandV23X(650),
         z: CORRIDORS[group.id === 'north' ? 0 : 1],
         mode: 'attackmove',
       },
@@ -218,7 +218,7 @@ export function enrollCityAssault(s, u) {
   u.defenseAttack = {
     phase: 'active',
     home: {
-      x: u.side % 2 ? 300 : -300,
+      x: u.side % 2 ? expandV23X(300) : -expandV23X(300),
       z:
         s.sides.length > 2
           ? hq.z < 0

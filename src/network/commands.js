@@ -2,7 +2,7 @@ import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
 // Production orders and earmarked road payments must match the client's rules.
-export const PROTOCOL_VERSION = 16;
+export const PROTOCOL_VERSION = 17;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>

@@ -114,7 +114,7 @@ export function terrain() {
   tex.repeat.set(16, 14);
   tex.colorSpace = T.SRGBColorSpace;
   tex.anisotropy = 8;
-  const geo = new T.PlaneGeometry(E.MAP.width + 3400, E.MAP.depth + 3200, 330, 280);
+  const geo = new T.PlaneGeometry(E.MAP.width + 3400, E.MAP.depth + 3200, 360, 310);
   geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position,
     colors = new Float32Array(p.count * 3),
@@ -245,7 +245,7 @@ export function environment() {
   leafGeo.computeVertexNormals();
   const crownGeo = new T.IcosahedronGeometry(6.5, 1);
   crownGeo.scale(1, 0.85, 1);
-  const LIMIT = 5200,
+  const LIMIT = 6400,
     kinds = [
       {
         trunks: new T.InstancedMesh(trunkGeo, this.mat('#51483b'), LIMIT),
@@ -291,7 +291,8 @@ export function environment() {
   };
   for (const patch of E.COVER_PATCHES) {
     if (!patch.forest) continue;
-    const count = Math.round((patch.r * patch.r) / 60),
+    // A tree line is a dense, narrow belt rather than a round grove.
+    const count = patch.belt ? 8 : Math.round((patch.r * patch.r) / 60),
       fir = rnd() < 0.55;
     for (let i = 0; i < count; i++) {
       const a = rnd() * Math.PI * 2,
@@ -320,7 +321,7 @@ export function environment() {
   // Layered distant hills give the valley a horizon without hiding the battlefield.
   for (let i = 0; i < 40; i++) {
     const a = (i / 40) * Math.PI * 2,
-      r = 3300 + (i % 3) * 120;
+      r = 3900 + (i % 3) * 120;
     const m = new T.Mesh(this.sphereGeo, this.mat(i % 2 ? '#3b4c4b' : '#455351'));
     m.position.set(Math.cos(a) * r, 20, Math.sin(a) * r);
     m.scale.set(260 + (i % 4) * 60, 110 + (i % 5) * 30, 280);

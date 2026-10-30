@@ -1,4 +1,5 @@
 import { GROUND_UNITS } from '../config.js';
+import { expandV23X } from '../map.js';
 import { COVER_PATCHES, coverInfo } from '../units/infantry/cover.js';
 import { walkable } from '../units/ground/navigation.js';
 import { corridorGeometry, defensePostPoint } from './geometry.js';
@@ -9,7 +10,7 @@ const supported = (u) => ['sniper', 'assault', 'infantry'].includes(u.key);
 
 function watchPoint(s, u, line, direction) {
   const edge = line.id === 'north' ? -1 : 1;
-  const nominal = { x: direction * 260, z: line.depot.z + edge * 130 };
+  const nominal = { x: direction * expandV23X(260), z: line.depot.z + edge * 130 };
   const candidates = COVER_PATCHES.filter(
     (p) => Math.abs(p.x - nominal.x) < 300 && Math.abs(p.z - nominal.z) < 180,
   ).map((p) => ({ x: p.x, z: p.z, score: distance(p, nominal) - (p.forest ? 30 : 0) }));

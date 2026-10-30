@@ -1,14 +1,44 @@
-export const VERSION = 22;
-// A wide valley split by an inland sea. Two narrow land corridors at the northern and southern
-// ends are the only ground routes between the opposing banks; aircraft cross the water.
-export const MAP = { width: 4000, depth: 3200, riverWidth: 44 };
+export const VERSION = 23;
+// A wide valley split by an inland sea. Two land corridors at the northern and southern ends are
+// the only ground routes between the opposing banks; aircraft cross the water.
+// State 23 widens the corridors (a deeper map) and moves the two banks further apart.
+export const MAP = { width: 4800, depth: 4000, riverWidth: 44 };
+// The map before state 23. Its seeded hills, woods and coast are kept and carried over by
+// expandV23X, so old campaigns keep the same ground under their trenches and towns.
+export const LEGACY_MAP = { width: 4000, depth: 3200 };
 // The playable field inside the map edge: orders, routes and saved points must stay inside it.
 export const FIELD = { x: MAP.width / 2 - 16, z: MAP.depth / 2 - 16 };
+const LEGACY_FIELD = { x: LEGACY_MAP.width / 2 - 16, z: LEGACY_MAP.depth / 2 - 16 };
 export const inField = (x, z, margin = 0) =>
   Math.abs(x) <= FIELD.x - margin && Math.abs(z) <= FIELD.z - margin;
-export const SEA = { halfX: 600, halfZ: 1120, round: 120 };
-// Ground routes around the sea: the centre line of each corridor.
-export const CORRIDORS = [-(SEA.halfZ + MAP.depth / 2) / 2, (SEA.halfZ + MAP.depth / 2) / 2];
+// Each bank moves 192 m outward (a whole number of 24 m route cells and 64 m obstacle cells). Only open water and the empty middle of the corridors between
+// the depots and the villages are stretched; towns, villages and the coast move intact.
+const V23 = { keep: 100, from: 360, shift: 192 };
+export function expandV23X(x) {
+  const value = Math.abs(x);
+  if (value <= V23.keep) return x;
+  if (value >= V23.from) return Math.sign(x) * (value + V23.shift);
+  return (
+    Math.sign(x) *
+    (V23.keep + ((value - V23.keep) * (V23.from + V23.shift - V23.keep)) / (V23.from - V23.keep))
+  );
+}
+export function compressV23X(x) {
+  const value = Math.abs(x);
+  if (value <= V23.keep) return x;
+  if (value >= V23.from + V23.shift) return Math.sign(x) * (value - V23.shift);
+  return (
+    Math.sign(x) *
+    (V23.keep + ((value - V23.keep) * (V23.from - V23.keep)) / (V23.from + V23.shift - V23.keep))
+  );
+}
+// The sea keeps its legacy shape in compressed coordinates; halfX is its new visible extent.
+const LEGACY_SEA = { halfX: 600, halfZ: 1120, round: 120 };
+export const SEA = { halfX: expandV23X(LEGACY_SEA.halfX), halfZ: 1120, round: 120 };
+// Ground routes around the sea. The crossing lines and depots stay on their legacy centre line;
+// the deeper map adds new outer fields, woods and tree lines beyond them.
+const LEGACY_CORRIDOR = (LEGACY_SEA.halfZ + LEGACY_MAP.depth / 2) / 2;
+export const CORRIDORS = [-LEGACY_CORRIDOR, LEGACY_CORRIDOR];
 // Keep city centres unchanged while stretching the sea and the two land corridors.
 // This same map transform preserves old wells and campaign positions on import.
 export function expandLegacyZ(z) {
@@ -43,8 +73,11 @@ export function expandLegacyX(x) {
   }
   return Math.sign(x) * (value + 400);
 }
-export const HQ_X = 1015;
-export const DISTRICT_X = 460;
+const LEGACY_HQ_X = 1015;
+export const HQ_X = expandV23X(LEGACY_HQ_X);
+// Co-op and two-bot cities stand north and south of the bank; their latitude is unchanged.
+export const HQ_Z = 1015;
+export const DISTRICT_X = expandV23X(460);
 // The neutral trading island in the middle of the sea. In the rules it is open water: armies
 // cannot walk or build there, but merchant ships of both cities tie up at its quays.
 export const ISLAND = { x: 0, z: 0, r: 62, quay: 94 };
@@ -61,7 +94,8 @@ export const LEGACY_OIL_FIELDS = [
   { id: i * 2 + 1, x, z, r: 22 },
   { id: i * 2 + 2, x: -x, z: -z, r: 22 },
 ]);
-export const OIL_FIELDS = LEGACY_OIL_FIELDS.map(({ id, x, z, r }) => ({
+// Field positions of states 15-22, before the banks moved apart.
+export const V22_OIL_FIELDS = LEGACY_OIL_FIELDS.map(({ id, x, z, r }) => ({
   id,
   x: expandLegacyX(x),
   z: expandLegacyZ(z),
@@ -69,22 +103,32 @@ export const OIL_FIELDS = LEGACY_OIL_FIELDS.map(({ id, x, z, r }) => ({
 }));
 // Identical nearby wells for each of the four co-op city positions. Legacy sites keep their IDs.
 for (const x of [-1280, 1280])
-  for (const z of [-HQ_X, HQ_X]) OIL_FIELDS.push({ id: OIL_FIELDS.length + 1, x, z, r: 22 });
+  for (const z of [-HQ_Z, HQ_Z])
+    V22_OIL_FIELDS.push({ id: V22_OIL_FIELDS.length + 1, x, z, r: 22 });
+const SETTLEMENT_SITES = [-1415, 1415].flatMap((z) =>
+  [-1515, -515, 515, 1515].map((x) => [expandV23X(x), z]),
+);
+const BELT_RADIUS = 12,
+  BELT_SPACING = 20;
+export const OIL_FIELDS = V22_OIL_FIELDS.map((f) => ({ ...f, x: expandV23X(f.x) }));
 
 // Gentle meander of the sea's long axis.
 export const riverX = (z) => (Math.sin(z / 190) * 42 + Math.sin(z / 470) * 25) * 0.5;
 
 // Signed distance to the shoreline: negative over water, positive on land.
-export function seaDistance(x, z) {
+function legacySeaDistance(x, z) {
   const px = Math.abs(x - riverX(z)),
     pz = Math.abs(z),
-    qx = px - (SEA.halfX - SEA.round),
-    qz = pz - (SEA.halfZ - SEA.round),
+    qx = px - (LEGACY_SEA.halfX - LEGACY_SEA.round),
+    qz = pz - (LEGACY_SEA.halfZ - LEGACY_SEA.round),
     outside = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)),
     inside = Math.min(Math.max(qx, qz), 0),
     coast = Math.sin(x * 0.031 + z * 0.017) * 9 + Math.sin(z * 0.043 + x * 0.006) * 6;
-  return outside + inside - SEA.round + coast;
+  return outside + inside - LEGACY_SEA.round + coast;
 }
+// The coast moved intact with the banks, and the stretched band lies in open water or across the
+// flat northern/southern shores, so the legacy measure stays a metric distance near the shore.
+export const seaDistance = (x, z) => legacySeaDistance(compressV23X(x), z);
 
 // Compatibility measure used by placement and movement rules since the river map: values below
 // MAP.riverWidth mean water, and every metre further from the shore adds one.
@@ -100,22 +144,41 @@ function lcg(seed) {
 }
 // City cores stay flat so streets and buildings never sit on a slope.
 const coreDistance = (x, z) =>
-  Math.min(Math.hypot(Math.abs(x) - HQ_X, z), Math.hypot(Math.abs(x) - HQ_X, Math.abs(z) - HQ_X));
+  Math.min(Math.hypot(Math.abs(x) - HQ_X, z), Math.hypot(Math.abs(x) - HQ_X, Math.abs(z) - HQ_Z));
 // Keep the seeded legacy hills/woods stable; extra city plains are flattened below.
+const legacyFlatCore = (x, z, r) => Math.hypot(Math.abs(x) - LEGACY_HQ_X, z) < r;
 const flatCore = (x, z, r) => Math.hypot(Math.abs(x) - HQ_X, z) < r;
+// Ground added by state 23: the outer fields beyond the legacy map edge.
+const newGround = (x, z, margin = 0) =>
+  Math.abs(z) > LEGACY_MAP.depth / 2 + margin ||
+  Math.abs(x) > expandV23X(LEGACY_MAP.width / 2) + margin;
 
 // Hills are part of the rules: they block lines of sight, so the same heights drive the picture.
 export const HILLS = [];
+let LEGACY_HILLS;
 {
   const rnd = lcg(5113);
   for (let i = 0; i < 400 && HILLS.length < 58; i++) {
-    const x = (rnd() - 0.5) * (MAP.width - 120),
-      z = (rnd() - 0.5) * (MAP.depth - 120),
+    const x = (rnd() - 0.5) * (LEGACY_MAP.width - 120),
+      z = (rnd() - 0.5) * (LEGACY_MAP.depth - 120),
       r = 40 + rnd() * 75,
       h = 5 + rnd() * 12;
-    if (seaDistance(x, z) < r * 0.7 + 30 || flatCore(x, z, 380 + r)) continue;
+    if (legacySeaDistance(x, z) < r * 0.7 + 30 || legacyFlatCore(x, z, 380 + r)) continue;
     // Mirror every hill so both sides get the same ground.
+    HILLS.push({ x: expandV23X(x), z, r, h }, { x: -expandV23X(x), z: -z, r, h });
+  }
+  LEGACY_HILLS = HILLS.length;
+  // Low rolling ground on the new outer fields.
+  const extra = lcg(23023);
+  for (let i = 0, added = 0; i < 600 && added < 24; i++) {
+    const x = (extra() - 0.5) * (MAP.width - 120),
+      z = (extra() - 0.5) * (MAP.depth - 120),
+      r = 45 + extra() * 70,
+      h = 4 + extra() * 9;
+    if (!newGround(x, z, r * 0.5) || seaDistance(x, z) < r + 30 || flatCore(x, z, 420 + r))
+      continue;
     HILLS.push({ x, z, r, h }, { x: -x, z: -z, r, h });
+    added += 2;
   }
 }
 
@@ -153,7 +216,7 @@ for (let row = 0; row < H_ROWS; row++)
         Math.max(0, (Math.hypot(Math.abs(x) - DISTRICT_X, Math.abs(z) - CORRIDORS[1]) - 70) / 50),
       );
     let village = 1;
-    for (const sx of [-1515, -515, 515, 1515])
+    for (const sx of [-1515, -515, 515, 1515].map(expandV23X))
       village = Math.min(village, Math.max(0, (Math.hypot(x - sx, Math.abs(z) - 1415) - 130) / 70));
     let oil = 1;
     for (const f of OIL_FIELDS)
@@ -190,25 +253,69 @@ export function terrainClear(ax, az, ay, bx, bz, by) {
 }
 
 // Forests and thickets: concealment and soft cover for infantry, mirrored like the hills.
+// `belt` marks a narrow tree line (lesopolosa): a chain of small patches along a field edge.
 export const COVER_PATCHES = [];
 {
   const rnd = lcg(81273);
-  for (let i = 0; i < 900 && COVER_PATCHES.length < 190; i++) {
-    const onHill = i % 3 === 0 && HILLS.length,
-      hill = onHill ? HILLS[Math.floor(rnd() * HILLS.length)] : null,
-      x = hill ? hill.x + (rnd() - 0.5) * hill.r * 1.6 : (rnd() - 0.5) * (MAP.width - 140),
-      z = hill ? hill.z + (rnd() - 0.5) * hill.r * 1.6 : (rnd() - 0.5) * (MAP.depth - 140),
+  const legacyOil = V22_OIL_FIELDS.slice(0, LEGACY_OIL_FIELDS.length);
+  for (let i = 0, legacy = 0; i < 900 && legacy < 190; i++) {
+    const onHill = i % 3 === 0 && LEGACY_HILLS,
+      hill = onHill ? HILLS[Math.floor(rnd() * LEGACY_HILLS)] : null,
+      // Legacy patches were placed around the legacy hill positions.
+      hx = hill ? compressV23X(hill.x) : 0,
+      x = hill ? hx + (rnd() - 0.5) * hill.r * 1.6 : (rnd() - 0.5) * (LEGACY_MAP.width - 140),
+      z = hill ? hill.z + (rnd() - 0.5) * hill.r * 1.6 : (rnd() - 0.5) * (LEGACY_MAP.depth - 140),
       forest = rnd() < 0.68,
       r = forest ? 22 + rnd() * 32 : 12 + rnd() * 14;
     if (
-      seaDistance(x, z) < r + 50 ||
-      flatCore(x, z, 400 + r) ||
-      !inField(x, z, r + 10) ||
-      OIL_FIELDS.slice(0, LEGACY_OIL_FIELDS.length).some(
+      legacySeaDistance(x, z) < r + 50 ||
+      legacyFlatCore(x, z, 400 + r) ||
+      Math.abs(x) > LEGACY_FIELD.x - r - 10 ||
+      Math.abs(z) > LEGACY_FIELD.z - r - 10 ||
+      legacyOil.some(
         (f) => Math.hypot(x - f.x, z - f.z) < r + 50 || Math.hypot(x + f.x, z + f.z) < r + 50,
       )
     )
       continue;
-    COVER_PATCHES.push({ x, z, r, forest }, { x: -x, z: -z, r, forest });
+    legacy += 2;
+    COVER_PATCHES.push({ x: expandV23X(x), z, r, forest }, { x: -expandV23X(x), z: -z, r, forest });
   }
+  const clear = (x, z, r) =>
+    seaDistance(x, z) >= r + 40 &&
+    !flatCore(x, z, 420 + r) &&
+    inField(x, z, r + 10) &&
+    !OIL_FIELDS.some((f) => Math.hypot(x - f.x, z - f.z) < r + 45) &&
+    !SETTLEMENT_SITES.some(([sx, sz]) => Math.hypot(x - sx, z - sz) < r + 150) &&
+    Math.hypot(x, Math.abs(z) - CORRIDORS[1]) > r + 120;
+  // Woods on the new outer fields.
+  const extra = lcg(42023);
+  for (let i = 0, added = 0; i < 900 && added < 70; i++) {
+    const x = (extra() - 0.5) * (MAP.width - 140),
+      z = (extra() - 0.5) * (MAP.depth - 140),
+      forest = extra() < 0.75,
+      r = forest ? 24 + extra() * 30 : 12 + extra() * 12;
+    if (!newGround(x, z, r) || !clear(x, z, r) || !clear(-x, -z, r)) continue;
+    COVER_PATCHES.push({ x, z, r, forest }, { x: -x, z: -z, r, forest });
+    added += 2;
+  }
+  // Tree lines across the corridor fields. Lines along z face the enemy and make natural
+  // defensive belts; lines along x are covered approaches for assault groups.
+  const belt = (ax, az, bx, bz, gaps) => {
+    const length = Math.hypot(bx - ax, bz - az),
+      count = Math.floor(length / BELT_SPACING);
+    for (let k = 0; k <= count; k++) {
+      const t = k / count;
+      if (gaps.some(([from, to]) => t >= from && t <= to)) continue;
+      const x = ax + (bx - ax) * t,
+        z = az + (bz - az) * t;
+      if (!clear(x, z, BELT_RADIUS) || !clear(-x, -z, BELT_RADIUS)) continue;
+      COVER_PATCHES.push(
+        { x, z, r: BELT_RADIUS, forest: true, belt: true },
+        { x: -x, z: -z, r: BELT_RADIUS, forest: true, belt: true },
+      );
+    }
+  };
+  for (const x of [-560, -330, 330, 560]) belt(x, -1220, x, -1940, [[0.42, 0.5]]);
+  belt(-760, -1800, 760, -1800, [[0.46, 0.54]]);
+  belt(-160, -1600, 160, -1600, []);
 }

@@ -25,7 +25,7 @@ function fresh() {
   }
   return s;
 }
-function troop(s, key, x = -1100, z = -100, side = 0) {
+function troop(s, key, x = -1292, z = -100, side = 0) {
   const u = E.makeGround(s, side, key, x, z);
   u.holdFire = true;
   s.groundUnits.push(u);
@@ -50,7 +50,7 @@ function distribution(units) {
 test('forty automatic machinegunners receive twenty posts on each front with bounded route waves', () => {
   const s = fresh();
   const units = Array.from({ length: 40 }, (_, i) =>
-    troop(s, 'machinegunner', -1100 + (i % 10) * 7, -100),
+    troop(s, 'machinegunner', -1292 + (i % 10) * 7, -100),
   );
   assert.equal(
     E.applyStance(
@@ -138,7 +138,7 @@ test('mixed roles balance independently and existing all-north spare rows repair
       slot: i % lines[0].slots.length,
     }),
   );
-  const pinned = troop(old, 'infantry', -1000, -300);
+  const pinned = troop(old, 'infantry', -1192, -300);
   pinned.guard = { x: pinned.x, z: pinned.z };
   pinned.order = { ...pinned.guard, mode: 'guard' };
   const oldPinned = { ...pinned.guard };
@@ -209,7 +209,7 @@ test('a casualty is replaced through the same persistent trenches without diggin
 
 test('an empty enemy trench is captured with its work intact; an occupied trench cannot be duplicated', () => {
   const s = fresh(),
-    u = troop(s, 'infantry', -1300, -300);
+    u = troop(s, 'infantry', -1492, -300);
   u.guard = { x: u.x, z: u.z };
   u.order = { ...u.guard, mode: 'guard' };
   const t = { id: s.nextId++, side: 1, x: u.x, z: u.z, progress: 1, fortificationWork: 90 };
@@ -222,7 +222,7 @@ test('an empty enemy trench is captured with its work intact; an occupied trench
   updateFortification(s, u, 0.05);
   assert.equal(t.side, 0);
   assert.equal(u.trenchId, t.id);
-  assert.equal(t.fortificationWork, 90);
+  assert.ok(t.fortificationWork >= 90, 'captured work is kept');
   assert.equal(t.progress, 1);
   assert.equal(s.trenches.length, 1);
   assert.ok(s.events.some((e) => e.type === 'trenchCaptured' && e.trenchId === t.id));
@@ -230,8 +230,8 @@ test('an empty enemy trench is captured with its work intact; an occupied trench
 
 test('distant position planning uses observed memory rather than the actual location of concealed enemies', () => {
   const s = fresh();
-  const u = troop(s, 'infantry', -1000, 0);
-  const point = { x: -1650, z: 200 };
+  const u = troop(s, 'infantry', -1192, 0);
+  const point = { x: -1842, z: 200 };
   const t = { id: s.nextId++, side: 1, x: point.x + 3, z: point.z, progress: 1 };
   s.trenches.push(t);
   const hidden = troop(s, 'infantry', t.x, t.z, 1);
@@ -244,15 +244,15 @@ test('distant position planning uses observed memory rather than the actual loca
 
 test('completed adjacent trenches form actual continuous cover, with bounded persistent links', () => {
   const s = fresh();
-  const baseCover = E.coverInfo(s, { key: 'infantry', x: -900, z: -180 }).cover;
-  const a = { id: s.nextId++, side: 0, x: -900, z: -220, progress: 1, fortificationWork: 30 };
-  const b = { id: s.nextId++, side: 0, x: -900, z: -140, progress: 1, fortificationWork: 90 };
+  const baseCover = E.coverInfo(s, { key: 'infantry', x: -1092, z: -180 }).cover;
+  const a = { id: s.nextId++, side: 0, x: -1092, z: -220, progress: 1, fortificationWork: 30 };
+  const b = { id: s.nextId++, side: 0, x: -1092, z: -140, progress: 1, fortificationWork: 90 };
   s.trenches.push(a, b);
   const links = trenchLinks(s);
   assert.equal(links.length, 1);
   assert.equal(links[0].a, a);
   assert.equal(links[0].b, b);
-  const point = { key: 'infantry', x: -900, z: -180 };
+  const point = { key: 'infantry', x: -1092, z: -180 };
   assert.equal(E.coverInfo(s, point).cover, Math.max(baseCover, 0.78 * 0.45));
   s.time += 1;
   assert.equal(trenchLinks(s), links, 'unit movement/time does not rebuild static earthworks');
@@ -264,7 +264,7 @@ test('completed adjacent trenches form actual continuous cover, with bounded per
     id: s.nextId++,
     side: 1,
     key: 'radar',
-    x: -900,
+    x: -1092,
     z: -180,
     hp: 100,
     maxHp: 100,
@@ -317,8 +317,8 @@ test('a quiet opposite front lends rear reserves, keeps its primary line, and tr
 
 test('a newly observed rear breakthrough is not dropped behind the first 120 enemy IDs', () => {
   const { s } = preparedBattle();
-  for (let i = 0; i < 130; i++) troop(s, 'leopard', 800 + i, -1360, 1);
-  const intruder = troop(s, 'leopard', -1050, 0, 1);
+  for (let i = 0; i < 130; i++) troop(s, 'leopard', 992 + i, -1552, 1);
+  const intruder = troop(s, 'leopard', -1242, 0, 1);
   E.step(s, 0.05);
   assert.equal(s.frontlineMemory[0].seen.length, E.FRONTLINE.maxSeen);
   assert.ok(s.frontlineMemory[0].seen.some((v) => v.id === intruder.id));
@@ -358,12 +358,16 @@ test('unposted automatic overflow remains a usable last-priority rear reserve an
   assert.equal(sent.defenseTask, null);
   assert.ok(distance(sent, home) <= 4);
   assert.equal(sent.defensePost, null);
-  assert.equal(posted.length, 120);
+  assert.equal(
+    posted.length,
+    (E.FRONTLINE.maxRows / 2) *
+      corridorGeometry(s, 0).reduce((n, line) => n + line.slots.length, 0),
+  );
 });
 
 test('observed armour behind the firing line draws reserves to the breakthrough rather than the obsolete front', () => {
   const { s, units } = preparedBattle();
-  const enemy = troop(s, 'leopard', -1050, 0, 1);
+  const enemy = troop(s, 'leopard', -1242, 0, 1);
   E.step(s, 0.05);
   const report = E.frontlineReport(s, 0);
   assert.ok(report.posts.some((p) => p.breakthrough > 0 && p.threatPoint?.x === enemy.x));
@@ -375,7 +379,7 @@ test('observed armour behind the firing line draws reserves to the breakthrough 
   assert.equal(sent.autoDefense, false);
   assert.equal(sent.defenseTask, null);
   const hidden = preparedBattle();
-  const scout = troop(hidden.s, 'infantry', -1650, 0, 1);
+  const scout = troop(hidden.s, 'infantry', -1842, 0, 1);
   scout.camouflaged = true;
   hidden.s.trenches.push({ id: hidden.s.nextId++, side: 1, x: scout.x, z: scout.z, progress: 1 });
   assert.equal(E.groundVisible(hidden.s, 0, scout), false);

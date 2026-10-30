@@ -33,22 +33,24 @@ export function availableTrenchSlots(s, u, t) {
       continue;
     const points = [v.guard, v.defenseTask?.home, v];
     for (const p of points) {
-      if (!p || !trenchContains(t, p.x, p.z)) continue;
-      let nearest = 1;
-      for (let i = 0; i < slots.length; i++)
-        if (
-          Math.hypot(p.x - slots[i].x, p.z - slots[i].z) <
-          Math.hypot(p.x - slots[nearest].x, p.z - slots[nearest].z)
-        )
-          nearest = i;
-      occupied.add(nearest);
+      if (!p || Math.hypot(p.x - t.x, p.z - t.z) > TRENCH_FOOTPRINT.queryRadius + 16) continue;
+      const inside = trenchContains(t, p.x, p.z);
+      if (inside) {
+        let nearest = 1;
+        for (let i = 0; i < slots.length; i++)
+          if (
+            Math.hypot(p.x - slots[i].x, p.z - slots[i].z) <
+            Math.hypot(p.x - slots[nearest].x, p.z - slots[nearest].z)
+          )
+            nearest = i;
+        occupied.add(nearest);
+      }
       // Large bodies outside their nearest slot still cannot physically overlap a new defender.
+      // A post just beside the earthwork keeps the ordinary guard clearance as well.
+      const clearance =
+        (GROUND_UNITS[u.key].size + (GROUND_UNITS[v.key]?.size || 0)) * 0.5 + (inside ? 0 : 7);
       for (let i = 0; i < slots.length; i++)
-        if (
-          Math.hypot(p.x - slots[i].x, p.z - slots[i].z) <
-          (GROUND_UNITS[u.key].size + (GROUND_UNITS[v.key]?.size || 0)) * 0.5
-        )
-          occupied.add(i);
+        if (Math.hypot(p.x - slots[i].x, p.z - slots[i].z) < clearance) occupied.add(i);
     }
   }
   return slots.filter(

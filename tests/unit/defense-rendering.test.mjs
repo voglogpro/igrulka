@@ -13,17 +13,19 @@ test('fortifications use bounded shared batches, advance stages and remove stale
       { id: 2, side: 0, x: 10, z: 0, progress: 1, fortificationWork: 30 },
       { id: 3, side: 0, x: 20, z: 0, progress: 1, fortificationWork: 90 },
       { id: 4, side: 1, x: 30, z: 0, progress: 1, fortificationWork: 90 },
+      { id: 5, side: 0, x: 40, z: 0, progress: 1, fortificationWork: 210 },
+      { id: 6, side: 0, x: 50, z: 0, progress: 1, fortificationWork: 390 },
     ],
   };
   const resources = view.pools.map((p) => [p.geometry, p.material, p.instanceMatrix.array]);
   assert.equal(view.sync(state), true);
-  assert.deepEqual(view.diagnostics().stages, [3, 2, 1]);
+  assert.deepEqual(view.diagnostics().stages, [5, 4, 3, 2, 1]);
   assert.equal(view.sync(state), false);
   for (let i = 0; i < 20; i++) {
     state.trenches[0].progress += 0.01;
     view.sync(state);
   }
-  assert.equal(scene.children.length, 6);
+  assert.equal(scene.children.length, 8);
   resources.forEach(([geometry, material, matrices], i) => {
     assert.equal(view.pools[i].geometry, geometry);
     assert.equal(view.pools[i].material, material);
@@ -38,7 +40,7 @@ test('fortifications use bounded shared batches, advance stages and remove stale
     fortificationWork: 90,
   }));
   view.sync(state);
-  assert.deepEqual(view.diagnostics().stages, [240, 240, 240]);
+  assert.deepEqual(view.diagnostics().stages, [240, 240, 240, 0, 0]);
   assert.equal(view.models.has(1), false);
   state.trenches = [];
   view.sync(state);
@@ -47,7 +49,7 @@ test('fortifications use bounded shared batches, advance stages and remove stale
   let disposed = 0;
   for (const p of view.pools) p.geometry.addEventListener('dispose', () => disposed++);
   view.dispose();
-  assert.equal(disposed, 3);
+  assert.equal(disposed, 5);
   assert.equal(scene.children.length, 0);
 });
 

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
+import { toV22Layout } from '../support/v22-layout.mjs';
 import { groundPath, walkable } from '../../src/game/units/ground/navigation.js';
 import {
   SETTLEMENTS,
@@ -54,7 +55,7 @@ test('a version-sixteen soldier retains its exact position and can walk away aft
   source.groundUnits.push(soldier);
   delete source.settlementHouseMask;
   const original = { x: soldier.x, z: soldier.z };
-  const restored = E.load(E.save(source)),
+  const restored = E.load(E.save(toV22Layout(source))),
     unit = restored.groundUnits.find((u) => u.id === soldier.id);
   assert.deepEqual({ x: unit.x, z: unit.z }, original, 'migration never teleports an old soldier');
   assert.equal(restored.settlementHouseMask & 1, 0, 'the colliding scenery house is omitted');

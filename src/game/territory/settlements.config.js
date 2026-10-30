@@ -1,3 +1,4 @@
+import { expandV23X } from '../map.js';
 export const SETTLEMENT_RULES = {
   roadReach: 34,
   radius: 54,
@@ -9,7 +10,7 @@ export const SETTLEMENT_RULES = {
   cadence: 1,
 };
 export const SETTLEMENTS = [-1415, 1415].flatMap((z, row) =>
-  [-1515, -515, 515, 1515].map((x, column) => ({
+  [-1515, -515, 515, 1515].map(expandV23X).map((x, column) => ({
     id: `${row ? 'south' : 'north'}-village-${column + 1}`,
     name: `${row ? 'Южное' : 'Северное'} поселение ${column + 1}`,
     x,

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
-import { SEA, expandLegacyZ, expandLegacyX } from '../../src/game/map.js';
+import { SEA, expandLegacyZ, expandLegacyX, expandV23X } from '../../src/game/map.js';
+const migrateX = (x) => expandV23X(expandLegacyX(x));
 import { GRID, fogVisible } from '../../src/game/vision-grid.js';
 import { walkable, groundPath } from '../../src/game/units/ground/navigation.js';
 import { moveUnits } from '../../src/game/units/aviation/flight.js';
@@ -13,8 +14,8 @@ function oldCampaign() {
   s.version = 13;
   for (const b of s.buildings) if (b.key === 'hq') b.x = b.side === 0 ? -615 : 615;
   for (const r of s.roads) {
-    r.ax -= Math.sign(r.ax) * 400;
-    r.bx -= Math.sign(r.bx) * 400;
+    r.ax -= Math.sign(r.ax) * 592;
+    r.bx -= Math.sign(r.bx) * 592;
   }
   s.mode = 'multiplayer';
   s.time = 100;
@@ -48,8 +49,8 @@ function oldCampaign() {
   return { s, well, moving, central };
 }
 
-test('expanded 4000x3200 map contains the 2240m sea and both land corridors span the field', () => {
-  assert.deepEqual([E.MAP.width, E.MAP.depth, SEA.halfZ * 2], [4000, 3200, 2240]);
+test('expanded 4800x4000 map contains the 2240m sea and both wide land corridors span the field', () => {
+  assert.deepEqual([E.MAP.width, E.MAP.depth, SEA.halfZ * 2, SEA.halfX], [4800, 4000, 2240, 792]);
   assert.deepEqual(E.CORRIDORS, [-1360, 1360]);
   const s = E.createGame(117);
   for (const z of E.CORRIDORS) {
@@ -61,10 +62,10 @@ test('expanded 4000x3200 map contains the 2240m sea and both land corridors span
   assert.equal(walkable(s, 0, 0, 3), false, 'sea centre remains impassable');
 });
 
-test('legacy vision dimensions cover both corridors but points are open for both sides', () => {
+test('vision dimensions cover both corridors but points are open for both sides', () => {
   const s = E.createGame(117);
-  assert.equal(GRID.rows * GRID.cell, 3200);
-  assert.equal(GRID.cols * GRID.cell, 4000);
+  assert.equal(GRID.rows * GRID.cell, 4000);
+  assert.equal(GRID.cols * GRID.cell, 4800);
   for (const z of E.CORRIDORS) s.groundUnits.push(E.makeGround(s, 0, 'infantry', -20, z));
   for (const z of E.CORRIDORS) {
     assert.equal(fogVisible(s, 0, -20, z), true);
@@ -85,7 +86,7 @@ test('version13 import preserves identity, money and central coordinates while f
   );
   assert.deepEqual(
     restored.buildings.map((b) => [b.id, b.x]),
-    s.buildings.map((b) => [b.id, expandLegacyX(b.x)]),
+    s.buildings.map((b) => [b.id, migrateX(b.x)]),
   );
   assert.equal(restored.nextId, s.nextId);
   for (const hq of restored.buildings.filter((b) => b.key === 'hq')) assert.equal(hq.z, 0);
@@ -101,10 +102,7 @@ test('moving legacy army follows the expanded corridor with a safe rebuilt route
   const { s, moving } = oldCampaign();
   const migrated = E.load(E.save(s));
   const u = migrated.groundUnits.find((unit) => unit.id === moving.id);
-  assert.deepEqual(
-    [u.x, u.z, u.order.x, u.order.z],
-    [expandLegacyX(-400), 1360, expandLegacyX(400), 1360],
-  );
+  assert.deepEqual([u.x, u.z, u.order.x, u.order.z], [migrateX(-400), 1360, migrateX(400), 1360]);
   assert.ok(walkable(migrated, u.x, u.z));
   assert.deepEqual(u.path, groundPath(migrated, u, u.order, E.GROUND_UNITS[u.key].size * 0.42));
   assert.notDeepEqual(u.path, moving.path);

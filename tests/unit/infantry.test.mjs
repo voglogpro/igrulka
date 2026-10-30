@@ -39,7 +39,7 @@ const patch = () =>
   E.COVER_PATCHES.find(
     (p) =>
       p.x > 100 &&
-      p.x < 1000 &&
+      p.x < 1192 &&
       Math.abs(p.z) < 800 &&
       E.groundHeight(p.x, p.z) < 0.5 &&
       E.terrainClear(p.x - 180, p.z, 2.2, p.x + 40, p.z, 2.2),
@@ -66,7 +66,7 @@ test('stationary cannon is removed, mobile gun vehicles remain, and individual r
 });
 test('batch recruitment reserves five costs atomically and rally orders newly trained individuals to a forest', () => {
   const s = fresh(),
-    b = ready(s, 'barracks', -1080, -10),
+    b = ready(s, 'barracks', -1272, -10),
     cash = s.sides[0].credits;
   assert.equal(E.recruit(s, 0, 'infantry', null, 5), true);
   assert.equal(s.sides[0].credits, cash - 5 * E.GROUND_UNITS.infantry.cost);
@@ -82,8 +82,8 @@ test('batch recruitment reserves five costs atomically and rally orders newly tr
 });
 test('saved control groups preserve unit IDs, prune dead units on recall and survive reload', () => {
   const s = fresh(),
-    a = soldier(s, 'infantry', -800, 0),
-    b = soldier(s, 'sniper', -780, 0);
+    a = soldier(s, 'infantry', -992, 0),
+    b = soldier(s, 'sniper', -972, 0);
   E.saveGroup(s, 0, 2, [a.id, b.id]);
   let loaded = E.load(E.save(s));
   assert.deepEqual(E.getGroup(loaded, 0, 2), [a.id, b.id]);
@@ -92,31 +92,31 @@ test('saved control groups preserve unit IDs, prune dead units on recall and sur
 });
 test('formation affects destinations and orders can address one soldier without moving the rest', () => {
   const s = fresh(),
-    units = Array.from({ length: 8 }, (_, i) => soldier(s, 'infantry', -500 + i * 5, 0));
+    units = Array.from({ length: 8 }, (_, i) => soldier(s, 'infantry', -692 + i * 5, 0));
   s.formations[0] = 'column';
   E.orderGround(
     s,
     0,
     units.map((u) => u.id),
-    { x: -700, z: 0 },
+    { x: -892, z: 0 },
   );
   assert.equal(new Set(units.map((u) => u.order.x)).size, 2);
   const order = structuredClone(units[1].order);
-  E.orderGround(s, 0, [units[0].id], { x: -650, z: 50 });
+  E.orderGround(s, 0, [units[0].id], { x: -842, z: 50 });
   assert.deepEqual(units[1].order, order);
   s.formations[0] = 'spread';
   E.orderGround(
     s,
     0,
     units.map((u) => u.id),
-    { x: -700, z: 0 },
+    { x: -892, z: 0 },
   );
   assert.ok(new Set(units.map((u) => u.order.x)).size > 2);
 });
 test('trenches take time to dig, give damage protection, persist after leaving and engineers dig faster', () => {
   const s = fresh(),
-    a = soldier(s, 'infantry', -750, 150),
-    b = soldier(s, 'engineer', -720, 150);
+    a = soldier(s, 'infantry', -942, 150),
+    b = soldier(s, 'engineer', -912, 150);
   assert.equal(E.commandUnits(s, 0, [a.id, b.id], 'dig'), 2);
   E.advance(s, 7);
   assert.ok(s.trenches.find((t) => t.id === b.trenchId).progress >= 1);
@@ -128,7 +128,7 @@ test('trenches take time to dig, give damage protection, persist after leaving a
   const hp = a.hp;
   E.applyBlast(s, a.x, a.z, 10, 2);
   assert.ok(a.hp > hp - 10);
-  E.orderGround(s, 0, [a.id], { x: -700, z: 160 });
+  E.orderGround(s, 0, [a.id], { x: -892, z: 160 });
   assert.equal(a.trenchId, null);
   assert.equal(s.trenches.length, 2);
   assert.equal(E.load(E.save(s)).trenches.length, 2);
@@ -172,16 +172,16 @@ test('hidden shooters create imprecise expiring contacts and enemies can return 
 });
 test('buildings block ground line of fire; attackmove stops to fight, hold-fire prevents all new shots', () => {
   const s = fresh();
-  ready(s, 'launcher', -750, 100);
-  const a = soldier(s, 'infantry', -820, 100),
-    b = soldier(s, 'infantry', -680, 100, 1);
+  ready(s, 'launcher', -942, 100);
+  const a = soldier(s, 'infantry', -1012, 100),
+    b = soldier(s, 'infantry', -872, 100, 1);
   assert.equal(E.lineOfSight(s, a, b), false);
-  b.x = -810;
+  b.x = -1002;
   b.z = 160;
   assert.equal(E.lineOfSight(s, a, b), true);
   E.orderGround(s, 0, [a.id], { x: -200, z: 100, mode: 'attackmove' });
   E.advance(s, 0.3);
-  assert.ok(Math.hypot(a.x + 820, a.z - 100) < 2);
+  assert.ok(Math.hypot(a.x + 1012, a.z - 100) < 2);
   E.commandUnits(s, 0, [a.id], 'fire');
   s.events = [];
   E.advance(s, 1);
@@ -189,8 +189,8 @@ test('buildings block ground line of fire; attackmove stops to fight, hold-fire 
 });
 test('suppression grows under machine gun fire and recovers after disengagement', () => {
   const s = fresh(),
-    a = soldier(s, 'machinegunner', -800, 250),
-    b = soldier(s, 'infantry', -710, 250, 1);
+    a = soldier(s, 'machinegunner', -992, 250),
+    b = soldier(s, 'infantry', -902, 250, 1);
   b.hp = b.maxHp = 10000;
   b.holdFire = true;
   E.advance(s, 5);
@@ -202,8 +202,8 @@ test('suppression grows under machine gun fire and recovers after disengagement'
 });
 test('boarding respects eight seats, passengers cannot shoot, unloads to dry land and survives a save', () => {
   const s = fresh(),
-    apc = soldier(s, 'apc', -800, 0),
-    troops = Array.from({ length: 9 }, (_, i) => soldier(s, 'infantry', -825 + i * 2, -12));
+    apc = soldier(s, 'apc', -992, 0),
+    troops = Array.from({ length: 9 }, (_, i) => soldier(s, 'infantry', -1017 + i * 2, -12));
   assert.equal(
     E.boardGround(
       s,
@@ -224,19 +224,19 @@ test('boarding respects eight seats, passengers cannot shoot, unloads to dry lan
 });
 test('destroying a transport ejects wounded survivors without duplicate blast damage', () => {
   const s = fresh(),
-    apc = soldier(s, 'apc', -800, 0),
-    u = soldier(s, 'infantry', -810, 0);
+    apc = soldier(s, 'apc', -992, 0),
+    u = soldier(s, 'infantry', -1002, 0);
   E.boardGround(s, 0, [u.id], apc.id);
   E.advance(s, 1);
   assert.equal(u.carrierId, apc.id);
-  E.applyBlast(s, apc.x, apc.z, 1000, 20);
+  E.applyBlast(s, apc.x, apc.z, 1192, 20);
   assert.equal(apc.hp, 0);
   assert.equal(u.carrierId, null);
   assert.ok(u.hp > 0 && u.hp < u.maxHp);
 });
 test('FPV operators consume prepaid ammunition without a second cash charge; range, cooldown and real hits remain', () => {
   const s = fresh(),
-    u = soldier(s, 'operator', 850, 0),
+    u = soldier(s, 'operator', 1042, 0),
     hq = s.buildings[1],
     cash = s.sides[0].credits;
   assert.equal(typeof E.launchFPV(s, 0, [u.id], { x: 0, z: 0 }), 'string');
@@ -252,14 +252,14 @@ test('FPV operators consume prepaid ammunition without a second cash charge; ran
 });
 test('engineers repair nearby vehicles for resources and retreating infantry recovers at base', () => {
   const s = fresh(),
-    e = soldier(s, 'engineer', -850, 0),
-    apc = soldier(s, 'apc', -835, 0);
+    e = soldier(s, 'engineer', -1042, 0),
+    apc = soldier(s, 'apc', -1027, 0);
   apc.hp = 100;
   const metal = s.sides[0].materials;
   E.advance(s, 3);
   assert.ok(apc.hp > 100);
   assert.ok(s.sides[0].materials < metal);
-  const u = soldier(s, 'infantry', -900, -100);
+  const u = soldier(s, 'infantry', -1092, -100);
   u.hp = 10;
   E.commandUnits(s, 0, [u.id], 'retreat');
   assert.equal(u.order.mode, 'retreat');
@@ -268,7 +268,7 @@ test('engineers repair nearby vehicles for resources and retreating infantry rec
 });
 test('a fixed MG team packs into a mobile MOG and must deploy before firing', () => {
   const s = fresh(),
-    b = ready(s, 'gun', -800, 0),
+    b = ready(s, 'gun', -992, 0),
     id = E.redeployMOG(s, 0, b.id),
     u = s.groundUnits.find((u) => u.id === id);
   assert.ok(b.demolished);
@@ -276,21 +276,21 @@ test('a fixed MG team packs into a mobile MOG and must deploy before firing', ()
   assert.equal(u.setup, 0);
   E.advance(s, 3.1);
   assert.equal(u.setup, 1);
-  E.orderGround(s, 0, [u.id], { x: -700, z: 0 });
+  E.orderGround(s, 0, [u.id], { x: -892, z: 0 });
   E.advance(s, 0.2);
   assert.equal(u.setup, 0);
 });
 test('v7 cannon conversion refunds the difference and legacy five-man units become five individuals', () => {
   const s = fresh();
   s.version = 7;
-  const u = soldier(s, 'infantry', -800, 0);
+  const u = soldier(s, 'infantry', -992, 0);
   u.maxHp = 110;
   u.hp = 55;
   s.buildings.push({
     id: s.nextId++,
     side: 0,
     key: 'cannon',
-    x: -700,
+    x: -892,
     z: 0,
     hp: 140,
     maxHp: 280,
@@ -307,11 +307,11 @@ test('v7 cannon conversion refunds the difference and legacy five-man units beco
 });
 test('mobile MOG needs deployment, intercepts drones, shares its magazine and cools while holding fire', () => {
   const s = fresh(),
-    u = soldier(s, 'mog', -700, 100),
-    site = ready(s, 'launcher', -665, 175, 1);
+    u = soldier(s, 'mog', -892, 100),
+    site = ready(s, 'launcher', -857, 175, 1);
   s.sides[1].inventory.heavy = 1;
   stage(s, site, 'heavy', 1);
-  E.launch(s, 1, 'heavy', { x: -1000, z: 100 });
+  E.launch(s, 1, 'heavy', { x: -1192, z: 100 });
   E.advance(s, 0.1);
   const drone = s.units[0];
   drone.hp = drone.maxHp = 100000;
@@ -330,8 +330,8 @@ test('mobile MOG needs deployment, intercepts drones, shares its magazine and co
 });
 test('group stance commands set a common state for a mixed selection', () => {
   const s = fresh(),
-    a = soldier(s, 'infantry', -800, 0),
-    b = soldier(s, 'infantry', -780, 0);
+    a = soldier(s, 'infantry', -992, 0),
+    b = soldier(s, 'infantry', -972, 0);
   a.holdFire = true;
   b.holdFire = false;
   E.commandUnits(s, 0, [a.id, b.id], 'fire');

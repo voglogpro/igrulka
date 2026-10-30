@@ -51,7 +51,7 @@ export {
   DEFENSE_ATTACK_PERCENT,
 } from './units/ground/defense-attack.js';
 export { frontlineReport } from './defense/frontline.js';
-export { fortificationStatus } from './defense/fortifications.js';
+export { fortificationStatus, FORTIFICATION_TOP } from './defense/fortifications.js';
 export { FRONTLINE, FRONT_SECTORS, FORTIFICATION } from './defense/config.js';
 export { visionOf, fogVisible, GRID as VISION_GRID } from './vision-grid.js';
 export { DIFFICULTY, DEFAULT_DIFFICULTY, difficultyOf } from './ai/difficulty.config.js';

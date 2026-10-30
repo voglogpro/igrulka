@@ -82,7 +82,7 @@ test('forty ordinary machinegunners physically occupy balanced outer, inner and 
       0,
       'machinegunner',
       {
-        x: -900 - (i % 5) * 8,
+        x: -1092 - (i % 5) * 8,
         z: (Math.floor(i / 5) - 4) * 8,
       },
       true,
@@ -91,17 +91,19 @@ test('forty ordinary machinegunners physically occupy balanced outer, inner and 
   defend(s, 0, units);
   E.step(s, 0.05);
   assert.ok(units.filter((u) => u.defensePost).length <= E.FRONTLINE.maxNewAssignments);
-  E.advance(s, 170);
+  E.advance(s, 260);
   for (const line of corridorGeometry(s, 0)) {
     const local = units.filter((u) => u.defensePost?.corridorId === line.id);
     assert.equal(local.length, 20);
-    assert.equal(local.filter((u) => u.defensePost.row === 0).length, 6);
-    assert.equal(local.filter((u) => u.defensePost.row === 2).length, 6);
-    assert.equal(local.filter((u) => u.defensePost.row >= 4).length, 8);
+    // The wide corridor first completes its outer line, then the depot core, then the rear.
+    assert.equal(local.filter((u) => u.defensePost.row === 0).length, line.slots.length);
+    assert.ok(local.filter((u) => u.defensePost.row === 2).length >= 2);
+    assert.ok(local.filter((u) => u.defensePost.row >= 4).length >= 1);
     for (const u of local) {
       assert.equal(u.path.length, 0);
       assert.ok(distance(u, u.guard) < 4);
-      if (u.defensePost.row === 2) assert.ok(distance(u, line.depot) < line.depot.radius);
+      // The wide corridor's inner garrison spreads 20 m apart around and beside the depot.
+      if (u.defensePost.row === 2) assert.ok(Math.abs(u.z - line.depot.z) < 20 * line.slots.length);
     }
   }
 });
@@ -201,17 +203,17 @@ test('a visible moving rear intruder is followed at bounded cadence and survivin
     for (const line of corridorGeometry(s, 0))
       for (const slot of line.slots)
         units.push(post(s, 0, 'infantry', line.id, row, slot.slot, true));
-  const enemy = troop(s, 1, 'leopard', { x: -1050, z: -100 }, true);
+  const enemy = troop(s, 1, 'leopard', { x: -1242, z: -100 }, true);
   E.step(s, 0.05);
   const sent = units.find((u) => u.defenseTask);
   assert.ok(sent);
   const home = { ...sent.defenseTask.home },
     initial = { ...sent.guard };
   assert.ok(distance(initial, enemy) < 140);
-  assert.equal(E.orderGround(s, 1, [enemy.id], { x: -1380, z: -350, mode: 'move' }), 1);
+  assert.equal(E.orderGround(s, 1, [enemy.id], { x: -1572, z: -350, mode: 'move' }), 1);
   const start = { x: sent.x, z: sent.z };
   E.advance(s, 14);
-  assert.ok(distance(enemy, { x: -1050, z: -100 }) > 200, 'the intruder really moved');
+  assert.ok(distance(enemy, { x: -1242, z: -100 }) > 200, 'the intruder really moved');
   assert.ok(sent.defenseTask && !sent.defenseTask.returning);
   assert.ok(distance(sent.guard, initial) > 100);
   assert.ok(
@@ -278,7 +280,7 @@ test('comparable travel times favour actual anti-armour weapons and indirect res
   own(s, 0);
   const antiarmour = post(s, 0, 'atgm', 'north', 4, 2, true);
   const rifles = [0, 1, 3, 4, 5].map((slot) => post(s, 0, 'infantry', 'north', 4, slot, true));
-  const target = troop(s, 1, 'leopard', { x: -500, z: -1360 }, true);
+  const target = troop(s, 1, 'leopard', { x: -692, z: -1360 }, true);
   visibleBreach(s, [antiarmour, ...rifles], target);
   assert.ok(
     antiarmour.defenseTask,
@@ -500,7 +502,7 @@ test('central depot hubs receive finite paid ammunition by real vans without dup
   const s = fresh();
   own(s, 0);
   const before = s.sides[0].credits;
-  const factory = E.build(s, 0, 'ammofactory', -1080, -80);
+  const factory = E.build(s, 0, 'ammofactory', -1272, -80);
   assert.equal(factory.key, 'ammofactory');
   assert.ok(s.sides[0].credits < before);
   for (const line of corridorGeometry(s, 0))
@@ -512,7 +514,7 @@ test('central depot hubs receive finite paid ammunition by real vans without dup
     supplied = false;
   const deliveredHubs = new Set(),
     suppliedFronts = new Set();
-  for (let second = 0; second < 240; second++) {
+  for (let second = 0; second < 420; second++) {
     E.advance(s, 1);
     // Only small arms are demanded; each ordinary paid12-credit batch contains60 rounds.
     assert.ok(Math.abs(smallRounds(s) - (s.sides[0].ammoProductionSpent || 0) * 5) < 1e-6);

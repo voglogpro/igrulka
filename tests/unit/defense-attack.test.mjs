@@ -26,7 +26,7 @@ function fixture(mode, side = 0) {
       s,
       side,
       'machinegunner',
-      side % 2 ? 420 : -420,
+      side % 2 ? 612 : -612,
       (north ? -1 : 1) * (1320 + Math.floor(i / 2) * 5),
     );
     u.autoDefense = true;
@@ -106,8 +106,8 @@ test('attack excludes wounded, supply trips, carried infantry, MOG and manual or
   s.groundUnits[2].carrierId = 123;
   s.groundUnits[3].autoDefense = false;
   s.groundUnits[3].guard = null;
-  s.groundUnits[3].order = { mode: 'move', x: -900, z: 250 };
-  const mog = E.makeGround(s, 0, 'mog', -1100, 250);
+  s.groundUnits[3].order = { mode: 'move', x: -1092, z: 250 };
+  const mog = E.makeGround(s, 0, 'mog', -1292, 250);
   mog.autoDefense = true;
   mog.guard = { x: mog.x, z: mog.z };
   s.groundUnits.push(mog);
@@ -127,7 +127,7 @@ test('attack excludes wounded, supply trips, carried infantry, MOG and manual or
 
 test('cooperative attack commands own only their city and keep one defender per occupied direction', () => {
   const s = fixture('coop', 2),
-    friend = E.makeGround(s, 0, 'machinegunner', -900, -1300);
+    friend = E.makeGround(s, 0, 'machinegunner', -1092, -1300);
   friend.autoDefense = true;
   friend.guard = { x: friend.x, z: friend.z };
   s.groundUnits.push(friend);
@@ -170,13 +170,13 @@ test('recall preserves positions, returns only own survivors, and manual command
 
 test('an operation continues against another public hostile building after its endpoint is destroyed', () => {
   const s = fixture();
-  const building = E.build(s, 1, 'gun', 1150, 250);
+  const building = E.build(s, 1, 'gun', 1342, 250);
   assert.equal(typeof building, 'object');
   building.progress = 1;
   E.launchDefenseAttack(s, 0);
   const u = s.groundUnits.find((u) => u.defenseAttack);
   for (const v of s.groundUnits) if (v !== u) delete v.defenseAttack;
-  u.x = 950;
+  u.x = 1142;
   u.z = 250;
   u.path = [];
   u.routeQueue = [];
@@ -212,7 +212,7 @@ test('AI assaults share the thirty percent operation and cannot repeat over an a
 
 test('automatic attack recruits use persistent city missions while precise manual orders detach them', () => {
   const s = E.createGame(813);
-  const u = E.makeGround(s, 0, 'armoredcar', -850, 250);
+  const u = E.makeGround(s, 0, 'armoredcar', -1042, 250);
   s.groundUnits.push(u);
   u.stance = { mode: 'attack' };
   assert.equal(enrollCityAssault(s, u), true);
@@ -221,15 +221,15 @@ test('automatic attack recruits use persistent city missions while precise manua
     E.load(E.save(s)).groundUnits.find((v) => v.id === u.id).defenseAttack.phase,
     'active',
   );
-  assert.equal(E.orderGround(s, 0, [u.id], { x: -700, z: 250, mode: 'move' }), 1);
+  assert.equal(E.orderGround(s, 0, [u.id], { x: -892, z: 250, mode: 'move' }), 1);
   assert.equal(u.defenseAttack, undefined);
   u.stance = { mode: 'attack' };
   enrollCityAssault(s, u);
-  assert.equal(E.appendGroundOrder(s, 0, [u.id], { x: -750, z: 280 }), 1);
+  assert.equal(E.appendGroundOrder(s, 0, [u.id], { x: -942, z: 280 }), 1);
   assert.equal(u.defenseAttack, undefined);
   u.stance = { mode: 'attack' };
   enrollCityAssault(s, u);
-  assert.equal(E.guardGround(s, 0, [u.id], { x: -750, z: 280 }), 1);
+  assert.equal(E.guardGround(s, 0, [u.id], { x: -942, z: 280 }), 1);
   assert.equal(u.defenseAttack, undefined);
 });
 
@@ -237,15 +237,15 @@ test('an ordinary tank walks to ammunition then destroys two ordinary city build
   const s = E.createGame(813, { mode: 'multiplayer' });
   s.rules.oil = false;
   s.rules.rear = false;
-  const first = E.build(s, 1, 'launcher', 1000, 350);
-  const second = E.build(s, 1, 'launcher', 1180, 350);
+  const first = E.build(s, 1, 'launcher', 1192, 350);
+  const second = E.build(s, 1, 'launcher', 1372, 350);
   assert.equal(typeof first, 'object');
   assert.equal(typeof second, 'object');
   for (const b of [first, second]) {
     b.progress = 1;
     b.hp = b.maxHp;
   }
-  const u = E.makeGround(s, 0, 'leopard', 800, 350);
+  const u = E.makeGround(s, 0, 'leopard', 992, 350);
   s.groundUnits.push(u);
   // An exhausted paid load is the trigger. The only replacement ammunition is
   // the finite physical crate, over the normal service radius away.
@@ -254,9 +254,9 @@ test('an ordinary tank walks to ammunition then destroys two ordinary city build
   assert.equal(
     depositFieldAmmo(s, {
       side: 0,
-      x: 800,
+      x: 992,
       z: 450,
-      fieldPoint: { x: 800, z: 450 },
+      fieldPoint: { x: 992, z: 450 },
       cargo: { kind: 'ammo', key: 'shell', amount: 48 },
     }),
     48,
@@ -266,7 +266,7 @@ test('an ordinary tank walks to ammunition then destroys two ordinary city build
       s,
       0,
       [u.id],
-      { x: 900, z: 350, mode: 'attackmove', targetId: first.id },
+      { x: 1092, z: 350, mode: 'attackmove', targetId: first.id },
       { defer: true },
     ),
     1,
@@ -289,7 +289,7 @@ test('an ordinary tank walks to ammunition then destroys two ordinary city build
   assert.equal(first.hp, 0);
   assert.equal(second.hp, 0);
   assert.equal(u.maxHp, initialHp);
-  assert.ok(u.x > 900, 'the second target needs actual travel beyond the original point');
+  assert.ok(u.x > 1092, 'the second target needs actual travel beyond the original point');
   const remaining = s.ammoCrates[0].stock.shell + E.ammunitionStatus(s, u).total;
   assert.ok(remaining < 48 && remaining >= 0);
   assert.equal(u.defenseAttack.phase, 'active');

@@ -13,20 +13,20 @@ import { invalidateTrenchLinks } from './trench-links.js';
 import { TRENCH_FOOTPRINT, trenchContains } from './trench-footprint.js';
 const workTimes = new WeakMap();
 const nearbyGeometry = new WeakMap();
-const labels = ['Земляные работы', 'Окоп', 'Укреплённый окоп', 'Блокпост'];
+const labels = ['Земляные работы', 'Окоп', 'Укреплённый окоп', 'Блокпост', 'Опорный пункт', 'Форт'];
+export const FORTIFICATION_TOP = labels.length - 1;
 
 export function fortificationStatus(t) {
   const progress = Math.max(0, Math.min(1, t?.progress || 0));
   const work = Math.max(0, Math.min(C.maxWork, t?.fortificationWork || 0));
-  const level = progress < 1 ? 0 : work >= C.maxWork ? 3 : work >= C.secondLevel ? 2 : 1;
-  const nextProgress =
-    level === 0
-      ? progress
-      : level === 1
-        ? work / C.secondLevel
-        : level === 2
-          ? (work - C.secondLevel) / (C.maxWork - C.secondLevel)
-          : 1;
+  let level = 0;
+  if (progress >= 1) {
+    level = 1;
+    while (level <= C.thresholds.length && work >= C.thresholds[level - 1]) level++;
+  }
+  const from = level > 1 ? C.thresholds[level - 2] : 0,
+    to = C.thresholds[level - 1];
+  const nextProgress = level === 0 ? progress : to == null ? 1 : (work - from) / (to - from);
   return {
     level,
     progress,
@@ -141,17 +141,22 @@ export function updateFortification(s, u, dt) {
     if (worked.get(t.id) !== s.time) {
       worked.set(t.id, s.time);
       const f = s.sides[u.side];
+      const heavy = (t.fortificationWork || 0) >= C.heavyFrom,
+        credits = heavy ? C.heavyCreditsPerWork : C.creditsPerWork,
+        materials = heavy ? C.heavyMaterialsPerWork : C.materialsPerWork,
+        // One price per tick: a step never straddles the timber threshold.
+        cap = heavy ? C.maxWork : C.heavyFrom;
       const work = Math.min(
-        C.maxWork - (t.fortificationWork || 0),
+        cap - (t.fortificationWork || 0),
         dt * speed,
-        f.credits / C.creditsPerWork,
-        f.materials / C.materialsPerWork,
+        f.credits / credits,
+        f.materials / materials,
       );
       if (work > 0) {
-        t.fortificationWork = Math.min(C.maxWork, (t.fortificationWork || 0) + work);
-        if (C.maxWork - t.fortificationWork < 1e-8) t.fortificationWork = C.maxWork;
-        f.credits = Math.max(0, f.credits - work * C.creditsPerWork);
-        f.materials = Math.max(0, f.materials - work * C.materialsPerWork);
+        t.fortificationWork = Math.min(cap, (t.fortificationWork || 0) + work);
+        if (cap - t.fortificationWork < 1e-8) t.fortificationWork = cap;
+        f.credits = Math.max(0, f.credits - work * credits);
+        f.materials = Math.max(0, f.materials - work * materials);
       }
     }
   }

@@ -15,7 +15,7 @@ import { restoreDefense } from '../defense/persistence.js';
 import { restoreOil } from './oil.js';
 import { restoreEconomy } from './economy.js';
 import { restoreElectronics } from '../city/electronics.js';
-import { migrateMapLayout } from './map-layout.js';
+import { migrateMapLayout, migrateV23Layout } from './map-layout.js';
 import { restoreRetiredResearch } from './retired-research.js';
 import { restoreArmyComposition } from '../units/ground/composition.js';
 import { restoreGroundScars } from '../combat/ground-scars.js';
@@ -38,7 +38,7 @@ export function load(raw) {
   const s = JSON.parse(raw);
   const sourceVersion = s.version;
   if (
-    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, VERSION].includes(
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, VERSION].includes(
       s.version,
     ) ||
     !Array.isArray(s.buildings) ||
@@ -446,6 +446,7 @@ export function load(raw) {
   for (const f of s.sides) f.rearAuto ??= true;
   if (s.sides.some((f) => typeof f.rearAuto !== 'boolean'))
     throw Error('Повреждена тыловая служба');
+  migrateV23Layout(s, sourceVersion);
   restoreDistricts(s, sourceVersion);
   restoreSettlements(s, sourceVersion);
   restoreServices(s);

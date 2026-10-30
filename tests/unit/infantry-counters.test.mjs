@@ -26,8 +26,8 @@ function unit(s, side, key, x, z, hold = true) {
 function row(s, gap = 120) {
   for (const z of [250, -250, 400, -400, 0, 150]) {
     const points = [
-      { x: -900, z },
-      { x: -900 + gap, z },
+      { x: -1092, z },
+      { x: -1092 + gap, z },
     ];
     if (
       points.every(
@@ -195,7 +195,7 @@ test('guidance never reads concealed infantry new position and the real flight i
   assert.equal(launchFPV(s, 0, [operator.id], b, tank.id), true);
   const air = s.units[0],
     aim = { x: air.tx, z: air.tz };
-  tank.x = 1000;
+  tank.x = 1192;
   tank.z = 700;
   tank.moving = false;
   tank.camouflaged = true;

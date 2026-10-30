@@ -24,14 +24,14 @@ const ready = (s, side, key, x, z) => {
 
 test('commuters pay: residents with reachable jobs add income, an unmatched city does not', () => {
   const s = fresh();
-  ready(s, 0, 'power', -1070, -80);
+  ready(s, 0, 'power', -1262, -80);
   const base = E.economy(s, 0);
   assert.equal(base.commute.employed, 0);
-  ready(s, 0, 'housing', -1015, -80);
+  ready(s, 0, 'housing', -1207, -80);
   // Only the power plant's few jobs exist so far.
   const small = E.economy(s, 0).commute;
   assert.ok(small.employed > 0 && small.employed <= small.jobs + 1e-9);
-  ready(s, 0, 'industry', -960, -80);
+  ready(s, 0, 'industry', -1152, -80);
   const withJobs = E.economy(s, 0);
   assert.ok(withJobs.commute.employed > small.employed);
   assert.equal(withJobs.commute.homes > 8, true);
@@ -44,10 +44,10 @@ test('commuters pay: residents with reachable jobs add income, an unmatched city
 
 test('markets on both sides send real caravans around the enlarged sea and pay both sides', () => {
   const s = fresh();
-  ready(s, 0, 'power', -1070, -80);
-  ready(s, 1, 'power', 1070, -80);
-  const mine = ready(s, 0, 'market', -960, -80),
-    theirs = ready(s, 1, 'market', 960, -80);
+  ready(s, 0, 'power', -1262, -80);
+  ready(s, 1, 'power', 1262, -80);
+  const mine = ready(s, 0, 'market', -1152, -80),
+    theirs = ready(s, 1, 'market', 1152, -80);
   E.advance(s, 4);
   const truck = s.groundUnits.find((u) => u.key === 'tradetruck' && u.trade?.from === mine.id);
   assert.ok(truck, 'a caravan leaves the connected market');
@@ -69,16 +69,16 @@ test('soldiers ignore caravans unless explicitly ordered, and raiding pays the r
     id: s.nextId++,
     key: 'market',
     side: 0,
-    x: 1300,
+    x: 1492,
     z: 900,
     hp: 1,
     maxHp: 1,
     progress: 1,
   };
   s.buildings.push(market);
-  const truck = E.makeGround(s, 1, 'tradetruck', -800, 250);
+  const truck = E.makeGround(s, 1, 'tradetruck', -992, 250);
   truck.trade = { from: 1, to: market.id, bonus: 1 };
-  const tank = E.makeGround(s, 0, 'leopard', -850, 250);
+  const tank = E.makeGround(s, 0, 'leopard', -1042, 250);
   s.groundUnits.push(truck, tank);
   E.advance(s, 3);
   assert.ok(truck.hp === truck.maxHp);
@@ -93,7 +93,7 @@ test('soldiers ignore caravans unless explicitly ordered, and raiding pays the r
 
 test('caravans and trade state survive save and load with validation', () => {
   const s = fresh();
-  const truck = E.makeGround(s, 0, 'tradetruck', -800, 250);
+  const truck = E.makeGround(s, 0, 'tradetruck', -992, 250);
   truck.trade = { from: 5, to: 6, bonus: 1 };
   s.groundUnits.push(truck);
   const copy = E.load(E.save(s));

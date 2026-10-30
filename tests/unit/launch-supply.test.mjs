@@ -14,7 +14,7 @@ function fresh() {
   }
   return s;
 }
-function site(s, key = 'launcher', x = -850, z = 100) {
+function site(s, key = 'launcher', x = -1042, z = 100) {
   const b = E.build(s, 0, key, x, z);
   assert.equal(typeof b, 'object', String(b));
   b.progress = 1;
@@ -32,10 +32,10 @@ function deliver(s, b, key, count) {
 test('warehouse stock cannot teleport to a remote rack; physical delivery is finite and key-restricted', () => {
   const s = fresh(),
     b = site(s),
-    silo = site(s, 'silo', -750, 170);
+    silo = site(s, 'silo', -942, 170);
   s.sides[0].inventory.drone = 20;
   const before = E.save(s);
-  assert.equal(typeof E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id), 'string');
+  assert.equal(typeof E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 1, b.id), 'string');
   assert.equal(E.save(s), before);
   E.updateLaunchSupply(s);
   assert.equal(E.availableLaunchStock(b, 'drone'), 0);
@@ -47,11 +47,11 @@ test('warehouse stock cannot teleport to a remote rack; physical delivery is fin
   assert.equal(E.acceptLaunchDelivery(silo, 'drone', 1), 0);
   assert.equal(deliver(s, b, 'drone', 20), 6);
   assert.equal(E.weaponStock(s, 0, 'drone'), 20);
-  assert.equal(E.launch(s, 0, 'drone', { x: 900, z: 0 }, 6, b.id), 6);
+  assert.equal(E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 6, b.id), 6);
   assert.equal(E.availableLaunchStock(b, 'drone'), 0);
   assert.equal(s.sides[0].inventory.drone, 14);
   assert.equal(
-    E.launch(s, 0, 'ballistic', { x: 900, z: 0 }, 1, b.id),
+    E.launch(s, 0, 'ballistic', { x: 1092, z: 0 }, 1, b.id),
     'Выбранная пусковая недоступна',
   );
 });
@@ -66,7 +66,8 @@ for (const [level, delays] of [
       b = site(s);
     b.level = level;
     deliver(s, b, 'drone', 6);
-    for (let i = 0; i < 6; i++) assert.equal(E.launch(s, 0, 'drone', { x: 900, z: i }, 1, b.id), 1);
+    for (let i = 0; i < 6; i++)
+      assert.equal(E.launch(s, 0, 'drone', { x: 1092, z: i }, 1, b.id), 1);
     assert.deepEqual(
       s.units.map((u) => u.delay),
       delays,
@@ -81,10 +82,10 @@ test('a partial level-two burst cannot reset on the next simulation tick', () =>
     b = site(s);
   b.level = 2;
   deliver(s, b, 'drone', 6);
-  E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
+  E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 1, b.id);
   E.step(s, 0.05);
-  E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
-  E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
+  E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 1, b.id);
+  E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 1, b.id);
   assert.equal(s.units[1].delay, 0.75);
   assert.ok(Math.abs(s.units[2].delay - 9.95) < 1e-9);
 });
@@ -94,20 +95,20 @@ test('save/load preserves a partially consumed burst and upgrades never reschedu
     b = site(s);
   b.level = 2;
   deliver(s, b, 'drone', 6);
-  E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
+  E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 1, b.id);
   const id = b.id;
   s = E.load(E.save(s));
   b = s.buildings.find((site) => site.id === id);
   E.step(s, 0.05);
-  E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
-  E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
+  E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 1, b.id);
+  E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 1, b.id);
   assert.equal(s.units[1].delay, 0.75);
   assert.ok(Math.abs(s.units[2].delay - 9.95) < 1e-9);
 
   s = fresh();
   b = site(s);
   deliver(s, b, 'drone', 6);
-  E.launch(s, 0, 'drone', { x: 900, z: 0 }, 2, b.id);
+  E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 2, b.id);
   const reserved = s.units.map((u) => ({ id: u.id, delay: u.delay }));
   const stock = E.availableLaunchStock(b, 'drone');
   assert.equal(E.upgradeDefense(s, 0, b.id), true);
@@ -117,18 +118,18 @@ test('save/load preserves a partially consumed burst and upgrades never reschedu
     reserved,
   );
   assert.equal(E.availableLaunchStock(b, 'drone'), stock);
-  E.launch(s, 0, 'drone', { x: 900, z: 0 }, 1, b.id);
+  E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 1, b.id);
   assert.equal(s.units.at(-1).delay, 20.8);
 });
 
 test('a factory warehouses all four types and cannot launch any type directly', () => {
   const s = fresh(),
-    b = site(s, 'factory', -1080, -10);
+    b = site(s, 'factory', -1272, -10);
   for (const key of Object.keys(E.WEAPONS)) {
     assert.equal(E.acceptLaunchDelivery(b, key, 2), 2);
     assert.equal(E.availableLaunchStock(b, key), 0);
     assert.equal(E.launchStoreCapacity(b, key), 24);
-    assert.equal(typeof E.launch(s, 0, key, { x: 900, z: 0 }, 1, b.id), 'string');
+    assert.equal(typeof E.launch(s, 0, key, { x: 1092, z: 0 }, 1, b.id), 'string');
   }
   assert.equal(E.launchStoreTotal(b), 8);
   assert.equal(E.launchSites(s, 0).length, 0);
@@ -156,7 +157,7 @@ test('destroying a new local rack loses its reserved stock rather than refunding
   const s = fresh(),
     b = site(s);
   deliver(s, b, 'drone', 2);
-  E.launch(s, 0, 'drone', { x: 900, z: 0 }, 2, b.id);
+  E.launch(s, 0, 'drone', { x: 1092, z: 0 }, 2, b.id);
   b.hp = 0;
   const stock = s.sides[0].inventory.drone;
   E.step(s, 0.05);
@@ -166,7 +167,7 @@ test('destroying a new local rack loses its reserved stock rather than refunding
 
 test('factory plans count paid stock in local racks and in transit without buying duplicates', () => {
   const s = fresh(),
-    factory = site(s, 'factory', -1080, -10),
+    factory = site(s, 'factory', -1272, -10),
     rack = site(s);
   s.sides[0].inventory.drone = 0;
   E.acceptLaunchDelivery(rack, 'drone', 1);
@@ -194,7 +195,7 @@ test('factory plans count paid stock in local racks and in transit without buyin
 
 test('a one-drone factory plan physically supplies a remote launcher from its own staged rack without extra production', () => {
   const s = fresh(),
-    factory = site(s, 'factory', -1080, -10),
+    factory = site(s, 'factory', -1272, -10),
     remote = site(s);
   for (const key of Object.keys(E.WEAPONS)) s.sides[0].inventory[key] = 0;
   const materials = s.sides[0].materials;

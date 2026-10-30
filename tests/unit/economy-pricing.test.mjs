@@ -45,30 +45,30 @@ test('successful construction alone spends the current quote; demolition never r
   const s = fresh();
   const quote = purchaseQuote(s, 0, 'building', 'launcher');
   const start = s.sides[0].credits;
-  const built = build(s, 0, 'launcher', -960, 80);
+  const built = build(s, 0, 'launcher', -1152, 80);
   assert.equal(typeof built, 'object');
   assert.equal(start - s.sides[0].credits, quote.cost);
   const ledger = structuredClone(s.sides[0].purchases);
-  const failed = build(s, 0, 'launcher', -960, 80);
+  const failed = build(s, 0, 'launcher', -1152, 80);
   assert.equal(typeof failed, 'string');
   assert.deepEqual(s.sides[0].purchases, ledger);
   assert.equal(demolish(s, built.id), true);
   assert.equal(purchaseQuote(s, 0, 'building', 'launcher').factor, 0.75);
-  assert.equal(typeof build(s, 0, 'launcher', -960, 80), 'object');
+  assert.equal(typeof build(s, 0, 'launcher', -1152, 80), 'object');
   assert.equal(purchaseQuote(s, 0, 'building', 'launcher').factor, 1);
   assert.equal(purchaseQuote(load(save(s)), 0, 'building', 'launcher').factor, 1);
 });
 
 test('driveway cost remains a road cost and failed resource checks consume no ordinal', () => {
   const s = fresh(),
-    plan = placementPlan(s, 0, 'housing', -960, -80);
+    plan = placementPlan(s, 0, 'housing', -1152, -80);
   assert.ok(!plan.error, plan.error);
   const quote = purchaseQuote(s, 0, 'building', 'housing');
   s.sides[0].credits = quote.cost + (plan.driveCost || 0) - 1;
-  assert.equal(typeof build(s, 0, 'housing', -960, -80), 'string');
+  assert.equal(typeof build(s, 0, 'housing', -1152, -80), 'string');
   assert.equal(purchaseQuote(s, 0, 'building', 'housing').factor, 0.5);
   s.sides[0].credits++;
-  const building = build(s, 0, 'housing', -960, -80);
+  const building = build(s, 0, 'housing', -1152, -80);
   assert.equal(typeof building, 'object');
   assert.equal(s.sides[0].credits, 0);
   assert.equal(s.sides[0].materials, 10000 - quote.metal);

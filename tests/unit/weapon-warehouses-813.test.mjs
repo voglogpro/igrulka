@@ -12,11 +12,11 @@ function fixture() {
   const s = E.createGame(813, { mode: 'multiplayer' });
   s.rules.rear = false;
   s.sides[0].components = 6;
-  const factory = E.build(s, 0, 'factory', -1080, -10);
+  const factory = E.build(s, 0, 'factory', -1272, -10);
   assert.equal(typeof factory, 'object', String(factory));
   factory.progress = 1;
   factory.hp = factory.maxHp;
-  const silo = E.build(s, 0, 'silo', -800, 250);
+  const silo = E.build(s, 0, 'silo', -992, 250);
   assert.equal(typeof silo, 'object', String(silo));
   silo.progress = 1;
   silo.hp = silo.maxHp;

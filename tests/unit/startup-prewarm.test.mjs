@@ -759,7 +759,7 @@ test('first paid base building and upgrades reuse actual warmed geometry after r
       if (object.geometry)
         assert.ok(warmed.has(object.geometry), 'real model shares the warmed attribute owner');
     });
-  const gun = E.build(s, 0, 'gun', -850, 100);
+  const gun = E.build(s, 0, 'gun', -1042, 100);
   assert.equal(typeof gun, 'object', String(gun));
   check(f.world.model(gun).root);
   E.advance(s, E.BUILDINGS.gun.time + 0.1);
@@ -768,7 +768,7 @@ test('first paid base building and upgrades reuse actual warmed geometry after r
     assert.equal(gun.level, level);
     check(f.world.model(gun).root);
   }
-  const factory = E.build(s, 0, 'factory', -1080, -10);
+  const factory = E.build(s, 0, 'factory', -1272, -10);
   assert.equal(typeof factory, 'object', String(factory));
   check(f.world.model(factory).root);
   for (const level of [0, 1, 2])

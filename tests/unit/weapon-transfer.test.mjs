@@ -17,7 +17,7 @@ function fresh() {
   }
   return s;
 }
-function ready(s, key, x = -1080, z = -10, side = 0) {
+function ready(s, key, x = -1272, z = -10, side = 0) {
   const b = E.build(s, side, key, x, z);
   assert.equal(typeof b, 'object', String(b));
   b.progress = 1;
@@ -27,7 +27,7 @@ function ready(s, key, x = -1080, z = -10, side = 0) {
 function fixture() {
   const s = fresh();
   ready(s, 'factory');
-  const silo = ready(s, 'silo', -800, 250);
+  const silo = ready(s, 'silo', -992, 250);
   E.acceptLaunchDelivery(silo, 'cruise', 4);
   s.sides[0].inventory.ballistic = 2;
   return { s, silo };
@@ -132,10 +132,10 @@ test('a factory retains all paid warehouse types and rejects launch-rack deliver
 test('launch deliveries reserve distinct civic bays and an old occupied bay resumes the same paid delivery after loading', () => {
   const s = fresh(),
     depot = ready(s, 'factory'),
-    a = ready(s, 'launcher', -850, 100);
+    a = ready(s, 'launcher', -1042, 100);
   E.acceptLaunchDelivery(depot, 'heavy', 2);
-  assert.equal(typeof E.buildRoad(s, 0, -1105, -45, -1230, -45), 'object');
-  const b = ready(s, 'factory', -1200, -10);
+  assert.equal(typeof E.buildRoad(s, 0, -1297, -45, -1422, -45), 'object');
+  const b = ready(s, 'factory', -1392, -10);
   E.acceptLaunchDelivery(b, 'drone', 2);
   E.requestWeaponDelivery(s, 0, a.id, 'drone', 1);
   until(
@@ -234,7 +234,7 @@ test('launch preferences are authenticated and malformed commands cannot mutate 
 test('production expenses count actual paid batches and old saves acquire a zero starting statistic', () => {
   const s = fresh(),
     b = ready(s, 'ammofactory');
-  s.groundUnits.push(E.makeGround(s, 0, 'leopard', -950, 250));
+  s.groundUnits.push(E.makeGround(s, 0, 'leopard', -1142, 250));
   const before = s.sides[0].credits;
   updateAmmoProduction(s);
   assert.equal(s.sides[0].ammoStock.shell, 6);

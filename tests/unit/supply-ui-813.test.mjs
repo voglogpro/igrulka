@@ -22,7 +22,7 @@ test('reopening launcher supply details is pure and shows compatible per-key sto
     hp: 100,
     maxHp: 100,
     progress: 1,
-    x: -900,
+    x: -1092,
     z: 200,
     launchStore: { cruise: 0, ballistic: 2 },
     weaponDemand: { cruise: 1 },
@@ -50,7 +50,7 @@ test('physical incoming cargo shows its count and approximate ETA while collecti
 
 test('electronics inspector shows actual stock and batch progress with a collapsed-input recipe', () => {
   const s = E.createGame(813);
-  const factory = E.build(s, 0, 'electronics', -1080, -80);
+  const factory = E.build(s, 0, 'electronics', -1272, -80);
   assert.equal(typeof factory, 'object', String(factory));
   factory.progress = 1;
   factory.hp = factory.maxHp;

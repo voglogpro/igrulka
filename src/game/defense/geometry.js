@@ -1,5 +1,5 @@
 import { allied, hqOf } from '../factions.js';
-import { FIELD, SEA, riverDistance, seaDistance } from '../map.js';
+import { FIELD, SEA, COVER_PATCHES, riverDistance, seaDistance } from '../map.js';
 import { DISTRICTS } from '../territory/districts.config.js';
 import { FRONTLINE as C } from './config.js';
 
@@ -51,12 +51,61 @@ export function corridorGeometry(s, side, direction = directionOf(side)) {
   });
 }
 
+// Woods and tree lines are fixed map data. Bucket them once along the front axis.
+const TREE_CELL = 64;
+const treeCells = new Map();
+for (const p of COVER_PATCHES) {
+  if (!p.forest) continue;
+  for (
+    let cz = Math.floor((p.z - p.r) / TREE_CELL);
+    cz <= Math.floor((p.z + p.r) / TREE_CELL);
+    cz++
+  )
+    for (
+      let cx = Math.floor((p.x - p.r - C.treeSnap) / TREE_CELL);
+      cx <= Math.floor((p.x + p.r + C.treeSnap) / TREE_CELL);
+      cx++
+    ) {
+      const key = cx + ',' + cz;
+      if (!treeCells.has(key)) treeCells.set(key, []);
+      treeCells.get(key).push(p);
+    }
+}
+const treePoints = new Map();
+// A post slides along the front axis onto the enemy-facing edge of a nearby tree line or wood,
+// so a section holds the lesopolosa instead of the open field beside it. The shift is shorter
+// than half the row spacing, so two rows of one slot can never take the same place.
+export function treeLinePoint(point, direction) {
+  const key = point.x + ',' + point.z + ',' + direction;
+  let cached = treePoints.get(key);
+  if (cached) return cached;
+  let best = null,
+    score = Infinity;
+  for (const p of treeCells.get(
+    Math.floor(point.x / TREE_CELL) + ',' + Math.floor(point.z / TREE_CELL),
+  ) || []) {
+    const dz = Math.abs(p.z - point.z),
+      reach = p.r - 1.5;
+    if (dz >= reach) continue;
+    // The forward edge of the wood at this latitude, a few metres inside the trees.
+    const x = p.x + direction * Math.sqrt(reach * reach - dz * dz),
+      shift = Math.abs(x - point.x) - (p.belt ? 4 : 0);
+    if (Math.abs(x - point.x) > C.treeSnap || shift >= score) continue;
+    best = x;
+    score = shift;
+  }
+  cached = best == null ? point : { x: best, z: point.z, treeLine: true };
+  if (treePoints.size > 4096) treePoints.clear();
+  treePoints.set(key, cached);
+  return cached;
+}
+
 export function defensePostPoint(lines, reference, direction) {
   const line = lines.find((v) => v.id === reference?.corridorId);
   const slot = line?.slots[reference?.slot];
   if (!slot) return null;
   const row = reference.row;
-  return {
+  const nominal = {
     x: slot.x - direction * (row === 0 ? 0 : C.supportOffset + (row - 1) * C.rowSpacing),
     // The second infantry row and its vehicle support hold the actual depot.
     // Outer/rear rows still span the complete land corridor, including flanks.
@@ -65,6 +114,8 @@ export function defensePostPoint(lines, reference, direction) {
         ? line.depot.z + (reference.slot - (line.slots.length - 1) / 2) * 20
         : slot.z,
   };
+  const { x, z } = treeLinePoint(nominal, direction);
+  return { x, z };
 }
 
 export function spreadOrder(count, centerFirst = true) {

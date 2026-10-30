@@ -19,7 +19,7 @@ test('four cities form a square, have independent equal budgets and connected dr
     assert.notEqual(s.sides[side], s.sides[(side + 1) % 4]);
     const hq = E.hqOf(s, side),
       enemy = E.hqOf(s, E.pairedEnemy(s, side));
-    assert.equal(Math.hypot(hq.x - enemy.x, hq.z - enemy.z), 2030);
+    assert.equal(Math.hypot(hq.x - enemy.x, hq.z - enemy.z), 2 * E.HQ_X);
     assert.equal(E.groundHeight(hq.x, hq.z), 0);
     assert.equal(E.isWater(hq.x, hq.z), false);
     assert.equal(s.roads.filter((r) => r.side === side).length, 3);

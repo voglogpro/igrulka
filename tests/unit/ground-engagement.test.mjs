@@ -51,12 +51,12 @@ function round(shooter, victim, changes = {}) {
 
 test('an explicit building attack beats a nearby distracting soldier in a real firing tick', () => {
   const s = fresh(),
-    tank = unit(s, 0, 'leopard', -850);
-  const target = E.build(s, 1, 'launcher', -700, 250);
+    tank = unit(s, 0, 'leopard', -1042);
+  const target = E.build(s, 1, 'launcher', -892, 250);
   assert.notEqual(typeof target, 'string', target);
   target.progress = 1;
   target.hp = target.maxHp;
-  const distraction = unit(s, 1, 'infantry', -810);
+  const distraction = unit(s, 1, 'infantry', -1002);
   distraction.holdFire = true;
   assert.equal(
     E.orderGround(s, 0, [tank.id], {
@@ -74,9 +74,9 @@ test('an explicit building attack beats a nearby distracting soldier in a real f
 
 test('an ordinary rifle round damages one physical victim rather than every soldier in a small explosion', () => {
   const s = fresh(),
-    shooter = unit(s, 0, 'infantry', -850);
-  const a = unit(s, 1, 'infantry', -800),
-    b = unit(s, 1, 'infantry', -800, 251);
+    shooter = unit(s, 0, 'infantry', -1042);
+  const a = unit(s, 1, 'infantry', -992),
+    b = unit(s, 1, 'infantry', -992, 251);
   impactGround(s, round(shooter, a));
   assert.ok(a.hp < a.maxHp);
   assert.equal(b.hp, b.maxHp);
@@ -85,24 +85,24 @@ test('an ordinary rifle round damages one physical victim rather than every sold
 
 test('the original firing line blocks both damage and suppression even after a round has flown beyond a wall', () => {
   const s = fresh(),
-    shooter = unit(s, 0, 'infantry', -850);
-  const victim = unit(s, 1, 'infantry', -790);
-  wall(s, -820);
-  impactGround(s, round(shooter, victim, { px: -395, pz: victim.z }));
+    shooter = unit(s, 0, 'infantry', -1042);
+  const victim = unit(s, 1, 'infantry', -982);
+  wall(s, -1012);
+  impactGround(s, round(shooter, victim, { px: -587, pz: victim.z }));
   assert.equal(victim.hp, victim.maxHp);
   assert.equal(victim.suppression, 0);
 });
 
 test('tank shells retain actual splash while rifle and anti-tank warheads have different armour effects', () => {
   const s = fresh(),
-    tank = unit(s, 0, 'leopard', -850);
-  const a = unit(s, 1, 'infantry', -800),
-    b = unit(s, 1, 'infantry', -800, 258);
+    tank = unit(s, 0, 'leopard', -1042);
+  const a = unit(s, 1, 'infantry', -992),
+    b = unit(s, 1, 'infantry', -992, 258);
   impactGround(s, round(tank, a, { kind: 'shell', damage: 20 }));
   assert.ok(a.hp < a.maxHp && b.hp < b.maxHp);
   function damage(key, targetKey) {
     const s = fresh(),
-      u = unit(s, 0, key, -850),
+      u = unit(s, 0, key, -1042),
       v = unit(s, 1, targetKey, -800);
     impactGround(s, round(u, v, { damage: 20, kind: groundWeaponProfile(key).kind }));
     return v.maxHp - v.hp;
@@ -114,24 +114,24 @@ test('tank shells retain actual splash while rifle and anti-tank warheads have d
 
 test('cached targets that leave range cannot freeze an attackmove unit until its next scan', () => {
   const s = fresh(),
-    u = unit(s, 0, 'infantry', -850),
-    foe = unit(s, 1, 'infantry', -800);
+    u = unit(s, 0, 'infantry', -1042),
+    foe = unit(s, 1, 'infantry', -992);
   foe.holdFire = true;
-  assert.equal(E.orderGround(s, 0, [u.id], { x: -650, z: 250, mode: 'attackmove' }), 1);
+  assert.equal(E.orderGround(s, 0, [u.id], { x: -842, z: 250, mode: 'attackmove' }), 1);
   E.step(s, 0.05);
   assert.equal(u.enemyId, foe.id);
   const before = u.x;
-  foe.x = 400;
+  foe.x = 592;
   E.step(s, 0.05);
   assert.ok(u.x > before, 'out-of-range cached enemy must not halt movement');
 });
 
 test('real rifle shots lead a moving infantry target rather than always hitting its old position', () => {
   const s = fresh(),
-    u = unit(s, 0, 'infantry', -850),
-    foe = unit(s, 1, 'infantry', -770);
+    u = unit(s, 0, 'infantry', -1042),
+    foe = unit(s, 1, 'infantry', -962);
   foe.holdFire = true;
-  assert.equal(E.orderGround(s, 1, [foe.id], { x: -770, z: 400 }), 1);
+  assert.equal(E.orderGround(s, 1, [foe.id], { x: -962, z: 400 }), 1);
   E.advance(s, 2.5);
   assert.ok(foe.z > 280);
   assert.ok(foe.hp < foe.maxHp, 'the ordinary simulation must resolve actual moving-target hits');
@@ -140,8 +140,8 @@ test('real rifle shots lead a moving infantry target rather than always hitting 
 
 test('target scans are cadenced, indexed once and bounded before visibility/LoS work', () => {
   const s = fresh(),
-    u = unit(s, 0, 'infantry', -850);
-  for (let i = 0; i < 40; i++) unit(s, 1, 'infantry', -790 + i * 0.5, 250 + i * 0.2);
+    u = unit(s, 0, 'infantry', -1042);
+  for (let i = 0; i < 40; i++) unit(s, 1, 'infantry', -982 + i * 0.5, 250 + i * 0.2);
   assert.ok(groundEngagement(s, u).target);
   const first = groundEngagementMetrics(s);
   assert.equal(first.indexBuilds, 1);
@@ -154,8 +154,8 @@ test('target scans are cadenced, indexed once and bounded before visibility/LoS 
   assert.equal(cached.searches, 1);
   assert.equal(cached.lineTests, first.lineTests);
   const distant = fresh(),
-    lone = unit(distant, 0, 'infantry', -1100, 450);
-  for (let i = 0; i < 80; i++) unit(distant, 1, 'infantry', 450 + i, -350);
+    lone = unit(distant, 0, 'infantry', -1292, 450);
+  for (let i = 0; i < 80; i++) unit(distant, 1, 'infantry', 642 + i, -350);
   groundEngagement(distant, lone);
   assert.equal(groundEngagementMetrics(distant).visibilityTests, 0);
   assert.equal(groundEngagementMetrics(distant).lineTests, 0);
@@ -163,10 +163,10 @@ test('target scans are cadenced, indexed once and bounded before visibility/LoS 
 
 test('the LoS budget cannot permanently starve the ninth visible target behind eight blocked priorities', () => {
   const s = fresh(),
-    u = unit(s, 0, 'atgm', -1000, 400);
-  for (let i = 0; i < 8; i++) unit(s, 1, 'apc', -870, 397 + i);
-  wall(s, -930, 400);
-  const visible = unit(s, 1, 'infantry', -970, 450);
+    u = unit(s, 0, 'atgm', -1192, 400);
+  for (let i = 0; i < 8; i++) unit(s, 1, 'apc', -1062, 397 + i);
+  wall(s, -1122, 400);
+  const visible = unit(s, 1, 'infantry', -1162, 450);
   let selected = null;
   for (let i = 0; i < 10 && selected?.id !== visible.id; i++) {
     s.time = i * 0.4;
@@ -184,7 +184,7 @@ test('a real 132-unit battle shares one index per tick and amortizes visibility 
         s,
         side,
         keys[i % keys.length],
-        (side ? -770 : -870) + (i % 11) * 3,
+        (side ? -962 : -1062) + (i % 11) * 3,
         250 + Math.floor(i / 11) * 5,
       );
       u.hp = u.maxHp = 1e6;
@@ -212,7 +212,7 @@ test('a peaceful city does not build a ground target index, while a legacy stati
     id: s.nextId++,
     key: 'gun',
     side: 0,
-    x: -850,
+    x: -1042,
     z: 250,
     hp: 100,
     maxHp: 100,
@@ -228,11 +228,11 @@ test('a peaceful city does not build a ground target index, while a legacy stati
 
 test('a target search does not rescan hundreds of nearby friendly or allied soldiers', () => {
   const s = E.createGame(811, { mode: 'coop' }),
-    shooter = E.makeGround(s, 0, 'infantry', -1100, -1050);
+    shooter = E.makeGround(s, 0, 'infantry', -1292, -1050);
   s.groundUnits.push(shooter);
   let friendlyCoordinateReads = 0;
   for (let i = 0; i < 500; i++) {
-    const x = -1100 + (i % 10),
+    const x = -1292 + (i % 10),
       u = E.makeGround(s, i % 2 ? 2 : 0, 'infantry', x, -1050);
     Object.defineProperty(u, 'x', {
       get() {
@@ -254,8 +254,8 @@ test('a target search does not rescan hundreds of nearby friendly or allied sold
 
 test('direct-fire rounds rise slightly and drop onto the target instead of flying flat', () => {
   const s = fresh(),
-    u = unit(s, 0, 'machinegunner', -850),
-    foe = unit(s, 1, 'infantry', -760);
+    u = unit(s, 0, 'machinegunner', -1042),
+    foe = unit(s, 1, 'infantry', -952);
   foe.holdFire = true;
   let p = null;
   for (let i = 0; i < 200 && !p; i++) {
@@ -276,12 +276,12 @@ test('direct-fire rounds rise slightly and drop onto the target instead of flyin
 
 test('bullet hits report what they struck so impacts can differ', () => {
   const s = fresh(),
-    shooter = unit(s, 0, 'infantry', -850),
-    soldier = unit(s, 1, 'infantry', -800),
-    tank = unit(s, 1, 'leopard', -800, 320);
+    shooter = unit(s, 0, 'infantry', -1042),
+    soldier = unit(s, 1, 'infantry', -992),
+    tank = unit(s, 1, 'leopard', -992, 320);
   impactGround(s, round(shooter, soldier));
   impactGround(s, round(shooter, tank));
-  impactGround(s, round(shooter, soldier, { tx: -800, tz: 200 }));
+  impactGround(s, round(shooter, soldier, { tx: -992, tz: 200 }));
   const hits = s.events.filter((e) => e.type === 'hit');
   assert.deepEqual(
     hits.map((e) => e.surface),

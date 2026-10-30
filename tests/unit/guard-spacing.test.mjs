@@ -19,20 +19,20 @@ function fresh() {
 }
 
 function barracks(s, key = 'infantry') {
-  const b = game.build(s, 0, game.recruitmentFacility(key), -1080, -10);
+  const b = game.build(s, 0, game.recruitmentFacility(key), -1272, -10);
   assert.notEqual(typeof b, 'string', b);
   b.progress = 1;
   b.hp = b.maxHp;
   return b;
 }
 
-function unit(s, key, x = -1100, z = 300) {
+function unit(s, key, x = -1292, z = 300) {
   const u = game.makeGround(s, 0, key, x, z);
   s.groundUnits.push(u);
   return u;
 }
 
-function produce(key, count, setup = () => ({ x: -900, z: -40 })) {
+function produce(key, count, setup = () => ({ x: -1092, z: -40 })) {
   const s = fresh();
   const b = barracks(s, key);
   const rally = setup(s);
@@ -113,7 +113,7 @@ test('twenty actual auto-recruited soldiers obey manual guard with distinct post
   assert.deepEqual(result.units[0].guard, ownPost, 'a unit must not block its own reservation');
   assert.deepEqual({ x: result.units[0].x, z: result.units[0].z }, ownPosition);
   assert.equal(
-    game.orderGround(result.s, 0, [result.units[0].id], { x: -850, z: -100, mode: 'move' }),
+    game.orderGround(result.s, 0, [result.units[0].id], { x: -1042, z: -100, mode: 'move' }),
     1,
   );
   assert.equal(result.units[0].guard, null);
@@ -127,7 +127,7 @@ test('ten actual auto-recruited APCs reserve larger footprints under manual guar
 test('rally reservations remain separated near a city wall, forest, sea shore and map corner', async (t) => {
   const setups = {
     wall(s) {
-      const wall = game.build(s, 0, 'launcher', -750, 100);
+      const wall = game.build(s, 0, 'launcher', -942, 100);
       assert.notEqual(typeof wall, 'string', wall);
       wall.progress = 1;
       wall.hp = wall.maxHp;
@@ -139,7 +139,7 @@ test('rally reservations remain separated near a city wall, forest, sea shore an
       );
       return { x: p.x, z: p.z };
     },
-    shore: () => ({ x: -675, z: 0 }),
+    shore: () => ({ x: -867, z: 0 }),
     corner: () => ({ x: -(game.FIELD.x - 9), z: -(game.FIELD.z - 6) }),
   };
   for (const [name, setup] of Object.entries(setups))
@@ -161,7 +161,7 @@ test('rally reservations remain separated near a city wall, forest, sea shore an
 test('mixed infantry, MOG and vehicles reserve different spacing without teleporting', () => {
   const s = fresh();
   const units = [unit(s, 'infantry'), unit(s, 'mog'), unit(s, 'apc')];
-  const rally = { x: -900, z: -40 };
+  const rally = { x: -1092, z: -40 };
   for (const u of units) {
     const before = { x: u.x, z: u.z };
     assert.equal(game.guardGround(s, 0, [u.id], rally), 1);
@@ -174,8 +174,8 @@ test('mixed infantry, MOG and vehicles reserve different spacing without telepor
 test('a drawn line keeps every exact preview post even when close spacing would fail rally occupancy', () => {
   const s = fresh();
   const units = Array.from({ length: 5 }, () => unit(s, 'apc'));
-  const a = { x: -920, z: 250 },
-    b = { x: -900, z: 250 };
+  const a = { x: -1112, z: 250 },
+    b = { x: -1092, z: 250 };
   assert.equal(
     game.defendLineGround(
       s,
@@ -189,11 +189,11 @@ test('a drawn line keeps every exact preview post even when close spacing would 
   assert.deepEqual(
     units.map((u) => u.guard),
     [
-      { x: -920, z: 250 },
-      { x: -915, z: 250 },
-      { x: -910, z: 250 },
-      { x: -905, z: 250 },
-      { x: -900, z: 250 },
+      { x: -1112, z: 250 },
+      { x: -1107, z: 250 },
+      { x: -1102, z: 250 },
+      { x: -1097, z: 250 },
+      { x: -1092, z: 250 },
     ],
   );
 });
@@ -201,7 +201,7 @@ test('a drawn line keeps every exact preview post even when close spacing would 
 test('a saturated rally refuses more posts and a paid recruit waits at its safe spawn', () => {
   const s = fresh();
   const b = barracks(s, 'apc');
-  const rally = { x: -900, z: -40 };
+  const rally = { x: -1092, z: -40 };
   let rejected = 0;
   for (let i = 0; i < 80; i++) {
     const u = unit(s, 'apc');

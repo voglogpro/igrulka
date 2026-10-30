@@ -110,9 +110,9 @@ function separated(units) {
 
 test('both civic fleets bypass a deployed MOG while preserving its post and their paid mission schemas', () => {
   const s = fresh(),
-    fixed = mog(s, -1200, -400),
-    a = ammo(s, -1300, -400, { x: -1100, z: -400 }),
-    b = service(s, -1100, -400, { x: -1300, z: -400 });
+    fixed = mog(s, -1392, -400),
+    a = ammo(s, -1492, -400, { x: -1292, z: -400 }),
+    b = service(s, -1292, -400, { x: -1492, z: -400 });
   const stationary = structuredClone(fixed),
     cargo = structuredClone(a.cargo),
     keys = [Object.keys(a), Object.keys(b)];
@@ -141,8 +141,8 @@ test('all four owners share physical fleet avoidance without treating foreign va
   for (const side of [0, 1, 2, 3]) {
     const z = -700 + side * 70;
     vans.push(
-      ammo(s, -1300, z, { x: -1100, z }, side),
-      service(s, -1100, z, { x: -1300, z }, side),
+      ammo(s, -1300, z, { x: -1292, z }, side),
+      service(s, -1100, z, { x: -1492, z }, side),
     );
   }
   tick(s, 16, () => separated(vans));
@@ -152,8 +152,8 @@ test('all four owners share physical fleet avoidance without treating foreign va
 test('opposite-heading allied and hostile vans both keep their physical footprints', () => {
   for (const otherSide of [1, 2]) {
     const s = fresh(true),
-      a = ammo(s, -1300, -400, { x: -1100, z: -400 }, 0),
-      b = service(s, -1100, -400, { x: -1300, z: -400 }, otherSide);
+      a = ammo(s, -1492, -400, { x: -1292, z: -400 }, 0),
+      b = service(s, -1292, -400, { x: -1492, z: -400 }, otherSide);
     tick(s, 15, () => separated([a, b]));
     assert.equal(a.path.length, 0);
     assert.equal(b.path.length, 0);
@@ -162,9 +162,9 @@ test('opposite-heading allied and hostile vans both keep their physical footprin
 
 test('cold save continuation retains hp-less repair vans, finite cargo and exact avoidance trajectories', () => {
   const s = fresh();
-  mog(s, -1200, -400);
-  ammo(s, -1300, -400, { x: -1100, z: -400 });
-  service(s, -1100, -400, { x: -1300, z: -400 });
+  mog(s, -1392, -400);
+  ammo(s, -1492, -400, { x: -1292, z: -400 });
+  service(s, -1292, -400, { x: -1492, z: -400 });
   tick(s, 2);
   const cold = E.load(E.save(s));
   tick(s, 12);
@@ -188,7 +188,7 @@ test('cold save continuation retains hp-less repair vans, finite cargo and exact
 test('actual ammo dispatch drives around a fixed MOG and delivers only its loaded weapon', () => {
   const s = fresh(),
     factory = ready(s, 'factory'),
-    silo = E.build(s, 0, 'silo', -800, 250);
+    silo = E.build(s, 0, 'silo', -992, 250);
   assert.equal(typeof silo, 'object');
   silo.progress = 1;
   silo.hp = silo.maxHp;
@@ -251,7 +251,7 @@ test('500 marching soldiers and both van fleets reuse one local index despite ha
   const s = fresh(),
     units = [];
   for (let i = 0; i < 500; i++) {
-    const x = -1750 + (i % 20) * 24,
+    const x = -1942 + (i % 20) * 24,
       z = -850 + Math.floor(i / 20) * 24,
       u = E.makeGround(s, 0, 'infantry', x, z);
     u.path = [{ x: x + 150, z }];
@@ -259,8 +259,8 @@ test('500 marching soldiers and both van fleets reuse one local index despite ha
     s.groundUnits.push(u);
     units.push(u);
   }
-  const a = ammo(s, -1800, -150, { x: -1600, z: -150 }),
-    b = service(s, -1800, -100, { x: -1600, z: -100 });
+  const a = ammo(s, -1992, -150, { x: -1792, z: -150 }),
+    b = service(s, -1992, -100, { x: -1792, z: -100 });
   s.time = 0.05;
   moveCivicVehicle(s, a, 0.05, 32);
   s.ammoVehicles = [...s.ammoVehicles];
@@ -294,7 +294,7 @@ test('army and civic static recoveries share two slots and keep final destinatio
       id: s.nextId++,
       key: 'housing',
       side: 0,
-      x: -1200,
+      x: -1392,
       z,
       r: 10,
       hp: 100,
@@ -303,12 +303,12 @@ test('army and civic static recoveries share two slots and keep final destinatio
     });
   s.networkRevision++;
   const vans = [
-    ammo(s, -1214, -680, { x: -1160, z: -680 }, 0, depot),
-    service(s, -1214, -580, { x: -1160, z: -580 }, 0, station),
+    ammo(s, -1406, -680, { x: -1352, z: -680 }, 0, depot),
+    service(s, -1406, -580, { x: -1352, z: -580 }, 0, station),
   ];
   for (let i = 0; i < 4; i++) {
-    const u = E.makeGround(s, 0, 'leopard', -1214, -480 + i * 60);
-    u.path = [{ x: -1160, z: u.z }];
+    const u = E.makeGround(s, 0, 'leopard', -1406, -480 + i * 60);
+    u.path = [{ x: -1352, z: u.z }];
     u.order = { ...u.path[0], mode: 'move' };
     s.groundUnits.push(u);
   }

@@ -2,9 +2,11 @@ import {
   FIELD,
   OIL_FIELDS,
   LEGACY_OIL_FIELDS,
+  V22_OIL_FIELDS,
   seaDistance,
   expandLegacyZ,
   expandLegacyX,
+  expandV23X,
 } from '../map.js';
 import { GROUND_UNITS } from '../config.js';
 import { walkable, groundPath } from '../units/ground/navigation.js';
@@ -37,10 +39,12 @@ function stretch(value, fields, transform) {
 // Keep the island's quays fixed while expanding the open-water leg of merchant routes.
 function stretchShipX(x) {
   const value = Math.abs(x);
-  if (value <= 100) return x;
-  if (value >= 240) return expandLegacyX(x);
-  return Math.sign(x) * (100 + ((value - 100) * 540) / 140);
+  if (value <= 100) return expandV23X(x);
+  if (value >= 240) return expandV23X(expandLegacyX(x));
+  return expandV23X(Math.sign(x) * (100 + ((value - 100) * 540) / 140));
 }
+// Pre-15 positions cross both map changes; the island quays (|x| <= 100) never move.
+const legacyX = (x) => expandV23X(expandLegacyX(x));
 
 function portShore(point) {
   const original = seaDistance(point.x, point.z);
@@ -68,8 +72,8 @@ function spatialBuildingAnchors(s, sourceVersion) {
   for (const building of s.buildings) {
     let target = null;
     if (building.key === 'oilwell') {
-      for (const old of LEGACY_OIL_FIELDS) {
-        const z = sourceVersion < 14 ? old.z : expandLegacyZ(old.z);
+      for (const old of sourceVersion < 15 ? LEGACY_OIL_FIELDS : V22_OIL_FIELDS) {
+        const z = sourceVersion < 14 || sourceVersion >= 15 ? old.z : expandLegacyZ(old.z);
         const dx = building.x - old.x,
           dz = building.z - z;
         if (Math.hypot(dx, dz) > old.r * 0.7 + 1e-6) continue;
@@ -115,6 +119,39 @@ function dryPoint(s, point, radius, side) {
 // corridor positions follow the enlarged coast, including oil fields and queued orders.
 export function migrateMapLayout(s, sourceVersion) {
   if (sourceVersion >= 15) return;
+  migrateLayout(s, sourceVersion);
+  repairLegacyPositions(s);
+}
+
+// Collections that hold map positions. Velocities (vx/vz) are recomputed, never stretched.
+const SPATIAL = [
+  'buildings',
+  'roads',
+  'groundUnits',
+  'units',
+  'trenches',
+  'serviceVehicles',
+  'ammoVehicles',
+  'ammoCrates',
+  'groundScars',
+  'ships',
+  'projectiles',
+  'contacts',
+  'frontlineMemory',
+];
+
+// State 23 moves both banks 200 m apart and deepens the corridors. The transform is monotone,
+// keeps towns, villages and the coast rigid and only stretches open water and empty corridor
+// ground, so every dry position stays dry and every street keeps its buildings.
+// It runs before settlements and oil are validated against their new sites.
+export function migrateV23Layout(s, sourceVersion) {
+  if (sourceVersion < 15 || sourceVersion >= 23) return;
+  migrateLayout(s, sourceVersion);
+}
+
+function migrateLayout(s, sourceVersion) {
+  const legacy = sourceVersion < 15;
+  const transform = legacy ? legacyX : expandV23X;
   const buildingAnchors = spatialBuildingAnchors(s, sourceVersion);
   // Stretching is not uniform: a global progress fraction would jump aircraft backwards.
   // Keep their actual position as a waypoint so the next tick continues from that position.
@@ -132,23 +169,25 @@ export function migrateMapLayout(s, sourceVersion) {
     if (u.route.length > 100) u.route.splice(index > 1 ? index - 1 : index + 1, 1);
     airAnchors.set(u, anchor);
   }
-  for (const collection of [
-    'buildings',
-    'roads',
-    'groundUnits',
-    'units',
-    'trenches',
-    'serviceVehicles',
-    'ships',
-    'projectiles',
-    'contacts',
-    'frontlineMemory',
-  ]) {
+  for (const collection of legacy
+    ? [
+        'buildings',
+        'roads',
+        'groundUnits',
+        'units',
+        'trenches',
+        'serviceVehicles',
+        'ships',
+        'projectiles',
+        'contacts',
+        'frontlineMemory',
+      ]
+    : SPATIAL) {
     if (sourceVersion < 14) stretch(s[collection], zFields, expandLegacyZ);
-    stretch(s[collection], xFields, collection === 'ships' ? stretchShipX : expandLegacyX);
+    stretch(s[collection], xFields, legacy && collection === 'ships' ? stretchShipX : transform);
   }
   for (const { building, target, connectors } of buildingAnchors) {
-    Object.assign(building, target || portShore(building));
+    Object.assign(building, target || (legacy ? portShore(building) : {}));
     for (const { road, end, dx, dz } of connectors) {
       road[`${end}x`] = building.x + dx;
       road[`${end}z`] = building.z + dz;
@@ -171,22 +210,6 @@ export function migrateMapLayout(s, sourceVersion) {
     else if (ship.state === 'returning' && ship.path?.length)
       ship.path[ship.path.length - 1] = berth;
   }
-  for (const trench of s.trenches || []) Object.assign(trench, dryPoint(s, trench, 2, trench.side));
-  invalidateStaticGeometry(s, 'trenches');
-  for (const u of s.groundUnits || []) {
-    if (u.carrierId) continue;
-    const radius = (GROUND_UNITS[u.key]?.size || 3) * 0.42;
-    Object.assign(u, dryPoint(s, u, radius, u.side));
-    if (u.guard) u.guard = dryPoint(s, u.guard, radius, u.side);
-    if (u.order && ['move', 'attackmove', 'guard', 'retreat'].includes(u.order.mode)) {
-      const target = dryPoint(s, u.order, radius, u.side);
-      u.order = target;
-      u.path = groundPath(s, u, target, radius);
-    } else if (u.path?.length) {
-      const target = dryPoint(s, u.path.at(-1), radius, u.side);
-      u.path = groundPath(s, u, target, radius);
-    }
-  }
   for (const u of s.units || []) {
     if (!u.route?.length) continue;
     let distance = 0;
@@ -204,4 +227,24 @@ export function migrateMapLayout(s, sourceVersion) {
   }
   // Old contact and path caches cannot describe the new terrain.
   s.networkRevision = (s.networkRevision || 0) + 1;
+  invalidateStaticGeometry(s, 'trenches');
+}
+
+function repairLegacyPositions(s) {
+  for (const trench of s.trenches || []) Object.assign(trench, dryPoint(s, trench, 2, trench.side));
+  invalidateStaticGeometry(s, 'trenches');
+  for (const u of s.groundUnits || []) {
+    if (u.carrierId) continue;
+    const radius = (GROUND_UNITS[u.key]?.size || 3) * 0.42;
+    Object.assign(u, dryPoint(s, u, radius, u.side));
+    if (u.guard) u.guard = dryPoint(s, u.guard, radius, u.side);
+    if (u.order && ['move', 'attackmove', 'guard', 'retreat'].includes(u.order.mode)) {
+      const target = dryPoint(s, u.order, radius, u.side);
+      u.order = target;
+      u.path = groundPath(s, u, target, radius);
+    } else if (u.path?.length) {
+      const target = dryPoint(s, u.path.at(-1), radius, u.side);
+      u.path = groundPath(s, u, target, radius);
+    }
+  }
 }

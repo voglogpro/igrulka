@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
+import { toV22Layout } from '../support/v22-layout.mjs';
 import {
   SETTLEMENTS,
   createSettlements,
@@ -426,7 +427,7 @@ test('a city-to-depot march takes its physical route, stays on land and captures
   for (const side of [0, 1]) {
     const s = fresh(),
       d = E.DISTRICTS[side],
-      u = foot(s, side, { x: side ? 900 : -900, z: side ? 200 : -200 });
+      u = foot(s, side, { x: side ? 1092 : -1092, z: side ? 200 : -200 });
     const start = { x: u.x, z: u.z };
     assert.equal(E.captureDistrict(s, side, [u.id], d.id), 1);
     let length = 0,
@@ -556,8 +557,8 @@ test('v16 imports suppress houses over the paid city, road, troops and pending d
     s.sides[0].purchases.building[key] = 1;
     return b;
   };
-  const station = ready('service', -1080, -80),
-    depot = ready('ammofactory', -950, -80);
+  const station = ready('service', -1272, -80),
+    depot = ready('ammofactory', -1142, -80);
   s.serviceVehicles.push({
     id: s.nextId++,
     side: 0,
@@ -606,7 +607,7 @@ test('v16 imports suppress houses over the paid city, road, troops and pending d
     sides: s.sides,
     nextId: s.nextId,
   });
-  const loaded = E.load(E.save(s));
+  const loaded = E.load(E.save(toV22Layout(s)));
   for (const index of [0, 1, 2, 3, 4, 6, 8, 10, 11, 12, 13, 14])
     assert.equal(settlementHouseEnabled(loaded, index), false, `house${index}`);
   assert.equal(settlementHouseEnabled(loaded, 15), true, 'unoccupied houses survive');

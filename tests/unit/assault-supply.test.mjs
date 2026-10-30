@@ -36,7 +36,7 @@ test('a stationary building gun cannot start a walking supply trip', () => {
     id: s.nextId++,
     side: 0,
     key: 'gun',
-    x: -900,
+    x: -1092,
     z: -80,
     hp: d.hp,
     maxHp: d.hp,
@@ -49,7 +49,7 @@ test('a stationary building gun cannot start a walking supply trip', () => {
     id: s.nextId++,
     side: 0,
     key: 'ammo-crate',
-    x: -1100,
+    x: -1292,
     z: -80,
     hp: 100,
     maxHp: 100,
@@ -63,15 +63,15 @@ test('a stationary building gun cannot start a walking supply trip', () => {
 
 test('a blocked return after real pickup and save/load resumes the attack without teleporting', () => {
   let s = E.createGame(8131, { mode: 'multiplayer' });
-  let u = E.makeGround(s, 0, 'infantry', -980, -80);
+  let u = E.makeGround(s, 0, 'infantry', -1172, -80);
   s.groundUnits.push(u);
-  E.orderGround(s, 0, [u.id], { x: -780, z: -80, mode: 'attackmove' });
+  E.orderGround(s, 0, [u.id], { x: -972, z: -80, mode: 'attackmove' });
   u.groundAmmo = u.ammoReserve = 0;
   s.ammoCrates.push({
     id: s.nextId++,
     side: 0,
     key: 'ammo-crate',
-    x: -1160,
+    x: -1352,
     z: -80,
     hp: 100,
     maxHp: 100,
@@ -82,7 +82,7 @@ test('a blocked return after real pickup and save/load resumes the attack withou
     E.advance(s, 1);
   assert.equal(u.supplyTrip?.phase, 'returning');
   assert.ok(E.ammunitionStatus(s, u).total > 0);
-  const building = E.build(s, 0, 'housing', -980, -80);
+  const building = E.build(s, 0, 'housing', -1172, -80);
   assert.equal(typeof building, 'object');
   // Discard the old now-invalid path after the actual paid solid placement.
   u.path = [];
@@ -93,22 +93,22 @@ test('a blocked return after real pickup and save/load resumes the attack withou
   updateFieldSupply(s);
   assert.equal(u.supplyTrip, undefined);
   assert.equal(u.order.mode, 'attackmove');
-  assert.equal(u.order.x, -780);
+  assert.equal(u.order.x, -972);
   assert.deepEqual({ x: u.x, z: u.z, ammo: E.ammunitionStatus(s, u).total }, before);
   assert.doesNotThrow(() => E.load(E.save(s)));
 });
 
 test('Shift during a manual attack supply trip preserves the original goal then completes the appended goal', () => {
   const s = E.createGame(8131, { mode: 'multiplayer' });
-  const u = E.makeGround(s, 0, 'infantry', -980, -80);
+  const u = E.makeGround(s, 0, 'infantry', -1172, -80);
   s.groundUnits.push(u);
-  E.orderGround(s, 0, [u.id], { x: -780, z: -80, mode: 'attackmove' });
+  E.orderGround(s, 0, [u.id], { x: -972, z: -80, mode: 'attackmove' });
   u.groundAmmo = u.ammoReserve = 0;
   s.ammoCrates.push({
     id: s.nextId++,
     side: 0,
     key: 'ammo-crate',
-    x: -1160,
+    x: -1352,
     z: -80,
     hp: 100,
     maxHp: 100,
@@ -116,24 +116,24 @@ test('Shift during a manual attack supply trip preserves the original goal then 
   });
   updateFieldSupply(s);
   const before = { x: u.x, z: u.z };
-  assert.equal(appendGroundOrder(s, 0, [u.id], { x: -700, z: -80, mode: 'move' }), 1);
+  assert.equal(appendGroundOrder(s, 0, [u.id], { x: -892, z: -80, mode: 'move' }), 1);
   assert.deepEqual({ x: u.x, z: u.z }, before);
   assert.ok(u.supplyTrip);
   assert.equal(u.routeState, null);
   assert.deepEqual(
     u.routeQueue.map((p) => p.x),
-    [-780, -700],
+    [-972, -892],
   );
   assert.doesNotThrow(() => E.load(E.save(s)));
   let originalReached = false;
   for (let second = 0; second < 100; second++) {
     E.advance(s, 1);
-    originalReached ||= !u.supplyTrip && u.order?.mode === 'move' && u.order.x === -700;
-    if (Math.hypot(u.x + 700, u.z + 80) <= 4) break;
+    originalReached ||= !u.supplyTrip && u.order?.mode === 'move' && u.order.x === -892;
+    if (Math.hypot(u.x + 892, u.z + 80) <= 4) break;
   }
   assert.equal(originalReached, true);
   assert.equal(u.supplyTrip, undefined);
-  assert.ok(Math.hypot(u.x + 700, u.z + 80) <= 4);
+  assert.ok(Math.hypot(u.x + 892, u.z + 80) <= 4);
 });
 
 test('blocked supply returns consume at most four path attempts per cadence', () => {
@@ -142,7 +142,7 @@ test('blocked supply returns consume at most four path attempts per cadence', ()
     id: s.nextId++,
     side: 0,
     key: 'ammo-crate',
-    x: -1160,
+    x: -1352,
     z: -80,
     hp: 100,
     maxHp: 100,
@@ -152,11 +152,11 @@ test('blocked supply returns consume at most four path attempts per cadence', ()
   // Controlled already-loaded return records; the existing solid HQ blocks
   // every old endpoint. No rounds are transferred or created by this check.
   for (let i = 0; i < 5; i++) {
-    const u = E.makeGround(s, 0, 'infantry', -1160, -80 - i * 4);
+    const u = E.makeGround(s, 0, 'infantry', -1352, -80 - i * 4);
     s.groundUnits.push(u);
-    u.supplyTrip = { crateId: crate.id, phase: 'returning', home: { x: -1015, z: 0 } };
-    u.order = { x: -1015, z: 0, mode: 'resupplyReturn', supplyId: crate.id };
-    u.routeQueue = [{ x: -780, z: -80 - i * 4, mode: 'attackmove' }];
+    u.supplyTrip = { crateId: crate.id, phase: 'returning', home: { x: -1207, z: 0 } };
+    u.order = { x: -1207, z: 0, mode: 'resupplyReturn', supplyId: crate.id };
+    u.routeQueue = [{ x: -972, z: -80 - i * 4, mode: 'attackmove' }];
   }
   assert.doesNotThrow(() => E.load(E.save(s)));
   updateFieldSupply(s);
@@ -173,10 +173,10 @@ for (const domain of ['ground-attack', 'air-guard'])
     const original = d.groundRange;
     try {
       d.groundRange = 100;
-      const u = E.makeGround(s, 0, 'shilka', -900, -80);
+      const u = E.makeGround(s, 0, 'shilka', -1092, -80);
       s.groundUnits.push(u);
       if (domain === 'ground-attack') {
-        E.orderGround(s, 0, [u.id], { x: -700, z: -80, mode: 'attackmove' });
+        E.orderGround(s, 0, [u.id], { x: -892, z: -80, mode: 'attackmove' });
         u.groundAmmo = 0;
       } else {
         u.guard = { x: u.x, z: u.z };
@@ -188,7 +188,7 @@ for (const domain of ['ground-attack', 'air-guard'])
         id: s.nextId++,
         side: 0,
         key: 'ammo-crate',
-        x: -1100,
+        x: -1292,
         z: -80,
         hp: 100,
         maxHp: 100,
@@ -206,7 +206,7 @@ for (const domain of ['ground-attack', 'air-guard'])
 
 test('an empty assault recruit waits behind its defensive line without marching out', () => {
   const s = E.createGame(8131, { mode: 'multiplayer' });
-  const u = E.makeGround(s, 0, 'infantry', -1000, -80);
+  const u = E.makeGround(s, 0, 'infantry', -1192, -80);
   s.groundUnits.push(u);
   u.groundAmmo = u.ammoReserve = 0;
   u.stance = { mode: 'attack' };
@@ -215,7 +215,7 @@ test('an empty assault recruit waits behind its defensive line without marching 
   assert.equal(u.path.length, 0);
   assert.equal(holdAssaultForSupply(s, u), true);
   assert.equal(E.defenseAttackStatus(s, 0).preparing, 1);
-  assert.equal(E.orderGround(s, 0, [u.id], { x: -900, z: -80, mode: 'move' }), 1);
+  assert.equal(E.orderGround(s, 0, [u.id], { x: -1092, z: -80, mode: 'move' }), 1);
   assert.equal(u.defenseAttack, undefined);
   assert.equal(u.supplyTrip, undefined);
 });
@@ -226,7 +226,7 @@ test('an air magazine does not hide an empty ground magazine', () => {
   const previous = d.groundRange;
   try {
     d.groundRange = 100;
-    const u = E.makeGround(s, 0, 'shilka', -1000, -80);
+    const u = E.makeGround(s, 0, 'shilka', -1192, -80);
     u.groundAmmo = u.ammoReserve = 0;
     assert.ok(u.ammo > 0);
     assert.equal(assaultAmmunition(s, u).low, true);
@@ -238,7 +238,7 @@ test('an air magazine does not hide an empty ground magazine', () => {
 
 test('an operation can physically seek a distant finite box and recall cancels its trip', () => {
   const s = E.createGame(8131, { mode: 'multiplayer' });
-  const u = E.makeGround(s, 0, 'infantry', -700, -80);
+  const u = E.makeGround(s, 0, 'infantry', -892, -80);
   s.groundUnits.push(u);
   u.groundAmmo = u.ammoReserve = 0;
   u.stance = { mode: 'attack' };
@@ -247,7 +247,7 @@ test('an operation can physically seek a distant finite box and recall cancels i
     id: s.nextId++,
     side: 0,
     key: 'ammo-crate',
-    x: -1000,
+    x: -1192,
     z: -80,
     hp: 100,
     maxHp: 100,
@@ -269,7 +269,7 @@ test('an operation can physically seek a distant finite box and recall cancels i
 
 test('an unreachable stocked box does not prevent the operation returning to its own line', () => {
   const s = E.createGame(8131, { mode: 'multiplayer' });
-  const u = E.makeGround(s, 0, 'infantry', 700, -80);
+  const u = E.makeGround(s, 0, 'infantry', 892, -80);
   s.groundUnits.push(u);
   u.groundAmmo = u.ammoReserve = 0;
   u.stance = { mode: 'attack' };
@@ -297,19 +297,19 @@ for (const key of ['infantry', 'mog'])
   for (const mode of ['attackmove', 'guard'])
     test(`manual ${key} ${mode} physically resupplies, saves and keeps its original destination`, () => {
       const s = E.createGame(8131, { mode: 'multiplayer' });
-      const u = E.makeGround(s, 0, key, -900, -80);
+      const u = E.makeGround(s, 0, key, -1092, -80);
       s.groundUnits.push(u);
       if (mode === 'guard') {
-        u.guard = { x: -900, z: -80 };
+        u.guard = { x: -1092, z: -80 };
         u.order = { ...u.guard, mode: 'guard' };
-      } else assert.equal(E.orderGround(s, 0, [u.id], { x: -700, z: -80, mode }), 1);
+      } else assert.equal(E.orderGround(s, 0, [u.id], { x: -892, z: -80, mode }), 1);
       const original = { ...u.order };
       u.groundAmmo = u.ammoReserve = 0;
       const crate = {
         id: s.nextId++,
         side: 0,
         key: 'ammo-crate',
-        x: -1100,
+        x: -1292,
         z: -80,
         hp: 100,
         maxHp: 100,
@@ -340,6 +340,6 @@ for (const key of ['infantry', 'mog'])
         assert.equal(u.order.x, original.x);
         assert.equal(u.order.z, original.z);
       }
-      assert.equal(E.orderGround(s, 0, [u.id], { x: -800, z: -80, mode: 'move' }), 1);
+      assert.equal(E.orderGround(s, 0, [u.id], { x: -992, z: -80, mode: 'move' }), 1);
       assert.equal(u.supplyTrip, undefined);
     });

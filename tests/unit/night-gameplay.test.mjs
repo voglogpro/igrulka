@@ -36,9 +36,9 @@ function unit(s, side, key, x, z) {
 
 test('veterans gain finite experience only from actual enemy damage and a single defeat', () => {
   const s = fresh();
-  const shooter = unit(s, 0, 'machinegunner', -830, 250);
-  const enemy = unit(s, 1, 'infantry', -780, 250);
-  const friendly = unit(s, 0, 'infantry', -780, 255);
+  const shooter = unit(s, 0, 'machinegunner', -1022, 250);
+  const enemy = unit(s, 1, 'infantry', -972, 250);
+  const friendly = unit(s, 0, 'infantry', -972, 255);
   const projectile = {
     source: shooter.id,
     side: 0,
@@ -71,12 +71,12 @@ test('veterans gain finite experience only from actual enemy damage and a single
 
 test('guard line assigns posts and a direct order takes precedence', () => {
   const s = fresh();
-  const a = unit(s, 0, 'infantry', -910, 250);
-  const b = unit(s, 0, 'infantry', -900, 270);
-  assert.equal(defendLineGround(s, 0, [a.id, b.id], { x: -900, z: 250 }, { x: -800, z: 250 }), 2);
-  assert.deepEqual(a.guard, { x: -900, z: 250 });
-  assert.deepEqual(b.guard, { x: -800, z: 250 });
-  assert.equal(game.orderGround(s, 0, [a.id], { x: -850, z: 310 }), 1);
+  const a = unit(s, 0, 'infantry', -1102, 250);
+  const b = unit(s, 0, 'infantry', -1092, 270);
+  assert.equal(defendLineGround(s, 0, [a.id, b.id], { x: -1092, z: 250 }, { x: -992, z: 250 }), 2);
+  assert.deepEqual(a.guard, { x: -1092, z: 250 });
+  assert.deepEqual(b.guard, { x: -992, z: 250 });
+  assert.equal(game.orderGround(s, 0, [a.id], { x: -1042, z: 310 }), 1);
   assert.equal(a.guard, null);
   assert.ok(b.guard);
   assert.equal(game.commandUnits(s, 0, [b.id], 'stop'), 1);
@@ -85,68 +85,68 @@ test('guard line assigns posts and a direct order takes precedence', () => {
 
 test('guard intercepts nearby threat and returns to its post when safe', () => {
   const s = fresh();
-  const guard = unit(s, 0, 'assault', -810, 250);
-  const enemy = unit(s, 1, 'infantry', -710, 250);
+  const guard = unit(s, 0, 'assault', -1002, 250);
+  const enemy = unit(s, 1, 'infantry', -902, 250);
   enemy.holdFire = true;
   guard.holdFire = true;
-  assert.equal(guardGround(s, 0, [guard.id], { x: -810, z: 250 }), 1);
+  assert.equal(guardGround(s, 0, [guard.id], { x: -1002, z: 250 }), 1);
   game.advance(s, 0.5);
   assert.equal(guard.guardTargetId, null);
   guard.holdFire = false;
-  enemy.x = -725;
+  enemy.x = -917;
   game.advance(s, 0.8);
   assert.equal(guard.guardTargetId, enemy.id);
   enemy.hp = 0;
   game.advance(s, 5);
   assert.equal(guard.guardTargetId, null);
-  assert.ok(Math.hypot(guard.x + 810, guard.z - 250) <= 3);
+  assert.ok(Math.hypot(guard.x + 1002, guard.z - 250) <= 3);
   assert.equal(guard.order.mode, 'guard');
 });
 
 test('a guard helps an adjacent post but holds fire when ordered', () => {
   const s = fresh();
-  const helper = unit(s, 0, 'assault', -860, 230);
-  const neighbor = unit(s, 0, 'infantry', -795, 230);
-  const enemy = unit(s, 1, 'infantry', -740, 230);
+  const helper = unit(s, 0, 'assault', -1052, 230);
+  const neighbor = unit(s, 0, 'infantry', -987, 230);
+  const enemy = unit(s, 1, 'infantry', -932, 230);
   enemy.holdFire = true;
   neighbor.holdFire = true;
-  assert.equal(guardGround(s, 0, [helper.id], { x: -860, z: 230 }), 1);
-  assert.equal(guardGround(s, 0, [neighbor.id], { x: -795, z: 230 }), 1);
+  assert.equal(guardGround(s, 0, [helper.id], { x: -1052, z: 230 }), 1);
+  assert.equal(guardGround(s, 0, [neighbor.id], { x: -987, z: 230 }), 1);
   game.advance(s, 0.8);
   assert.equal(helper.guardTargetId, enemy.id);
   helper.holdFire = true;
   game.advance(s, 1);
   assert.equal(helper.guardTargetId, null);
-  assert.ok(Math.hypot(helper.x + 860, helper.z - 230) <= 3);
+  assert.ok(Math.hypot(helper.x + 1052, helper.z - 230) <= 3);
 });
 
 test('guard abandons a chase past its leash and returns without a fresh command', () => {
   const s = fresh();
-  const defender = unit(s, 0, 'assault', -810, 250);
-  const enemy = unit(s, 1, 'infantry', -730, 250);
+  const defender = unit(s, 0, 'assault', -1002, 250);
+  const enemy = unit(s, 1, 'infantry', -922, 250);
   enemy.holdFire = true;
-  assert.equal(guardGround(s, 0, [defender.id], { x: -810, z: 250 }), 1);
+  assert.equal(guardGround(s, 0, [defender.id], { x: -1002, z: 250 }), 1);
   game.advance(s, 0.8);
   assert.equal(defender.guardTargetId, enemy.id);
-  enemy.x = -600;
+  enemy.x = -792;
   game.advance(s, 5);
   assert.equal(defender.guardTargetId, null);
   assert.equal(defender.order.mode, 'guard');
-  assert.ok(Math.hypot(defender.x + 810, defender.z - 250) <= 3);
+  assert.ok(Math.hypot(defender.x + 1002, defender.z - 250) <= 3);
 });
 
 test('an actual aircraft hit grants experience to the surviving shooter once', () => {
   const s = fresh();
-  const shooter = unit(s, 0, 'mog', -850, 250);
+  const shooter = unit(s, 0, 'mog', -1042, 250);
   const drone = {
     id: s.nextId++,
     key: 'drone',
     side: 1,
     hp: 3,
-    x: -800,
+    x: -992,
     y: 20,
     z: 250,
-    prevX: -800,
+    prevX: -992,
     prevY: 20,
     prevZ: 250,
     delay: 0,
@@ -157,7 +157,7 @@ test('an actual aircraft hit grants experience to the surviving shooter once', (
     sourceId: shooter.id,
     side: 0,
     kind: 'bullet',
-    x: -805,
+    x: -997,
     y: 20,
     z: 250,
     vx: 100,
@@ -177,14 +177,14 @@ test('an actual aircraft hit grants experience to the surviving shooter once', (
 test('experienced mobile AA applies its rank when firing at a real airborne target', () => {
   function firstSpread(xp) {
     const s = fresh();
-    const shooter = unit(s, 0, 'shilka', -830, 250);
+    const shooter = unit(s, 0, 'shilka', -1022, 250);
     shooter.xp = xp;
     s.units.push({
       id: s.nextId++,
       key: 'drone',
       side: 1,
       hp: 30,
-      x: -780,
+      x: -972,
       y: 40,
       z: 250,
       delay: 0,
@@ -206,7 +206,7 @@ test('experienced mobile AA applies its rank when firing at a real airborne targ
 
 test('desired army replacement pays ordinary costs, preserves reserves and never erases paid recruits', () => {
   const s = fresh();
-  const b = game.build(s, 0, 'barracks', -1080, -10);
+  const b = game.build(s, 0, 'barracks', -1272, -10);
   assert.notEqual(typeof b, 'string', b);
   b.hp = b.maxHp;
   b.progress = 1;
@@ -237,11 +237,11 @@ test('desired army replacement pays ordinary costs, preserves reserves and never
 test('barracks can send recruits to guard, wait, or move with combat to rally', () => {
   for (const mode of ['guard', 'wait', 'attackmove']) {
     const s = fresh();
-    const b = game.build(s, 0, 'barracks', -1080, -10);
+    const b = game.build(s, 0, 'barracks', -1272, -10);
     assert.notEqual(typeof b, 'string', b);
     b.hp = b.maxHp;
     b.progress = 1;
-    const rally = { x: -900, z: -40 };
+    const rally = { x: -1092, z: -40 };
     assert.equal(game.setRally(s, 0, b.id, rally), true);
     if (mode !== 'guard') assert.equal(setRallyMode(s, 0, b.id, mode), true);
     assert.equal(game.recruit(s, 0, 'infantry', b.id), true);
@@ -269,7 +269,7 @@ test('barracks can send recruits to guard, wait, or move with combat to rally', 
 
 test('default rally guards human troops and lets the solo bot enter the shared depot commander', () => {
   const s = fresh();
-  const b = game.build(s, 1, 'barracks', 1080, -10);
+  const b = game.build(s, 1, 'barracks', 1272, -10);
   assert.notEqual(typeof b, 'string', b);
   b.hp = b.maxHp;
   b.progress = 1;
@@ -279,7 +279,7 @@ test('default rally guards human troops and lets the solo bot enter the shared d
   game.advance(s, 0.1);
   const first = s.groundUnits.find((u) => u.side === 1);
   assert.equal(first.guard ?? null, null);
-  for (let i = 0; i < 6; i++) unit(s, 1, 'infantry', 900, 200 + i * 8);
+  for (let i = 0; i < 6; i++) unit(s, 1, 'infantry', 1092, 200 + i * 8);
   s.ai.nextArmy = 0;
   s.time = 231;
   game.advance(s, 0.1);
@@ -309,7 +309,7 @@ test('default rally guards human troops and lets the solo bot enter the shared d
 
 test('a city wall gives directional cover while flanks and blasts remain exposed', () => {
   const s = fresh();
-  const b = game.build(s, 0, 'launcher', -750, 100);
+  const b = game.build(s, 0, 'launcher', -942, 100);
   assert.notEqual(typeof b, 'string', b);
   b.hp = b.maxHp;
   b.progress = 1;
@@ -337,7 +337,7 @@ test('a city wall gives directional cover while flanks and blasts remain exposed
 
 test('a single guard seeks nearby cover; a drawn defense line keeps exact posts', () => {
   const s = fresh();
-  const b = game.build(s, 0, 'launcher', -750, 100);
+  const b = game.build(s, 0, 'launcher', -942, 100);
   assert.notEqual(typeof b, 'string', b);
   b.hp = b.maxHp;
   b.progress = 1;
@@ -359,14 +359,14 @@ test('a single guard seeks nearby cover; a drawn defense line keeps exact posts'
 
 test('guard yields cleanly to dig, boarding and retreat; MOG packs before changing post', () => {
   const s = fresh();
-  const infantry = unit(s, 0, 'infantry', -850, 280);
-  const apc = unit(s, 0, 'apc', -830, 280);
-  const mog = unit(s, 0, 'mog', -900, 300);
-  assert.equal(guardGround(s, 0, [infantry.id], { x: -850, z: 280 }), 1);
+  const infantry = unit(s, 0, 'infantry', -1042, 280);
+  const apc = unit(s, 0, 'apc', -1022, 280);
+  const mog = unit(s, 0, 'mog', -1092, 300);
+  assert.equal(guardGround(s, 0, [infantry.id], { x: -1042, z: 280 }), 1);
   assert.equal(game.commandUnits(s, 0, [infantry.id], 'dig'), 1);
   assert.equal(infantry.guard, null);
   assert.ok(infantry.digging);
-  assert.equal(guardGround(s, 0, [infantry.id], { x: -850, z: 280 }), 1);
+  assert.equal(guardGround(s, 0, [infantry.id], { x: -1042, z: 280 }), 1);
   assert.equal(infantry.digging, false);
   assert.equal(game.boardGround(s, 0, [infantry.id], apc.id), 1);
   assert.equal(infantry.guard, null);
@@ -380,7 +380,7 @@ test('guard yields cleanly to dig, boarding and retreat; MOG packs before changi
   mog.holdFire = true;
   game.advance(s, 3.2);
   assert.equal(mog.setup, 1);
-  assert.equal(guardGround(s, 0, [mog.id], { x: -850, z: 300 }), 1);
+  assert.equal(guardGround(s, 0, [mog.id], { x: -1042, z: 300 }), 1);
   game.advance(s, 0.2);
   assert.equal(mog.setup, 0);
 });

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as E from '../../src/game/index.js';
-import { expandLegacyX } from '../../src/game/map.js';
+import { expandLegacyX, expandV23X } from '../../src/game/map.js';
 import { pointOnRoute } from '../../src/game/units/aviation/routes.js';
 import { moveUnits } from '../../src/game/units/aviation/flight.js';
 const fixture = () =>
@@ -30,7 +30,7 @@ test('actual exported 8.8 city migrates facilities, paid work, health and explic
   assert.deepEqual(s.sides[0].armyComposition.targets, { infantry: 12 });
   for (const old of before.buildings.filter((b) => b.key !== 'lab')) {
     const current = s.buildings.find((b) => b.id === old.id);
-    assert.equal(current.x, expandLegacyX(old.x));
+    assert.equal(current.x, expandV23X(expandLegacyX(old.x)));
     assert.equal(current.z, old.z);
     assert.deepEqual(current.queue, old.queue);
     assert.deepEqual(current.armyQueue, old.armyQueue);

@@ -73,6 +73,24 @@ function template(stage) {
         );
         if (i % 3 === 0) add(x + 0.2, 0.86, side * width, 0.95, 0.25, 0.61, '#7a6b4f', true);
       }
+  } else if (stage === 3) {
+    // Covered strongpoint: a log-roofed dugout behind the firing trench under a layer of earth.
+    // It stays low and behind the three firing places, so occupants remain readable.
+    const back = -width * 2.6;
+    for (let i = 0; i < 8; i++)
+      add(-3.15 + i * 0.9, 0.95, back, 0.62, 0.36, 3.4, i % 2 ? '#5d4a33' : '#6b5539');
+    add(0, 1.2, back, 8, 0.45, 3.9, '#5f5640', true);
+    add(0, 1.38, back, 5.6, 0.36, 3, '#6d6449', true);
+    for (const x of [-4.1, 4.1]) add(x, 0, back, 0.35, 1.1, 3.2, '#4c3d2b');
+    for (const side of [-1, 1]) add(side * 7.6, 0.4, width * 0.9, 1.3, 0.55, 0.9, '#8b7b5c', true);
+  } else if (stage === 4) {
+    // Fort: a low concrete pillbox on the flank with embrasures and a concrete rear revetment.
+    const flank = TRENCH_FOOTPRINT.halfCore + width * 0.9;
+    add(flank, 0, 0, 4.2, 1.45, 4.4, '#8c8d86');
+    add(flank, 1.45, 0, 4.7, 0.3, 4.9, '#9a9b93');
+    add(flank, 0.85, width * 1.02, 2.8, 0.22, 0.12, '#2d2f2c');
+    add(flank + 2.13, 0.85, 0, 0.12, 0.22, 2.6, '#2d2f2c');
+    for (const x of [-6, -3, 0, 3]) add(x, 0, -width * 1.15, 2.6, 0.95, 0.35, '#878881');
   } else {
     for (const side of [-1, 1]) {
       for (let row = 0; row < 2; row++)
@@ -96,7 +114,7 @@ function template(stage) {
   return root.children[0];
 }
 
-// Three fixed batches replace one mesh tree per position. Advancement changes instance counts.
+// Five fixed batches replace one mesh tree per position. Advancement changes instance counts.
 export class FortificationView {
   constructor(scene, { height = () => 0, visible = () => true } = {}) {
     this.height = height;
@@ -105,7 +123,7 @@ export class FortificationView {
     this.seen = new Set();
     this.dummy = new T.Object3D();
     this.capacity = FORTIFICATION.maxPositions;
-    this.pools = Array.from({ length: 3 }, (_, stage) => {
+    this.pools = Array.from({ length: 5 }, (_, stage) => {
       const model = template(stage),
         mesh = new T.InstancedMesh(model.geometry, model.material, this.capacity);
       mesh.count = 0;
@@ -178,7 +196,7 @@ export class FortificationView {
         this.models.delete(id);
         dirty = shadowsChanged = true;
       }
-    const counts = [0, 0, 0];
+    const counts = [0, 0, 0, 0, 0];
     if (dirty)
       for (const record of this.models.values()) {
         const d = this.dummy;
@@ -191,9 +209,11 @@ export class FortificationView {
         d.updateMatrix();
         if (record.level >= 2) this.pools[1].setMatrixAt(counts[1]++, d.matrix);
         if (record.level >= 3) this.pools[2].setMatrixAt(counts[2]++, d.matrix);
+        if (record.level >= 4) this.pools[3].setMatrixAt(counts[3]++, d.matrix);
+        if (record.level >= 5) this.pools[4].setMatrixAt(counts[4]++, d.matrix);
       }
     if (dirty)
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < this.pools.length; i++) {
         const mesh = this.pools[i];
         mesh.count = counts[i];
         mesh.visible = mesh.count > 0;
@@ -217,7 +237,7 @@ export class FortificationView {
         ...Array.from(this.models.values(), (record) => record.terrainDeviation),
       ),
       links: this.links.diagnostics(),
-      batches: 6,
+      batches: 8,
     };
   }
   dispose() {

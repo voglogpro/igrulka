@@ -1,4 +1,5 @@
 import { VERSION, HQ_X } from './config.js';
+import { HQ_Z } from './map.js';
 import { campRoads } from './city/roads.js';
 import { log } from './shared/events.js';
 import { createDistricts } from './territory/state.js';
@@ -53,7 +54,7 @@ export function createGame(
       side,
       key: 'hq',
       x: side % 2 ? HQ_X : -HQ_X,
-      z: count === 4 ? (side < 2 ? -HQ_X : HQ_X) : 0,
+      z: count === 4 ? (side < 2 ? -HQ_Z : HQ_Z) : 0,
       hp: 1100,
       maxHp: 1100,
       progress: 1,

@@ -50,10 +50,10 @@ function ground(s, key, x, z, side = 0) {
   return u;
 }
 function target(s, key = 'heavy') {
-  const site = ready(s, 1, ['cruise', 'ballistic'].includes(key) ? 'silo' : 'launcher', -665, 175);
+  const site = ready(s, 1, ['cruise', 'ballistic'].includes(key) ? 'silo' : 'launcher', -857, 175);
   s.sides[1].inventory[key] = 1;
   stage(s, site, key, 1);
-  E.launch(s, 1, key, { x: -1100, z: 100 });
+  E.launch(s, 1, key, { x: -1292, z: 100 });
   E.advance(s, 0.1);
   const u = s.units[0];
   u.hp = u.maxHp = 1e7;
@@ -62,7 +62,7 @@ function target(s, key = 'heavy') {
 }
 test('gun magazines empty, reload without firing, then resume with a full magazine', () => {
   const s = fresh(),
-    b = ready(s, 0, 'gun', -700, 100);
+    b = ready(s, 0, 'gun', -892, 100);
   target(s);
   b.groundAmmo = 1;
   E.advance(s, 0.1);
@@ -77,7 +77,7 @@ test('gun magazines empty, reload without firing, then resume with a full magazi
 });
 test('continuous fire heats a gun, worsens spread, and quiet time cools it', () => {
   const s = fresh(),
-    b = ready(s, 0, 'gun', -700, 100);
+    b = ready(s, 0, 'gun', -892, 100);
   target(s);
   s.sides[0].tech = [];
   E.advance(s, 2);
@@ -95,7 +95,7 @@ test('all gun systems and infantry ignore cruise and ballistic missiles, includi
     for (const missile of ['cruise', 'ballistic'])
       assert.equal(E.canEngageAir(key, missile, true), false);
   const s = fresh(),
-    b = ready(s, 0, 'gun', -700, 100),
+    b = ready(s, 0, 'gun', -892, 100),
     u = target(s, 'cruise');
   E.advance(s, 1);
   assert.equal(s.stats.shots, 0);
@@ -126,7 +126,7 @@ test('all gun systems and infantry ignore cruise and ballistic missiles, includi
 });
 test('cash upgrades improve accuracy, range and rate while preserving damage and health', () => {
   const s = fresh(),
-    b = ready(s, 0, 'sam', -700, 100);
+    b = ready(s, 0, 'sam', -892, 100);
   const cash = s.sides[0].credits,
     metal = s.sides[0].materials;
   const initial = E.defenseStats(s.sides[0], b),
@@ -153,13 +153,13 @@ test('cash upgrades improve accuracy, range and rate while preserving damage and
 });
 test('waypoints produce a longer smooth flank route and each launched order snapshots its own path', () => {
   const s = fresh(),
-    site = ready(s, 0, 'launcher', -800, 0),
+    site = ready(s, 0, 'launcher', -992, 0),
     aim = {
-      x: 1000,
+      x: 1192,
       z: 0,
       waypoints: [
         { x: -180, z: -400 },
-        { x: 800, z: -400 },
+        { x: 992, z: -400 },
       ],
     };
   s.sides[0].inventory.drone = 2;
@@ -175,18 +175,18 @@ test('waypoints produce a longer smooth flank route and each launched order snap
   const loaded = E.load(E.save(s));
   assert.deepEqual(loaded.units[0].route, u.route);
   assert.equal(
-    E.launchStatus(s, 0, 'drone', { x: 1000, z: 0, waypoints: [{ x: NaN, z: 0 }] }),
+    E.launchStatus(s, 0, 'drone', { x: 1192, z: 0, waypoints: [{ x: NaN, z: 0 }] }),
     'Укажите точку в пределах карты',
   );
 });
 test('ballistic missiles ignore flank points and retain ordinary fixed statistics', () => {
   const s = fresh(),
-    site = ready(s, 0, 'silo', -800, 0);
+    site = ready(s, 0, 'silo', -992, 0);
   s.sides[0].inventory.ballistic = 1;
   stage(s, site, 'ballistic', 1);
-  E.launch(s, 0, 'ballistic', { x: 1000, z: 0, waypoints: [{ x: 0, z: 500 }] });
+  E.launch(s, 0, 'ballistic', { x: 1192, z: 0, waypoints: [{ x: 0, z: 500 }] });
   const u = s.units[0];
-  assert.equal(u.total, 1800);
+  assert.equal(u.total, 2184);
   assert.equal(u.speed, E.WEAPONS.ballistic.speed);
   assert.equal(u.maxHp, E.WEAPONS.ballistic.hp);
   assert.equal(u.damage, E.WEAPONS.ballistic.damage);
@@ -194,8 +194,8 @@ test('ballistic missiles ignore flank points and retain ordinary fixed statistic
 });
 test('barracks and armour base produce paid roles, charge upkeep and preserve their queues', () => {
   const s = fresh(),
-    b = ready(s, 0, 'barracks', -1080, -10),
-    v = ready(s, 0, 'vehiclebase', -950, -10),
+    b = ready(s, 0, 'barracks', -1272, -10),
+    v = ready(s, 0, 'vehiclebase', -1142, -10),
     money = s.sides[0].credits;
   assert.equal(E.recruit(s, 0, 'infantry'), true);
   assert.equal(s.sides[0].credits, money - E.GROUND_UNITS.infantry.cost);
@@ -213,8 +213,8 @@ test('barracks and armour base produce paid roles, charge upkeep and preserve th
 });
 test('ground navigation goes around the sea through a land corridor and avoids building corners', () => {
   const s = fresh();
-  ready(s, 0, 'launcher', -700, -120);
-  const path = E.groundPath(s, { x: -900, z: 0 }, { x: 900, z: 0 }, 4);
+  ready(s, 0, 'launcher', -892, -120);
+  const path = E.groundPath(s, { x: -1092, z: 0 }, { x: 1092, z: 0 }, 4);
   assert.ok(path.length > 20);
   assert.ok(path.every((p) => E.walkable(s, p.x, p.z, 4)));
   assert.ok(path.every((p) => E.seaDistance(p.x, p.z) > 0));
@@ -229,11 +229,11 @@ test('ground navigation goes around the sea through a land corridor and avoids b
 });
 test('orders actually move soldiers through a corridor, tanks damage an enemy HQ and blasts damage troops', () => {
   const s = fresh(),
-    u = ground(s, 'infantry', -900, 0);
-  assert.equal(E.orderGround(s, 0, [u.id], { x: 850, z: 0 }), 1);
+    u = ground(s, 'infantry', -1092, 0);
+  assert.equal(E.orderGround(s, 0, [u.id], { x: 1042, z: 0 }), 1);
   E.advance(s, 220);
   assert.ok(u.x > 200, JSON.stringify(u));
-  const tank = ground(s, 'leopard', 900, 0),
+  const tank = ground(s, 'leopard', 1092, 0),
     hq = s.buildings[1],
     hp = hq.hp;
   E.advance(s, 6);
@@ -243,7 +243,7 @@ test('orders actually move soldiers through a corridor, tanks damage an enemy HQ
 });
 test('city building output matches the total economy and exposes road, health and power factors', () => {
   const s = fresh(),
-    b = ready(s, 0, 'housing', -1015, -80),
+    b = ready(s, 0, 'housing', -1207, -80),
     o = E.buildingOutput(s, b),
     e = E.economy(s, 0);
   assert.equal(o.income, e.gross - 1.8);
@@ -251,12 +251,12 @@ test('city building output matches the total economy and exposes road, health an
   b.hp = b.maxHp * 0.5;
   assert.ok(E.buildingOutput(s, b).income < o.income);
   const noArmy = E.economy(s, 0).upkeep;
-  ground(s, 'gepard', -800, 0);
+  ground(s, 'gepard', -992, 0);
   assert.ok(Math.abs(E.economy(s, 0).upkeep - noArmy - 0.45) < 1e-8);
 });
 test('v6 campaigns migrate without losing buildings, credits, flights or construction', () => {
   const s = fresh();
-  ready(s, 0, 'housing', -1015, -80);
+  ready(s, 0, 'housing', -1207, -80);
   s.version = 6;
   delete s.groundUnits;
   const copy = E.load(E.save(s));
@@ -266,7 +266,7 @@ test('v6 campaigns migrate without losing buildings, credits, flights or constru
     s.buildings.map(({ x, ...b }) => b),
   );
   for (let i = 0; i < s.buildings.length; i++)
-    assert.equal(copy.buildings[i].x, s.buildings[i].x + Math.sign(s.buildings[i].x) * 400);
+    assert.equal(copy.buildings[i].x, s.buildings[i].x + Math.sign(s.buildings[i].x) * 592);
   assert.deepEqual(
     copy.sides,
     s.sides.map((f) => ({ ...f, science: 0 })),
@@ -280,14 +280,14 @@ test('day/night follows simulation time, repeats after twenty minutes and never 
 });
 test('aircraft cap and local army queue refuse excess orders before charging', () => {
   const s = fresh(),
-    site = ready(s, 0, 'launcher', -800, 0);
+    site = ready(s, 0, 'launcher', -992, 0);
   s.sides[0].inventory.drone = 10;
   for (let i = 0; i < 120; i++) s.units.push({ id: s.nextId++, side: 0, hp: 1, launched: true });
   const stock = s.sides[0].inventory.drone;
-  assert.equal(typeof E.launch(s, 0, 'drone', { x: 1000, z: 0 }), 'string');
+  assert.equal(typeof E.launch(s, 0, 'drone', { x: 1192, z: 0 }), 'string');
   assert.equal(s.sides[0].inventory.drone, stock);
-  const b = ready(s, 0, 'barracks', -1080, -10);
-  for (let i = 0; i < 130; i++) ground(s, 'infantry', -900, 400);
+  const b = ready(s, 0, 'barracks', -1272, -10);
+  for (let i = 0; i < 130; i++) ground(s, 'infantry', -1092, 400);
   for (let i = 0; i < 7; i++) assert.equal(E.recruit(s, 0, 'infantry'), true);
   assert.equal(E.recruit(s, 0, 'infantry'), true);
   const credits = s.sides[0].credits;
@@ -297,7 +297,7 @@ test('aircraft cap and local army queue refuse excess orders before charging', (
 test('mobile AA and infantry fire at drones, Leopard remains ground-only, and a group order spreads arrivals', () => {
   for (const key of ['infantry', 'shilka', 'gepard']) {
     const s = fresh(),
-      u = ground(s, key, -700, 100);
+      u = ground(s, key, -892, 100);
     target(s);
     E.advance(s, 1);
     assert.ok(s.stats.shots > 0, key);
@@ -309,8 +309,8 @@ test('mobile AA and infantry fire at drones, Leopard remains ground-only, and a 
   }
   assert.equal(E.canEngageAir('leopard', 'drone'), false);
   const s = fresh(),
-    a = ground(s, 'infantry', -900, 0),
-    b = ground(s, 'leopard', -850, 0);
-  assert.equal(E.orderGround(s, 0, [a.id, b.id], { x: -700, z: 0 }), 2);
+    a = ground(s, 'infantry', -1092, 0),
+    b = ground(s, 'leopard', -1042, 0);
+  assert.equal(E.orderGround(s, 0, [a.id, b.id], { x: -892, z: 0 }), 2);
   assert.notEqual(a.order.x, b.order.x);
 });

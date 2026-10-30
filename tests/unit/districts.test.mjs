@@ -140,7 +140,7 @@ test('abandoned partial neutral capture decays, while established ownership pers
   const s = fresh(),
     u = soldier(s, 0);
   E.advance(s, 5);
-  u.x = -600;
+  u.x = -792;
   u.z = -300;
   E.advance(s, 10);
   near(s.districts[0].control, 0);
@@ -153,8 +153,8 @@ test('abandoned partial neutral capture decays, while established ownership pers
 
 test('capture orders send real units to separate nearby posts and eventually take the site', () => {
   const s = fresh(),
-    a = soldier(s, 0, { x: -500, z: E.CORRIDORS[0] });
-  const b = soldier(s, 0, { x: -510, z: E.CORRIDORS[0] - 20 });
+    a = soldier(s, 0, { x: -692, z: E.CORRIDORS[0] });
+  const b = soldier(s, 0, { x: -702, z: E.CORRIDORS[0] - 20 });
   assert.equal(E.captureDistrict(s, 0, [a.id, b.id], E.DISTRICTS[0].id), 2);
   assert.notDeepEqual(a.guard, b.guard);
   assert.ok(a.path.length);
@@ -191,7 +191,7 @@ test('repair consumes real resources, pauses under enemy presence and stops at f
   assert.equal(E.setDistrictRepair(s, 0, d.id, true), true);
   E.advance(s, 1);
   assert.equal(d.hp, 0);
-  enemy.x = 600;
+  enemy.x = 792;
   enemy.z = 300;
   s.sides[0].credits = 1000;
   s.sides[0].materials = 100;
@@ -242,7 +242,7 @@ test('version eight imports neutral sites without altering troops, stockpiles or
   assert.deepEqual(restored.sides, s.sides);
   assert.deepEqual(
     restored.groundUnits,
-    s.groundUnits.map((u) => ({ ...u, x: u.x - 400 })),
+    s.groundUnits.map((u) => ({ ...u, x: u.x - 592 })),
   );
   assert.equal(restored.districts.length, 2);
   assert.ok(restored.districts.every((d) => d.owner == null));
@@ -326,7 +326,7 @@ test('side one perspective flips control and ownership without changing the site
 
 test('the command gateway binds district capture and repair to the real player side', () => {
   const s = fresh(),
-    u = soldier(s, 1, { x: 900, z: 250 });
+    u = soldier(s, 1, { x: 1092, z: 250 });
   assert.equal(executeCommand(s, 1, 'district', { ids: [u.id], id: 'south-depot' }), 1);
   assert.equal(
     typeof executeCommand(s, 0, 'district', { ids: [u.id], id: 'south-depot' }),

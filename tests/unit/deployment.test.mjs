@@ -9,7 +9,7 @@ import {
   retargetSquadReserves,
 } from '../../src/game/units/ground/squads.js';
 
-const goal = { x: -800, z: 250 };
+const goal = { x: -992, z: 250 };
 const canonical = (p) => ({ ...p, mode: 'attackmove' });
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 function fresh() {
@@ -21,7 +21,7 @@ function fresh() {
   }
   return s;
 }
-function barracks(s, side = 0, x = side ? 1080 : -1080, key = 'barracks') {
+function barracks(s, side = 0, x = side ? 1272 : -1272, key = 'barracks') {
   const b = E.build(s, side, key, x, -10);
   assert.notEqual(typeof b, 'string', b);
   b.progress = 1;
@@ -82,7 +82,7 @@ test('invalid types, counts, owners, destinations and sites cannot spend money, 
 test('automatic deployment chooses an available reachable barracks and preserves paid queues at the others', () => {
   const s = fresh(),
     a = barracks(s),
-    b = barracks(s, 0, -950);
+    b = barracks(s, 0, -1142);
   assert.equal(deploymentPlan(s, 0, 'infantry', goal, 2).siteId, b.id);
   b.armyQueue = Array.from({ length: 8 }, () => ({ key: 'infantry', progress: 0.2 }));
   const before = structuredClone(b.armyQueue);
@@ -134,19 +134,19 @@ test('a batch needs room for every slot and cannot buy an order beyond blocked c
       obstacles.push(b);
     }
   s.networkRevision++;
-  assert.equal(deploymentPlan(s, 0, 'infantry', { x: 900, z: 250 }, 1).ok, false);
+  assert.equal(deploymentPlan(s, 0, 'infantry', { x: 1092, z: 250 }, 1).ok, false);
   for (const b of obstacles) {
     b.hp = 0;
     b.demolished = true;
   }
   s.networkRevision++;
-  assert.equal(deploymentPlan(s, 0, 'infantry', { x: 900, z: 250 }, 1).ok, true);
+  assert.equal(deploymentPlan(s, 0, 'infantry', { x: 1092, z: 250 }, 1).ok, true);
 });
 
 test('five paid recruits really spawn, walk to different slots and form one persistent squad', () => {
   for (const key of ['infantry', 'apc']) {
     const s = fresh(),
-      b = barracks(s, 0, -1080, key === 'infantry' ? 'barracks' : 'vehiclebase');
+      b = barracks(s, 0, -1272, key === 'infantry' ? 'barracks' : 'vehiclebase');
     const f = s.sides[0],
       before = { credits: f.credits, materials: f.materials };
     const result = deployGround(s, 0, key, goal, 5, b.id);
@@ -180,7 +180,7 @@ test('each batch has a separate id, and fully queued squads cannot all be redire
   const s = fresh(),
     b = barracks(s);
   const a = deployGround(s, 0, 'infantry', goal, 2, b.id);
-  const next = deployGround(s, 0, 'infantry', { x: -850, z: 350 }, 2, b.id);
+  const next = deployGround(s, 0, 'infantry', { x: -1042, z: 350 }, 2, b.id);
   assert.notEqual(a.squadId, next.squadId);
   assert.deepEqual(
     squadRoster(s, 0).map((q) => [q.id, q.ids.length, q.queued]),
@@ -190,7 +190,7 @@ test('each batch has a separate id, and fully queued squads cannot all be redire
     ],
   );
   const before = E.save(s);
-  assert.equal(retargetSquadReserves(s, 0, [], { x: -700, z: 300 }), 0);
+  assert.equal(retargetSquadReserves(s, 0, [], { x: -892, z: 300 }), 0);
   assert.equal(E.save(s), before);
 });
 
@@ -202,7 +202,7 @@ test('only a complete field selection redirects paid reinforcements, without alt
   const first = units(s, result.squadId)[0];
   assert.ok(first);
   assert.equal(b.armyQueue.length, 2);
-  const next = { x: -750, z: 350 },
+  const next = { x: -942, z: 350 },
     order = structuredClone(first.order);
   assert.equal(retargetSquadReserves(s, 0, [first.id], next), 1);
   assert.deepEqual(
@@ -216,7 +216,7 @@ test('only a complete field selection redirects paid reinforcements, without alt
   assert.equal(field.length, 2);
   assert.equal(b.armyQueue.length, 1);
   const before = E.save(s);
-  assert.equal(retargetSquadReserves(s, 0, [first.id], { x: -700, z: 400 }), 0);
+  assert.equal(retargetSquadReserves(s, 0, [first.id], { x: -892, z: 400 }), 0);
   assert.equal(E.save(s), before);
   assert.equal(
     retargetSquadReserves(
@@ -232,11 +232,11 @@ test('only a complete field selection redirects paid reinforcements, without alt
       s,
       0,
       field.map((u) => u.id),
-      { x: -700, z: 400 },
+      { x: -892, z: 400 },
     ),
     1,
   );
-  assert.equal(b.armyQueue[0].destination.x, -700);
+  assert.equal(b.armyQueue[0].destination.x, -892);
 });
 
 test('explicitly cleared squad destinations wait at base while legacy recruit retains normal rally', () => {
@@ -294,7 +294,7 @@ test('either owner can save a partially trained squad and resume its paid reinfo
   for (const side of [0, 1]) {
     const s = fresh(),
       b = barracks(s, side),
-      point = { x: side ? 800 : -800, z: 250 };
+      point = { x: side ? 992 : -992, z: 250 };
     const result = deployGround(s, side, 'infantry', point, 3, b.id);
     E.advance(s, 4);
     const loaded = E.load(E.save(s));
@@ -321,7 +321,7 @@ test('the command gateway binds paid deployments to either owner and rejects for
   const s = fresh(),
     sites = [barracks(s, 0), barracks(s, 1)];
   for (const side of [0, 1]) {
-    const point = { x: side ? 800 : -800, z: 250 };
+    const point = { x: side ? 992 : -992, z: 250 };
     const accepted = executeCommand(s, side, 'deploy', {
       key: 'infantry',
       point,
@@ -370,14 +370,14 @@ test('gateway orders redirect the complete squad reserves and numeric stop makes
       sign = side ? 1 : -1;
     const accepted = executeCommand(s, side, 'deploy', {
       key: 'infantry',
-      point: { x: sign * 800, z: 250 },
+      point: { x: sign * 992, z: 250 },
       count: 5,
       siteId: b.id,
     });
     E.advance(s, 8);
     const field = units(s, accepted.squadId);
     assert.equal(field.length, 2);
-    const point = { x: sign * 750, z: 350 },
+    const point = { x: sign * 942, z: 350 },
       ids = field.map((u) => u.id);
     assert.equal(
       executeCommand(s, side, 'order', { ids: [ids[0]], aim: { ...point, mode: 'move' } }),
