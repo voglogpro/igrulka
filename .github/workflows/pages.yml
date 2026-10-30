@@ -31,7 +31,7 @@ jobs:
       - name: Prepare standalone game
         run: |
           version=$(node -p "require('./package.json').version")
-          mkdir -p "_site/releases/$version" _site/releases/8.10.3 _site/releases/8.11.0 _site/releases/8.11.1 _site/releases/8.11.2 _site/releases/8.12.0 _site/releases/8.12.1 _site/releases/8.13.0 _site/releases/8.13.1 _site/releases/8.13.2
+          mkdir -p "_site/releases/$version" _site/releases/8.10.3 _site/releases/8.11.0 _site/releases/8.11.1 _site/releases/8.11.2 _site/releases/8.12.0 _site/releases/8.12.1 _site/releases/8.13.0 _site/releases/8.13.1 _site/releases/8.13.2 _site/releases/8.13.3
           cp play/Skyfront.html "_site/releases/$version/index.html"
           # The old running servers advertise the root URL with protocol 10.
           # Keep their client stable while new invitations use a versioned path.
@@ -45,6 +45,7 @@ jobs:
           git show 7d528c937c6364718c1cab763a8a992f2efacfaf:play/Skyfront.html > _site/releases/8.13.0/index.html
           git show cbabc0a4d43d739c8ee44e9cc9ca4af8ea0f66c8:play/Skyfront.html > _site/releases/8.13.1/index.html
           git show b4bf9c4b3305fb51a59a482c121dffb201079186:play/Skyfront.html > _site/releases/8.13.2/index.html
+          git show 761829fa5cbd30453b9aacbb363bf430887e2e27:play/Skyfront.html > _site/releases/8.13.3/index.html
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4

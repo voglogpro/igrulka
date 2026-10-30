@@ -1,5 +1,24 @@
 # Карта кода
 
+## Изменения 8.14.0
+
+| Механика                                                   | Основные файлы                                                                           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Карта 4800×4000, сдвиг берегов, лесополосы и новые поля    | `src/game/map.js` (`expandV23X`, `compressV23X`, `COVER_PATCHES[].belt`)                 |
+| Миграция 22→23 и прежних форматов                          | `src/game/persistence/map-layout.js` (`migrateV23Layout`), `territory/settlements.js`    |
+| Посты на переднем крае лесополосы                          | `src/game/defense/geometry.js` (`treeLinePoint`), `defense/config.js` (`homeLineX`)      |
+| Опорный пункт и форт, цена леса и бетона                   | `src/game/defense/config.js`, `fortifications.js`, `rendering/defense/fortifications.js` |
+| Захват окопов штурмом и закрепление                        | `src/game/units/ground/defense-attack.js` (`seizeTrench`, `ASSAULT`)                     |
+| Режим «Один против двух» и командные правила               | `src/game/state.js`, `factions.js` (`teamOf`, `frontDirection`, `frontIds`)              |
+| Выбор режима на старте и в новой игре                      | `src/ui/app.js`, `ui/session/campaign-actions.js`                                        |
+| Бюджетный арсенал, залпы, подавление ЗРК, прикрытие штурма | `src/game/ai/strike-ai.js`, `city-ai.js`, `army-ai.js` (`ARMY_PACE`)                     |
+
+Состояние 23 и протокол 17. Сторона больше не определяет направление или
+команду через чётность: используйте `teamOf`, `frontDirection`, `frontIds` и
+`onOwnFront`. Сдвиг берегов равен 192 м — целому числу клеток маршрута (24 м)
+и препятствий (64 м), поэтому пути внутри городов не меняются. Сохранения
+старше 23 переводятся `migrateV23Layout` до проверки поселений и нефти.
+
 ## Изменения 8.13.3
 
 | Механика                                               | Основные файлы                                                           |
