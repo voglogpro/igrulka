@@ -44,8 +44,10 @@ export function load(raw) {
     !Array.isArray(s.buildings) ||
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
-    ![2, 4].includes(s.sides.length) ||
+    ![2, 3, 4].includes(s.sides.length) ||
     (s.sides.length === 4 && (s.version < 17 || s.mode !== 'coop')) ||
+    (s.sides.length === 3 && (s.version < 23 || s.mode !== 'siege')) ||
+    (s.mode === 'siege' && s.sides.length !== 3) ||
     !Number.isFinite(s.time) ||
     s.time < 0
   )

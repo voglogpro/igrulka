@@ -4,7 +4,7 @@ import { assignGuardPost } from '../units/ground/guard.js';
 import { FRONTLINE as C } from './config.js';
 import { corridorGeometry, defensePostPoint, spreadOrder } from './geometry.js';
 import { persistentDefensePoint } from './positions.js';
-import { allied } from '../factions.js';
+import { allied, frontDirection } from '../factions.js';
 import { layerRanks } from './layers.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -152,7 +152,7 @@ function postCandidates(u, own, volunteers, lines, direction, corridorId = null)
 
 // One bounded planning pulse, never a per-frame all-army repath.
 export function updateDefenseFormation(s, side, own) {
-  const direction = side % 2 === 0 ? 1 : -1,
+  const direction = frontDirection(s, side),
     lines = corridorGeometry(s, side),
     occupiedCarriers = occupiedDefenseCarriers(s);
   let attempts = 0,

@@ -11,7 +11,7 @@ export function loadCampaign(storage, game) {
     if (raw) {
       state = game.load(raw);
       const version = JSON.parse(raw).version;
-      resumed = state.time > 0 || state.buildings.length > 2;
+      resumed = state.time > 0 || state.buildings.length > state.sides.length;
       if (version < 10 && !storage.getItem(SAVE + '-before-deployment10')) {
         storage.setItem(SAVE + '-before-deployment10', raw);
         loadNotice =

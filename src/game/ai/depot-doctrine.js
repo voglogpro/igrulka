@@ -1,5 +1,5 @@
 import { GROUND_UNITS, isInfantry } from '../config.js';
-import { allied, hostile, hqOf } from '../factions.js';
+import { allied, hostile, hqOf, onOwnFront } from '../factions.js';
 import { districtStatus, DISTRICTS } from '../territory/districts.js';
 import { groundVisible } from '../units/infantry/cover.js';
 import { hasOil, oilCost } from '../city/oil.js';
@@ -24,7 +24,7 @@ export function infrastructureReserve(s, side, key) {
 export function depotObjectives(s, side) {
   const hq = hqOf(s, side);
   if (!hq) return [];
-  return DISTRICTS.filter((d) => s.sides.length <= 2 || Math.sign(d.z) === Math.sign(hq.z))
+  return DISTRICTS.filter((d) => onOwnFront(s, side, d.z))
     .map((d) => districtStatus(s, d.id))
     .filter(Boolean);
 }

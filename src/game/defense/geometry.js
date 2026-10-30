@@ -1,11 +1,10 @@
-import { allied, hqOf } from '../factions.js';
+import { allied, frontDirection, frontIds } from '../factions.js';
 import { FIELD, SEA, COVER_PATCHES, riverDistance, seaDistance } from '../map.js';
 import { DISTRICTS } from '../territory/districts.config.js';
 import { FRONTLINE as C } from './config.js';
 
-const directionOf = (side) => (side % 2 === 0 ? 1 : -1);
-export function corridorGeometry(s, side, direction = directionOf(side)) {
-  const ids = s.sides.length > 2 ? [hqOf(s, side).z < 0 ? 'north' : 'south'] : ['north', 'south'];
+export function corridorGeometry(s, side, direction = frontDirection(s, side)) {
+  const ids = frontIds(s, side);
   return ids.map((id) => {
     const sign = id === 'north' ? -1 : 1;
     const district = DISTRICTS.find(

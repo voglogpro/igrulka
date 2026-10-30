@@ -36,7 +36,24 @@ export function createGame(
   seed = Date.now() >>> 0,
   { difficulty = DEFAULT_DIFFICULTY, mode } = {},
 ) {
-  const count = mode === 'coop' ? 4 : 2;
+  // 'coop': two allied player cities against two bots; 'siege': one player in the middle of the
+  // western bank against two allied bots holding the north and south of the eastern bank.
+  const count = mode === 'coop' ? 4 : mode === 'siege' ? 3 : 2;
+  const plan = () => ({
+    nextBuild: 7,
+    nextAttack: 170,
+    roadPlan: 0,
+    aiDefenseAt: 0,
+    aiGroundReserve: { amount: 0, nextAt: 0 },
+  });
+  const site = (side) =>
+    count === 4
+      ? { x: side % 2 ? HQ_X : -HQ_X, z: side < 2 ? -HQ_Z : HQ_Z }
+      : count === 3
+        ? side
+          ? { x: HQ_X, z: side === 1 ? -HQ_Z : HQ_Z }
+          : { x: -HQ_X, z: 0 }
+        : { x: side ? HQ_X : -HQ_X, z: 0 };
   const s = {
     version: VERSION,
     ...(mode ? { mode } : {}),
@@ -53,12 +70,11 @@ export function createGame(
       id: side + 1,
       side,
       key: 'hq',
-      x: side % 2 ? HQ_X : -HQ_X,
-      z: count === 4 ? (side < 2 ? -HQ_Z : HQ_Z) : 0,
+      ...site(side),
       hp: 1100,
       maxHp: 1100,
       progress: 1,
-      rotation: side % 2 ? Math.PI : 0,
+      rotation: site(side).x > 0 ? Math.PI : 0,
       cooldown: 0,
     })),
     roads: [],
@@ -92,19 +108,7 @@ export function createGame(
       aiDefenseAt: 0,
       aiGroundReserve: { amount: 0, nextAt: 0 },
     },
-    ...(count === 4
-      ? {
-          aiBySide: {
-            3: {
-              nextBuild: 7,
-              nextAttack: 170,
-              roadPlan: 0,
-              aiDefenseAt: 0,
-              aiGroundReserve: { amount: 0, nextAt: 0 },
-            },
-          },
-        }
-      : {}),
+    ...(count === 4 ? { aiBySide: { 3: plan() } } : count === 3 ? { aiBySide: { 2: plan() } } : {}),
     result: null,
     stats: {
       shots: 0,

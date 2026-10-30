@@ -1,5 +1,5 @@
 import { aiState } from './state.js';
-import { hqOf, pairedEnemy, validSide } from '../factions.js';
+import { hqOf, pairedEnemy, validSide, frontIds } from '../factions.js';
 import { BUILDINGS, WEAPONS, HQ_X, SEA, CORRIDORS } from '../config.js';
 import { demolish, repair, canPlace, build } from '../city/construction.js';
 import { passable, overlappingRoad } from '../city/road-network.js';
@@ -191,10 +191,8 @@ export function ai(s, side = 1) {
         if (weaponStock(s, side, key)) {
           const flank = ['drone', 'heavy', 'cruise'].includes(key) && random(s) < 0.45,
             z =
-              s.sides.length > 2
-                ? hq.z < 0
-                  ? CORRIDORS[0]
-                  : CORRIDORS[1]
+              frontIds(s, side).length === 1
+                ? CORRIDORS[frontIds(s, side)[0] === 'north' ? 0 : 1]
                 : random(s) < 0.5
                   ? CORRIDORS[0]
                   : CORRIDORS[1],

@@ -1,5 +1,6 @@
 import { FIELD, BUILDINGS, GROUND_UNITS, riverDistance, CORRIDORS } from '../../config.js';
 import { activeSettlementFootprints } from '../../territory/settlements.config.js';
+import { frontDirection, frontIds } from '../../factions.js';
 import { GROUND_COMMAND_LIMIT } from './limits.js';
 // The ground crossings between the cities. The name stays for older code and saves: since the sea
 // map they are the two land corridors, not bridges.
@@ -120,11 +121,11 @@ export function* navigationWarmup(s, { radii = null, terrainBatch = 1024 } = {})
   ].sort((a, b) => a - b);
   const jobs = [];
   for (const hq of s.buildings.filter((b) => b.key === 'hq' && b.hp > 0)) {
-    const crossings = s.sides.length > 2 ? [hq.z < 0 ? CORRIDORS[0] : CORRIDORS[1]] : CORRIDORS;
+    const crossings = frontIds(s, hq.side).map((id) => CORRIDORS[id === 'north' ? 0 : 1]);
     for (const radius of footprints)
       for (const z of crossings)
         jobs.push({
-          from: { x: hq.x + (hq.side % 2 ? -100 : 100), z: hq.z },
+          from: { x: hq.x + frontDirection(s, hq.side) * 100, z: hq.z },
           to: { x: 0, z },
           radius,
         });

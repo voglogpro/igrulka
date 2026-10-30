@@ -44,10 +44,15 @@ function restorePlan(s, plan) {
 }
 export function restoreAI(s) {
   s.ai = restorePlan(s, s.ai);
-  if (s.sides.length === 4) {
-    if (!object(s.aiBySide) || Object.keys(s.aiBySide).some((key) => key !== '3'))
+  const extra = s.sides.length === 4 ? '3' : s.sides.length === 3 ? '2' : null;
+  if (extra) {
+    if (
+      !object(s.aiBySide) ||
+      Object.keys(s.aiBySide).length !== 1 ||
+      !Object.hasOwn(s.aiBySide, extra)
+    )
       throw Error('Повреждены города ботов');
-    s.aiBySide = { 3: restorePlan(s, s.aiBySide[3]) };
+    s.aiBySide = { [extra]: restorePlan(s, s.aiBySide[extra]) };
   } else if (s.aiBySide != null) {
     if (!object(s.aiBySide) || Object.keys(s.aiBySide).length) throw Error('Лишний город бота');
     delete s.aiBySide;

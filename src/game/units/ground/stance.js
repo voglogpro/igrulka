@@ -1,4 +1,4 @@
-import { hqOf, pairedEnemy, hostile } from '../../factions.js';
+import { hqOf, pairedEnemy, hostile, frontDirection, frontIds } from '../../factions.js';
 import { GROUND_UNITS, isInfantry } from '../../config.js';
 import { BRIDGES, walkable } from './navigation.js';
 import { orderGround } from './orders.js';
@@ -27,9 +27,9 @@ export function validStance(stance) {
   );
 }
 
-export function bridgePoint(side, post) {
+export function bridgePoint(side, post, s = null) {
   const z = BRIDGE_Z[post];
-  const x = side % 2 === 0 ? -POST_OFFSET : POST_OFFSET;
+  const x = -(s ? frontDirection(s, side) : side % 2 === 0 ? 1 : -1) * POST_OFFSET;
   return { x, z };
 }
 
@@ -47,7 +47,8 @@ function defenders(s, side, post) {
 
 // "auto" sends the group to the bridge that currently has fewer defenders.
 export function chooseBridge(s, side) {
-  if (s.sides.length > 2) return hqOf(s, side).z < 0 ? 'north' : 'south';
+  const fronts = frontIds(s, side);
+  if (fronts.length === 1) return fronts[0];
   const north = defenders(s, side, 'north'),
     south = defenders(s, side, 'south');
   return north <= south ? 'north' : 'south';
@@ -90,7 +91,7 @@ export function applyStance(s, side, ids, stance) {
   if (!stance.post || stance.post === 'auto')
     return queueAutoDefense(s, units) || 'Выберите доступные боевые отряды';
   const post = stance.post && stance.post !== 'auto' ? stance.post : chooseBridge(s, side);
-  const point = bridgePoint(side, post);
+  const point = bridgePoint(side, post, s);
   const previous = new Map(units.map((u) => [u.id, u.guard]));
   const result = guardGround(s, side, ids, point);
   if (typeof result === 'string') return result;
@@ -116,6 +117,6 @@ export function updateStance(s, u) {
 
 export const stanceMobile = (u) => !!GROUND_UNITS[u.key] && !isInfantry(u.key);
 export const postWalkable = (s, side, post) => {
-  const p = bridgePoint(side, post);
+  const p = bridgePoint(side, post, s);
   return walkable(s, p.x, p.z, 3);
 };

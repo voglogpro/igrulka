@@ -1,6 +1,6 @@
 import { BUILDINGS, GROUND_UNITS, isInfantry } from '../../config.js';
 import { CORRIDORS, expandV23X } from '../../map.js';
-import { hqOf, hostile, pairedEnemy, validSide } from '../../factions.js';
+import { hqOf, hostile, pairedEnemy, validSide, frontDirection, frontIds } from '../../factions.js';
 import { groundFormationDestinations, orderGround } from './orders.js';
 import { groundVisible } from '../infantry/cover.js';
 import { clearGroundRoute } from './route-queue.js';
@@ -24,8 +24,7 @@ const enemyHQ = (s, side) => {
 function attackPlan(s, side) {
   if (!validSide(s, side))
     return { total: 0, eligible: 0, count: 0, groups: [], active: 0, returning: 0, initial: 0 };
-  const fronts =
-    s.sides.length > 2 ? [hqOf(s, side)?.z < 0 ? 'north' : 'south'] : ['north', 'south'];
+  const fronts = frontIds(s, side);
   const buckets = fronts.map((id) => ({ id, units: [], take: 0 })),
     waiting = [];
   const waves = new Map();
@@ -165,7 +164,7 @@ export function launchDefenseAttack(s, side) {
   if (!status.ok) return status.reason;
   const plan = attackPlan(s, side),
     hq = enemyHQ(s, side),
-    direction = side % 2 ? -1 : 1;
+    direction = frontDirection(s, side);
   let accepted = 0;
   const wave = s.nextId++;
   const homes = new Map(
@@ -225,12 +224,10 @@ export function enrollCityAssault(s, u) {
   u.defenseAttack = {
     phase: 'active',
     home: {
-      x: u.side % 2 ? expandV23X(300) : -expandV23X(300),
+      x: -frontDirection(s, u.side) * expandV23X(300),
       z:
-        s.sides.length > 2
-          ? hq.z < 0
-            ? CORRIDORS[0]
-            : CORRIDORS[1]
+        frontIds(s, u.side).length === 1
+          ? CORRIDORS[frontIds(s, u.side)[0] === 'north' ? 0 : 1]
           : u.z < 0
             ? CORRIDORS[0]
             : CORRIDORS[1],

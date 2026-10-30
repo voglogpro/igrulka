@@ -1,4 +1,5 @@
 import { GROUND_UNITS } from '../config.js';
+import { frontDirection } from '../factions.js';
 import { groundWeaponProfile } from '../units/ground/engagement.js';
 import { event } from '../shared/events.js';
 import { FRONTLINE as C } from './config.js';
@@ -6,12 +7,12 @@ import { defenseAvailable, assignDefensePost, occupiedDefenseCarriers } from './
 import { corridorGeometry, defensePostPoint } from './geometry.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-function interceptPoint(u, target, rank = 0) {
+function interceptPoint(u, target, rank = 0, direction = 1) {
   const d = GROUND_UNITS[u.key],
     dx = u.x - target.x,
     dz = u.z - target.z,
     length = Math.hypot(dx, dz),
-    nx = length > 1e-6 ? dx / length : u.side % 2 === 0 ? -1 : 1,
+    nx = length > 1e-6 ? dx / length : -direction,
     nz = length > 1e-6 ? dz / length : 0,
     stand =
       u.key === 'operator'
@@ -21,9 +22,9 @@ function interceptPoint(u, target, rank = 0) {
     across = rank % 2 ? 12 : -12;
   return { x: target.x + nx * along - nz * across, z: target.z + nz * along + nx * across };
 }
-function freeIntercept(own, u, target) {
+function freeIntercept(own, u, target, direction) {
   return Array.from({ length: C.maxReinforcing }, (_, rank) =>
-    interceptPoint(u, target, rank),
+    interceptPoint(u, target, rank, direction),
   ).find((point) =>
     own.every((v) => {
       if (v.id === u.id) return true;
@@ -36,7 +37,7 @@ function freeIntercept(own, u, target) {
 }
 export function updateDefenseReserves(s, side, own, report, memory) {
   let following = 0;
-  const direction = side % 2 === 0 ? 1 : -1,
+  const direction = frontDirection(s, side),
     lines = corridorGeometry(s, side);
   for (const u of own) {
     if (u.supplyTrip || u.order?.mode === 'cover') continue;
@@ -75,7 +76,7 @@ export function updateDefenseReserves(s, side, own, report, memory) {
       task.until = Math.max(task.until, s.time + C.minDuty);
       // A breach is a moving target. Follow its last observed position instead
       // of waiting forever at the first interception marker behind the line.
-      const toward = freeIntercept(own, u, currentThreat);
+      const toward = freeIntercept(own, u, currentThreat, direction);
       if (
         toward &&
         following < 2 &&
@@ -204,7 +205,7 @@ export function updateDefenseReserves(s, side, own, report, memory) {
       if (attempts++ >= C.maxPathAttempts) return;
       // Returning details leave holes in their old ranks. Counting active units would
       // reuse an occupied high rank; explicitly reserve the first free physical slot.
-      const point = freeIntercept(own, u, intercept);
+      const point = freeIntercept(own, u, intercept, direction);
       if (!point) continue;
       const home = u.guard ? { ...u.guard } : { x: u.x, z: u.z };
       if (!assignDefensePost(s, u, point)) continue;

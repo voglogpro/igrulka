@@ -5,7 +5,7 @@ import { unloadGround, cancelTransportDelivery } from '../vehicles/transport.js'
 import { clearGroundRoute } from './route-queue.js';
 import { clearAutoDefense } from '../../defense/volunteers.js';
 import { invalidateFrontline } from '../../defense/cache.js';
-import { hostile } from '../../factions.js';
+import { hostile, frontDirection } from '../../factions.js';
 import { trenchContains } from '../../defense/trench-footprint.js';
 import { trenchContested } from '../../defense/positions.js';
 import { invalidateTrenchLinks } from '../../defense/trench-links.js';
@@ -50,7 +50,7 @@ export function orderGround(s, side, ids, aim, { preserveRoute = false, defer = 
       const length = Math.max(Math.abs(dx), Math.abs(dz), 1);
       const half = (BUILDINGS[b.key]?.size || 30) * 0.56 + GROUND_UNITS[u.key].size * 0.42 + 4;
       destination = {
-        x: b.x + ((dx || (side % 2 ? 1 : -1)) * half) / length,
+        x: b.x + ((dx || -frontDirection(s, side)) * half) / length,
         z: b.z + (dz * half) / length,
       };
     }

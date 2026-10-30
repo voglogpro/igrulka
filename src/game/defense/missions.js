@@ -1,5 +1,6 @@
 import { GROUND_UNITS } from '../config.js';
 import { expandV23X } from '../map.js';
+import { frontDirection } from '../factions.js';
 import { COVER_PATCHES, coverInfo } from '../units/infantry/cover.js';
 import { walkable } from '../units/ground/navigation.js';
 import { corridorGeometry, defensePostPoint } from './geometry.js';
@@ -29,7 +30,7 @@ function watchPoint(s, u, line, direction) {
 // A small reconnaissance/ambush section uses the same physical guard, supply
 // and cover systems as the rest of the army. It never learns hidden targets.
 export function updateDepotMissions(s, side, own, report, memory) {
-  const direction = side % 2 === 0 ? 1 : -1,
+  const direction = frontDirection(s, side),
     lines = corridorGeometry(s, side);
   let paths = 0;
   for (const u of own) {

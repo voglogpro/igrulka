@@ -4,6 +4,7 @@ export function createCampaignActions({
   getState,
   isNetwork,
   getDifficulty,
+  getMode = () => null,
   persist,
   replaceCampaign,
   toast,
@@ -35,7 +36,12 @@ export function createCampaignActions({
         button.textContent = 'Подтвердить новую игру';
       }),
       new: soloOnly(() =>
-        replaceCampaign(game.createGame(undefined, { difficulty: getDifficulty() })),
+        replaceCampaign(
+          game.createGame(undefined, {
+            difficulty: getDifficulty(),
+            ...(getMode() ? { mode: getMode() } : {}),
+          }),
+        ),
       ),
     },
     async importFile(event) {

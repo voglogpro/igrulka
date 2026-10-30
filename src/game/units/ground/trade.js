@@ -1,4 +1,5 @@
 import { BUILDINGS } from '../../config.js';
+import { pairedEnemy } from '../../factions.js';
 import { event as emit } from '../../shared/events.js';
 import { buildingConnected } from '../../city/road-network.js';
 import { groundPath } from './navigation.js';
@@ -26,7 +27,7 @@ export function tradeReport(s, side) {
 
 function pay(s, u) {
   const from = s.sides[u.side],
-    to = s.sides[s.buildings.find((b) => b.id === u.trade.to)?.side ?? u.side ^ 1];
+    to = s.sides[s.buildings.find((b) => b.id === u.trade.to)?.side ?? pairedEnemy(s, u.side)];
   const bonus = u.trade.bonus || 1;
   from.credits += TRADE.owner.credits * bonus;
   from.materials += TRADE.owner.materials * bonus;

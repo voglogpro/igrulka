@@ -1,7 +1,7 @@
 import { GROUND_UNITS, BUILDINGS, isInfantry } from '../../config.js';
 import { COVER_PATCHES, coverInfo } from '../infantry/cover.js';
 import { walkable } from './navigation.js';
-import { allied } from '../../factions.js';
+import { allied, frontDirection } from '../../factions.js';
 import { staticObjectsInBounds } from '../../shared/static-spatial.js';
 import {
   tacticalPath,
@@ -150,7 +150,7 @@ function findCover(s, u, threat) {
 function fallBack(s, u, threat) {
   const radius = GROUND_UNITS[u.key].size * 0.42;
   const d = distance(u, threat),
-    nx = d > 1e-8 ? (u.x - threat.x) / d : u.side % 2 ? 1 : -1,
+    nx = d > 1e-8 ? (u.x - threat.x) / d : -frontDirection(s, u.side),
     nz = d > 1e-8 ? (u.z - threat.z) / d : 0;
   for (const turn of [0, 0.6, -0.6]) {
     const dx = nx * Math.cos(turn) - nz * Math.sin(turn),

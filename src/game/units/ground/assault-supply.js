@@ -1,5 +1,6 @@
 import { ammunitionProfile, ammunitionStatus } from './ammunition.js';
 import { orderGround } from './orders.js';
+import { frontDirection } from '../../factions.js';
 
 const failures = new WeakMap();
 export function unavailableAssaultCrate(s, u, crate) {
@@ -41,7 +42,7 @@ export function holdAssaultForSupply(s, u) {
   )
     return true;
   const op = u.defenseAttack;
-  const behindHome = u.side % 2 ? u.x >= op.home.x : u.x <= op.home.x;
+  const behindHome = (u.x - op.home.x) * frontDirection(s, u.side) <= 0;
   if (behindHome || Math.hypot(u.x - op.home.x, u.z - op.home.z) <= 12) {
     u.path = [];
     u.routeQueue = [];

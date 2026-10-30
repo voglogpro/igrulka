@@ -1,4 +1,4 @@
-import { validSide, sideIds } from '../../factions.js';
+import { validSide, sideIds, frontDirection } from '../../factions.js';
 import { GROUND_UNITS, BUILDINGS, isInfantry } from '../../config.js';
 import { event as emit } from '../../shared/events.js';
 import { random } from '../../shared/random.js';
@@ -109,7 +109,7 @@ function supportCamp(s, u) {
   if (!army.length) return null;
   // Choose an actual soldier as anchor: an arithmetic centroid can be offshore.
   const anchor = army[Math.floor((army.length - 1) / 2)];
-  return { x: anchor.x - (u.side % 2 === 0 ? 28 : -28), z: anchor.z + ((u.id % 3) - 1) * 8 };
+  return { x: anchor.x - frontDirection(s, u.side) * 28, z: anchor.z + ((u.id % 3) - 1) * 8 };
 }
 
 function walkTo(s, u, point, stopAt = 3) {

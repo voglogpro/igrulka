@@ -15,7 +15,9 @@ const TRACER = [
   [6.2, 1.5, 0.32],
   [1, 5.4, 1.2],
 ];
-const tracerColor = (p) => TRACER[p.side % 2 === 1 ? 1 : 0];
+// Team colours: alternating cities form teams; in a three-city game both bots share team 1.
+const tracerColor = (p, siege = false) =>
+  TRACER[(siege ? Math.min(p.side, 1) : p.side % 2) === 1 ? 1 : 0];
 const HOT_CORE = [4.6, 4, 3.1];
 const SHELL_HEAD = [7, 3, 0.7];
 const INTERCEPTOR_HEAD = [5, 3.4, 1.4];
@@ -869,7 +871,7 @@ export class CombatEffects {
             ? [1.6, 2.6, 4]
             : p.kind === 'shell'
               ? [4, 1.7, 0.4]
-              : tracerColor(p).map((v) => v * 0.75);
+              : tracerColor(p, this.world.state?.sides?.length === 3).map((v) => v * 0.75);
       for (let i = 0; i < TAIL_STEPS && segment < this.traceCapacity; i++, segment++)
         for (let end = 0; end < 2; end++) {
           const k = (i + end) / TAIL_STEPS,
@@ -924,7 +926,7 @@ export class CombatEffects {
         length: 2.5,
         width: 0.3,
         stretch: 0.03,
-        color: tracerColor(p),
+        color: tracerColor(p, this.world.state?.sides?.length === 3),
       });
     }
   }
@@ -973,7 +975,11 @@ export class CombatEffects {
         glow = ignite * (interceptor ? 1 : flicker),
         length = Math.min(interceptor ? 9 : shell ? 11 : 8, speed * 0.032, speed * flown) * zoom,
         width = (interceptor ? 1.1 : shell ? 0.5 : 0.24) * zoom,
-        color = interceptor ? INTERCEPTOR_HEAD : shell ? SHELL_HEAD : tracerColor(p);
+        color = interceptor
+          ? INTERCEPTOR_HEAD
+          : shell
+            ? SHELL_HEAD
+            : tracerColor(p, this.world.state?.sides?.length === 3);
       if (!interceptor)
         this.streaks.add(
           x,

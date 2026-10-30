@@ -1,4 +1,4 @@
-import { allied, hostile } from '../factions.js';
+import { allied, hostile, frontDirection, onOwnFront } from '../factions.js';
 import { validSide } from '../factions.js';
 import { GROUND_UNITS, isInfantry } from '../config.js';
 import { groundVisible } from '../units/infantry/cover.js';
@@ -58,13 +58,13 @@ export function observedFrontline(s, side, previous = []) {
       visible.add(u.id);
     }
   const lines = corridorGeometry(s, side),
-    direction = side % 2 === 0 ? 1 : -1;
+    direction = frontDirection(s, side);
   const urgency = new Map();
   for (const v of seen.values()) {
     let closest = lines[0];
     for (const line of lines)
       if (Math.abs(line.z - v.z) < Math.abs(closest.z - v.z)) closest = line;
-    const ownHalf = s.sides.length <= 2 || (closest.id === 'north' ? v.z <= 0 : v.z >= 0);
+    const ownHalf = onOwnFront(s, side, v.z);
     urgency.set(v.id, ownHalf ? Math.max(0, (closest.x - v.x) * direction - 80) * v.strength : 0);
   }
   return {
@@ -91,7 +91,7 @@ export function calculateFrontline(
   side,
   memory,
   visible = new Set(),
-  direction = side % 2 === 0 ? 1 : -1,
+  direction = frontDirection(s, side),
 ) {
   const own = s.groundUnits.filter((u) => u.side === side && military(u));
   const lines = corridorGeometry(s, side, direction);
@@ -108,11 +108,7 @@ export function calculateFrontline(
       }
     }
     let result = null;
-    if (
-      closest &&
-      (closest.x - point.x) * direction > 80 &&
-      (s.sides.length <= 2 || (closest.id === 'north' ? point.z <= 0 : point.z >= 0))
-    ) {
+    if (closest && (closest.x - point.x) * direction > 80 && onOwnFront(s, side, point.z)) {
       let slot = closest.slots[0];
       for (const candidate of closest.slots)
         if (Math.abs(candidate.z - point.z) < Math.abs(slot.z - point.z)) slot = candidate;
@@ -331,9 +327,7 @@ export function frontlineReport(s, side) {
       ? -1
       : s.frontlineDirections?.[side] === 1
         ? 1
-        : side % 2 === 0
-          ? 1
-          : -1;
+        : frontDirection(s, side);
   const report = calculateFrontline(s, side, seen, visible, direction);
   cacheFrontline(s, side, report);
   return report;

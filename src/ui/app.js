@@ -218,10 +218,18 @@ let recruitMode = ['point', 'attack', 'defend'].includes(settings.recruitMode)
     ? settings.recruitPost
     : 'auto';
 let chosenDifficulty = E.DIFFICULTY[settings.difficulty] ? settings.difficulty : 'normal';
+// Solo opponents: one bot, or two allied bots on the eastern bank against one player.
+let chosenMode = resumed
+  ? settings.soloMode === 'siege'
+    ? 'siege'
+    : 'solo'
+  : state.mode === 'siege'
+    ? 'siege'
+    : 'solo';
 function renderWelcomeSetup() {
   const current = E.difficultyOf(state);
   $('#welcome-setup').innerHTML =
-    `<div class="welcome-modes"><button class="active" data-welcome-mode="solo"><b>Одиночная игра</b><small>против бота</small></button><button data-action="network"><b>Сетевая игра</b><small>дуэль или команда</small></button></div>` +
+    `<div class="welcome-modes"><button class="${chosenMode === 'solo' ? 'active' : ''}" data-welcome-mode="solo"><b>Один на один</b><small>против бота</small></button><button class="${chosenMode === 'siege' ? 'active' : ''}" data-welcome-mode="siege"><b>Один против двух</b><small>два бота-союзника</small></button><button data-action="network"><b>Сетевая игра</b><small>дуэль или команда</small></button></div>` +
     `<span class="welcome-label">${resumed ? 'Сложность новой игры' : 'Сложность бота'}</span><div class="difficulty-picker">${Object.entries(
       E.DIFFICULTY,
     )
@@ -389,7 +397,7 @@ function renderOpponentRule() {
   const d =
     !started && !resumed && !network ? E.DIFFICULTY[chosenDifficulty] : E.difficultyOf(state);
   $('#opponent-rule').innerHTML =
-    `${state.mode === 'multiplayer' ? 'ДУЭЛЬ · БЕЗ БОТОВ' : (state.sides.length === 4 ? 'ДВА БОТА: ' : 'БОТ: ') + d.name.toUpperCase()} <i>${state.mode !== 'multiplayer' && d.bonus > 1 ? 'ДОХОД +' + Math.round((d.bonus - 1) * 100) + '%' : 'БЕЗ БОНУСА'}</i>`;
+    `${state.mode === 'multiplayer' ? 'ДУЭЛЬ · БЕЗ БОТОВ' : (state.sides.length >= 3 ? 'ДВА БОТА: ' : 'БОТ: ') + d.name.toUpperCase()} <i>${state.mode !== 'multiplayer' && d.bonus > 1 ? 'ДОХОД +' + Math.round((d.bonus - 1) * 100) + '%' : 'БЕЗ БОНУСА'}</i>`;
 }
 function begin() {
   if (!startup.ready) return;
@@ -455,7 +463,7 @@ function frame(dt) {
     persist();
     $('#result').hidden = false;
     $('#result').innerHTML =
-      `<span class="eyebrow">${network ? 'МАТЧ ЗАВЕРШЁН' : 'КАМПАНИЯ ЗАВЕРШЕНА'}</span><h2>${state.result === 'victory' ? (state.sides.length === 4 ? 'Оба вражеских штаба уничтожены' : 'Командный пункт врага уничтожен') : state.sides.length === 4 ? 'Оба союзных штаба потеряны' : 'Ваш командный пункт потерян'}</h2><p>${time(state.time)} · Перехватов: ${state.sides[0].kills} · Дорог выведено из строя: ${state.stats.roadsCut}</p><button class="primary" data-action="${network ? 'network-leave' : 'new'}">${network ? 'Закрыть матч' : 'Новая кампания'}</button>`;
+      `<span class="eyebrow">${network ? 'МАТЧ ЗАВЕРШЁН' : 'КАМПАНИЯ ЗАВЕРШЕНА'}</span><h2>${state.result === 'victory' ? (state.sides.length >= 3 ? 'Оба вражеских штаба уничтожены' : 'Командный пункт врага уничтожен') : state.sides.length === 4 ? 'Оба союзных штаба потеряны' : 'Ваш командный пункт потерян'}</h2><p>${time(state.time)} · Перехватов: ${state.sides[0].kills} · Дорог выведено из строя: ${state.stats.roadsCut}</p><button class="primary" data-action="${network ? 'network-leave' : 'new'}">${network ? 'Закрыть матч' : 'Новая кампания'}</button>`;
   }
 }
 function handleEvent(e) {
@@ -550,7 +558,7 @@ function updateHUD() {
   }
   $('#mission').textContent = inbound
     ? `Воздушная тревога: ${inbound}${warning?.bearing ? ` · ${warning.bearing}` : ''}${warning?.eta != null ? ` · подход ≈${Math.ceil(warning.eta)} с` : ''}${warning?.rangeBonus > 0 ? ` · Радар: ПВО +${Math.round((warning.rangeBonus || 0) * 100)}% дальности` : ''}`
-    : `${state.sides.length === 4 ? 'Два союзных города против двух ботов. Уничтожьте оба вражеских штаба.' : 'Уничтожьте штаб врага.'} Склады: ${e.districts.owned}/${E.DISTRICTS.length} · работают ${e.districts.active}.`;
+    : `${state.sides.length === 4 ? 'Два союзных города против двух ботов. Уничтожьте оба вражеских штаба.' : state.sides.length === 3 ? 'Один против двух ботов: они держат север и юг восточного берега. Уничтожьте оба вражеских штаба.' : 'Уничтожьте штаб врага.'} Склады: ${e.districts.owned}/${E.DISTRICTS.length} · работают ${e.districts.active}.`;
 }
 function updateBuildingPrices() {
   for (const button of document.querySelectorAll('[data-build]')) {
@@ -1314,6 +1322,7 @@ const campaignActions = createCampaignActions({
   getState: () => state,
   isNetwork: () => !!network,
   getDifficulty: () => chosenDifficulty,
+  getMode: () => (chosenMode === 'siege' ? 'siege' : null),
   persist: flushPersistence,
   replaceCampaign,
   toast,
@@ -1448,6 +1457,26 @@ document.addEventListener('click', async (ev) => {
     if (d.panel === 'attack' && b?.side === 0 && b.key === 'launcher')
       strike.model.launcherId = b.id;
     openPanel(d.panel);
+  }
+  if (d.welcomeMode === 'solo' || d.welcomeMode === 'siege') {
+    chosenMode = d.welcomeMode;
+    settings.soloMode = chosenMode;
+    saveSettings();
+    renderWelcomeSetup();
+    // An untouched start campaign switches immediately; a running one keeps its mode until
+    // "new game".
+    if (
+      !resumed &&
+      !network &&
+      state.time === 0 &&
+      (state.mode === 'siege') !== (chosenMode === 'siege')
+    )
+      replaceCampaign(
+        E.createGame(undefined, {
+          difficulty: chosenDifficulty,
+          ...(chosenMode === 'siege' ? { mode: 'siege' } : {}),
+        }),
+      );
   }
   if (d.difficulty && E.DIFFICULTY[d.difficulty]) {
     chosenDifficulty = d.difficulty;
