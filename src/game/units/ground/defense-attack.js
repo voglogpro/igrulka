@@ -6,8 +6,15 @@ import { groundVisible } from '../infantry/cover.js';
 import { clearGroundRoute } from './route-queue.js';
 import { walkable } from './navigation.js';
 import { assaultAmmunition, holdAssaultForSupply } from './assault-supply.js';
+import { assignGuardPost } from './guard.js';
+import { staticObjectsInBounds } from '../../shared/static-spatial.js';
+import { trenchContains } from '../../defense/trench-footprint.js';
+import { trenchContested } from '../../defense/positions.js';
+import { captureTrench } from '../../defense/fortifications.js';
 
 export const DEFENSE_ATTACK_PERCENT = 30;
+// Assault groups clear enemy earthworks on their way instead of walking past them.
+export const ASSAULT = Object.freeze({ trenchReach: 420, trenchPreference: 160, holdFrom: 4 });
 const enemyHQ = (s, side) => {
   const paired = hqOf(s, pairedEnemy(s, side));
   return paired?.hp > 0
@@ -236,6 +243,30 @@ export function enrollCityAssault(s, u) {
   return true;
 }
 
+// A soldier standing in an emptied enemy trench takes it over. While the wave is still strong,
+// the first soldier into each captured trench stays to hold and dig it in as an ordinary guard;
+// the rest continue the attack. Holding uses the normal guard and fortification systems.
+function seizeTrench(s, u) {
+  if (!isInfantry(u.key) || u.path?.length) return false;
+  const nearby = staticObjectsInBounds(s, 'trenches', u.x - 10, u.z - 10, u.x + 10, u.z + 10);
+  const t = nearby.find((t) => hostile(s, u.side, t.side) && trenchContains(t, u.x, u.z, 2));
+  if (!t || trenchContested(s, t, u.side, u.id)) return false;
+  captureTrench(s, t, u);
+  const wave = u.defenseAttack.wave;
+  let strength = 0;
+  for (const v of s.groundUnits)
+    if (
+      v.side === u.side &&
+      v.hp > 0 &&
+      v.defenseAttack?.wave === wave &&
+      v.defenseAttack.phase === 'active'
+    )
+      strength++;
+  if (strength <= ASSAULT.holdFrom || !assignGuardPost(s, u, { x: t.x, z: t.z })) return false;
+  u.stance = { mode: 'defend' };
+  return true;
+}
+
 // Operation routes use the shared two-path planner; commands never run A*.
 export function recallDefenseAttack(s, side) {
   if (s.result || !validSide(s, side)) return 'Недоступный отзыв';
@@ -278,6 +309,7 @@ export function updateDefenseAttacks(s) {
       continue;
     }
     if (holdAssaultForSupply(s, u)) continue;
+    if (seizeTrench(s, u)) continue;
     if (
       u.path?.length ||
       u.routeQueue?.length ||
@@ -298,6 +330,48 @@ export function updateDefenseAttacks(s) {
         target = b;
         best = score;
       }
+    }
+    // Earthworks are public map objects. A nearby enemy trench is cleared before the march goes on.
+    const reach = ASSAULT.trenchReach;
+    let trench = null;
+    if (isInfantry(u.key))
+      for (const t of staticObjectsInBounds(
+        s,
+        'trenches',
+        u.x - reach,
+        u.z - reach,
+        u.x + reach,
+        u.z + reach,
+      )) {
+        if (!hostile(s, u.side, t.side) || !(t.progress > 0)) continue;
+        if (
+          u.routeState?.status === 'blocked' &&
+          u.order &&
+          Math.hypot(u.order.x - t.x, u.order.z - t.z) < 1
+        )
+          continue;
+        const range = Math.hypot(u.x - t.x, u.z - t.z),
+          score = range - ASSAULT.trenchPreference;
+        if (range <= reach && score < best) {
+          trench = t;
+          best = score;
+        }
+      }
+    if (trench) {
+      const saved = u.defenseAttack;
+      if (
+        typeof orderGround(
+          s,
+          u.side,
+          [u.id],
+          { x: trench.x, z: trench.z, mode: 'attackmove' },
+          { defer: true },
+        ) === 'number'
+      ) {
+        u.defenseAttack = saved;
+        u.stance = { mode: 'attack' };
+      }
+      continue;
     }
     if (!target) continue;
     const direction = u.x < target.x ? 1 : -1;

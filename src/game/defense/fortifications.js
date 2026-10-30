@@ -36,6 +36,14 @@ export function fortificationStatus(t) {
   };
 }
 
+// Earthworks change hands intact: their dug progress and fortification work stay with them.
+export function captureTrench(s, t, u) {
+  t.side = u.side;
+  invalidateFrontline(s);
+  invalidateTrenchLinks(s);
+  event(s, 'trenchCaptured', { x: t.x, z: t.z, side: u.side, unitId: u.id, trenchId: t.id });
+}
+
 export function defensivePositionReady(u) {
   return (
     !!u.guard &&
@@ -96,12 +104,7 @@ export function prepareDefensivePosition(s, u) {
   let t =
     nearby.find((t) => t.side === u.side) ||
     nearby.find((t) => !trenchContested(s, t, u.side, u.id));
-  if (t && !allied(s, t.side, u.side)) {
-    t.side = u.side;
-    invalidateFrontline(s);
-    invalidateTrenchLinks(s);
-    event(s, 'trenchCaptured', { x: t.x, z: t.z, side: u.side, unitId: u.id, trenchId: t.id });
-  }
+  if (t && !allied(s, t.side, u.side)) captureTrench(s, t, u);
   // An occupied enemy trench is physical earthwork too. Do not place a fresh
   // duplicate on top of it while its owner is still contesting the position.
   if (!t && nearby.length) return null;

@@ -97,7 +97,9 @@ test('upper fortifications spend only affordable work and resource shortage neve
   updateFortification(s, u, 1);
   assert.equal(t.fortificationWork, E.FORTIFICATION.heavyFrom + 0.5);
   assert.equal(s.sides[0].credits, 0);
-  assert.ok(Math.abs(s.sides[0].materials - (1 - E.FORTIFICATION.heavyMaterialsPerWork * 0.5)) < 1e-12);
+  assert.ok(
+    Math.abs(s.sides[0].materials - (1 - E.FORTIFICATION.heavyMaterialsPerWork * 0.5)) < 1e-12,
+  );
 });
 
 test('actual damage uses the strongest cover once and reinforced posts remain vulnerable to bullets and blasts', () => {
