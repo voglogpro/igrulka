@@ -1269,14 +1269,20 @@ function updateLivePanel() {
       ],
       ['Доход от поездок на работу', '+' + rate(e.commute.income) + ' ₡/мин'],
       [
-        'Торговля',
+        'Рынки: оборот с жилыми кварталами',
+        e.market.markets
+          ? `+${rate(e.market.income)} ₡/мин · рынков ${e.market.markets} · домов ${e.market.homes}`
+          : 'нет рынка',
+      ],
+      [
+        'Торговые караваны',
         (() => {
           const t = E.tradeReport(state, 0);
           return !t.markets
             ? 'нет рынка'
-            : !t.partners
-              ? 'ждём рынок партнёра'
-              : `рынков ${t.markets} · караванов ${t.trips} · рейсов ${state.stats.trades || 0}`;
+            : !t.active
+              ? 'нет маршрута: подключите поселение дорогой'
+              : `в пути ${t.trips} · рейсов ${t.delivered} · заработано ${num(t.earned)} ₡ · поселений ${t.villages}${t.partners ? ' · есть рынок врага' : ''}`;
         })(),
       ],
       ['Районы под контролем / работают', `${e.districts.owned} / ${e.districts.active}`],

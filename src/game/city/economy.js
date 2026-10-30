@@ -16,6 +16,9 @@ export function supplyFactor(s, b) {
 }
 
 export const COMMUTE_INCOME = 0.07;
+// Trade turnover per connected home (credits/s), homes counted per market, and the share each
+// further market adds.
+export const MARKET = Object.freeze({ perHome: 0.18, homes: 8, falloff: 0.6 });
 export function economy(s, owner, dt = 0) {
   const alive = s.buildings.filter((b) => b.side === owner && b.hp > 0 && b.progress >= 1);
   let power = 10,
@@ -63,6 +66,21 @@ export function economy(s, owner, dt = 0) {
   const employed = Math.min(homes, jobs),
     commute = employed * COMMUTE_INCOME * productivity * efficient;
   income += commute;
+  // Market turnover: every connected market trades with the connected homes of its city. More
+  // markets share the same customers, so each further market adds less.
+  let linkedHomes = 0,
+    marketBase = 0,
+    marketTrade = 0;
+  for (const b of alive)
+    if (b.key === 'housing' && supplyFactor(s, b) === 1)
+      linkedHomes += 0.5 + (0.5 * b.hp) / b.maxHp;
+  const markets = alive.filter((b) => b.key === 'market').sort((a, b) => a.id - b.id);
+  markets.forEach((b, i) => {
+    const f = productivity * (0.5 + (0.5 * b.hp) / b.maxHp) * supplyFactor(s, b);
+    marketBase += BUILDINGS.market.income * f;
+    marketTrade += Math.min(linkedHomes, MARKET.homes) * MARKET.perHome * MARKET.falloff ** i * f;
+  });
+  income += marketTrade;
   const armyUpkeep = (s.groundUnits || [])
     .filter((u) => u.side === owner && u.hp > 0)
     .reduce((n, u) => n + GROUND_UNITS[u.key].upkeep, 0);
@@ -104,6 +122,11 @@ export function economy(s, owner, dt = 0) {
       jobs: Math.round(jobs),
       employed: Math.round(employed),
       income: commute * bonus * outputBonus,
+    },
+    market: {
+      markets: markets.length,
+      homes: Math.round(linkedHomes),
+      income: (marketBase + marketTrade) * bonus * outputBonus,
     },
     districts: {
       ...districts,

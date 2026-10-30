@@ -22,7 +22,7 @@ import { restoreGroundScars } from '../combat/ground-scars.js';
 import { restoreLaunchSupply } from '../units/aviation/launch-supply.js';
 import { restoreAmmunition } from './ammunition.js';
 import { sideIds, validSide } from '../factions.js';
-import { restoreSettlements } from '../territory/settlements.js';
+import { restoreSettlements, SETTLEMENTS } from '../territory/settlements.js';
 import { restoreAI } from './ai.js';
 import { restoreFieldSupply } from './field-supply.js';
 import { restoreRoadRecovery } from '../city/road-recovery.js';
@@ -287,7 +287,8 @@ export function load(raw) {
       (typeof u.trade !== 'object' ||
         !Number.isSafeInteger(u.trade.from) ||
         !(u.trade.to === null || Number.isSafeInteger(u.trade.to)) ||
-        !Number.isFinite(u.trade.bonus))
+        !Number.isFinite(u.trade.bonus) ||
+        (u.trade.village != null && !SETTLEMENTS.some((v) => v.id === u.trade.village)))
     )
       throw Error('Повреждён торговый караван');
     for (const key of ['supplyAt', 'supportAt'])
