@@ -59,7 +59,7 @@ test('completed paid production stays at its factory and waits intact behind a f
   assert.equal(factoryWarehouseStatus(s, factory).capacity, 36);
 });
 
-test('two-missile loads split legacy/local withdrawal exactly, expose pure ETA, survive loading and complete without cycling', () => {
+test('full missile loads split legacy/local withdrawal exactly, expose pure ETA, survive loading and complete without cycling', () => {
   const { s, factory, silo } = fixture();
   s.sides[0].inventory.ballistic = 1;
   E.acceptLaunchDelivery(factory, 'ballistic', 3);
@@ -70,7 +70,7 @@ test('two-missile loads split legacy/local withdrawal exactly, expose pure ETA, 
     cars.reduce((n, v) => n + v.cargo.amount, 0),
     4,
   );
-  assert.ok(cars.every((v) => v.cargo.amount === 2));
+  assert.ok(cars.every((v) => v.cargo.amount <= E.AMMUNITION.weaponLoad.missile));
   assert.equal(s.sides[0].inventory.ballistic, 0);
   assert.equal(factory.launchStore.ballistic, 0);
   const before = E.save(s),

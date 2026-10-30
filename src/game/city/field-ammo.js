@@ -1,5 +1,7 @@
 import { GROUND_UNITS, BUILDINGS } from '../config.js';
-import { validSide } from '../factions.js';
+import { validSide, hostile } from '../factions.js';
+import { isInfantry } from '../config.js';
+import { event } from '../shared/events.js';
 import { depotSupplyPoint } from '../defense/supply.js';
 import { walkable } from '../units/ground/navigation.js';
 import {
@@ -12,11 +14,17 @@ import {
 export const FIELD_SUPPLY = {
   load: { small: 360, shell: 24, rocket: 24, sam: 8 },
   capacity: { small: 720, shell: 48, rocket: 48, sam: 16 },
-  serviceRadius: 36,
-  walkRadius: 160,
+  // Soldiers and vehicles inside this circle draw ammunition from the box directly.
+  serviceRadius: 60,
+  // How far a post walks to a box; attack groups may fall back further.
+  walkRadius: 260,
+  assaultWalkRadius: 700,
   clusterRadius: 120,
   hp: 100,
   cadence: 1,
+  // An unguarded box is taken over by enemy infantry standing next to it, with its contents.
+  captureRadius: 25,
+  guardRadius: 45,
 };
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const jobsCache = new WeakMap();
@@ -232,5 +240,30 @@ export function damageAmmoCrates(s, x, z, damage, radius, filter = () => true) {
     if (c.hp <= 0 || d > radius || !filter(c)) continue;
     c.hp = Math.max(0, c.hp - damage * (1 - (0.8 * d) / Math.max(1, radius)));
     if (c.hp === 0) c.stock = createAmmoStock();
+  }
+}
+
+// Physical presence only: an enemy rifleman at a box nobody of its owner guards takes it over,
+// together with the paid rounds inside. Downed, carried and support troops cannot.
+export function updateCrateCapture(s) {
+  for (const c of s.ammoCrates || []) {
+    if (c.hp <= 0 || total(c) <= 0) continue;
+    let taker = null,
+      guarded = false;
+    for (const u of s.groundUnits) {
+      if (u.hp <= 0 || u.downed || u.carrierId || !isInfantry(u.key) || GROUND_UNITS[u.key].support)
+        continue;
+      const d = distance(u, c);
+      if (u.side === c.side || !hostile(s, u.side, c.side)) {
+        if (u.side === c.side && d <= FIELD_SUPPLY.guardRadius) guarded = true;
+      } else if (d <= FIELD_SUPPLY.captureRadius && (!taker || d < distance(taker, c))) taker = u;
+      if (guarded) break;
+    }
+    if (!taker || guarded) continue;
+    const from = c.side;
+    c.side = taker.side;
+    for (const u of s.groundUnits)
+      if (u.supplyTrip?.crateId === c.id && u.side === from) delete u.supplyTrip;
+    event(s, 'crateCaptured', { x: c.x, z: c.z, side: taker.side, from, crateId: c.id });
   }
 }

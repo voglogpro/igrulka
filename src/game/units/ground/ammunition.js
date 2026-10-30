@@ -11,7 +11,10 @@ export const AMMUNITION = {
   interval: 1,
   reserveCredits: 250,
   fleetLimit: 8,
-  speed: 32,
+  speed: 40,
+  // Weapon cargo per trip: a full drone rack, or a full missile silo.
+  weaponLoad: { drone: 6, missile: 4 },
+  searchesPerSide: 4,
   vehicle: { hp: 140, radius: 5, replacementCost: 100, replacementMetal: 8, replacementDelay: 20 },
   reach: 30,
 };

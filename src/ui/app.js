@@ -1209,7 +1209,10 @@ function updateLivePanel() {
             b.progress < 1
               ? 'База дронов строится'
               : b.queue?.length
-                ? `${E.WEAPONS[b.queue[0].key].name}: ${Math.floor(b.queue[0].progress * 100)}% · в очереди ${b.queue.length}`
+                ? `Линии ${Math.min(b.queue.length, E.FACTORY_LINES[b.level || 0])}/${E.FACTORY_LINES[b.level || 0]}: ${b.queue
+                    .slice(0, E.FACTORY_LINES[b.level || 0])
+                    .map((q) => `${E.WEAPONS[q.key].name} ${Math.floor(q.progress * 100)}%`)
+                    .join(', ')} · в очереди ${b.queue.length}`
                 : 'База дронов свободна',
           )
           .join(' · ')

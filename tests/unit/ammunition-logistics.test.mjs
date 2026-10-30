@@ -143,7 +143,7 @@ test('production stops without roads but paid stock still travels across real dr
     const start = { x: van.x, z: van.z };
     assert.equal(u.ammoReserve, 0, 'no warehouse teleport');
     E.advance(s, 1);
-    assert.ok(Math.hypot(van.x - start.x, van.z - start.z) <= 32.01);
+    assert.ok(Math.hypot(van.x - start.x, van.z - start.z) <= E.AMMUNITION.speed + 0.01);
     until(s, () => E.ammunitionStatus(s, u).total === 60, 40);
     assert.equal(s.sides[side].ammoStock.small, 0);
     assert.ok(s.ammoVehicles.every((v) => E.walkable(s, v.x, v.z, 3)));

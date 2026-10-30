@@ -5,6 +5,8 @@ import { BUILDINGS, WEAPONS } from '../config.js';
 import { event } from '../shared/events.js';
 import { supplyFactor } from './economy.js';
 import { passable, dirtyNetwork } from './road-network.js';
+// Assembly lines of a drone base by equipment level.
+export const FACTORY_LINES = [2, 3, 4];
 export function updateConstruction(s, rates, dt) {
   for (const b of s.buildings) {
     if (b.hp <= 0) continue;
@@ -22,19 +24,21 @@ export function updateConstruction(s, rates, dt) {
     }
     b.launchCooldown = Math.max(0, (b.launchCooldown || 0) - dt);
     if (b.key === 'factory' && b.queue?.length) {
-      const q = b.queue[0];
-      q.progress = Math.min(
-        1,
-        q.progress +
-          (dt *
-            rates[b.side].productivity *
-            supplyFactor(s, b) *
-            equipmentModifiers(b).production) /
-            WEAPONS[q.key].time,
-      );
-      if (q.progress >= 1 && acceptLaunchDelivery(b, q.key, 1)) {
-        b.queue.shift();
-        event(s, 'produced', { side: b.side, key: q.key, x: b.x, z: b.z });
+      // Parallel assembly lines: the first items of the paid queue are built side by side.
+      // A finished craft waits on its line until the factory warehouse has room for it.
+      const lines = Math.min(b.queue.length, FACTORY_LINES[Math.max(0, Math.min(2, b.level || 0))]),
+        rate =
+          dt * rates[b.side].productivity * supplyFactor(s, b) * equipmentModifiers(b).production;
+      for (let i = 0; i < lines; i++) {
+        const q = b.queue[i];
+        q.progress = Math.min(1, q.progress + rate / WEAPONS[q.key].time);
+      }
+      for (let i = 0; i < Math.min(lines, b.queue.length);) {
+        const q = b.queue[i];
+        if (q.progress >= 1 && acceptLaunchDelivery(b, q.key, 1)) {
+          b.queue.splice(i, 1);
+          event(s, 'produced', { side: b.side, key: q.key, x: b.x, z: b.z });
+        } else i++;
       }
     }
   }

@@ -176,3 +176,4 @@ export {
   RALLY_MODES,
   defaultRallyMode,
 } from './units/ground/index.js';
+export { FACTORY_LINES } from './city/update.js';

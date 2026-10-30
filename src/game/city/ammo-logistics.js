@@ -237,9 +237,12 @@ function jobs(s, v, depot) {
             : 0),
         0,
       );
+      // A van carries a whole rack load, shared fairly between the pads asking for this type.
+      const asking = requests.filter((r) => r.key === key && !r.manual).length || 1;
       const amount = Math.min(
-        ['drone', 'heavy'].includes(key) ? 4 : 2,
+        C.weaponLoad[['drone', 'heavy'].includes(key) ? 'drone' : 'missile'],
         weaponAvailable(key),
+        request.manual ? Infinity : Math.max(1, Math.ceil(weaponAvailable(key) / asking)),
         launchStoreCapacity(t) - launchStoreTotal(t) - allIncoming,
         request.manual
           ? request.amount - availableLaunchStock(t, key) - incoming(s, t.id, 'weapon', key)
@@ -250,7 +253,11 @@ function jobs(s, v, depot) {
           target: t,
           targetKind: 'building',
           cargo: { kind: 'weapon', key, amount },
-          urgency: (request.manual ? 4 : 0) + (launchStoreTotal(t) + allIncoming === 0 ? 2 : 0),
+          // Empty racks first, then the least filled: no pad hoards the whole output.
+          urgency:
+            (request.manual ? 4 : 0) +
+            (launchStoreTotal(t) + allIncoming === 0 ? 2 : 0) +
+            (1 - (launchStoreTotal(t) + allIncoming) / Math.max(1, launchStoreCapacity(t))),
         });
     }
   } else {
@@ -338,7 +345,8 @@ export function updateAmmoLogistics(s, dt) {
     s.ammoLogisticsAt = s.time + 1;
     reconcile(s);
   }
-  let searches = 0;
+  // Route searches are budgeted per side, so a large fleet of one city cannot starve another.
+  const used = s.sides.map(() => 0);
   for (const v of s.ammoVehicles || []) {
     if (v.hp <= 0) continue;
     const depot = s.buildings.find(
@@ -352,11 +360,17 @@ export function updateAmmoLogistics(s, dt) {
       (v.targetId != null || v.targetKind === 'field') &&
       (!target || (depot && !depotActive(s, depot)))
     ) {
-      if (searches++ < 4) returnHome(s, v);
+      if (used[v.side]++ < C.searchesPerSide) returnHome(s, v);
     }
-    if (thinking && searches < 4 && v.status === 'idle' && !v.cargo && depotActive(s, depot)) {
+    if (
+      thinking &&
+      used[v.side] < C.searchesPerSide &&
+      v.status === 'idle' &&
+      !v.cargo &&
+      depotActive(s, depot)
+    ) {
       for (const job of jobs(s, v, depot).slice(0, 3)) {
-        if (searches++ >= 4) break;
+        if (used[v.side]++ >= C.searchesPerSide) break;
         const goal = destination(s, v, job.target);
         if (!goal || !route(s, v, goal, 'outbound')) {
           job.target.ammoSupplyBlocked = true;
@@ -382,8 +396,13 @@ export function updateAmmoLogistics(s, dt) {
         break;
       }
     }
-    if (thinking && searches < 4 && v.status === 'blocked' && s.time >= v.retryAt) {
-      searches++;
+    if (
+      thinking &&
+      used[v.side] < C.searchesPerSide &&
+      v.status === 'blocked' &&
+      s.time >= v.retryAt
+    ) {
+      used[v.side]++;
       if (target) {
         const point = destination(s, v, target);
         if (point) route(s, v, point, 'outbound');
@@ -394,13 +413,13 @@ export function updateAmmoLogistics(s, dt) {
     // another real destination; never unload through the obstructing vehicle.
     if (
       thinking &&
-      searches < 4 &&
+      used[v.side] < C.searchesPerSide &&
       v.goal &&
       v.path.length &&
       ['outbound', 'returning'].includes(v.status) &&
       !parkingSpace(s, v, true)(v.goal)
     ) {
-      searches++;
+      used[v.side]++;
       if (v.status === 'returning') returnHome(s, v);
       else if (target) {
         const point = destination(s, v, target);
@@ -409,13 +428,13 @@ export function updateAmmoLogistics(s, dt) {
     }
     if (
       thinking &&
-      searches < 4 &&
+      used[v.side] < C.searchesPerSide &&
       v.status === 'outbound' &&
       target &&
       v.goal &&
       distance(v.goal, target) > C.reach + (BUILDINGS[target.key]?.size || 0) * 0.5
     ) {
-      searches++;
+      used[v.side]++;
       const point = destination(s, v, target);
       if (point && !route(s, v, point, 'outbound')) {
         v.status = 'blocked';
@@ -430,8 +449,8 @@ export function updateAmmoLogistics(s, dt) {
       v.status = 'unloading';
       v.unloadAt = s.time + 0.4;
     }
-    if (v.status === 'unloading' && s.time >= v.unloadAt && searches < 4) {
-      searches++;
+    if (v.status === 'unloading' && s.time >= v.unloadAt && used[v.side] < C.searchesPerSide) {
+      used[v.side]++;
       if (!unload(s, v)) {
         v.status = 'blocked';
         v.retryAt = s.time + 2;

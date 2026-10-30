@@ -137,7 +137,7 @@ test('empty automatic infantry physically approaches a local crate, reloads and 
     tripSeen = true;
   for (let t = 0; t < 15; t += 0.05) {
     E.step(s, 0.05);
-    approached ||= Math.hypot(u.x - crate.x, u.z - crate.z) < 36;
+    approached ||= Math.hypot(u.x - crate.x, u.z - crate.z) < 60;
     returned ||= tripSeen && !u.supplyTrip && Math.hypot(u.x - home.x, u.z - home.z) <= 4;
     tripSeen ||= !!u.supplyTrip;
   }

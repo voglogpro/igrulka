@@ -1,5 +1,5 @@
 import { GROUND_UNITS } from '../../config.js';
-import { FIELD_SUPPLY as C } from '../../city/field-ammo.js';
+import { FIELD_SUPPLY as C, updateCrateCapture } from '../../city/field-ammo.js';
 import { ammunitionProfile, ammunitionStatus, receiveAmmunition } from './ammunition.js';
 import { groundPath, walkable } from './navigation.js';
 import { clearGroundRoute } from './route-queue.js';
@@ -43,6 +43,7 @@ function finishTrip(s, u, blocked = false) {
 export function updateFieldSupply(s) {
   if (s.result || s.paused || s.time < (s.fieldSupplyAt || 0)) return;
   s.fieldSupplyAt = s.time + C.cadence;
+  updateCrateCapture(s);
   let searches = 0;
   const crates = (s.ammoCrates || []).filter((c) => c.hp > 0);
   const cursor = s.fieldSupplyCursor || 0,
@@ -143,7 +144,13 @@ export function updateFieldSupply(s) {
       continue;
     const candidates = crates
       .filter(
-        (c) => c.side === u.side && c.stock[profile.kind] > 0 && !unavailableAssaultCrate(s, u, c),
+        (c) =>
+          c.side === u.side &&
+          c.stock[profile.kind] > 0 &&
+          !unavailableAssaultCrate(s, u, c) &&
+          // A post walks only to a nearby box; a vehicle brings a new one closer otherwise.
+          // Attack groups may fall back further, but never across the map around the sea.
+          distance(u, c) <= (cityMission || combatOrder ? C.assaultWalkRadius : C.walkRadius),
       )
       .sort((a, b) => distance(u, a) - distance(u, b) || a.id - b.id);
     for (const crate of candidates) {

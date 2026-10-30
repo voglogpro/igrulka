@@ -238,7 +238,8 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
               v.cargo.amount > FIELD_SUPPLY.load[v.cargo.key]
             : depot.key !== 'factory' ||
               !['drone', 'heavy', 'cruise', 'ballistic'].includes(v.cargo.key) ||
-              v.cargo.amount > (['drone', 'heavy'].includes(v.cargo.key) ? 4 : 2)))) ||
+              v.cargo.amount >
+                C.weaponLoad[['drone', 'heavy'].includes(v.cargo.key) ? 'drone' : 'missile']))) ||
       (v.pickup != null &&
         (!record(v.pickup) ||
           depot.key !== 'factory' ||

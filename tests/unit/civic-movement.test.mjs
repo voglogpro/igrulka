@@ -204,7 +204,7 @@ test('actual ammo dispatch drives around a fixed MOG and delivers only its loade
   for (let i = 0; i < 1200 && silo.launchStore.cruise !== 1; i++) {
     const before = { x: van.x, z: van.z };
     E.step(s, 0.05);
-    assert.ok(distance(van, before) <= 1.6 + 1e-6);
+    assert.ok(distance(van, before) <= E.AMMUNITION.speed * 0.05 + 1e-6);
     separated([fixed, van]);
     assert.equal(
       (s.sides[0].inventory.cruise || 0) +
