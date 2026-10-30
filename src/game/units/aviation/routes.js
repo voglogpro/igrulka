@@ -1,5 +1,6 @@
+import { weaponFamily } from './weapons.config.js';
 export function flightRoute(origin, aim, key) {
-  const points = [origin, ...(key === 'ballistic' ? [] : aim.waypoints || []), aim],
+  const points = [origin, ...(weaponFamily(key) === 'ballistic' ? [] : aim.waypoints || []), aim],
     path = [{ x: origin.x, z: origin.z, d: 0 }];
   const add = (p) => {
     const a = path.at(-1),

@@ -1,4 +1,4 @@
-import { FIELD, GROUND_UNITS } from '../config.js';
+import { FIELD, GROUND_UNITS, WEAPONS } from '../config.js';
 import {
   AMMUNITION as C,
   createAmmoStock,
@@ -237,7 +237,7 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
               !Object.hasOwn(C.cargo, v.cargo.key) ||
               v.cargo.amount > FIELD_SUPPLY.load[v.cargo.key]
             : depot.key !== 'factory' ||
-              !['drone', 'heavy', 'cruise', 'ballistic'].includes(v.cargo.key) ||
+              !Object.hasOwn(WEAPONS, v.cargo.key) ||
               v.cargo.amount >
                 C.weaponLoad[['drone', 'heavy'].includes(v.cargo.key) ? 'drone' : 'missile']))) ||
       (v.pickup != null &&
@@ -247,7 +247,7 @@ export function restoreAmmunition(s, sourceVersion = s.version) {
           v.targetKind !== 'building' ||
           v.targetId == null ||
           !['outbound', 'unloading', 'blocked'].includes(v.status) ||
-          !['drone', 'heavy', 'cruise', 'ballistic'].includes(v.pickup.key) ||
+          !Object.hasOwn(WEAPONS, v.pickup.key) ||
           v.pickup.amount !== 1))
     )
       throw Error('Повреждена машина снабжения');

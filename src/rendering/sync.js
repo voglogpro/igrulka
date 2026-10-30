@@ -1,3 +1,4 @@
+import { weaponFamily } from '../game/units/aviation/weapons.config.js';
 import { updateSelectionCoverage } from './performance/selection-coverage.js';
 import { syncRoadVisuals } from './performance/road-visual-sync.js';
 import { disposeTree, batchStatic } from './mesh-utils.js';
@@ -304,7 +305,7 @@ export function sync() {
         ['impact', 'crash', 'destroy'].includes(e.type) ||
         (e.type === 'intercept' && e.mode === 'burst')
       )
-        this.addShake(e.x, e.z, e.key === 'ballistic' ? 2.5 : 1);
+        this.addShake(e.x, e.z, weaponFamily(e.key) === 'ballistic' ? 2.5 : 1);
       this.callbacks.onEvent?.(e);
     }
 }

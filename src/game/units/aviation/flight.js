@@ -1,3 +1,4 @@
+import { weaponFamily } from './weapons.config.js';
 import { hostile, sideIds } from '../../factions.js';
 import { event } from '../../shared/events.js';
 import { random } from '../../shared/random.js';
@@ -66,7 +67,7 @@ export function routePoint(origin, target, key, t, phase = 0, landing = false) {
     x: origin.x + dx * t - (dz / total) * wave,
     z: origin.z + dz * t + (dx / total) * wave,
     y:
-      key === 'ballistic'
+      weaponFamily(key) === 'ballistic'
         ? 5 + Math.sin(t * Math.PI) * d.altitude
         : Math.min(d.altitude, 5 + travelled * 0.48, 5 + (total - travelled) * 0.48),
   };
@@ -84,7 +85,7 @@ export function basePosition(u, travelled) {
     const p = pointOnRoute(u.route, Math.min(travelled, u.total));
     pos.x = p.x;
     pos.z = p.z;
-    if (u.key !== 'ballistic')
+    if (weaponFamily(u.key) !== 'ballistic')
       pos.y = Math.min(
         u.altitude || WEAPONS[u.key].altitude,
         5 + travelled * 0.48,

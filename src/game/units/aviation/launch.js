@@ -1,3 +1,4 @@
+import { isMissile } from './weapons.config.js';
 import { hostile } from '../../factions.js';
 import { MAP, WEAPONS, weaponStats } from '../../config.js';
 import { targetById } from '../../targets.js';
@@ -82,7 +83,7 @@ export function launchStatus(s, owner, key, aim, siteId = null) {
   const f = s.sides[owner];
   if (!f || !Object.hasOwn(WEAPONS, key)) return 'Неизвестное вооружение';
   if (!launchSites(s, owner, key).length)
-    return ['cruise', 'ballistic'].includes(key)
+    return isMissile(key)
       ? 'Постройте ракетную пусковую на суше'
       : 'Постройте площадку запуска дронов';
   const origin = selectedLaunchSite(s, owner, siteId, key);

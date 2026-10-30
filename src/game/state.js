@@ -1,4 +1,4 @@
-import { VERSION, HQ_X } from './config.js';
+import { VERSION, HQ_X, WEAPONS } from './config.js';
 import { HQ_Z } from './map.js';
 import { campRoads } from './city/roads.js';
 import { log } from './shared/events.js';
@@ -22,7 +22,7 @@ export const newSide = () => ({
   roadRecovery: null,
   armyComposition: createArmyComposition(),
   ammoStock: createAmmoStock(),
-  inventory: { drone: 0, heavy: 0, cruise: 0, ballistic: 0 },
+  inventory: Object.fromEntries(Object.keys(WEAPONS).map((key) => [key, 0])),
   spentAmmo: 0,
   ammoProductionSpent: 0,
   rearAuto: true,

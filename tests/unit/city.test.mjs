@@ -317,6 +317,7 @@ test('state round trips, validates resources and rejects foreign saves', () => {
   s.sides[0].credits = -1;
   assert.throws(() => E.load(E.save(s)));
 });
+const BASE_WEAPONS = ['drone', 'heavy', 'cruise', 'ballistic'];
 test('all four base weapons participate in a live defended battle without research', () => {
   const s = fresh();
   funds(s);
@@ -334,10 +335,10 @@ test('all four base weapons participate in a live defended battle without resear
     ready(s, owner, 'gun', x + (owner === 0 ? 170 : -170), 0);
     ready(s, owner, 'sam', x + (owner === 0 ? 180 : -180), 85);
     ready(s, owner, 'silo', x + (owner === 0 ? 170 : -170), 180);
-    for (const key of Object.keys(E.WEAPONS)) assert.equal(E.produce(s, owner, key, 2), true);
+    for (const key of BASE_WEAPONS) assert.equal(E.produce(s, owner, key, 2), true);
   }
   E.advance(s, 420);
-  for (const key of Object.keys(E.WEAPONS)) {
+  for (const key of BASE_WEAPONS) {
     for (const owner of [0, 1]) {
       assert.ok(E.weaponStock(s, owner, key) >= 2);
       let launched = 0;

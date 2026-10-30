@@ -1,3 +1,4 @@
+import { weaponFamily } from '../../game/units/aviation/weapons.config.js';
 import { deliveryText } from '../format.js';
 // Strike owns its bounded targeting model. No application globals are captured:
 // simulation/world reads, commands and cross-tool transitions are named ports.
@@ -55,7 +56,10 @@ export function createStrikeController({
     updateStrikeHUD();
   }
   function attackAim() {
-    return { ...model.aimPoint, waypoints: model.weapon === 'ballistic' ? [] : model.waypoints };
+    return {
+      ...model.aimPoint,
+      waypoints: weaponFamily(model.weapon) === 'ballistic' ? [] : model.waypoints,
+    };
   }
   function refreshOrderPreview() {
     getWorld().setOrderPreview(
@@ -113,9 +117,9 @@ export function createStrikeController({
     query('#route-toggle').textContent = model.routeEditing
       ? 'Готово · наводить'
       : 'Задать маршрут';
-    query('#route-toggle').disabled = model.weapon === 'ballistic';
+    query('#route-toggle').disabled = weaponFamily(model.weapon) === 'ballistic';
     query('#waypoint-status').textContent =
-      model.weapon === 'ballistic'
+      weaponFamily(model.weapon) === 'ballistic'
         ? 'Баллистическая ракета летит по прямой дуге'
         : model.routeEditing
           ? `Кликайте точки пути: ${model.waypoints.length}/10. Затем «Готово» и цель.`
@@ -135,7 +139,7 @@ export function createStrikeController({
     const tool = interaction.getBuildTool();
     if (tool) interaction.chooseBuild(tool);
     model.weapon = key;
-    if (key === 'ballistic') model.routeEditing = false;
+    if (weaponFamily(key) === 'ballistic') model.routeEditing = false;
     interaction.clearInspection();
     model.aiming = true;
     getWorld().setAiming(true);
@@ -153,7 +157,7 @@ export function createStrikeController({
   async function chooseAimPoint(p, modifiers = {}) {
     if (!getStarted() || !model.aiming) return;
     const revision = getRevision();
-    if ((model.routeEditing || modifiers.shift) && model.weapon !== 'ballistic') {
+    if ((model.routeEditing || modifiers.shift) && weaponFamily(model.weapon) !== 'ballistic') {
       if (model.waypoints.length >= 10) {
         toast('До 10 точек маршрута', true);
         return;

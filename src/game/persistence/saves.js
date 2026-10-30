@@ -127,6 +127,8 @@ export function load(raw) {
       f.tech.some((k) => !configured(TECH, k)) ||
       !f.inventory ||
       typeof f.inventory !== 'object' ||
+      // Weapon types added in 8.15 start at zero for older campaigns.
+      Object.keys(WEAPONS).some((k) => (f.inventory[k] ??= 0) === undefined) ||
       Array.isArray(f.inventory) ||
       Object.keys(f.inventory).some((k) => !configured(WEAPONS, k)) ||
       Object.keys(WEAPONS).some((k) => !Number.isFinite(f.inventory[k]) || f.inventory[k] < 0)

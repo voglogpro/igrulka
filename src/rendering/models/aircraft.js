@@ -1,3 +1,4 @@
+import { weaponFamily } from '../../game/units/aviation/weapons.config.js';
 import * as T from '../../../vendor/three/three.module.js';
 import { batchStatic } from '../mesh-utils.js';
 function wingGeometry(side, scale) {
@@ -141,12 +142,20 @@ function buildTemplate(w, key, side) {
       for (const sign of [-1, 1]) box(details, sign * 2.8, -0.7, 0, 0.7, 0.8, 4.2, '#7e8c80');
     }
   } else {
-    const ballistic = key === 'ballistic',
-      r = ballistic ? 1.15 : 0.7,
-      len = ballistic ? 12 : 11;
+    const ballistic = weaponFamily(key) === 'ballistic',
+      // Variants keep one family silhouette: a slim tactical round, a fat cluster carrier and
+      // a dark, flattened low-signature cruise body.
+      shape = {
+        tactical: [0.9, 10],
+        cluster: [1.35, 13],
+        stealth: [0.62, 10],
+      }[key] || [ballistic ? 1.15 : 0.7, ballistic ? 12 : 11],
+      r = shape[0],
+      len = shape[1],
+      skin = key === 'stealth' ? '#4f5856' : key === 'cluster' ? '#a49a74' : color;
     const body = new T.Mesh(
       new T.CylinderGeometry(r, r * 1.08, len, 16),
-      w.mat(color, { metalness: 0.4, roughness: 0.35 }),
+      w.mat(skin, { metalness: 0.4, roughness: 0.35 }),
     );
     body.rotation.x = Math.PI / 2;
     g.add(body);

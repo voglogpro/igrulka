@@ -44,9 +44,10 @@ export function defenseStats(f, b) {
     heatPerShot: d.heatPerShot * (modifiers.heat || 1),
   };
 }
+export { weaponFamily, isMissile } from './units/aviation/weapons.config.js';
 export function canEngageAir(key, target) {
   return key === 'sam'
-    ? ['drone', 'heavy', 'cruise', 'ballistic'].includes(target)
+    ? Object.hasOwn(WEAPONS, target)
     : [
         'gun',
         'mog',
@@ -57,6 +58,5 @@ export function canEngageAir(key, target) {
         'operator',
         'shilka',
         'gepard',
-      ].includes(key) &&
-        (target === 'drone' || target === 'heavy');
+      ].includes(key) && WEAPONS[target]?.family === 'drone';
 }

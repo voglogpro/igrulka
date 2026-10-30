@@ -131,7 +131,7 @@ test('a factory warehouses all four types and cannot launch any type directly', 
     assert.equal(E.launchStoreCapacity(b, key), 24);
     assert.equal(typeof E.launch(s, 0, key, { x: 1092, z: 0 }, 1, b.id), 'string');
   }
-  assert.equal(E.launchStoreTotal(b), 8);
+  assert.equal(E.launchStoreTotal(b), 2 * Object.keys(E.WEAPONS).length);
   assert.equal(E.launchSites(s, 0).length, 0);
 });
 

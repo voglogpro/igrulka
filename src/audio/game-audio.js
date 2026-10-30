@@ -1,3 +1,4 @@
+import { weaponFamily, isMissile } from '../game/units/aviation/weapons.config.js';
 import { ImpactReturn, IMPACT_RETURNS, impactReturnGain } from './impact-return.js';
 import { uavEngineMix } from './engines.js';
 import { FootstepScheduler } from './footsteps.js';
@@ -362,7 +363,8 @@ export class GameAudio {
       ['impact', 'destroy', 'crash', 'groundDestroyed'].includes(e.type) ||
       (e.type === 'intercept' && e.mode !== 'fall')
     ) {
-      const large = e.key === 'ballistic' || e.key === 'heavy' || e.type === 'destroy',
+      const large =
+          weaponFamily(e.key) === 'ballistic' || e.key === 'heavy' || e.type === 'destroy',
         small = e.key === 'tank' || e.key === 'fpv' || e.type === 'intercept',
         name = large ? 'blastLarge' : small ? 'blastSmall' : 'blast';
       if (this.throttle('blast:' + name, 0.06))
@@ -407,10 +409,14 @@ export class GameAudio {
     }
     if (e.type === 'launch' && this.throttle('launch', 0.1))
       this.sample(
-        e.key === 'ballistic' ? 'ballisticLaunch' : e.key === 'cruise' ? 'cruiseLaunch' : 'whoosh',
+        weaponFamily(e.key) === 'ballistic'
+          ? 'ballisticLaunch'
+          : weaponFamily(e.key) === 'cruise'
+            ? 'cruiseLaunch'
+            : 'whoosh',
         where.distance,
         where.pan,
-        e.key === 'ballistic' ? 1.05 : 0.8,
+        weaponFamily(e.key) === 'ballistic' ? 1.05 : 0.8,
       );
   }
   createEngines() {
@@ -490,7 +496,7 @@ export class GameAudio {
   incoming(state) {
     for (const u of state.units || []) {
       if (
-        u.key !== 'ballistic' ||
+        weaponFamily(u.key) !== 'ballistic' ||
         u.hp <= 0 ||
         u.delay > 0 ||
         u.status === 'falling' ||
@@ -578,13 +584,7 @@ export class GameAudio {
     if (!paused) {
       for (const u of state.units)
         if (u.hp > 0 && u.delay <= 0 && u.status !== 'falling')
-          wanted[
-            ['cruise', 'ballistic'].includes(u.key)
-              ? 'jet'
-              : u.subtype === 'fpv'
-                ? 'rotor'
-                : 'moped'
-          ].push(u);
+          wanted[isMissile(u.key) ? 'jet' : u.subtype === 'fpv' ? 'rotor' : 'moped'].push(u);
       for (const p of state.projectiles || [])
         if (!p.dead && (p.shooterKey === 'mlrs' || p.kind === 'interceptor')) wanted.jet.push(p);
       // Nearby foot soldiers use the bounded one-shot scheduler above.

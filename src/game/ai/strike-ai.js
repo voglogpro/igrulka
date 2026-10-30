@@ -1,4 +1,4 @@
-import { WEAPONS, GROUND_UNITS, SEA, CORRIDORS } from '../config.js';
+import { WEAPONS, GROUND_UNITS, SEA, CORRIDORS, weaponFamily, isMissile } from '../config.js';
 import { hostile, hqOf, pairedEnemy, frontIds, frontDirection } from '../factions.js';
 import { random } from '../shared/random.js';
 import { produce } from '../units/aviation/production.js';
@@ -70,7 +70,17 @@ function weaponWeights(s, side) {
     drone: 3 + sam * 2 + gun * 0.5,
     heavy: 2,
     cruise: sam ? 1 : 3,
+    // Low-signature missiles slip under standing batteries.
+    stealth: sam ? 1 + sam * 0.5 : 0.5,
     ballistic: weaponStock(s, side, 'ballistic') >= 2 ? 0 : sam ? 1 + sam : 0.5,
+    tactical: weaponStock(s, side, 'tactical') >= 2 ? 0 : sam ? 1 : 0.7,
+    // Cluster warheads answer dug-in troops.
+    cluster:
+      weaponStock(s, side, 'cluster') >= 2
+        ? 0
+        : s.trenches.some((t) => hostile(s, side, t.side) && t.progress >= 1)
+          ? 1.2
+          : 0.2,
   };
 }
 
@@ -153,7 +163,7 @@ function strategicTarget(s, side, key, defences) {
     local = enemies.filter((b) => b.side === pairedEnemy(s, side)),
     front = local.length ? local : enemies;
   // Missiles open the enemy air defence first; drones then keep hitting the economy behind it.
-  if (defences.sam && ['ballistic', 'cruise'].includes(key)) {
+  if (defences.sam && isMissile(key) && key !== 'cluster') {
     const sams = front.filter((b) => b.key === 'sam' || b.key === 'radar');
     if (sams.length) return sams[Math.floor(random(s) * sams.length)];
   }
@@ -172,7 +182,7 @@ function strategicTarget(s, side, key, defences) {
 
 function aimAt(s, side, key, target) {
   const hq = hqOf(s, side);
-  const flank = ['drone', 'heavy', 'cruise'].includes(key) && random(s) < 0.45;
+  const flank = weaponFamily(key) !== 'ballistic' && random(s) < 0.45;
   if (!flank || !hq) return target.id ?? { x: target.x, z: target.z };
   const fronts = frontIds(s, side),
     id = fronts.length === 1 ? fronts[0] : random(s) < 0.5 ? 'north' : 'south',
@@ -203,7 +213,7 @@ export function updateStrikes(s, side, reserve) {
     salvo = Math.min(STRIKE.salvoMax, Math.max(STRIKE.salvoMin, 2 + defences.sam)),
     stock = totalStock(s, side);
   if (stock < salvo && stock < strikeStockTarget(s, side, reserve)) return launched;
-  for (const key of ['ballistic', 'cruise', 'heavy', 'drone']) {
+  for (const key of ['ballistic', 'tactical', 'stealth', 'cruise', 'heavy', 'drone']) {
     const target = strategicTarget(s, side, key, defences);
     if (!target) break;
     const aim = aimAt(s, side, key, target);

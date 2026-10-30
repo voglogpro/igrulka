@@ -1,6 +1,7 @@
 // Fictional game values. Change balance here, not in rendering code.
 export const WEAPONS = {
   drone: {
+    family: 'drone',
     name: 'Лёгкий дрон',
     cost: 90,
     oil: 3,
@@ -14,6 +15,7 @@ export const WEAPONS = {
     altitude: 43,
   },
   heavy: {
+    family: 'drone',
     name: 'Тяжёлый дрон',
     cost: 180,
     oil: 6,
@@ -27,6 +29,7 @@ export const WEAPONS = {
     altitude: 57,
   },
   cruise: {
+    family: 'cruise',
     name: 'Крылатая ракета',
     cost: 340,
     oil: 15,
@@ -40,6 +43,7 @@ export const WEAPONS = {
     altitude: 35,
   },
   ballistic: {
+    family: 'ballistic',
     name: 'Баллистическая ракета',
     cost: 650,
     oil: 25,
@@ -52,4 +56,52 @@ export const WEAPONS = {
     blast: 75,
     altitude: 235,
   },
+  // Low terrain-following cruise missile: the defence notices it only at a fraction of its range.
+  stealth: {
+    family: 'cruise',
+    name: 'Малозаметная крылатая ракета',
+    cost: 430,
+    oil: 16,
+    components: 8,
+    metal: 30,
+    time: 34,
+    hp: 45,
+    speed: 70,
+    damage: 280,
+    blast: 40,
+    altitude: 18,
+    signature: 0.55,
+  },
+  // Short-range ballistic missile: cheaper and faster, a smaller warhead.
+  tactical: {
+    family: 'ballistic',
+    name: 'Оперативно-тактическая ракета',
+    cost: 430,
+    oil: 18,
+    components: 7,
+    metal: 36,
+    time: 30,
+    hp: 110,
+    speed: 115,
+    damage: 420,
+    blast: 55,
+    altitude: 160,
+  },
+  // Cluster warhead: a wide footprint against troops, trenches and parked vehicles.
+  cluster: {
+    family: 'ballistic',
+    name: 'Ракета с кассетной БЧ',
+    cost: 560,
+    oil: 22,
+    components: 9,
+    metal: 44,
+    time: 38,
+    hp: 140,
+    speed: 90,
+    damage: 230,
+    blast: 135,
+    altitude: 220,
+  },
 };
+export const weaponFamily = (key) => WEAPONS[key]?.family || null;
+export const isMissile = (key) => ['cruise', 'ballistic'].includes(weaponFamily(key));

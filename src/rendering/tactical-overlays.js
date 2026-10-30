@@ -1,3 +1,4 @@
+import { weaponFamily } from '../game/units/aviation/weapons.config.js';
 import * as T from '../../vendor/three/three.module.js';
 import * as E from '../game/index.js';
 // One persistent route and two rings. Moving the cursor never allocates GPU objects.
@@ -309,7 +310,7 @@ export class TacticalView {
         const q = E.pointOnRoute(route, (total * i) / 64);
         p.x = q.x;
         p.z = q.z;
-        if (order.key !== 'ballistic')
+        if (weaponFamily(order.key) !== 'ballistic')
           p.y = Math.min(
             d.altitude,
             5 + ((total * i) / 64) * 0.48,
@@ -324,7 +325,7 @@ export class TacticalView {
     }
     this.route.geometry.attributes.position.needsUpdate = true;
     this.route.geometry.attributes.lineDistance.needsUpdate = true;
-    const markers = order.key === 'ballistic' ? [] : aim.waypoints || [];
+    const markers = weaponFamily(order.key) === 'ballistic' ? [] : aim.waypoints || [];
     this.markers.count = markers.length;
     for (let i = 0; i < markers.length; i++) {
       this.dummy.position.set(markers[i].x, 1.7, markers[i].z);

@@ -732,7 +732,7 @@ test('exact paid construction tiers and participating enemy aircraft have canoni
   );
   for (const job of jobs) families.prepare(job);
   const result = families.diagnostics();
-  assert.ok(jobs.length <= 134, `${jobs.length} bounded jobs`);
+  assert.ok(jobs.length <= 146, `${jobs.length} bounded jobs`);
   assert.ok(
     result.geometryBytes < 16 * 1024 * 1024,
     `${result.geometryBytes} unique geometry bytes`,

@@ -11,6 +11,9 @@ const radii = {
   heavy: 3.1,
   cruise: 4,
   ballistic: 6.5,
+  stealth: 3.8,
+  tactical: 5,
+  cluster: 9,
 };
 const known = (kind) => typeof kind === 'string' && Object.hasOwn(radii, kind);
 

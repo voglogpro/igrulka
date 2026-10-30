@@ -109,7 +109,8 @@ export function fireDefenses(s, rates, dt) {
       )
         continue;
       const distance = Math.hypot(candidate.x - b.x, candidate.z - b.z);
-      if (distance >= range) continue;
+      // A low-signature missile is noticed only at a fraction of the battery's reach.
+      if (distance >= range * (WEAPONS[candidate.key]?.signature ?? 1)) continue;
       const others = (tracked.get(candidate.id) || 0) - (b.trackId === candidate.id ? 1 : 0),
         toughness = missile ? 0 : Math.min(3, candidate.hp / Math.max(1, d.damage * 6)),
         score =

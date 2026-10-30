@@ -1,3 +1,4 @@
+import { weaponFamily } from '../game/units/aviation/weapons.config.js';
 import { pcm as rocket, sampleRate as rocketRate } from './samples/rocket-launch.js';
 import { pcm as cruise, sampleRate as cruiseRate } from './samples/cruise-launch.js';
 import { pcm as ballistic, sampleRate as ballisticRate } from './samples/ballistic-launch.js';
@@ -56,7 +57,7 @@ export function recordedJetMix(unit, distance, listener) {
         : 0,
     doppler = Math.max(0.84, Math.min(1.18, 343 / Math.max(240, 343 - approach)));
   return {
-    rate: (unit.key === 'ballistic' ? 0.92 : 1.04) * doppler,
+    rate: (weaponFamily(unit.key) === 'ballistic' ? 0.92 : 1.04) * doppler,
     gain: 0.27 * (260 / (260 + d)),
     cutoff: Math.max(900, Math.min(6000, 10000 * Math.exp(-d / 1100))),
   };

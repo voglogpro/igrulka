@@ -1,3 +1,4 @@
+import { weaponFamily, isMissile } from '../../game/units/aviation/weapons.config.js';
 import * as T from '../../../vendor/three/three.module.js';
 import { ParticleBatch } from './particles.js';
 import { StreakBatch, StreakParticles } from './streaks.js';
@@ -601,7 +602,7 @@ export class CombatEffects {
             vz: (Math.random() - 0.5) * 35,
           });
         this.fragment(e.x, e.y, e.z, 3, e.vx, e.vy, e.vz);
-      } else this.explode(e.x, e.y, e.z, e.key === 'ballistic' ? 1.6 : 1, true);
+      } else this.explode(e.x, e.y, e.z, weaponFamily(e.key) === 'ballistic' ? 1.6 : 1, true);
     }
     if (e.type === 'impact' || e.type === 'crash')
       this.explode(
@@ -616,7 +617,7 @@ export class CombatEffects {
               ? 1.05
               : e.key === 'tank'
                 ? 0.8
-                : e.key === 'ballistic'
+                : weaponFamily(e.key) === 'ballistic'
                   ? 2.6
                   : e.key === 'heavy'
                     ? 1.7
@@ -698,7 +699,7 @@ export class CombatEffects {
     for (const u of state.units) {
       if (u.delay > 0 || !visible(u)) continue;
       const burning = u.status === 'falling' || u.hp / u.maxHp < 0.45,
-        missile = ['cruise', 'ballistic'].includes(u.key),
+        missile = isMissile(u.key),
         interval = burning ? 0.055 : missile ? 0.055 : 0.18;
       if (this.clock - (this.emitters.get(u.id) || 0) < interval) continue;
       this.emitters.set(u.id, this.clock);

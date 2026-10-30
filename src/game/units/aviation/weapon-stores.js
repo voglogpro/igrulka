@@ -1,3 +1,4 @@
+import { isMissile } from './weapons.config.js';
 import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
 import { WEAPONS } from '../../config.js';
 
@@ -10,7 +11,7 @@ export function weaponStoreAllows(site, key) {
     Object.hasOwn(WEAPONS, key) &&
     (site?.key === 'factory' ||
       (site?.key === 'launcher' && ['drone', 'heavy'].includes(key)) ||
-      (site?.key === 'silo' && ['cruise', 'ballistic'].includes(key)))
+      (site?.key === 'silo' && isMissile(key)))
   );
 }
 export function launchSiteAllows(site, key) {
