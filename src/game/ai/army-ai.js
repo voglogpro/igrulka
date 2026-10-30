@@ -6,6 +6,8 @@ import { difficultyOf } from './difficulty.config.js';
 import { chooseArmyRecruit, needsDepotInfantry, infrastructureReserve } from './depot-doctrine.js';
 import { defenseAttackStatus, launchDefenseAttack } from '../units/ground/defense-attack.js';
 
+export const ARMY_PACE = Object.freeze({ credits: 1500, max: 4 });
+
 // The decision clock survives loading: a cold mid-second save must not issue
 // fresh orders early. The shared coordinator still owns all actual positions.
 export const needsCaptureInfantry = needsDepotInfantry;
@@ -39,7 +41,6 @@ export function updateArmyAI(s, _hooks, side = 1) {
   }
   const level = difficultyOf(s);
   if (s.time <= level.armyFrom || (memory.nextArmy || 0) >= s.time) return;
-  memory.nextArmy = s.time + level.armyEvery;
   const facilities = new Set(
     s.buildings
       .filter((b) => b.side === side && b.hp > 0 && b.progress >= 1 && !b.demolished)
@@ -50,6 +51,13 @@ export function updateArmyAI(s, _hooks, side = 1) {
   // Waiting for an entire future escalated building quote can postpone both
   // depot captures indefinitely; ordinary mixed reinforcements still protect it.
   const reserve = needsDepotInfantry(s, side) ? 250 : Math.max(250, planned);
+  // Spare money above the reserve shortens the recruitment interval instead of idling in the
+  // treasury. One choice per interval keeps the mixed-role doctrine and its queue counting.
+  const pace = Math.min(
+    ARMY_PACE.max,
+    1 + Math.floor(Math.max(0, s.sides[side].credits - reserve) / ARMY_PACE.credits),
+  );
+  memory.nextArmy = s.time + level.armyEvery / pace;
   const key = chooseArmyRecruit(s, side, facilities, { reserve });
   if (key) recruit(s, side, key, null, 1);
 }

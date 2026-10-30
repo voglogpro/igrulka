@@ -34,21 +34,21 @@ test('retired research never consumes AI money or creates lab projects', () => {
   );
 });
 
-test('removing research preserves every difficulty income bonus and army/raid cadence', () => {
+test('removing research preserves every difficulty income bonus and army cadence; raids follow the budget', () => {
   const expected = {
-    easy: [1, 28, 46],
-    normal: [1.1, 21, 36],
-    hard: [1.25, 17, 28],
-    ultra: [1.45, 12, 21],
+    easy: [1, 28],
+    normal: [1.1, 21],
+    hard: [1.25, 17],
+    ultra: [1.45, 12],
   };
-  for (const [difficulty, [bonus, armyEvery, attackEvery]] of Object.entries(expected)) {
+  for (const [difficulty, [bonus, armyEvery]] of Object.entries(expected)) {
     const s = fresh();
     s.difficulty = difficulty;
     s.ai.nextResearch = 0;
     ai(s);
     assert.equal(E.economy(s, 1).bonus, bonus);
     assert.equal(E.DIFFICULTY[difficulty].armyEvery, armyEvery);
-    assert.equal(E.DIFFICULTY[difficulty].attackEvery, attackEvery);
+    assert.equal(Object.hasOwn(E.DIFFICULTY[difficulty], 'attackEvery'), false);
     assert.equal(s.sides[1].research, null);
   }
 });

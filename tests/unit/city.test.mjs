@@ -5,7 +5,7 @@ import { FixedCamera, CAMERA } from '../../src/rendering/camera.js';
 import { PerspectiveCamera, Vector3 } from '../../vendor/three/three.module.js';
 const fresh = () => {
   const s = E.createGame(117);
-  s.ai.nextBuild = s.ai.nextAttack = s.ai.nextResearch = s.ai.nextScout = 1e9;
+  s.ai.nextBuild = s.ai.nextAttack = s.ai.nextResearch = s.ai.nextScout = s.ai.nextStrike = 1e9;
   return s;
 };
 function ready(s, side, key, x, z) {

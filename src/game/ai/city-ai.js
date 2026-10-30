@@ -1,22 +1,20 @@
 import { aiState } from './state.js';
-import { hqOf, pairedEnemy, validSide, frontIds } from '../factions.js';
-import { BUILDINGS, WEAPONS, HQ_X, SEA, CORRIDORS } from '../config.js';
+import { hqOf, validSide } from '../factions.js';
+import { BUILDINGS } from '../config.js';
 import { demolish, repair, canPlace, build } from '../city/construction.js';
 import { passable, overlappingRoad } from '../city/road-network.js';
 import { economy } from '../city/economy.js';
 import { buildRoad } from '../city/roads.js';
 import { difficultyOf } from './difficulty.config.js';
 import { random } from '../shared/random.js';
-import { produce } from '../units/aviation/production.js';
-import { knownTargets } from '../visibility.js';
-import { launch } from '../units/aviation/launch.js';
 import { oilPlan } from './oil-ai.js';
 import { settlementRoadPlan } from './settlement-ai.js';
-import { weaponStock } from '../units/aviation/launch-supply.js';
+import { updateStrikeProduction, updateStrikes } from './strike-ai.js';
 import { armyProductionReserve, infrastructureReserve } from './depot-doctrine.js';
 import { launchAIAssault } from './army-ai.js';
-import { componentCost, hasComponents } from '../city/electronics.js';
-import { hasOil } from '../city/oil.js';
+
+const ASSAULT_CADENCE = 30,
+  ASSAULT_JITTER = 12;
 
 // Rebuild once per second and persist the decision window, so loading midway
 // through it cannot spend a different budget or consume different random draws.
@@ -96,6 +94,18 @@ export function ai(s, side = 1) {
         ['market', s.time > 420 ? 1 : 0],
         ['gun', Math.min(6, 3 + Math.floor(s.time / 240))],
       ];
+      // A treasury that keeps growing expands production and air defence instead of idling.
+      if (f.credits > 2500 && s.time > 600)
+        goals.push(
+          ['sam', 4],
+          ['factory', 3],
+          ['launcher', 3],
+          ['barracks', 2],
+          ['vehiclebase', 2],
+          ['silo', 2],
+          ['housing', 12],
+          ['industry', 7],
+        );
       key = goals.find(([k, n]) => active(k).length < n)?.[0] || null;
     }
     if (!key && !oilBusy) settlementRoadPlan(s, side);
@@ -144,70 +154,16 @@ export function ai(s, side = 1) {
       }
     }
   }
-  if (ready('factory').length) {
-    const queued = ready('factory').reduce((n, b) => n + (b.queue?.length || 0), 0),
-      stock = Object.keys(WEAPONS).reduce((n, key) => n + weaponStock(s, side, key), 0),
-      reserve = Math.max(
-        infrastructureReserve(s, side, memory.plannedBuild) || 150,
-        groundBudget(s, side),
-      );
-    if (
-      queued < 3 &&
-      stock < 7 &&
-      f.credits > reserve + 90 &&
-      f.materials > 30 &&
-      hasComponents(s, side, componentCost(s, WEAPONS.drone))
-    ) {
-      let key = random(s) > 0.5 ? 'cruise' : random(s) > 0.5 ? 'heavy' : 'drone';
-      if (random(s) > 0.75) key = 'ballistic';
-      const affordable = (key) =>
-        f.credits >= reserve + WEAPONS[key].cost &&
-        f.materials >= WEAPONS[key].metal &&
-        hasOil(s, side, WEAPONS[key].oil) &&
-        hasComponents(s, side, componentCost(s, WEAPONS[key]));
-      if (!affordable(key)) key = 'drone';
-      if (affordable(key)) produce(s, side, key);
-    }
-  }
+  // Weapons and launches follow the budget and the enemy's defences at a fixed cadence.
+  const reserve = Math.max(
+    infrastructureReserve(s, side, memory.plannedBuild) || 150,
+    groundBudget(s, side),
+  );
+  if (ready('factory').length && f.materials > 30) updateStrikeProduction(s, side, reserve);
+  updateStrikes(s, side, reserve);
+  // Ground offensives are timed by force readiness, not by difficulty.
   if (s.time >= memory.nextAttack) {
-    memory.nextAttack =
-      s.time + difficultyOf(s).attackEvery + random(s) * difficultyOf(s).attackJitter;
+    memory.nextAttack = s.time + ASSAULT_CADENCE + random(s) * ASSAULT_JITTER;
     launchAIAssault(s, side);
-    const enemies = knownTargets(s, side);
-    const local = enemies.filter((b) => b.side === pairedEnemy(s, side));
-    const front = local.length ? local : enemies;
-    let targets = front.filter((b) => b.key !== 'road');
-    if (random(s) < 0.28) {
-      const roads = front.filter((r) => r.key === 'road' && passable(r));
-      if (roads.length) targets = roads;
-    }
-    const weighted = targets.flatMap((b) =>
-        Array(['hq', 'power', 'factory', 'launcher'].includes(b.key) ? 3 : 1).fill(b),
-      ),
-      target = weighted[Math.floor(random(s) * weighted.length)] ||
-        hqOf(s, pairedEnemy(s, side)) || { x: -HQ_X, z: hq.z };
-    if (target)
-      for (const key of Object.keys(WEAPONS))
-        if (weaponStock(s, side, key)) {
-          const flank = ['drone', 'heavy', 'cruise'].includes(key) && random(s) < 0.45,
-            z =
-              frontIds(s, side).length === 1
-                ? CORRIDORS[frontIds(s, side)[0] === 'north' ? 0 : 1]
-                : random(s) < 0.5
-                  ? CORRIDORS[0]
-                  : CORRIDORS[1],
-            aim = flank
-              ? {
-                  x: target.x,
-                  z: target.z,
-                  waypoints: [
-                    { x: SEA.halfX + 90, z },
-                    { x: -SEA.halfX - 90, z },
-                  ],
-                }
-              : (target.id ?? target);
-          const r = launch(s, side, key, aim, 6);
-          if (typeof r === 'number') break;
-        }
   }
 }

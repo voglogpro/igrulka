@@ -8,6 +8,7 @@ function restorePlan(s, plan) {
     !timer(plan.nextBuild) ||
     !timer(plan.nextAttack) ||
     (plan.nextArmy != null && !timer(plan.nextArmy)) ||
+    (plan.nextStrike != null && !timer(plan.nextStrike)) ||
     (plan.roadPlan != null &&
       (!Number.isSafeInteger(plan.roadPlan) || plan.roadPlan < 0 || plan.roadPlan > 10000)) ||
     (plan.plannedBuild != null && !Object.hasOwn(BUILDINGS, plan.plannedBuild))
@@ -32,7 +33,7 @@ function restorePlan(s, plan) {
   )
     throw Error('Повреждён такт армии бота');
   const restored = Object.fromEntries(
-    ['nextBuild', 'nextAttack', 'roadPlan', 'nextArmy', 'plannedBuild']
+    ['nextBuild', 'nextAttack', 'roadPlan', 'nextArmy', 'nextStrike', 'plannedBuild']
       .filter((key) => Object.hasOwn(plan, key))
       .map((key) => [key, plan[key]]),
   );

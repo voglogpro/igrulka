@@ -7,6 +7,7 @@ export function aiState(s, side = 1) {
     plan = s.aiBySide[side] ||= { nextBuild: 7, nextAttack: 170, roadPlan: 0 };
   }
   plan.aiDefenseAt ??= 0;
+  plan.nextStrike ??= 0;
   plan.aiGroundReserve ??= { amount: 0, nextAt: 0 };
   return plan;
 }

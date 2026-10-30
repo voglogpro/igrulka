@@ -1,45 +1,35 @@
-// Bot difficulty. Prices and starting resources stay equal; only the bot's resource income bonus
-// and the pace of its army and raids change. "hard" matches earlier versions.
+// Bot difficulty. Prices and starting resources stay equal; difficulty changes only the bot's
+// resource income bonus and the pace of its army recruitment. Air strikes and ground
+// offensives follow the bot's budget, the enemy's defences and its force readiness the same
+// way on every difficulty (ai/strike-ai.js), so a richer bot simply fields more.
 export const DIFFICULTY = {
   easy: {
     name: 'Лёгкий',
-    description: 'Без бонуса дохода, редкие налёты и медленный набор армии.',
+    description: 'Без бонуса дохода, медленный набор армии. Удары — по бюджету.',
     bonus: 1,
     armyFrom: 380,
     armyEvery: 28,
-    attackEvery: 46,
-    attackJitter: 26,
-    researchEvery: 22,
   },
   normal: {
     name: 'Средний',
-    description: 'Доход бота +10%, умеренный темп.',
+    description: 'Доход бота +10%, умеренный набор армии. Удары — по бюджету.',
     bonus: 1.1,
     armyFrom: 300,
     armyEvery: 21,
-    attackEvery: 36,
-    attackJitter: 22,
-    researchEvery: 16,
   },
   hard: {
     name: 'Сложный',
-    description: 'Доход бота +25%, частые налёты и постоянный набор.',
+    description: 'Доход бота +25%, постоянный набор армии. Удары — по бюджету.',
     bonus: 1.25,
     armyFrom: 230,
     armyEvery: 17,
-    attackEvery: 28,
-    attackJitter: 18,
-    researchEvery: 13,
   },
   ultra: {
     name: 'Ультра',
-    description: 'Доход бота +45%, частые налёты и быстрый набор армии.',
+    description: 'Доход бота +45%, быстрый набор армии. Удары — по бюджету.',
     bonus: 1.45,
     armyFrom: 180,
     armyEvery: 12,
-    attackEvery: 21,
-    attackJitter: 13,
-    researchEvery: 9,
   },
 };
 export const DEFAULT_DIFFICULTY = 'hard';
