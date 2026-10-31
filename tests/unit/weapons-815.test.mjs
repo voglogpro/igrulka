@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
 import { flightRoute } from '../../src/game/units/aviation/routes.js';
 import { fireDefenses } from '../../src/game/combat/air-defense.js';
+import { damageAircraft, moveUnits } from '../../src/game/units/aviation/flight.js';
 
 test('new missiles join their families: silo racks, SAM targets and straight ballistic routes', () => {
   assert.deepEqual(
@@ -87,4 +88,35 @@ test('a low-signature cruise missile is engaged by a SAM battery only at a short
     stealth = engagedAt('stealth');
   assert.ok(cruise > 0 && stealth > 0, `${cruise} ${stealth}`);
   assert.ok(stealth < cruise * 0.7, `${stealth} < ${cruise}`);
+});
+
+test('two missile-defence hits bring down any ballistic missile, and it leaves no ground debris', () => {
+  for (const key of ['ballistic', 'tactical', 'cluster']) {
+    const s = E.createGame(8155);
+    const hq = E.hqOf(s, 0);
+    const u = {
+      id: s.nextId++,
+      side: 1,
+      key,
+      x: hq.x,
+      y: 80,
+      z: hq.z,
+      hp: E.WEAPONS[key].hp,
+      maxHp: E.WEAPONS[key].hp,
+      status: 'flying',
+      vx: 0,
+      vy: -60,
+      vz: 0,
+    };
+    s.units.push(u);
+    const hit = E.BUILDINGS.sam.damage;
+    assert.equal(damageAircraft(s, u, hit, 0), false, `${key} survives one hit`);
+    assert.equal(damageAircraft(s, u, hit, 0), true, `${key} falls to the second`);
+    assert.equal(u.status, 'airburst');
+    const before = hq.hp;
+    moveUnits(s, 0.05);
+    for (let i = 0; i < 200; i++) moveUnits(s, 0.05);
+    assert.equal(hq.hp, before, 'no warhead lands under an intercepted missile');
+    assert.equal(s.stats.crashes, 0);
+  }
 });

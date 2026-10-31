@@ -17,7 +17,9 @@ export function damageAircraft(s, u, damage, attacker) {
   u.hp = 0;
   s.sides[attacker].kills++;
   s.stats.interceptions++;
-  const falling = random(s) < 0.65 && u.y > 6;
+  // A drone hit by fire can tumble down and burst on the ground. A missile hit by an interceptor
+  // breaks up in the air: its warhead never reaches the ground as lethal debris.
+  const falling = WEAPONS[u.key]?.family === 'drone' && random(s) < 0.65 && u.y > 6;
   u.status = falling ? 'falling' : 'airburst';
   u.missingWing = random(s) < 0.5 ? -1 : 1;
   u.fallAge = 0;

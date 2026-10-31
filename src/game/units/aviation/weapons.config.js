@@ -50,7 +50,8 @@ export const WEAPONS = {
     components: 10,
     metal: 52,
     time: 42,
-    hp: 150,
+    // Two missile-defence hits (68 each) bring it down.
+    hp: 130,
     speed: 90,
     damage: 620,
     blast: 75,
@@ -96,7 +97,7 @@ export const WEAPONS = {
     components: 9,
     metal: 44,
     time: 38,
-    hp: 140,
+    hp: 130,
     speed: 90,
     damage: 230,
     blast: 135,
