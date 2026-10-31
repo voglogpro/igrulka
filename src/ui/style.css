@@ -2607,3 +2607,17 @@ body {
   font-size: 11px;
   line-height: 1.4;
 }
+
+.problem-chip {
+  border-color: #e05b4a99;
+  color: #f2c0b4;
+  background: #e05b4a1c;
+  cursor: pointer;
+  font: inherit;
+  font-size: 8px;
+  margin-left: 8px;
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

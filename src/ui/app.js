@@ -507,9 +507,35 @@ function updateWeatherChip() {
   chip.title = `Погода меняет обзор (−${percent}%), разброс (${w.spread.toFixed(2)}×) и скорость техники (${w.speed.toFixed(2)}×). Радар не страдает.`;
   chip.classList.toggle('online', f.now === 'clear');
 }
+// City-builder style warnings: what the player's buildings and soldiers lack right now.
+let problemCursor = 0;
+function updateProblemChip() {
+  const chip = $('#problem-chip'),
+    summary = E.problemSummary(E.problemMarkers(state, 0));
+  chip.hidden = !summary.length;
+  if (!summary.length) return;
+  chip.textContent =
+    '⚠ ' +
+    summary
+      .slice(0, 2)
+      .map((p) => `${p.label}${p.count > 1 ? ' ×' + p.count : ''}`)
+      .join(' · ') +
+    (summary.length > 2 ? ` · ещё ${summary.length - 2}` : '');
+  chip.title =
+    summary.map((p) => `${p.label}: ${p.count}`).join('\n') +
+    '\nНажмите, чтобы показать следующую проблему на карте.';
+}
+function focusNextProblem() {
+  const markers = E.problemMarkers(state, 0);
+  if (!markers.length) return;
+  const m = markers[problemCursor++ % markers.length];
+  world.focus(m.x, m.z, 300);
+  toast(m.label);
+}
 function updateHUD() {
   updateBuildingPrices();
   updateWeatherChip();
+  updateProblemChip();
   frontlineHUD.update(state, {
     visible: started && !panel && !strike.model.aiming && !troopMode && !tool && lobby.host.hidden,
   });
@@ -1403,6 +1429,7 @@ const actionRouter = createActionRouter({
     saveSettings();
     updateHUD();
   },
+  problem: () => focusNextProblem(),
   home: () => {
     const own = home();
     world.focus(own.x, own.z);

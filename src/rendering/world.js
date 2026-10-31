@@ -36,6 +36,7 @@ import { Traffic } from './traffic.js';
 import { ServiceFleet } from './service-fleet.js';
 import { Ships } from './ships.js';
 import { Warships } from './warships.js';
+import { ProblemIcons } from './problem-icons.js';
 import { WeatherFX } from './effects/weather-fx.js';
 import { disposeTree } from './mesh-utils.js';
 import { aircraftModel } from './models/aircraft.js';
@@ -331,6 +332,7 @@ export class RTSWorld {
     this.ammoCrates = new AmmoCrateView(this.scene, { height: (x, z) => this.height(x, z) });
     this.ships = new Ships(this);
     this.warships = new Warships(this);
+    this.problemIcons = new ProblemIcons(this);
     this.tactical = new TacticalView(this);
     this.deploymentPreview = new DeploymentPreview(this.scene);
     this.frontlineView = new FrontlineView(this.scene, (x, z) => this.height(x, z));
@@ -677,6 +679,7 @@ export class RTSWorld {
       this.battleTime,
       (ship) => ship.side === 0 || E.fogVisible(this.state, 0, ship.x, ship.z),
     );
+    this.problemIcons.update(this.state, this.elapsed, (x, z) => this.height(x, z));
     if (this.buildKey && this.lastPointer) this.updateGhost(this.lastPointer);
     if (this.aiming && this.lastPointer && !this.controls.rotating) {
       const p = this.groundPoint(this.lastPointer);
