@@ -20,7 +20,7 @@ test('real road-connected electronics converts paid alloy and oil only after ass
   const { s, b, f } = fixture(),
     before = { ...f };
   assert.equal(E.electronicsFactoryStatus(s, 0, b.id).status, 'active');
-  updateElectronics(s, rates, 5);
+  updateElectronics(s, rates, E.ELECTRONICS.seconds - 1);
   assert.equal(f.components, 0);
   assert.equal(f.materials, before.materials);
   updateElectronics(s, rates, 1.01);
@@ -138,13 +138,13 @@ test('ordinary rifle and tank-shell ammunition can be produced with zero electro
 
 test('schema21 preserves assembly phase and rejects corrupt new fields; schema20 migrates without charging paid queues', () => {
   const { s, b, f } = fixture();
-  updateElectronics(s, rates, 3);
+  updateElectronics(s, rates, E.ELECTRONICS.seconds / 2);
   f.components = 7;
   const loaded = E.load(E.save(s));
   assert.equal(loaded.sides[0].components, 7);
   assert.equal(loaded.buildings.find((v) => v.id === b.id).componentProgress, 0.5);
-  updateElectronics(s, rates, 3.01);
-  updateElectronics(loaded, rates, 3.01);
+  updateElectronics(s, rates, E.ELECTRONICS.seconds / 2 + 0.01);
+  updateElectronics(loaded, rates, E.ELECTRONICS.seconds / 2 + 0.01);
   assert.deepEqual(loaded.sides, s.sides);
   assert.equal(loaded.buildings.find((v) => v.id === b.id).componentProgress, b.componentProgress);
   assert.equal(loaded.rng, s.rng);

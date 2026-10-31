@@ -84,7 +84,7 @@ export function ai(s, side = 1) {
         ['vehiclebase', s.time > level.armyFrom + 20 ? 1 : 0],
         ['housing', Math.min(9, 3 + Math.floor(s.time / 130))],
         ['industry', Math.min(5, 2 + Math.floor(s.time / 250))],
-        ['electronics', s.time > 600 ? 2 : 1],
+        ['electronics', s.time > 1200 ? 3 : s.time > 600 ? 2 : 1],
         ['radar', s.time > 220 ? 1 : 0],
         ['sam', s.time > 220 ? 2 : 0],
         ['launcher', s.time > 600 ? 2 : 1],

@@ -3,12 +3,14 @@ import { buildingConnected } from './road-network.js';
 import { oilEnabled } from './oil.js';
 import { validSide } from '../factions.js';
 
+// Guidance electronics are the bottleneck of missile production: a workshop assembles one unit
+// every eight seconds, and a ballistic missile needs eighteen.
 export const ELECTRONICS = Object.freeze({
   capacity: 120,
-  seconds: 6,
-  credits: 2,
-  metal: 4,
-  oil: 0.3,
+  seconds: 8,
+  credits: 6,
+  metal: 5,
+  oil: 0.5,
   reserveCredits: 250,
 });
 // Preserve the existing oil-off isolated-scenario convention; a components

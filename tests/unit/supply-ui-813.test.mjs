@@ -62,7 +62,7 @@ test('electronics inspector shows actual stock and batch progress with a collaps
   compactInspectorStatus({ querySelector: () => status }, s, factory);
   assert.match(html, /Электроника 7 \/ 120/);
   assert.match(html, /50%/);
-  assert.match(html, /2 ₡ · 4 спл. · 0.3 нефти → 1 эл./);
+  assert.match(html, /6 ₡ · 5 спл. · 0.5 нефти → 1 эл./);
   assert.match(status.textContent, /7\/120 эл. · сборка 50%/);
   assert.equal(JSON.stringify(s), before);
 });
