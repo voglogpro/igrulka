@@ -11,6 +11,7 @@ const collections = new Set([
   'ammoVehicles',
   'ammoCrates',
   'ships',
+  'warships',
   'trenches',
   'groundScars',
 ]);

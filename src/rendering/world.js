@@ -35,6 +35,7 @@ import { FortificationView } from './defense/fortifications.js';
 import { Traffic } from './traffic.js';
 import { ServiceFleet } from './service-fleet.js';
 import { Ships } from './ships.js';
+import { Warships } from './warships.js';
 import { WeatherFX } from './effects/weather-fx.js';
 import { disposeTree } from './mesh-utils.js';
 import { aircraftModel } from './models/aircraft.js';
@@ -329,6 +330,7 @@ export class RTSWorld {
     });
     this.ammoCrates = new AmmoCrateView(this.scene, { height: (x, z) => this.height(x, z) });
     this.ships = new Ships(this);
+    this.warships = new Warships(this);
     this.tactical = new TacticalView(this);
     this.deploymentPreview = new DeploymentPreview(this.scene);
     this.frontlineView = new FrontlineView(this.scene, (x, z) => this.height(x, z));
@@ -583,6 +585,7 @@ export class RTSWorld {
       ammoFleet: this.ammoFleet.diagnostics(),
       ammoCrates: this.ammoCrates.diagnostics(),
       ships: this.ships.diagnostics(),
+      warships: this.warships.diagnostics(),
       frontline: this.frontlineView.diagnostics(),
       fortifications: this.fortifications.diagnostics(),
       detectedEnemies: this.state.units.filter(
@@ -665,6 +668,11 @@ export class RTSWorld {
     this.combatFX.update(this.visualDt, this.elapsed, this.camera);
     this.traffic.update(this.state, this.visualDt, this.combatFX);
     this.ships.update(
+      this.state,
+      this.battleTime,
+      (ship) => ship.side === 0 || E.fogVisible(this.state, 0, ship.x, ship.z),
+    );
+    this.warships.update(
       this.state,
       this.battleTime,
       (ship) => ship.side === 0 || E.fogVisible(this.state, 0, ship.x, ship.z),

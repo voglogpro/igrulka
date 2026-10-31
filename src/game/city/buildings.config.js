@@ -292,6 +292,31 @@ export const BUILDINGS = {
     description:
       'Строится на берегу моря. Грузовое судно само ходит на нейтральный остров-биржу: продаёт излишки нефти, докупает её при нехватке и привозит товары. Нужна дорога к штабу.',
   },
+  navalbase: {
+    height: 14,
+    name: 'Военно-морская база',
+    tag: 'Ракетный корабль',
+    cost: 1100,
+    metal: 70,
+    time: 40,
+    hp: 520,
+    size: 30,
+    power: 4,
+    upkeep: 0.8,
+    naval: {
+      hp: 600,
+      speed: 13,
+      // The firing station lies this share of the way from the berth to the island.
+      station: 0.6,
+      replaceCost: 450,
+      replaceMetal: 30,
+      replaceDelay: 45,
+      // Seconds a partly loaded ship waits at the berth for more missiles.
+      loadWait: 20,
+    },
+    description:
+      'Строится у воды. Её ракетный корабль принимает крылатые ракеты у причала (до 4), сам выходит в море на огневую позицию и пускает их оттуда — ближе к врагу и в обход сухопутного фронта. Без ракет возвращается на перезарядку. Потопленный корабль пропадает вместе с ракетами; база спускает новый за плату.',
+  },
   training: {
     height: 9,
     name: 'Учебный полигон',

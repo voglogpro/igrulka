@@ -24,6 +24,7 @@ import { restoreAmmunition } from './ammunition.js';
 import { sideIds, validSide } from '../factions.js';
 import { restoreSettlements, SETTLEMENTS } from '../territory/settlements.js';
 import { restoreAI } from './ai.js';
+import { restoreWarships } from '../city/naval.js';
 import { restoreFieldSupply } from './field-supply.js';
 import { restoreRoadRecovery } from '../city/road-recovery.js';
 export const SAVE_GROUND_MAX = 20000;
@@ -465,6 +466,7 @@ export function load(raw) {
   restoreArmyComposition(s, sourceVersion);
   restoreGroundScars(s, sourceVersion);
   restoreLaunchSupply(s, sourceVersion);
+  restoreWarships(s);
   restoreFactoryOrders(s);
   restoreAmmunition(s, sourceVersion);
   restoreFieldSupply(s, sourceVersion);

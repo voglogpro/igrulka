@@ -581,7 +581,7 @@ function buildList() {
     tab === 'city'
       ? ['road', 'housing', 'industry', 'power', 'market', 'service']
       : tab === 'oil'
-        ? ['oilwell', 'oiltank', 'port', 'electronics']
+        ? ['oilwell', 'oiltank', 'port', 'navalbase', 'electronics']
         : tab === 'army'
           ? ['barracks', 'vehiclebase', 'training', 'ammofactory']
           : ['factory', 'launcher', 'silo', 'gun', 'sam', 'radar'];

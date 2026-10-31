@@ -94,5 +94,15 @@ export function oilPlan(s, side, hq, active) {
   }
   if (s.time > 360 && !active('port').length && f.credits > BUILDINGS.port.cost + 600)
     for (const p of portSites(hq)) if (tryBuild(s, side, 'port', p.x, p.z)) return true;
+  // A rich city adds a missile ship once its port and missile production run.
+  if (
+    s.time > 900 &&
+    active('port').length &&
+    active('factory').length &&
+    !active('navalbase').length &&
+    f.credits > BUILDINGS.navalbase.cost + 1500
+  )
+    for (const p of portSites(hq).reverse())
+      if (tryBuild(s, side, 'navalbase', p.x, p.z)) return true;
   return false;
 }

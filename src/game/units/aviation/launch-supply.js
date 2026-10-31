@@ -1,4 +1,5 @@
 import { WEAPONS } from '../../config.js';
+import { warshipDocked } from '../../city/naval.js';
 import {
   weaponStoreStock,
   weaponStoreAllows,
@@ -78,7 +79,7 @@ export function launchSupplyRequests(s, side) {
     )
       continue;
     const free = launchStoreCapacity(site) - launchStoreTotal(site);
-    if (free <= 0) continue;
+    if (free <= 0 || (site.key === 'navalbase' && !warshipDocked(s, site))) continue;
     const allowed = weaponKeys.filter(
       (key) => launchSiteAllows(site, key) && movableWeaponStock(s, side, key) >= 1,
     );

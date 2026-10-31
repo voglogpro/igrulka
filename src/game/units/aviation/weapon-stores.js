@@ -3,15 +3,16 @@ import { equipmentModifiers } from '../../combat/upgrade-tiers.js';
 import { WEAPONS } from '../../config.js';
 
 const keys = Object.keys(WEAPONS);
-export const WEAPON_STORE_CAPACITY = { factory: 24, launcher: 6, silo: 4 };
-export const LAUNCH_CAPACITY = { launcher: 6, silo: 4 };
+export const WEAPON_STORE_CAPACITY = { factory: 24, launcher: 6, silo: 4, navalbase: 4 };
+export const LAUNCH_CAPACITY = { launcher: 6, silo: 4, navalbase: 4 };
 export function weaponStoreAllows(site, key) {
   return (
     typeof key === 'string' &&
     Object.hasOwn(WEAPONS, key) &&
     (site?.key === 'factory' ||
       (site?.key === 'launcher' && ['drone', 'heavy'].includes(key)) ||
-      (site?.key === 'silo' && isMissile(key)))
+      (site?.key === 'silo' && isMissile(key)) ||
+      (site?.key === 'navalbase' && WEAPONS[key].family === 'cruise'))
   );
 }
 export function launchSiteAllows(site, key) {

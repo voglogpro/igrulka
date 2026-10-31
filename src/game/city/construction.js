@@ -47,14 +47,14 @@ export function physicalPlacement(s, key, x, z, owner = 0) {
   if (Math.abs(x) > MAP.width / 2 - d.size || Math.abs(z) > MAP.depth / 2 - d.size)
     return 'За границей карты';
   const shore = seaDistance(x, z);
-  if (key === 'port') {
+  if (key === 'port' || key === 'navalbase') {
     // A port stands on the waterline: its quay reaches into the sea, its yard stays on land.
     if (shore < 8 || shore > 34) return 'Порт строится у самой воды, на берегу моря';
   } else if (riverDistance(x, z) < MAP.riverWidth + d.size * 0.65 + 26)
     return 'Нужна сухая ровная земля';
   if (key === 'oilwell' && !oilFieldAt(x, z))
     return 'Вышка ставится только на нефтяное месторождение';
-  if (key !== 'port')
+  if (key !== 'port' && key !== 'navalbase')
     for (const [dx, dz] of [
       [0, 0],
       [-1, -1],

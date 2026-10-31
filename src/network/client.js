@@ -227,7 +227,14 @@ export class NetworkSession {
     const delay = Math.min(0.5, Math.max(0.1, span));
     const t = Math.max(0, Math.min(1, (span - delay + (now - this.latest.received) / 1000) / span));
     display.time = a.time + span * t;
-    for (const key of ['units', 'groundUnits', 'serviceVehicles', 'ships', 'projectiles']) {
+    for (const key of [
+      'units',
+      'groundUnits',
+      'serviceVehicles',
+      'ships',
+      'warships',
+      'projectiles',
+    ]) {
       const before = sampleIndex(this.previous, key);
       const after = sampleIndex(this.latest, key);
       for (const u of display[key] || []) {

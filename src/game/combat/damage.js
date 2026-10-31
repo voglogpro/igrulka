@@ -1,3 +1,4 @@
+import { damageWarships } from '../city/naval.js';
 import { passable, dirtyNetwork, projectPoint, removeDriveways } from '../city/road-network.js';
 import { event } from '../shared/events.js';
 import { clamp } from '../shared/math.js';
@@ -50,6 +51,7 @@ export function applyBlast(s, x, z, damage, radius) {
       );
       if (amount) damageBuilding(s, b, amount);
     }
+  damageWarships(s, x, z, at);
   for (const u of (s.groundUnits || []).filter((u) => u.hp > 0 && !u.carrierId)) {
     const amount = at(Math.max(0, Math.hypot(u.x - x, u.z - z) - GROUND_UNITS[u.key].size));
     if (amount) damageGround(s, u, amount, event, 'blast');

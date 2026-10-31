@@ -85,6 +85,7 @@ export function createGame(
     fieldSupplyCursor: 0,
     ammoLogisticsAt: 0,
     ships: [],
+    warships: [],
     frontlineMemory: createFrontlineMemory(count),
     units: [],
     groundUnits: [],

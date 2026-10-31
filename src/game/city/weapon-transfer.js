@@ -1,3 +1,4 @@
+import { warshipDocked } from './naval.js';
 import {
   availableLaunchStock,
   launchSiteAllows,
@@ -91,6 +92,8 @@ export function collectWeapon(s, van, site) {
 }
 
 export function deliverySpace(s, site, key) {
+  // A missile ship takes cargo only while alongside its berth.
+  if (site.key === 'navalbase' && !warshipDocked(s, site)) return 0;
   const free = Math.max(0, launchStoreCapacity(site) - launchStoreTotal(site));
   const reserved = Object.entries(site.weaponDemand || {}).reduce(
     (n, [wanted, count]) =>

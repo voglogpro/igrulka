@@ -8,6 +8,7 @@ import { flightRoute } from './routes.js';
 import { random } from '../../shared/random.js';
 import { event, log } from '../../shared/events.js';
 import { availableLaunchStock, launchSiteAllows } from './launch-supply.js';
+import { warshipOf } from '../../city/naval.js';
 
 export function launchTempo(site) {
   const level = Math.max(0, Math.min(2, site.level || 0));
@@ -46,7 +47,7 @@ export function launchSites(s, owner, key = null) {
   return s.buildings.filter(
     (b) =>
       b.side === owner &&
-      ['launcher', 'silo'].includes(b.key) &&
+      ['launcher', 'silo', 'navalbase'].includes(b.key) &&
       (key == null || launchSiteAllows(b, key)) &&
       !b.demolished &&
       b.hp > 0 &&
@@ -88,6 +89,8 @@ export function launchStatus(s, owner, key, aim, siteId = null) {
       : 'Постройте площадку запуска дронов';
   const origin = selectedLaunchSite(s, owner, siteId, key);
   if (!origin) return 'Выбранная пусковая недоступна';
+  if (origin.key === 'navalbase' && !warshipOf(s, origin))
+    return 'Корабль базы потоплен: ждём спуска нового';
   if (!availableLaunchStock(origin, key))
     return 'На пусковой нет готового аппарата: ждём физическую доставку со склада';
   if (queuedLaunches(s, origin) >= COMBAT.queueLimit)
@@ -107,7 +110,9 @@ export function launch(s, owner, key, aim, count = 1, siteId = null) {
       COMBAT.queueLimit - queuedLaunches(s, origin),
       COMBAT.airLimit - s.units.filter((u) => u.side === owner && u.hp > 0).length,
     ),
-    tempo = launchTempo(origin);
+    tempo = launchTempo(origin),
+    // A naval base launches from its ship, wherever the ship is.
+    from = origin.key === 'navalbase' ? warshipOf(s, origin) : origin;
   let next = origin.nextLaunchAt ?? s.time;
   let left = Math.min(tempo.count, origin.launchBurstLeft ?? tempo.count);
   // An unused second slot belongs to the same ten-second window, including
@@ -127,7 +132,7 @@ export function launch(s, owner, key, aim, count = 1, siteId = null) {
       slot = tempo.count - left,
       launchAt = next + slot * COMBAT.cadence[key],
       delay = Math.max(0, launchAt - s.time),
-      route = flightRoute(origin, target, key);
+      route = flightRoute(from, target, key);
     s.units.push({
       id: s.nextId++,
       side: owner,
@@ -138,17 +143,17 @@ export function launch(s, owner, key, aim, count = 1, siteId = null) {
       route,
       speed: d.speed,
       damage: d.damage,
-      x: origin.x,
-      z: origin.z,
+      x: from.x,
+      z: from.z,
       y: 5,
-      prevX: origin.x,
+      prevX: from.x,
       prevY: 5,
-      prevZ: origin.z,
+      prevZ: from.z,
       vx: 0,
       vy: 0,
       vz: 0,
-      startX: origin.x,
-      startZ: origin.z,
+      startX: from.x,
+      startZ: from.z,
       targetId: target.id ?? null,
       targetKind: target.key === 'point' ? 'point' : target.key === 'road' ? 'road' : 'building',
       tx: target.x,

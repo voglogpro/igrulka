@@ -53,7 +53,7 @@ export function model(b) {
   const d = BUILDINGS[b.key],
     size = d?.size || 30,
     accent = factionHex(b.side);
-  if (!['gun', 'port'].includes(b.key)) {
+  if (!['gun', 'port', 'navalbase'].includes(b.key)) {
     this.box(root, 0, 0, 0, size + 7, 0.65, size + 7, '#6d706a');
     this.box(root, 0, 0.68, size / 2 + 2, size + 5, 0.15, 0.65, accent, {
       emissive: accent,
@@ -76,8 +76,8 @@ export function model(b) {
     oilWellModel(this, content, root, accent);
   } else if (b.key === 'oiltank') {
     oilTankModel(this, content, accent);
-  } else if (b.key === 'port') {
-    portModel(this, content, accent);
+  } else if (b.key === 'port' || b.key === 'navalbase') {
+    portModel(this, content, b.key === 'navalbase' ? '#6f7b7e' : accent);
   } else if (b.key === 'training') {
     trainingModel(this, content, accent);
   } else if (b.key === 'housing') {
@@ -273,7 +273,9 @@ export function model(b) {
     }
   }
   // Warm porch lights are emissive geometry, avoiding a point light per structure.
-  if (!['gun', 'cannon', 'sam', 'oilwell', 'oiltank', 'port', 'training'].includes(b.key))
+  if (
+    !['gun', 'cannon', 'sam', 'oilwell', 'oiltank', 'port', 'navalbase', 'training'].includes(b.key)
+  )
     for (const x of [-size * 0.4, size * 0.4]) {
       this.cyl(content, x, 0.8, size * 0.43, 0.18, 7, '#485951');
       this.box(content, x, 7.5, size * 0.43, 1.7, 0.35, 1.7, '#ffcf8e', {
