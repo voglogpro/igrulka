@@ -3,14 +3,28 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['vendor/**', 'archive/**', 'play/**', 'artifacts/**', 'node_modules/**', '.tools/**'],
+    ignores: [
+      'vendor/**',
+      'archive/**',
+      'play/**',
+      'artifacts/**',
+      'node_modules/**',
+      '.tools/**',
+      'native/build/**',
+      'native/**/.godot/**',
+      'native/**/bin/**',
+      'native/**/obj/**',
+    ],
   },
   {
     files: [
       'src/**/*.js',
       'server/**/*.mjs',
       'scripts/**/*.mjs',
+      'scripts/native-parity-*.js',
       'tests/**/*.mjs',
+      'native/parity/**/*.mjs',
+      'native/network/**/*.mjs',
       'eslint.config.mjs',
     ],
     ...js.configs.recommended,
@@ -31,6 +45,8 @@ export default [
       'src/audio/**/*.js',
       'src/network/client.js',
       'src/main.js',
+      'native/parity/**/*.mjs',
+      'scripts/native-parity-*.js',
     ],
     languageOptions: { globals: globals.browser },
   },
@@ -39,7 +55,13 @@ export default [
     languageOptions: { globals: { structuredClone: 'readonly' } },
   },
   {
-    files: ['server/**/*.mjs', 'scripts/**/*.mjs', 'tests/**/*.mjs', 'eslint.config.mjs'],
+    files: [
+      'server/**/*.mjs',
+      'scripts/**/*.mjs',
+      'tests/**/*.mjs',
+      'native/network/**/*.mjs',
+      'eslint.config.mjs',
+    ],
     languageOptions: { globals: globals.node },
   },
 ];
