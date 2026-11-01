@@ -10,5 +10,9 @@ artifacts/
 *.tar.gz
 __pycache__/
 .venv/
+tools/engine-probe/.godot/
+tools/engine-probe/bin/
+tools/engine-probe/obj/
+tools/engine-probe/NuGet.Config
 .DS_Store
 Thumbs.db

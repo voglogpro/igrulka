@@ -1,5 +1,10 @@
 # Карта кода
 
+Нативный движок: `docs/engine/MIGRATION.md` — решение и этапы;
+`docs/engine/SYSTEMS.md` — инвентарь фактической 8.16 и контракты;
+`docs/engine/VALIDATION.md` — будущие измерения; `docs/engine/TOOLCHAIN.md` —
+проверенная цепочка. `tools/engine-probe` — диагностический C#-проект.
+
 ## Изменения 8.14.0
 
 | Механика                                                   | Основные файлы                                                                           |
