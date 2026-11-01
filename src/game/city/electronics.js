@@ -2,6 +2,7 @@ import { BUILDINGS } from '../config.js';
 import { buildingConnected } from './road-network.js';
 import { oilEnabled } from './oil.js';
 import { validSide } from '../factions.js';
+import { complexBonus } from './complexes.js';
 
 // Guidance electronics are the bottleneck of missile production: a workshop assembles one unit
 // every eight seconds, and a ballistic missile needs eighteen.
@@ -74,7 +75,8 @@ export function updateElectronics(s, rates, dt) {
   for (const b of s.buildings) {
     if (b.key !== 'electronics' || factoryState(s, b) !== 'active') continue;
     const f = s.sides[b.side],
-      rate = (rates[b.side]?.productivity ?? 1) * (0.5 + (0.5 * b.hp) / b.maxHp);
+      rate =
+        (rates[b.side]?.productivity ?? 1) * (0.5 + (0.5 * b.hp) / b.maxHp) * complexBonus(s, b);
     b.componentProgress = (b.componentProgress || 0) + (dt * rate) / ELECTRONICS.seconds;
     while (b.componentProgress >= 1 && factoryState(s, b) === 'active') {
       f.credits -= ELECTRONICS.credits;

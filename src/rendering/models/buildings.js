@@ -110,6 +110,21 @@ export function model(b) {
       emissive: '#e1b96f',
       emissiveIntensity: 0.6,
     });
+  } else if (b.key === 'refinery') {
+    // Distillation columns, a furnace hall, pipe racks and a flare stack.
+    this.box(content, -6, 0.7, 4, 16, 6, 12, '#8a8678');
+    this.box(content, -6, 6.7, 4, 16.6, 0.6, 12.6, '#4d5452');
+    for (const [x, z, r, h] of [
+      [6, -6, 2.2, 22],
+      [10, 2, 1.6, 17],
+      [5, 8, 1.4, 14],
+    ]) {
+      this.cyl(content, x, 0.7, z, r, h, '#a7aba3');
+      this.cyl(content, x, 0.7 + h * 0.6, z, r + 0.15, 0.6, accent);
+    }
+    for (const z of [-9, -4]) this.box(content, -2, 3.5, z, 22, 0.5, 0.5, '#6b6f6a');
+    this.cyl(content, -12, 0.7, -9, 0.5, 24, '#5b5f5c');
+    this.cyl(content, -12, 24.7, -9, 0.75, 1.2, '#ff9b42');
   } else if (b.key === 'electronics') {
     // Compact clean assembly hall, restrained green cladding and rooftop air handling.
     this.box(content, 0, 0.7, 0, 28, 12, 24, '#40594b');

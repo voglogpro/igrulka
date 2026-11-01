@@ -187,9 +187,12 @@ test('ballistic missiles ignore flank points and retain ordinary fixed statistic
   E.launch(s, 0, 'ballistic', { x: 1192, z: 0, waypoints: [{ x: 0, z: 500 }] });
   const u = s.units[0];
   assert.equal(u.total, 2184);
-  assert.equal(u.speed, E.WEAPONS.ballistic.speed);
+  // Without a refinery the missile flies on unrefined fuel: slower and weaker.
+  const fuel = E.weaponPerformance(s, 0);
+  assert.equal(fuel, E.oilEnabled(s) ? E.REFINED.without : 1);
+  assert.equal(u.speed, E.WEAPONS.ballistic.speed * fuel);
   assert.equal(u.maxHp, E.WEAPONS.ballistic.hp);
-  assert.equal(u.damage, E.WEAPONS.ballistic.damage);
+  assert.equal(u.damage, E.WEAPONS.ballistic.damage * fuel);
   assert.deepEqual(E.load(E.save(s)).units, s.units);
 });
 test('barracks and armour base produce paid roles, charge upkeep and preserve their queues', () => {

@@ -11,6 +11,7 @@ import {
   launchSiteAllows,
 } from '../units/aviation/launch-supply.js';
 import { WEAPONS } from '../config.js';
+import { refineryActive } from './oil.js';
 
 // Problem markers in the manner of city builders: a read-only projection of the owner's own
 // state, never of the enemy's. Each marker names one thing a building or a group of soldiers
@@ -49,6 +50,7 @@ export function problemMarkers(s, side) {
     let kind = null;
     if (ROAD_REQUIRED.has(b.key) && supplyFactor(s, b) < 1) kind = 'road';
     else if (d.power > 0 && e.supply < 0.75) kind = 'power';
+    else if (b.key === 'refinery' && !refineryActive(s, side)) kind = 'oil';
     else if (b.key === 'electronics')
       kind = fromReason[electronicsFactoryStatus(s, side, b.id)?.status];
     else if (b.key === 'ammofactory') kind = fromReason[ammoFactoryStatus(s, side, b.id)?.status];

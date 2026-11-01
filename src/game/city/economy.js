@@ -1,4 +1,5 @@
 import { ROAD_REQUIRED } from './rules.js';
+import { complexBonus } from './complexes.js';
 import { buildingConnected } from './road-network.js';
 import { BUILDINGS, GROUND_UNITS } from '../config.js';
 import { districtIncome } from '../territory/districts.js';
@@ -48,7 +49,11 @@ export function economy(s, owner, dt = 0) {
   for (const b of alive) {
     const d = BUILDINGS[b.key];
     if (!d) continue;
-    const f = productivity * (0.5 + (0.5 * b.hp) / b.maxHp) * supplyFactor(s, b);
+    const f =
+      productivity *
+      (0.5 + (0.5 * b.hp) / b.maxHp) *
+      supplyFactor(s, b) *
+      (b.key === 'industry' ? complexBonus(s, b) : 1);
     income += (d.income || 0) * f * efficient;
     materials += (d.materials || 0) * f * efficient;
     science += (d.science || 0) * f;

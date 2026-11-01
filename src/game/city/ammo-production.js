@@ -4,6 +4,7 @@ import { economy } from './economy.js';
 import { oilEnabled } from './oil.js';
 import { componentsEnabled, hasComponents, spendComponents } from './electronics.js';
 import { equipmentModifiers } from '../combat/upgrade-tiers.js';
+import { complexBonus } from './complexes.js';
 import {
   AMMUNITION as C,
   createAmmoStock,
@@ -99,11 +100,15 @@ export function updateAmmoProduction(s) {
   const economies = [null, null];
   for (const b of s.buildings) {
     if (b.key !== 'ammofactory' || s.time < (b.ammoNextAt || 0)) continue;
-    b.ammoNextAt = s.time + C.interval / equipmentModifiers(b).production;
+    b.ammoNextAt = s.time + C.interval / (equipmentModifiers(b).production * complexBonus(s, b));
     const desired = (desires[b.side] ||= demand(s, b.side));
     if (status(s, b, desired) !== 'active') continue;
     const e = (economies[b.side] ||= economy(s, b.side));
-    const rate = equipmentModifiers(b).production * e.productivity * (0.5 + (0.5 * b.hp) / b.maxHp);
+    const rate =
+      equipmentModifiers(b).production *
+      complexBonus(s, b) *
+      e.productivity *
+      (0.5 + (0.5 * b.hp) / b.maxHp);
     b.ammoNextAt = s.time + C.interval / rate;
     const f = s.sides[b.side];
     f.ammoStock ||= createAmmoStock();

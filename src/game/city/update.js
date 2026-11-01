@@ -4,6 +4,7 @@ import { updateElectronics } from './electronics.js';
 import { BUILDINGS, WEAPONS } from '../config.js';
 import { event } from '../shared/events.js';
 import { supplyFactor } from './economy.js';
+import { complexBonus } from './complexes.js';
 import { passable, dirtyNetwork } from './road-network.js';
 // Assembly lines of a drone base by equipment level.
 export const FACTORY_LINES = [2, 3, 4];
@@ -28,7 +29,11 @@ export function updateConstruction(s, rates, dt) {
       // A finished craft waits on its line until the factory warehouse has room for it.
       const lines = Math.min(b.queue.length, FACTORY_LINES[Math.max(0, Math.min(2, b.level || 0))]),
         rate =
-          dt * rates[b.side].productivity * supplyFactor(s, b) * equipmentModifiers(b).production;
+          dt *
+          rates[b.side].productivity *
+          supplyFactor(s, b) *
+          equipmentModifiers(b).production *
+          complexBonus(s, b);
       for (let i = 0; i < lines; i++) {
         const q = b.queue[i];
         q.progress = Math.min(1, q.progress + rate / WEAPONS[q.key].time);

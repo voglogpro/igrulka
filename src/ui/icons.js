@@ -17,6 +17,7 @@ const paths = {
   market: 'M3 21h18M5 21V10l2-5h10l2 5v11M5 10h14M9 21v-6h6v6',
   oilwell: 'M3 21h18M8 21l3-12 3 12M5 8l14-3M17 5l2 3v3M7 8v6M11 9l2 4',
   oiltank: 'M4 21h16M5 21V8c0-2 3-3 7-3s7 1 7 3v13M5 8c0 2 3 3 7 3s7-1 7-3M5 14h14',
+  refinery: 'M3 21h18M6 21V9h3v12M11 21V5h3v16M16 21v-8h3v8M7 6V3M17 10V7',
   training: 'M12 3v4M12 17v4M3 12h4M17 12h4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 3v2',
   port: 'M2 19c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0M5 16h14l-2-5H7ZM9 11V7h4v4M15 4v7M15 4h4',
   navalbase:
@@ -47,6 +48,7 @@ export const short = {
   service: 'Ремонтная служба',
   oilwell: 'Нефтевышка',
   oiltank: 'Нефтехранилище',
+  refinery: 'НПЗ',
   port: 'Торговый порт',
   navalbase: 'Военно-морская база',
   training: 'Учебный полигон',

@@ -1,3 +1,4 @@
+import { complexBonus } from './complexes.js';
 import { BUILDINGS, GROUND_UNITS, WEAPONS } from '../config.js';
 import { event } from '../shared/events.js';
 import { supplyFactor } from './economy.js';
@@ -63,8 +64,30 @@ export function oilBurn(s, side) {
   // Civil repair vans are not combatants and have no hit-point field.
   for (const v of s.serviceVehicles || [])
     if (v.side === side && (v.hp == null || v.hp > 0) && v.path?.length) total += OIL.deliveryBurn;
+  // Refineries turn crude into aviation fuel; a complex with tanks and wells wastes less.
+  for (const b of refineries(s, side)) total += BUILDINGS.refinery.refine.oil / complexBonus(s, b);
   return total;
 }
+
+function refineries(s, side) {
+  return s.buildings.filter(
+    (b) =>
+      b.side === side &&
+      b.key === 'refinery' &&
+      b.hp > 0 &&
+      !b.demolished &&
+      b.progress >= 1 &&
+      supplyFactor(s, b) === 1,
+  );
+}
+// Drones and missiles fly and strike at full strength only on refined fuel.
+export const REFINED = Object.freeze({ without: 0.8 });
+export function refineryActive(s, side) {
+  return refineries(s, side).length > 0 && (!oilEnabled(s) || (s.sides[side]?.oil ?? 0) > 0);
+}
+// Without the oil economy (isolated scenarios) there is no fuel to refine.
+export const weaponPerformance = (s, side) =>
+  !oilEnabled(s) || refineryActive(s, side) ? 1 : REFINED.without;
 
 export function updateOil(s, rates, dt) {
   for (const side of sideIds(s)) {

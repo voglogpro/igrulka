@@ -9,6 +9,7 @@ import { random } from '../../shared/random.js';
 import { event, log } from '../../shared/events.js';
 import { availableLaunchStock, launchSiteAllows } from './launch-supply.js';
 import { warshipOf } from '../../city/naval.js';
+import { weaponPerformance } from '../../city/oil.js';
 
 export function launchTempo(site) {
   const level = Math.max(0, Math.min(2, site.level || 0));
@@ -127,6 +128,7 @@ export function launch(s, owner, key, aim, count = 1, siteId = null) {
       left = tempo.count;
     }
     const d = weaponStats(f, key),
+      perf = weaponPerformance(s, owner),
       // Two upgraded rails share a ten-second window, but the second craft
       // leaves later instead of occupying the first one's route and model.
       slot = tempo.count - left,
@@ -141,8 +143,8 @@ export function launch(s, owner, key, aim, count = 1, siteId = null) {
       localLaunch: true,
       status: 'flying',
       route,
-      speed: d.speed,
-      damage: d.damage,
+      speed: d.speed * perf,
+      damage: d.damage * perf,
       x: from.x,
       z: from.z,
       y: 5,

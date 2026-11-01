@@ -85,6 +85,7 @@ export function ai(s, side = 1) {
         ['housing', Math.min(9, 3 + Math.floor(s.time / 130))],
         ['industry', Math.min(5, 2 + Math.floor(s.time / 250))],
         ['electronics', s.time > 1200 ? 3 : s.time > 600 ? 2 : 1],
+        ['refinery', s.time > 480 ? 1 : 0],
         ['radar', s.time > 220 ? 1 : 0],
         ['sam', s.time > 220 ? 2 : 0],
         ['launcher', s.time > 600 ? 2 : 1],

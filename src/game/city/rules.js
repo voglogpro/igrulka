@@ -4,6 +4,7 @@ export const ROAD_REQUIRED = new Set([
   'service',
   'oilwell',
   'port',
+  'refinery',
   'housing',
   'industry',
   'power',

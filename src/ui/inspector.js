@@ -128,7 +128,7 @@ export function renderInspector(context) {
   const o = E.buildingOutput(state, b);
   if (o && $('#building-detail') && b.key !== 'service')
     $('#building-detail').innerHTML =
-      `<div class="status-note">Выпуск ${Math.round(o.factor * 100)}% · дорога ${Math.round(o.road * 100)}% · мощность ${Math.round(o.power * 100)}%<br>${o.income ? rate(o.income) + ' ₡/мин · ' : ''}${o.materials ? rate(o.materials) + ' спл./мин · ' : ''}содержание ${Math.round(o.upkeep * 60)} ₡/мин</div>`;
+      `<div class="status-note">Выпуск ${Math.round(o.factor * 100)}% · дорога ${Math.round(o.road * 100)}% · мощность ${Math.round(o.power * 100)}%<br>${o.income ? rate(o.income) + ' ₡/мин · ' : ''}${o.materials ? rate(o.materials) + ' спл./мин · ' : ''}содержание ${Math.round(o.upkeep * 60)} ₡/мин${E.complexStatus(state, b) ? '<br>' + E.complexLabel(E.complexStatus(state, b)) : ''}${b.key === 'refinery' ? '<br>' + (E.refineryActive(state, b.side) ? 'Топливо есть: дроны и ракеты в полную силу' : 'Нет нефти или дороги: оружие на 20% слабее') : ''}</div>`;
   if (b.key === 'service' && b.side === 0 && !ruin) {
     if (!$('#service-detail'))
       $('#building-detail').insertAdjacentHTML(
