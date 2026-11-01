@@ -11,6 +11,8 @@ Immutable registry — только exact refs авторских bank/merged ge
 Prefix transport сохраняет vertex IDs; LOD, immutable и instance banks нельзя
 обрезать как обычные draw-range attributes. Effect warmup использует частные
 geometry clones и заканчивается после FramePostDraw, не меняя исходные FX pools.
+Tagged artWarmup ждёт до 120 секунд холодной компиляции; live scene watchdog остаётся
+30 секунд. Нельзя заменять подтверждение FramePostDraw ранним ACK ради теста.
 Старые готовые 0.1/0.2/0.2.1/0.3 папки и архивы не перезаписывать. Различать
 функциональный бой 500 групп и плавность: long tasks ещё остаются.
 

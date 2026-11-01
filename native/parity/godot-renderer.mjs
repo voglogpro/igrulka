@@ -77,11 +77,15 @@ export class NativeTransport {
   send(packet) {
     if (!this.ready) return Promise.reject(Error('Native scene backend is not ready'));
     if (this.pending.size) return Promise.reject(Error('Only one native scene may be in flight'));
+    // A cold driver compiles the authored model/effect variants before Start.
+    // Its ACK requires FramePostDraw and can exceed the live-frame watchdog,
+    // especially while another client is already drawing on an integrated GPU.
+    const timeoutMs = packet.frame?.environment?.post?.artWarmup === true ? 120000 : 30000;
     return new Promise((resolve, reject) => {
       const timer = globalThis.setTimeout(() => {
         this.pending.delete(packet.seq);
-        reject(Error('Godot did not acknowledge the scene in 30 seconds'));
-      }, 30000);
+        reject(Error(`Godot did not acknowledge the scene in ${timeoutMs / 1000} seconds`));
+      }, timeoutMs);
       this.pending.set(packet.seq, { resolve, reject, timer });
       try {
         this.webview.postMessage(packet);

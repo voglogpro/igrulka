@@ -355,6 +355,43 @@ test('native renderer applies backpressure before serialization and samples the 
   assert.equal(transport.pending.size, 0);
 });
 
+test('cold shader warmup can exceed 30 seconds but still needs its matching drawn ACK', async (t) => {
+  const timers = new Map();
+  let nextTimer = 0;
+  t.mock.method(globalThis, 'setTimeout', (callback, milliseconds) => {
+    const id = ++nextTimer;
+    timers.set(id, { callback, milliseconds });
+    return id;
+  });
+  t.mock.method(globalThis, 'clearTimeout', (id) => timers.delete(id));
+  const transport = new NativeTransport({ addEventListener() {}, postMessage() {} });
+  transport.receive({ kind: 'native-ready', protocol: 1 });
+  let acknowledged = false;
+  const warmup = transport
+    .send({
+      seq: 1,
+      frame: { environment: { post: { artWarmup: true } } },
+    })
+    .then(() => {
+      acknowledged = true;
+    });
+  assert.equal(timers.get(1).milliseconds, 120000);
+  transport.receive({ kind: 'scene-ack', seq: 2 });
+  await Promise.resolve();
+  assert.equal(acknowledged, false);
+  assert.equal(transport.pending.size, 1);
+  await assert.rejects(transport.send({ seq: 2 }), /Only one native scene/);
+  transport.receive({ kind: 'scene-ack', seq: 1 });
+  await warmup;
+  assert.equal(acknowledged, true);
+  assert.equal(timers.size, 0);
+  const live = transport.send({ seq: 2, frame: { environment: { post: {} } } });
+  assert.equal(timers.get(2).milliseconds, 30000);
+  timers.get(2).callback();
+  await assert.rejects(live, /30 seconds/);
+  assert.equal(transport.pending.size, 0);
+});
+
 test('renderer timing diagnostics use actual capture/send/ack boundaries without serializing again', async () => {
   const s = scene();
   let time = 0,
