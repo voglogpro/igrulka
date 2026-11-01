@@ -8,6 +8,8 @@ export const ENGAGEMENT_CADENCE = 0.3;
 export const ENGAGEMENT_LOS_BUDGET = 8;
 export const ENGAGEMENT_CELL = 96;
 const states = new WeakMap();
+// Static buildings that fight ground targets through the ordinary unit combat tick.
+export const FIRING_POSTS = new Set(['gun', 'atgun']);
 const profiles = {
   rifle: {
     id: 'rifle',
@@ -105,7 +107,7 @@ const profiles = {
 };
 
 export function groundWeaponProfile(key) {
-  const configured = GROUND_UNITS[key]?.groundWeapon;
+  const configured = (GROUND_UNITS[key] || BUILDINGS[key])?.groundWeapon;
   if (Object.hasOwn(profiles, configured)) return profiles[configured];
   if (key === 'leopard') return profiles.cannon;
   if (key === 'sniper') return profiles.sniper;
@@ -216,7 +218,7 @@ export function prepareGroundEngagement(s) {
   const cache = stateCache(s);
   if (
     !s.groundUnits.length &&
-    !s.buildings.some((b) => b.key === 'gun' && b.hp > 0 && b.progress >= 1)
+    !s.buildings.some((b) => FIRING_POSTS.has(b.key) && b.hp > 0 && b.progress >= 1)
   )
     return cache;
   if (

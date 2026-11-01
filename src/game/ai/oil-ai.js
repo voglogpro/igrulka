@@ -104,5 +104,11 @@ export function oilPlan(s, side, hq, active) {
   )
     for (const p of portSites(hq).reverse())
       if (tryBuild(s, side, 'navalbase', p.x, p.z)) return true;
+  // A coast that faces enemy ships gets a battery, then its own patrol boat.
+  const enemyShips = (s.warships || []).some((v) => v.hp > 0 && v.side !== side);
+  if (s.time > 700 && enemyShips && active('coastgun').length < 2 && f.credits > 1200)
+    for (const p of portSites(hq)) if (tryBuild(s, side, 'coastgun', p.x, p.z)) return true;
+  if (s.time > 1000 && !active('patrolbase').length && f.credits > BUILDINGS.patrolbase.cost + 1500)
+    for (const p of portSites(hq)) if (tryBuild(s, side, 'patrolbase', p.x, p.z)) return true;
   return false;
 }

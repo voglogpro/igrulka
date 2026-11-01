@@ -1,3 +1,4 @@
+import { FIRING_POSTS } from './engagement.js';
 import { aiSides } from '../../factions.js';
 import { sideIds } from '../../factions.js';
 import { trainRecruit } from './training.js';
@@ -335,7 +336,7 @@ export function updateGround(s, rates, dt, hooks) {
   for (const u of s.groundUnits) tickUnit(s, u, dt, rates, hooks);
   updateAutomaticFPV(s);
   for (const b of s.buildings)
-    if (b.key === 'gun' && b.hp > 0 && b.progress >= 1) tickUnit(s, b, dt, rates, hooks);
+    if (FIRING_POSTS.has(b.key) && b.hp > 0 && b.progress >= 1) tickUnit(s, b, dt, rates, hooks);
   updateDefenseAttacks(s);
   updateGroundRoutes(s);
   updateTransportDeliveries(s);

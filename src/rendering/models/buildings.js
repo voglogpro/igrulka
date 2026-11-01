@@ -17,7 +17,16 @@ export const STATIC_BUILDING_KEYS = new Set([
   'market',
   'ammofactory',
 ]);
-const tiered = new Set(['gun', 'sam', 'cannon', 'launcher', 'silo', 'ammofactory', 'factory']);
+const tiered = new Set([
+  'gun',
+  'atgun',
+  'sam',
+  'cannon',
+  'launcher',
+  'silo',
+  'ammofactory',
+  'factory',
+]);
 function cloneTier(template, b, world) {
   const root = template.clone(true);
   root.position.set(b.x, Math.max(0, world.height(b.x, b.z)), b.z);
@@ -53,7 +62,7 @@ export function model(b) {
   const d = BUILDINGS[b.key],
     size = d?.size || 30,
     accent = factionHex(b.side);
-  if (!['gun', 'port', 'navalbase'].includes(b.key)) {
+  if (!['gun', 'atgun', 'port', 'navalbase', 'patrolbase', 'coastgun'].includes(b.key)) {
     this.box(root, 0, 0, 0, size + 7, 0.65, size + 7, '#6d706a');
     this.box(root, 0, 0.68, size / 2 + 2, size + 5, 0.15, 0.65, accent, {
       emissive: accent,
@@ -78,6 +87,41 @@ export function model(b) {
     oilTankModel(this, content, accent);
   } else if (b.key === 'port' || b.key === 'navalbase') {
     portModel(this, content, b.key === 'navalbase' ? '#6f7b7e' : accent);
+  } else if (b.key === 'patrolbase') {
+    // A short pier with a boathouse and a signal mast.
+    this.box(content, 0, 0.7, 4, 22, 0.5, 14, '#7d7c72');
+    this.box(content, 0, -1.4, -9, 8, 2.6, 14, '#6c6a60');
+    this.box(content, -5, 0.95, 6, 9, 5, 8, '#8f9890');
+    this.box(content, -5, 5.95, 6, 9.6, 0.5, 8.6, '#4f5856');
+    this.cyl(content, 6, 1, 6, 0.18, 12, '#a9b0a8');
+    this.box(content, 6, 12, 6, 2.4, 1.2, 0.1, accent);
+  } else if (b.key === 'atgun' || b.key === 'coastgun') {
+    // A gun behind a sandbag or concrete parapet; the coastal piece is larger and on a pad.
+    const big = b.key === 'coastgun',
+      k = big ? 1.6 : 1,
+      wall = big ? '#8c8d86' : '#a89b74';
+    if (big) this.box(content, 0, 0, 0, 14, 0.6, 14, '#6f706b');
+    for (let i = 0; i < 5; i++) {
+      const a = Math.PI * (0.15 + i * 0.175);
+      this.box(
+        content,
+        Math.cos(a) * 4.5 * k,
+        0.4,
+        Math.sin(a) * 4.5 * k,
+        2.6 * k,
+        1.1 * k,
+        1.2 * k,
+        wall,
+      );
+    }
+    this.box(content, 0, 0.6, -0.5, 2.2 * k, 1.1 * k, 2.6 * k, '#4f5d4f');
+    this.box(content, 0, 1.2 * k, 2.2 * k, 0.32 * k, 0.32 * k, 5 * k, '#2f3632');
+    for (const x of [-1.4, 1.4])
+      this.box(content, x * k, 0.4, -2.6 * k, 0.3, 0.3, 3.4 * k, '#3d4640');
+    // Equipment tiers: an armoured shield, then a second stack of ready rounds.
+    if (!big && b.level > 0) this.box(content, 0, 0.9, 1.2, 3.4, 1.6, 0.2, '#5b6a5c');
+    if (!big && b.level > 1)
+      for (const x of [-2.6, 2.6]) this.box(content, x, 0.4, -1.5, 1, 0.8, 1.4, '#6f5d3f');
   } else if (b.key === 'training') {
     trainingModel(this, content, accent);
   } else if (b.key === 'housing') {
@@ -289,7 +333,19 @@ export function model(b) {
   }
   // Warm porch lights are emissive geometry, avoiding a point light per structure.
   if (
-    !['gun', 'cannon', 'sam', 'oilwell', 'oiltank', 'port', 'navalbase', 'training'].includes(b.key)
+    ![
+      'gun',
+      'atgun',
+      'coastgun',
+      'cannon',
+      'sam',
+      'oilwell',
+      'oiltank',
+      'port',
+      'navalbase',
+      'patrolbase',
+      'training',
+    ].includes(b.key)
   )
     for (const x of [-size * 0.4, size * 0.4]) {
       this.cyl(content, x, 0.8, size * 0.43, 0.18, 7, '#485951');

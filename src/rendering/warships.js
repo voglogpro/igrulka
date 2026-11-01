@@ -26,15 +26,31 @@ function warshipModel(w, root, accent) {
   w.cyl(root, 0, 3.2, 14.6, 0.15, 3, '#2f3436').rotation.x = Math.PI / 2;
 }
 
-// Naval missile ships drawn from state.warships, instanced per side with the same swell as
+// A fast patrol boat with a bow gun and a small wheelhouse.
+function patrolModel(w, root, accent) {
+  const hull = '#59625f';
+  w.box(root, 0, -1.4, 0, 5, 2.8, 20, hull);
+  const bow = w.box(root, 0, -1.4, 10, 3.5, 2.8, 3.5, hull);
+  bow.rotation.y = Math.PI / 4;
+  w.box(root, 0, 1.4, 0, 4.6, 0.2, 19, '#7a8385');
+  w.box(root, 0, 1.6, -2, 3.6, 2.8, 5, '#9aa2a3');
+  w.box(root, 0, 4.4, -1.6, 3.2, 0.2, 0.1, '#263238');
+  w.cyl(root, 0, 4.4, -3, 0.18, 4, '#4b5355');
+  w.cyl(root, 0, 1.6, 6, 0.8, 1, '#3e4648');
+  w.box(root, 0, 2.3, 7.8, 0.22, 0.22, 3.4, '#2f3436');
+  w.cyl(root, 0, 7.8, -3, 0.5, 0.6, accent);
+}
+
+// Naval missile ships and patrol boats drawn from state.warships, instanced per side with the same swell as
 // merchant ships and a wake while under way.
 export class Warships {
   constructor(world) {
     this.world = world;
     this.dummy = new T.Object3D();
-    this.meshes = [0, 1, 2, 3].map((side) => {
-      const group = new T.Group();
-      warshipModel(world, group, factionHex(side));
+    this.meshes = [0, 1, 2, 3, 4, 5, 6, 7].map((index) => {
+      const side = index % 4,
+        group = new T.Group();
+      (index < 4 ? warshipModel : patrolModel)(world, group, factionHex(side));
       batchStatic(group);
       const source = group.children[0],
         mesh = new T.InstancedMesh(source.geometry, source.material, CAPACITY);
@@ -49,11 +65,12 @@ export class Warships {
     this.wakeAt = new Map();
   }
   update(state, time, visible) {
-    const counts = [0, 0, 0, 0];
+    const counts = [0, 0, 0, 0, 0, 0, 0, 0];
     for (const ship of state.warships || []) {
-      if (ship.hp <= 0 || !visible(ship) || !this.meshes[ship.side]) continue;
-      const mesh = this.meshes[ship.side],
-        i = counts[ship.side]++;
+      const index = (ship.class === 'patrol' ? 4 : 0) + ship.side;
+      if (ship.hp <= 0 || !visible(ship) || !this.meshes[index] || ship.side > 3) continue;
+      const mesh = this.meshes[index],
+        i = counts[index]++;
       if (i >= CAPACITY) continue;
       const d = this.dummy,
         phase = time * 0.8 + ship.id;
@@ -74,8 +91,8 @@ export class Warships {
         );
       }
     }
-    this.meshes.forEach((mesh, side) => {
-      mesh.count = Math.min(CAPACITY, counts[side]);
+    this.meshes.forEach((mesh, index) => {
+      mesh.count = Math.min(CAPACITY, counts[index]);
       mesh.instanceMatrix.needsUpdate = true;
     });
     if (this.wakeAt.size > 64) this.wakeAt.clear();

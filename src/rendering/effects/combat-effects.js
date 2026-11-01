@@ -604,6 +604,7 @@ export class CombatEffects {
         this.fragment(e.x, e.y, e.z, 3, e.vx, e.vy, e.vz);
       } else this.explode(e.x, e.y, e.z, weaponFamily(e.key) === 'ballistic' ? 1.6 : 1, true);
     }
+    if (e.type === 'navalShot') this.flash(e.x, 4, e.z, 4, 0.08);
     if (e.type === 'impact' || e.type === 'crash')
       this.explode(
         e.x,

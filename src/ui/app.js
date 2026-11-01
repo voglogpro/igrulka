@@ -607,10 +607,10 @@ function buildList() {
     tab === 'city'
       ? ['road', 'housing', 'industry', 'power', 'market', 'service']
       : tab === 'oil'
-        ? ['oilwell', 'oiltank', 'refinery', 'port', 'navalbase', 'electronics']
+        ? ['oilwell', 'oiltank', 'refinery', 'port', 'navalbase', 'patrolbase', 'electronics']
         : tab === 'army'
           ? ['barracks', 'vehiclebase', 'training', 'ammofactory']
-          : ['factory', 'launcher', 'silo', 'gun', 'sam', 'radar'];
+          : ['factory', 'launcher', 'silo', 'gun', 'atgun', 'coastgun', 'sam', 'radar'];
   $('#build-list').innerHTML =
     keys
       .map((key) => {
