@@ -111,7 +111,7 @@ public partial class ParityApp : Node3D
             if (_exiting || !IsInsideTree())
                 return;
             var handle = DisplayServer.WindowGetNativeHandle(DisplayServer.HandleType.WindowHandle);
-            var profile = ProjectSettings.GlobalizePath(_qa ? $"user://parity-qa/run-{System.Environment.ProcessId}/browser-profile" : "user://browser-profile");
+            var profile = ProjectSettings.GlobalizePath(_qa ? $"user://parity-qa/run-{System.Environment.ProcessId}-{System.Guid.NewGuid():N}/browser-profile" : "user://browser-profile");
             _browser.Start(handle, profile, _qa);
         }
         catch (Exception e) { ShowError(e.ToString()); }

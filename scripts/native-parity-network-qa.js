@@ -103,6 +103,7 @@
         query('#welcome [data-action="start"]') &&
         !query('#welcome [data-action="start"]').disabled,
       'original startup readiness',
+      180000,
     );
     api = window.skyfront;
     world = api.getWorld();
