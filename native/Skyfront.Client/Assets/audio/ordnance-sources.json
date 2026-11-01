@@ -1,0 +1,97 @@
+{
+  "sources": {
+    "rocket": {
+      "file": "rocket-launch-original.mp3",
+      "title": "Rocket Launch.flac",
+      "author": "qubodup / original U.S. Government recording",
+      "page": "https://freesound.org/people/qubodup/sounds/182794/",
+      "download": "https://cdn.freesound.org/previews/182/182794_71257-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "6853bef08fe98fd3682bf0622f23693b2fb05dd8a02a2c69804654bce8b49d16"
+    },
+    "cruise": {
+      "file": "missile-launch-original.mp3",
+      "title": "Tomahawk Missile Rocket Launch 2",
+      "author": "qubodup / original U.S. Government recording",
+      "page": "https://freesound.org/people/qubodup/sounds/162379/",
+      "download": "https://cdn.freesound.org/previews/162/162379_71257-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "712d0910dc76f1b9ef7600ba2e55d80f2bfa062d74ef2bf08fec8c9247ebd6f9"
+    },
+    "artillery": {
+      "file": "artillery-shot-original.mp3",
+      "title": "Artillery Gunfire",
+      "author": "qubodup / ArmyVideoTube U.S. Government recording",
+      "page": "https://freesound.org/people/qubodup/sounds/239137/",
+      "download": "https://cdn.freesound.org/previews/239/239137_71257-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "6b5d70ee4467a8b4998064a8e01fb5bd5cf58304ab95eccb357558d68ce90a47"
+    },
+    "flight": {
+      "file": "rocket-flight-original.mp3",
+      "title": "Rocket Flight Loop",
+      "author": "qubodup / NASA recording",
+      "page": "https://freesound.org/people/qubodup/sounds/171106/",
+      "download": "https://cdn.freesound.org/previews/171/171106_71257-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "76bd1423f80548ad06376628fe863cd3159ed89a89c5587f72f662fc55c074c0"
+    },
+    "ballistic": {
+      "file": "ballistic-952860-original.mp4",
+      "title": "Minuteman III Test Launch, non-narrated, 19 February 2025",
+      "author": "Staff Sgt. Joshua LeRoi / U.S. Space Force, Space Launch Delta 30",
+      "page": "https://www.dvidshub.net/video/952860/minuteman-iii-test-launch-showcases-readiness-us-nuclear-forces-safe-effective-deterrent-non-narrated",
+      "download": "https://d34w7g4gy10iej.cloudfront.net/video/2502/DOD_110819589/DOD_110819589.mp4",
+      "license": "Public-domain U.S. Government recording; DVIDS public-use conditions",
+      "licenseUrl": "https://www.dvidshub.net/about/copyright",
+      "sha256": "28c7e4b09bbeafa4f75ce41e29bc7a49065a75b1310b4fbd341d13b619d1bb33"
+    }
+  },
+  "clips": [
+    {
+      "name": "rocket-launch",
+      "source": "rocket",
+      "start": 0.48,
+      "duration": 3,
+      "fadeIn": 0.006,
+      "fadeOut": 0.3
+    },
+    {
+      "name": "cruise-launch",
+      "source": "cruise",
+      "start": 0,
+      "duration": 4.2,
+      "fadeIn": 0.006,
+      "fadeOut": 0.4
+    },
+    {
+      "name": "ballistic-launch",
+      "source": "ballistic",
+      "start": 36.8,
+      "duration": 4.6,
+      "fadeIn": 0.025,
+      "fadeOut": 0.8
+    },
+    {
+      "name": "artillery-shot",
+      "source": "artillery",
+      "start": 0,
+      "duration": 2.75,
+      "fadeIn": 0.001,
+      "fadeOut": 0.18
+    },
+    { "name": "missile-flight", "source": "flight", "start": 0, "duration": 3.2, "loop": true },
+    {
+      "name": "missile-approach",
+      "source": "flight",
+      "start": 0.4,
+      "duration": 1.5,
+      "fadeIn": 0.32,
+      "fadeOut": 0.055
+    }
+  ]
+}

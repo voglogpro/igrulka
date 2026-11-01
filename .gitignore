@@ -14,5 +14,11 @@ tools/engine-probe/.godot/
 tools/engine-probe/bin/
 tools/engine-probe/obj/
 tools/engine-probe/NuGet.Config
+native/**/.godot/
+native/**/bin/
+native/**/obj/
+native/**/NuGet.Config
+native/Skyfront.Client/export_presets.cfg
+native/build/
 .DS_Store
 Thumbs.db

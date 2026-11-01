@@ -1,0 +1,30 @@
+# Offline rules sidecar, bridge v1
+
+Запуск: `node native/runtime/bridge.mjs`. Godot запускает этот процесс скрытым дочерним процессом и соединяет stdin/stdout. Нет TCP-порта, HTTP, браузера или внешнего сервера. Это временный мост к неизменённым настоящим правилам 8.16, а не будущая полная C# реализация. Для автономной Windows-сборки нужны bundled Node и JS-модули; отсутствие установленного Node нельзя компенсировать сетью.
+
+UTF-8 NDJSON, одна команда/сообщение на строку. stdout содержит только JSON; stderr — диагностику. Все действия принадлежат стороне 0 и проходят существующий `executeCommand`, без читов/добавочных ресурсов. Сторона из payload не назначает владельца.
+
+| stdin                                                                                                | Значение                                                            |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `{"id":1,"cmd":"new","seed":816,"difficulty":"normal","mode":"solo"}`                                | Новая кампания; mode solo/siege/coop; default solo, normal, seed816 |
+| `{"id":2,"cmd":"action","type":"build","payload":{"key":"barracks","x":-2040,"z":-10,"rotation":0}}` | Любой разрешённый приказ gateway                                    |
+| `{"id":3,"cmd":"pause","paused":true}`                                                               | Пауза реальной симуляции                                            |
+| `{"id":4,"cmd":"save"}`                                                                              | reply.data содержит исходный JSON кампании, строкой                 |
+| `{"id":5,"cmd":"load","data":"...JSON..."}`                                                          | Валидация/миграция исходным load; успешная загрузка ставит паузу    |
+| `{"id":6,"cmd":"quit"}`                                                                              | Завершить процесс                                                   |
+
+Ответы: `{kind:"reply",id,ok:true,data?}` или `{kind:"error",id,ok:false,message}`. Ошибки правил возвращают оригинальный текст. `data` успешного action — оригинальный результат gateway (объект/число/boolean/null). `ok` означает обработанный без ошибки приказ: отдельные правила могут возвращать false как результат отказа. Файл сохраняет Godot, не sidecar. Не загружать приватный сетевой snapshot вместо полной кампании.
+
+Startup и успешные new/load публикуют `world`: bridgeVersion1, gameVersion8.16.0, schema23, protocol18, map/field, heightGrid, waterLevel=-1, coverPatches, trees, oilFields, depots, settlements, island, полные исходные catalogs buildings/weapons/groundUnits/difficulty. `heightGrid`: columns121, rows101, step40, originX=-2400, originZ=-2000; values и water row-major, индекс row*columns+column. Суша берётся из groundHeight, мокрые клетки имеют визуальную высоту -3; это упрощённое представление дна и берега, не замена правил isWater. Остров — декоративный landmark, не проходимая суша. Trees `{x,z,scale,yaw,kind}` воспроизводят seed171/порядок исходного scenery, не расходуют battle RNG. Это статическая исходная растительность; native должен скрывать деревья при застройке/расчистке, как отдельную визуальную работу.
+
+`state` приходит максимум 5 раз/сек, seq возрастает в течение процесса. Плоские поля: time, paused, mode, result, side0, sides, economy, sideHQ, log, groups, formations; массивы buildings, roads, groundUnits, units (авиация/ракеты), projectiles, serviceVehicles, ammoVehicles, ammoCrates, ships, warships, trenches, districts, settlements, contacts, events, groundScars. Исходные поля сущностей, включая key/id/side/x/y/z/yaw/hp, боезапас, очереди, прогресс и cooldown сохраняются; исключены path/route/routeQueue/routeSearch/frontlineMemory. Перед проекцией используется настоящий playerView: скрытые враги и чужие приватные данные не раскрываются. Нет RNG/AI authority на клиенте. Economy — настоящий расчёт стороны0, connected Set представлен массивом.
+
+`events` — исходный отфильтрованный журнал правил (кольцо до260 записей). Он повторяется между кадрами; клиент дедуплицирует по id, очищает свой dedup/cache при world. Это не гарантированная доставка каждого косметического события при stall: полный state остаётся актуальным, пропуски старых FX допустимы. Не превращать повторяющиеся события в повторный урон. Никаких выдуманных боёв, выстрелов или потерь мост не создаёт.
+
+Правила работают 20Hz, dt0.05, timescale1. За callback максимум4 шага и максимум0.2сек накопления; избыточный lag отбрасывается, часы не перематываются на день. Пауза останавливает бой/экономику. Все gameplay8.16, включая AI, захват, доставку, корабли и производство, рассчитывается исходным step.
+
+Backpressure: pipe содержит максимум один ожидающий state, заменяемый новейшим; уже переданная stream-буферу строка завершает запись обычным механизмом Node. Контрольные сообщения сохраняют порядок, очередь ограничена32; при переполнении процесс закрывает pipe с диагностикой вместо неограниченного роста памяти. Клиент должен дожидаться ответов и постоянно читать stdout на отдельном потоке. Save JSON может быть большой строкой. Максимум входной законченной строки16MiB; интерфейс доверенный локальный, не публичный сетевой endpoint.
+
+Gateway payload — `src/network/commands.js`. Частые формы: road `{a:{x,z},b:{x,z}}`, factory-order `{key,count,id?}`, army-target `{key,count}`, recruit `{key,count,siteId?,stance?}`, launch `{key,aim:{x,z,waypoints?},count,siteId?}`, repair/demolish/upgrade `{id}`. Полный список действий не дублируется новым allowlist: все существующие cases доступны, существующая валидация сохраняется. Каталоги дают фактические цены/длительности/роли; UI не должен обещать успешное действие до ответа правил.
+
+Проверка протокола/паритета: `node --test tests/unit/native-bridge.test.mjs`. Это целевые функциональные тесты, не аппаратный benchmark и не доказательство готовой native-графики.

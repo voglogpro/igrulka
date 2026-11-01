@@ -3,3 +3,7 @@
 *.woff2 binary
 *.png binary
 *.jpg binary
+
+# Preserve upstream license text, including its original whitespace.
+native/licenses/*.txt -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab
+native/Skyfront.Client/Assets/effects/*License.txt -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab

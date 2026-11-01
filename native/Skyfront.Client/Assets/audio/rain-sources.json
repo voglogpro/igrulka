@@ -1,0 +1,20 @@
+{
+  "id": "freesound-401277",
+  "author": "InspectorJ",
+  "title": "Rain, Moderate, A.wav",
+  "source": "https://freesound.org/people/InspectorJ/sounds/401277/",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "realRecordingEvidence": "Author reports Zoom H1 field recording in Witley, England, 2016-01-02",
+  "download": "https://cdn.freesound.org/previews/401/401277_5121236-hq.mp3",
+  "downloadKind": "Public HQ lossy preview, not the login-protected original WAV",
+  "local": "401277-inspectorj-moderate-rain-hq.mp3",
+  "candidate": "candidate-inspectorj-real-rain-56p5s.opus",
+  "analysis": "rain-analysis.json",
+  "synthesized": false,
+  "edits": "Trim1..59s,1.5s equal-power loop crossfade of recorded source,2dB attenuation,format conversion",
+  "asset": "rain-inspectorj.opus",
+  "sha256": "894e73679f77ce9b160959718d2d16d3449b725cee741a6c7812adb83fd2bb24",
+  "durationSeconds": 56.5,
+  "audition": "Not claimed: numerical PCM checks only; perceptual review remains a release check."
+}

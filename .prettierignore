@@ -4,6 +4,10 @@ vendor/
 assets/fonts/
 archive/
 artifacts/
+native/**/.godot/
+native/**/bin/
+native/**/obj/
+native/build/
 play/
 docs/history/
 package-lock.json
