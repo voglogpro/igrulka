@@ -5,6 +5,8 @@ import {
 } from '../../src/rendering/performance/warmup-families.js';
 import { showNativeFailure, reportNativeStatus } from './native-failure.mjs';
 import { registerVisualWorld } from './visual-bindings.mjs';
+import { registerStaticWorld } from './static-scenery-cache.mjs';
+import { attachNativeArtWarmup } from './art-warmup.mjs';
 
 const paint = () => new Promise((resolve) => globalThis.requestAnimationFrame(resolve));
 const identity = (state) => [
@@ -21,6 +23,7 @@ const equal = (a, b) => a.every((part, i) => part === b[i]);
 // changes only to a native readiness/first complete scene acknowledgement.
 export async function warmStartupScene(world, options) {
   registerVisualWorld(world);
+  registerStaticWorld(world);
   try {
     return await prepareNativeScene(world, options);
   } catch (error) {
@@ -121,6 +124,19 @@ async function prepareNativeScene(
   reportNativeStatus('native-warmup');
   await world.renderer.transport.waitReady();
   world.updateDaylight();
+  const artWarmup = attachNativeArtWarmup(world);
+  if (artWarmup) {
+    reportNativeStatus('art-shaders', { models: artWarmup.models, meshes: artWarmup.meshes });
+    try {
+      // The native ACK is deferred until FramePostDraw for this tagged frame.
+      await world.renderer.present(world.scene, world.camera, {
+        time: world.battleTime,
+        post: { daylight: world.post.daylight, artWarmup: true },
+      });
+    } finally {
+      artWarmup.dispose();
+    }
+  }
   await world.renderer.present(world.scene, world.camera, {
     time: world.battleTime,
     post: {

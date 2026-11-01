@@ -56,13 +56,17 @@ if ($LASTEXITCODE -ne 0) { throw 'Native compilation failed' }
 $nativeImportLog = Join-Path $nativeRepo 'artifacts/native/last-import.log'
 $nativeImportArgs = '--headless --editor --path "' + $nativeProject + '" --import --quit --log-file "' + $nativeImportLog + '"'
 $nativeImport = Start-Process -FilePath $nativeEngine -ArgumentList $nativeImportArgs -WindowStyle Hidden -PassThru
+$null = $nativeImport.Handle
 if (-not $nativeImport.WaitForExit(180000)) { $nativeImport.Kill(); throw 'Godot import timed out' }
+$nativeImport.Refresh()
 if ($nativeImport.ExitCode -ne 0) { throw 'Godot import failed' }
 $nativeExportMode = if ($DebugBuild) { '--export-debug' } else { '--export-release' }
 $nativeExportLog = Join-Path $nativeRepo 'artifacts/native/last-export.log'
 $nativeExportArgs = '--headless --path "' + $nativeProject + '" ' + $nativeExportMode + ' Windows "' + (Join-Path $nativeOutput 'Skyfront.exe') + '" --quit --log-file "' + $nativeExportLog + '"'
 $nativeExport = Start-Process -FilePath $nativeEngine -ArgumentList $nativeExportArgs -WindowStyle Hidden -PassThru
+$null = $nativeExport.Handle
 if (-not $nativeExport.WaitForExit(300000)) { $nativeExport.Kill(); throw 'Godot export timed out' }
+$nativeExport.Refresh()
 if ($nativeExport.ExitCode -ne 0) { throw 'Windows export failed' }
 if (Select-String -LiteralPath $nativeExportLog -SimpleMatch 'ERROR:' -Quiet) {
     throw 'Godot reported an export error; package is not accepted'

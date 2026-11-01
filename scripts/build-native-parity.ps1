@@ -29,4 +29,6 @@ Copy-Item -LiteralPath (Join-Path $parityRepo 'native/README-PARITY.txt') -Desti
 foreach ($terrainLicense in @('README.md','provenance.json','CC0-1.0.txt')) {
     Copy-Item -LiteralPath (Join-Path $parityRepo ('native/Skyfront.Client/Assets/terrain/'+$terrainLicense)) -Destination (Join-Path $parityOutput ('licenses/TERRAIN-'+$terrainLicense))
 }
+Copy-Item -LiteralPath (Join-Path $parityRepo 'native/art-assets/CC0-1.0.txt') -Destination (Join-Path $parityOutput 'licenses/ART-CC0-1.0.txt')
+Copy-Item -LiteralPath (Join-Path $parityRepo 'native/art-assets/README.md') -Destination (Join-Path $parityOutput 'licenses/ART-README.md')
 Write-Output "Full original game + Godot: $parityOutput"

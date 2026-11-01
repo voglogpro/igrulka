@@ -168,7 +168,7 @@ test('geometry buffers, topology ranges and uniforms invalidate independently of
   s.mesh.geometry.addGroup(0, 12, 0);
   s.mesh.geometry.setDrawRange(0, 12);
   const changed = s.exporter.capture(s.scene, s.camera, 2);
-  assert.equal(changed.frame.geometryUpdates[0].attributes.position.count, 24);
+  assert.equal(changed.frame.geometryUpdates[0].attributes.position.count, 8);
   assert.deepEqual(changed.frame.geometryUpdates[0].groups, [
     { start: 0, count: 12, materialIndex: 0 },
   ]);
@@ -594,7 +594,9 @@ test('parity web bundle uses the original application, network and audio with on
     ]) {
       if (contract === 'original-game-godot-backend') continue;
       assert.ok(
-        javascript.includes(contract) || javascript.includes(contract.replace('class ', 'var ')),
+        javascript.includes(contract) ||
+          javascript.includes(contract.replace('class ', 'var ')) ||
+          (contract === 'class RTSWorld' && /RTSWorld\s*=\s*class\b/.test(javascript)),
         contract,
       );
     }

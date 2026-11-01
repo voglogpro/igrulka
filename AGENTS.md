@@ -1,5 +1,19 @@
 # Работа с Небесным рубежом
 
+## Native 0.4 — наземные модели и запуск Windows
+
+Пользователь выбрал Windows-версию для себя и друзей, без Steam на этом этапе.
+План — `docs/engine/GRAPHICS-04.md`, факты — `GRAPHICS-04-STATUS.md`.
+Архитектура source 8.16 сохраняется; art overlays применяются только native.
+`native/art-assets/` — runtime banks в Git; Blender не нужен для обычной сборки.
+Генераторы — `native/art-source/`, загрузка/rig — `native/parity/`.
+Immutable registry — только exact refs авторских bank/merged geometries.
+Prefix transport сохраняет vertex IDs; LOD, immutable и instance banks нельзя
+обрезать как обычные draw-range attributes. Effect warmup использует частные
+geometry clones и заканчивается после FramePostDraw, не меняя исходные FX pools.
+Старые готовые 0.1/0.2/0.2.1/0.3 папки и архивы не перезаписывать. Различать
+функциональный бой 500 групп и плавность: long tasks ещё остаются.
+
 ## Активная задача — графика Godot после принятого переноса
 
 Пользователь отверг Native 0.1 как другую игру. Базовая ветка `codex/native-parity-full`,

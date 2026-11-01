@@ -28,7 +28,7 @@ public partial class ParityApp : Node3D
     public override async void _Ready()
     {
         // Keep the project/user-data name stable so existing campaigns survive.
-        DisplayServer.WindowSetTitle("Небесный рубеж — Godot 0.3 · правила 8.16");
+        DisplayServer.WindowSetTitle("Небесный рубеж — Godot 0.4 · правила 8.16");
         var args = OS.GetCmdlineUserArgs();
         _qa = args.Contains("--qa-parity");
         _capture = args.FirstOrDefault(x => x.StartsWith("--capture="))?[10..] ?? "";
@@ -169,7 +169,7 @@ public partial class ParityApp : Node3D
                             _firstFrame = _clock;
                         }
                         _status.Visible = false;
-                        _browser.Send(new
+                        var acknowledgement = new
                         {
                             kind = "scene-ack",
                             seq = message.I("seq"),
@@ -177,7 +177,10 @@ public partial class ParityApp : Node3D
                             applyMs = _lastApplyMs,
                             parseMs = _lastParseMs,
                             scene = _qa ? _scene.Diagnostics() : null
-                        });
+                        };
+                        if (message.P("frame").P("environment").P("post").B("artWarmup"))
+                            _ = AcknowledgeRenderedWarmup(acknowledgement);
+                        else _browser.Send(acknowledgement);
                         break;
                     case "host-error":
                     case "native-error":
@@ -199,6 +202,9 @@ public partial class ParityApp : Node3D
                             _ = CapturePhase(message.S("stage"));
                         if (message.S("stage") == "complete")
                             _qaFinished = true;
+                        break;
+                    case "qa-cpu-profile-result":
+                        if (_qa) GD.Print("SKYFRONT_PARITY_CPU_PROFILE " + line);
                         break;
                     case "host-eval-result":
                         if (_closing && message.S("id") == "close-save")
@@ -261,6 +267,11 @@ public partial class ParityApp : Node3D
             }));
             GetTree().Quit(1);
         }
+    }
+    private async Task AcknowledgeRenderedWarmup(object acknowledgement)
+    {
+        await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        if (IsInsideTree() && !_closing && !_qaFailed) _browser.Send(acknowledgement);
     }
     private async Task CapturePhase(string stage)
     {

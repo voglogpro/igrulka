@@ -99,7 +99,10 @@ export class GodotRenderer {
   constructor({ transport, exporter, canvas, clock = () => globalThis.performance.now() } = {}) {
     this.domElement = canvas || globalThis.document.createElement('canvas');
     this.domElement.dataset.renderer = 'godot';
-    this.transport = transport || new NativeTransport();
+    this.transport =
+      transport || globalThis.__SKYFRONT_STARTUP_TRANSPORT__ || new NativeTransport();
+    if (this.transport === globalThis.__SKYFRONT_STARTUP_TRANSPORT__)
+      delete globalThis.__SKYFRONT_STARTUP_TRANSPORT__;
     this.exporter = exporter || new SceneExporter();
     this.shadowMap = { enabled: true, type: 0, autoUpdate: false, needsUpdate: true };
     this.capabilities = { maxSamples: 4, isWebGL2: false };

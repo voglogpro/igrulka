@@ -84,6 +84,11 @@ void fragment() {
     const mat2 dirt_rotation = mat2(vec2(0.362358, -0.932039), vec2(0.932039, 0.362358));
     vec2 mud_uv = mud_rotation * metres / mud_tile_metres + vec2(17.23, 4.13) + earth_warp * 1.7;
     vec2 dirt_uv = dirt_rotation * metres / dirt_tile_metres + vec2(-9.27, 31.7) - earth_warp * 0.9;
+    // Broad photo variation avoids a one-metre diagonal carpet from the RTS
+    // camera. Keep all PBR maps aligned, and retain the conservative normal
+    // visibility budget below instead of adding distant texture fetches.
+    mud_uv *= 0.17;
+    dirt_uv *= 0.17;
     float blend = smoothstep(0.23, 0.79, earth_mix);
     // Filter by cycles per pixel, not metres per pixel. A 1.3m tile occupying
     // only a handful of pixels must not keep a strong high-frequency normal.
@@ -103,7 +108,7 @@ void fragment() {
     vec3 soil = mix(mud, dirt, blend);
     float luminance = dot(soil, vec3(0.2126, 0.7152, 0.0722));
     soil = mix(soil, vec3(luminance), 0.45) * vec3(0.85, 0.93, 0.91);
-    vec3 palette = mix(vec3(0.290, 0.280, 0.250), vec3(0.225, 0.250, 0.215), smoothstep(0.28, 0.85, earth_mix));
+    vec3 palette = mix(vec3(0.255, 0.265, 0.255), vec3(0.215, 0.240, 0.215), smoothstep(0.28, 0.85, earth_mix));
 #if CURRENT_RENDERER != RENDERER_COMPATIBILITY
     // Palette constants are authored as sRGB; the active GL renderer converts
     // ALBEDO to linear itself, whereas Forward+/Mobile expect linear here.
@@ -111,7 +116,7 @@ void fragment() {
 #endif
     // Distant pixels carry the broad earth palette, not a minified carpet of
     // one-metre colour/normal tiles. Texture detail returns smoothly up close.
-    soil = mix(palette, soil, mix(0.18, 0.62, detail));
+    soil = mix(palette, soil, mix(0.12, 0.62, detail));
     float macro_value = mix(0.72, 1.17, smoothstep(0.13, 0.87, earth_mix));
     vec3 quiet_grass = mix(vec3(1.0), vec3(0.88, 0.96, 0.84), vegetation_weight * 0.25);
     ALBEDO = soil * earth_tint * quiet_grass * macro_value * (1.0 - wetness * 0.13);

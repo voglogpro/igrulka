@@ -20,6 +20,7 @@ foreach($file in $files){
  $hashes[$relative]=$hash;$lines.Add($hash+'  '+$relative)
 }
 [IO.File]::WriteAllLines((Join-Path $package 'SHA256SUMS.txt'),$lines,[Text.UTF8Encoding]::new($false))
+$manifestHash=(Get-FileHash -LiteralPath (Join-Path $package 'SHA256SUMS.txt') -Algorithm SHA256).Hash.ToLowerInvariant()
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive=[IO.Compression.ZipFile]::Open($archivePath,[IO.Compression.ZipArchiveMode]::Create)
@@ -29,20 +30,26 @@ try{
   [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive,$file.FullName,($packageName+'/'+$relative),[IO.Compression.CompressionLevel]::Fastest)
  }
 }finally{$archive.Dispose()}
-$verified=0;$archive=[IO.Compression.ZipFile]::OpenRead($archivePath)
+$verified=0;$manifestVerified=$false;$entryNames=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal);$archive=[IO.Compression.ZipFile]::OpenRead($archivePath)
 try{
  if($archive.Entries.Count -ne $hashes.Count+1){throw 'Unexpected archive entry count'}
  foreach($entry in $archive.Entries){
   if(!$entry.FullName.StartsWith($packageName+'/')){throw 'Archive path boundary mismatch'}
   $relative=$entry.FullName.Substring($packageName.Length+1)
-  if($relative -eq 'SHA256SUMS.txt'){continue}
+  if(!$entryNames.Add($relative)){throw ('Duplicate archive entry '+$relative)}
+  if($relative -eq 'SHA256SUMS.txt'){
+   $stream=$entry.Open();try{$actualManifestHash=StreamHash $stream}finally{$stream.Dispose()}
+   if($actualManifestHash -ne $manifestHash){throw 'Archive manifest hash mismatch'}
+   $manifestVerified=$true;continue
+  }
   if(!$hashes.ContainsKey($relative)){throw ('Unexpected archive entry '+$relative)}
   $stream=$entry.Open();try{$hash=StreamHash $stream}finally{$stream.Dispose()}
   if($hash -ne $hashes[$relative]){throw ('Archive hash mismatch '+$relative)}
   $verified++
  }
+ if(!$manifestVerified){throw 'Archive manifest is absent'}
 }finally{$archive.Dispose();$sha.Dispose()}
-$result=[pscustomobject]@{passed=$true;package=$package;archive=$archivePath;verifiedPayloadFiles=$verified;archiveBytes=(Get-Item -LiteralPath $archivePath).Length;archiveSha256=(Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash;verifiedEveryDecompressedEntry=$true}
+$result=[pscustomobject]@{passed=$true;package=$package;archive=$archivePath;verifiedPayloadFiles=$verified;verifiedManifest=$manifestVerified;uniqueEntries=$entryNames.Count;archiveBytes=(Get-Item -LiteralPath $archivePath).Length;archiveSha256=(Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash;verifiedEveryDecompressedEntry=$true}
 $reportPath=Join-Path $repoDirectory ('artifacts/native/'+$packageName+'-archive.json')
 [IO.File]::WriteAllText($reportPath,($result|ConvertTo-Json),[Text.UTF8Encoding]::new($false))
 $result|ConvertTo-Json

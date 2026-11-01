@@ -57,12 +57,12 @@ internal sealed class BrowserMaterial
             else
                 _fields[property.Name] = property.Value.Clone();
         }
-        if (Type is "particle" or "streak" or "scar" or "weather" or "sky")
+        if (Type is "particle" or "streak" or "scar" or "weather" or "sky" or "infantry")
         {
             var mode = Type + (S("blending") == "additive" ? ":add" : ":mix");
             if (!Shaders.TryGetValue(mode, out var shader))
             {
-                shader = new Shader { Code = ShaderCode(Type, S("blending") == "additive") };
+                shader = Type == "infantry" ? GD.Load<Shader>("res://Parity/infantry-art.gdshader") : new Shader { Code = ShaderCode(Type, S("blending") == "additive") };
                 Shaders[mode] = shader;
             }
             if (Material is not ShaderMaterial custom || custom.Shader != shader)
@@ -148,6 +148,10 @@ internal sealed class BrowserMaterial
         standard.EmissionTexture = Map("emissiveMap");
         standard.MetallicTexture = Map("metalnessMap");
         standard.RoughnessTexture = Map("roughnessMap");
+        standard.MetallicTextureChannel = BaseMaterial3D.TextureChannel.Blue;
+        standard.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Green;
+        standard.AOTexture = Map("aoMap");
+        standard.AOEnabled = standard.AOTexture != null;
         var textureId = maps.P("map");
         if (textureId.ValueKind == JsonValueKind.Undefined)
             textureId = maps.P("normalMap");

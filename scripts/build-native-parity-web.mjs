@@ -4,6 +4,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { nativeInviteTransform } from '../native/parity/invite-host-transform.mjs';
 import { nativePresentationTransform } from '../native/parity/presentation-transform.mjs';
+import { nativeModelTransform } from '../native/parity/model-transform.mjs';
+import { nativeStaticSceneryTransform } from '../native/parity/static-scenery-transform.mjs';
 import { createHash } from 'node:crypto';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -17,15 +19,35 @@ export function parityAliases() {
       plugin.onResolve({ filter: /^skyfront-native-presentation$/ }, () => ({
         path: path.join(native, 'trench-presentation.mjs'),
       }));
+      plugin.onResolve({ filter: /^skyfront-native-(vehicles|infantry)$/ }, ({ path: name }) => ({
+        path: path.join(native, name.endsWith('vehicles') ? 'vehicle-art.mjs' : 'infantry-art.mjs'),
+      }));
+      plugin.onResolve({ filter: /^skyfront-native-static-scenery$/ }, () => ({
+        path: path.join(native, 'static-scenery-cache.mjs'),
+      }));
+      plugin.onLoad(
+        { filter: /src[\\/]rendering[\\/]terrain[\\/]environment\.js$/ },
+        async ({ path: sourcePath }) => ({
+          contents: nativeStaticSceneryTransform(
+            sourcePath.replaceAll('\\', '/'),
+            await readFile(sourcePath, 'utf8'),
+          ),
+          loader: 'js',
+          resolveDir: path.dirname(sourcePath),
+        }),
+      );
       plugin.onLoad(
         {
           filter:
             /src[\\/]rendering[\\/](models[\\/]infantry[\\/]soldiers|models[\\/]ground|input[\\/]build-tools|sync|effects[\\/]tracer-path|performance[\\/]contact-shadows)\.js$/,
         },
         async ({ path: sourcePath }) => ({
-          contents: nativePresentationTransform(
+          contents: nativeModelTransform(
             sourcePath.replaceAll('\\', '/'),
-            await readFile(sourcePath, 'utf8'),
+            nativePresentationTransform(
+              sourcePath.replaceAll('\\', '/'),
+              await readFile(sourcePath, 'utf8'),
+            ),
           ),
           loader: 'js',
           resolveDir: path.dirname(sourcePath),
@@ -152,9 +174,11 @@ export async function buildNativeParityWeb(output = path.join(root, 'native/buil
     adaptations: [
       'Three.WebGLRenderer -> native scene protocol',
       'post GPU backend -> Godot',
-      'GPU warmup -> CPU models/navigation + native first-frame acknowledgement',
+      'GPU warmup -> CPU models/navigation + Godot material draw + first-frame acknowledgement',
       'native asset origin default server address',
       'read-only terrain/fortification bindings and shared trench presentation floor',
+      'authored ground/infantry art with original aiming, shared LOD banks and pose state',
+      'exact static-tree residents, immutable owned geometry and active draw-range transport',
     ],
     sceneProtocol: 1,
     sourceInputs,
@@ -166,7 +190,23 @@ export async function buildNativeParityWeb(output = path.join(root, 'native/buil
       'src/rendering/sync.js: matching visual muzzle flash',
       'src/rendering/effects/tracer-path.js: matching visual projectile endpoints',
       'src/rendering/performance/contact-shadows.js: matching presentation floor',
+      'src/rendering/terrain/environment.js: exact tree-buffer dirty notifications',
+      'src/rendering/models/ground.js: native-only authored vehicle factory and original drive phase',
+      'src/rendering/models/infantry/soldiers.js: native-only authored rig and normalized hip/leg pose',
     ],
+    nativeArt: await Promise.all(
+      ['ground-v04.json', 'infantry-v04.json'].map(async (name) => {
+        const bytes = await readFile(path.join(root, 'native/art-assets', name)),
+          data = JSON.parse(bytes);
+        return {
+          path: 'native/art-assets/' + name,
+          version: data.version,
+          models: Object.keys(data.models),
+          bytes: bytes.length,
+          sha256: createHash('sha256').update(bytes).digest('hex'),
+        };
+      }),
+    ),
     output,
     bundleBytes: Buffer.byteLength(bundle.outputFiles[0].text),
   };

@@ -55,10 +55,16 @@ const base = state.buildings.find(
 const ship = state.warships.find((candidate) => candidate.baseId === base?.id);
 assert.ok(guns.length === 3 && armor && base && ship, 'Gallery camera reference cases missing');
 const fixture = {
+  nativeArtVersion: process.argv.includes('--art-v04') ? 4 : 0,
+  shadowComparison: process.argv.includes('--shadow-compare'),
   raw,
   sha256,
   source: path.relative(root, fixturePath).replaceAll('\\', '/'),
-  holdMilliseconds: 45000,
+  holdMilliseconds: process.argv.includes('--quick')
+    ? 1200
+    : process.argv.includes('--art-v04')
+      ? 10000
+      : 45000,
   expected: {
     counts: Object.fromEntries(
       ['buildings', 'groundUnits', 'units', 'ships', 'warships', 'trenches', 'groundScars'].map(

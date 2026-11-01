@@ -49,9 +49,11 @@ internal sealed class BrowserGeometry
     public readonly List<(int Start, int Count, int Material)> Groups = new();
     private readonly Dictionary<(string, int, int, bool, bool), ArrayMesh> _meshes = new();
     public int Revision;
+    public int LodCount => _lods.Count;
     private int[]? _index;
     private int _indexVersion = int.MinValue, _indexCount = -1;
     private string _indexIdentity = "";
+    private readonly List<(float Distance, BrowserAttribute Index)> _lods = new();
     public void Update(JsonElement value)
     {
         var meshChanged = false;
@@ -89,6 +91,23 @@ internal sealed class BrowserGeometry
                 _indexVersion = rawIndex.I("version");
                 _indexCount = rawIndex.I("count");
                 _indexIdentity = rawIndex.S("identity");
+                meshChanged = true;
+            }
+        }
+        if (value.TryGetProperty("nativeLods", out var rawLods))
+        {
+            var next = rawLods.Items().ToArray();
+            if (next.Length != _lods.Count || next.Where((lod, i) => i >= _lods.Count || _lods[i].Distance != lod.F("distance") || !_lods[i].Index.Matches(lod.P("index"))).Any())
+            {
+                _lods.Clear();
+                foreach (var lod in next)
+                {
+                    var distance = lod.F("distance");
+                    var index = BrowserAttribute.Read(lod.P("index"));
+                    if (!float.IsFinite(distance) || distance <= 0 || index.ItemSize != 1 || index.Count % 3 != 0)
+                        throw new InvalidDataException("Invalid native mesh LOD");
+                    _lods.Add((distance, index));
+                }
                 meshChanged = true;
             }
         }
@@ -143,6 +162,13 @@ internal sealed class BrowserGeometry
             arrays[(int)Godot.Mesh.ArrayType.TexUV] = data;
         }
         var color = Attribute("color");
+        var uv2 = Attribute("uv2");
+        if (uv2 != null && uv2.Count == vertices.Length)
+        {
+            var data = new Vector2[vertices.Length];
+            for (var i = 0; i < data.Length; i++) data[i] = new Vector2(uv2.At(i), uv2.At(i, 1));
+            arrays[(int)Godot.Mesh.ArrayType.TexUV2] = data;
+        }
         if (vertexColors && color != null && !color.Instanced && color.Count == vertices.Length)
         {
             var data = new Color[vertices.Length];
@@ -180,7 +206,31 @@ internal sealed class BrowserGeometry
         arrays[(int)Godot.Mesh.ArrayType.Index] = indices;
         var mesh = new ArrayMesh();
         if (vertices.Length > 0 && count > 0)
-            mesh.AddSurfaceFromArrays(mode, arrays);
+        {
+            var lods = new Godot.Collections.Dictionary();
+            // A bank belongs to a complete one-material mesh. Partial source
+            // draw ranges/groups keep their exact original index selection.
+            if (mode == Godot.Mesh.PrimitiveType.Triangles && start == 0 && count == ElementCount)
+                foreach (var (distance, attribute) in _lods)
+                {
+                    // Godot requires each LOD to have fewer indices than the
+                    // base surface. Tiny fixed details may retain the same
+                    // triangle count in all authored levels; draw those at base.
+                    if (attribute.Count >= count || attribute.Count == 0) continue;
+                    var lodIndices = new int[attribute.Count];
+                    for (var i = 0; i < lodIndices.Length; i++)
+                    {
+                        var v = attribute.At(i);
+                        if (!float.IsFinite(v) || v != MathF.Truncate(v) || v < 0 || v >= vertices.Length)
+                            throw new InvalidDataException("LOD index outside vertex bank");
+                        lodIndices[i] = checked((int)v);
+                    }
+                    for (var i = 0; i + 2 < lodIndices.Length; i += 3)
+                        (lodIndices[i + 1], lodIndices[i + 2]) = (lodIndices[i + 2], lodIndices[i + 1]);
+                    lods[distance] = lodIndices;
+                }
+            mesh.AddSurfaceFromArrays(mode, arrays, lods: lods);
+        }
         _meshes[key] = mesh;
         return mesh;
     }

@@ -139,12 +139,14 @@ public partial class WarAtmosphere : Node3D
         var sourceFog = frame.P("environment").P("fog");
         if (sourceFog.ValueKind == JsonValueKind.Object)
             sourceEnvironment.FogDensity = sourceFog.F("density");
-        var moonAmbient = new Color(.30f, .36f, .44f);
+        // Godot light-color properties are sRGB. Keep a restrained linear moon
+        // fill rather than accidentally converting an already dark value twice.
+        var moonAmbient = new Color(.18f, .24f, .30f).LinearToSrgb();
         var dayAmbient = new Color(.54f, .58f, .58f);
         environment.AmbientLightColor = moonAmbient.Lerp(dayAmbient, day);
         // Source daytime hemi+ambient reaches 1.9 before the sun is added. A
         // restrained day fill avoids beige overexposure, retaining the night floor.
-        environment.AmbientLightEnergy = sourceEnvironment.AmbientEnergy * Mathf.Lerp(.58f, .38f, day);
+        environment.AmbientLightEnergy = sourceEnvironment.AmbientEnergy * Mathf.Lerp(.75f, .38f, day);
         // No auto exposure: flashes and camera pans cannot pump the whole scene.
         environment.TonemapExposure = Mathf.Lerp(1.22f, 1.04f, day);
         if (environment.FogEnabled)

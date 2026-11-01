@@ -8,8 +8,11 @@ native/**/.godot/
 native/**/bin/
 native/**/obj/
 native/build/
+native/art-assets/
 tools/native-trench-checks/bin/
 tools/native-trench-checks/obj/
+tools/native-resource-owner-checks/bin/
+tools/native-resource-owner-checks/obj/
 play/
 docs/history/
 package-lock.json

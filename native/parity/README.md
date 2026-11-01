@@ -1,18 +1,38 @@
 # Original game with a Godot drawing backend
 
 This path preserves the browser application: `src/main.js`, UI/HTML/CSS,
-simulation, commands, AI, networking, audio, camera, picking, geometry and
-animation are compiled from their original modules. It does not run a browser
+simulation, commands, AI, networking, audio, camera and picking are compiled
+from their original modules. It does not run a browser
 WebGL renderer. WebView2 owns the existing DOM and JavaScript; Godot owns 3D.
 
 `scripts/build-native-parity-web.mjs` produces `native/build/parity-web/`.
 `PARITY-BUILD.json` contains SHA256/size for original compiled source inputs,
-styles and index, plus a list of the four host adaptations. Source files under
+styles and index, plus the native adaptations and art-bank hashes. Source files under
 `src/` are not modified by this build.
 
 The Three module alias reexports the actual CPU classes and replaces only
 `WebGLRenderer`. Original `RTSWorld`, `FixedCamera`, model builders, instancing,
 raycasts, selection, road snapping and callback payloads remain intact.
+
+Native0.4 deliberately replaces ground/infantry presentation through guarded
+build transforms: `model-transform.mjs`, `model-pack.mjs`, `vehicle-art.mjs` and
+`infantry-art.mjs`. The authored art retains source joint names, muzzle vectors,
+levels, instance IDs and the shared trench floor. Binary banks are checked in at
+`native/art-assets/`; Blender sources and regeneration instructions are in
+`native/art-source/`. Source rules and browser models are not edited.
+
+`art-warmup.mjs` draws private temporary art/effect meshes behind the welcome
+screen; native readiness waits for `FramePostDraw`, then removes them. It never
+spawns gameplay entities or modifies source effect geometry. The renderer uses
+the native typed-array Base64 path when available and preserves a compatibility
+fallback. `geometry-prefix.mjs` preserves vertex IDs while omitting unused draw
+range capacity; LOD/immutable/instance banks are retained in full.
+
+The exact tree registry and immutable art registry avoid repeated work without
+freezing mutable materials. Godot's resource-owner index updates actual geometry
+and material users rather than scanning every resident descriptor. See
+`docs/engine/NATIVE-STATIC-CACHE.md`, `NATIVE-GEOMETRY-PREFIX.md` and
+`NATIVE-BATTLE-QA.md` for proofs and test boundaries.
 Post-processing changes to the native backend. Startup still prepares original
 model caches and navigation, then waits for native readiness and successful
 application of the first complete scene. There is no fake success on an absent

@@ -307,7 +307,7 @@ internal sealed class BrowserContext : ApplicationContext
             _web.SetVirtualHostNameToFolderMapping(Options.Host, _options.WebRoot, CoreWebView2HostResourceAccessKind.DenyCors);
             _web.NavigationStarting += (_, e) => { if (!Options.AllowedUrl(e.Uri)) e.Cancel = true; };
             _web.NewWindowRequested += (_, e) => e.Handled = true;
-            _web.WebMessageReceived += (_, e) =>
+            _web.WebMessageReceived += async (_, e) =>
             {
                 if (!Options.AllowedUrl(e.Source))
                     return;
@@ -315,6 +315,29 @@ internal sealed class BrowserContext : ApplicationContext
                 {
                     var json = e.WebMessageAsJson;
                     NativeTransportPolicy.RequireMessageLength(json.Length, "Browser output");
+                    if (Environment.GetEnvironmentVariable("SKYFRONT_NATIVE_QA") == "1" &&
+                        json.StartsWith("{\"kind\":\"qa-cpu-profile\",", StringComparison.Ordinal))
+                    {
+                        using var probe = JsonDocument.Parse(json);
+                        if (probe.RootElement.TryGetProperty("kind", out var probeKind) && probeKind.GetString() == "qa-cpu-profile")
+                        {
+                            var action = probe.RootElement.GetProperty("action").GetString();
+                            if (action == "start")
+                            {
+                                await _web.CallDevToolsProtocolMethodAsync("Profiler.enable", "{}");
+                                await _web.CallDevToolsProtocolMethodAsync("Profiler.setSamplingInterval", "{\"interval\":1000}");
+                                await _web.CallDevToolsProtocolMethodAsync("Profiler.start", "{}");
+                            }
+                            else if (action == "stop")
+                            {
+                                var profile = await _web.CallDevToolsProtocolMethodAsync("Profiler.stop", "{}");
+                                using var parsedProfile = JsonDocument.Parse(profile);
+                                Send(new {kind="qa-cpu-profile-result",profile=parsedProfile.RootElement.Clone()});
+                                await _web.CallDevToolsProtocolMethodAsync("Profiler.disable", "{}");
+                            }
+                            return;
+                        }
+                    }
                     if (Environment.GetEnvironmentVariable("SKYFRONT_NATIVE_QA") == "1" && json.Length > 32 * 1024 * 1024)
                         Send(new { kind = "host-transport", direction = "browser-output", actualChars = json.Length,
                             limitChars = NativeTransportPolicy.MaxMessageCharacters, queueLimit = NativeTransportPolicy.MaxQueuedMessages });

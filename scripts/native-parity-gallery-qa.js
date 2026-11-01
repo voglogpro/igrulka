@@ -190,6 +190,37 @@
     );
     api = window.skyfront;
     world = api.getWorld();
+    if (fixture.nativeArtVersion === 4) {
+      const pool = world.infantry.pool('infantry', 0),
+        other = world.infantry.pool('infantry', 1);
+      check(
+        'seeded source infantry pool uses authored GPU rig after native handshake',
+        pool.body.material.userData.nativeFamily === 'infantry' &&
+          !!pool.body.geometry.attributes.uv2,
+      );
+      check(
+        'body keeps team mask and shares geometry across factions',
+        pool.body.geometry.attributes.color.itemSize === 4 &&
+          pool.body.geometry === other.body.geometry,
+      );
+      check(
+        'authored leg contains thigh shin and boot at normalized hip origin',
+        Math.abs(pool.legs.geometry.boundingBox.min.y + 1) < 0.003 &&
+          pool.legs.geometry.boundingBox.max.y <= 0.00001 &&
+          pool.legs.geometry.boundingBox.max.y > -0.02,
+      );
+      check(
+        'infantry LOD banks are strictly smaller and remain CPU selectable',
+        pool.body.geometry.userData.nativeLods.length === 2 &&
+          pool.body.geometry.userData.nativeLods.every(
+            (l) => l.index.count < pool.body.geometry.index.count,
+          ),
+      );
+      check(
+        'temporary startup shader objects removed before play',
+        !world.scene.getObjectByName('native-art-startup-preparation'),
+      );
+    }
     check(
       'phase' + record.phase + ': original Godot renderer ready',
       world.renderer.domElement.dataset.renderer === 'godot' &&
@@ -289,6 +320,38 @@
         world.groundModels.size === expected.counts.groundUnits &&
         !world.renderer.transport.failed,
     );
+    if (fixture.nativeArtVersion === 4) {
+      const originalTime = state.time;
+      try {
+        // A labelled visual-only noon plate, never a simulated campaign step.
+        state.time = 875;
+        world.updateDaylight();
+        world.sync();
+        const armor = fixture.cameras.find((c) => c.name === 'armor');
+        await holdCamera('native04-armor-noon', armor, 100);
+        if (fixture.shadowComparison) {
+          const oldCast = world.sun.castShadow;
+          try {
+            world.sun.castShadow = false;
+            await holdCamera('native04-armor-noon-no-shadow', armor, 100);
+          } finally {
+            world.sun.castShadow = oldCast;
+          }
+        }
+        const soldier = state.groundUnits.find((u) => u.key === 'infantry' && u.side === 0);
+        await holdCamera('native04-infantry-noon', soldier, 100);
+      } finally {
+        state.time = originalTime;
+        world.updateDaylight();
+        world.sync();
+      }
+      check('visual clock restored without simulation ticks', state.time === 0 && api.isPaused());
+      check(
+        'Godot accepted authored LOD and pose materials',
+        record.scenes.at(-1).native.lodGeometries > 0 &&
+          record.scenes.at(-1).native.infantryMaterials > 0,
+      );
+    }
     record.phase = 'complete';
     store();
     post({

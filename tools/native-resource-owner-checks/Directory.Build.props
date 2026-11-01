@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)../../artifacts/native/resource-owner-checks/bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../artifacts/native/resource-owner-checks/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>

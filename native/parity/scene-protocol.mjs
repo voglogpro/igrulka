@@ -1,5 +1,8 @@
 // Godot owns drawing. These descriptors retain the original Three scene and CPU rules.
 import { captureVisualBindings } from './visual-bindings.mjs';
+import { getStaticCapturePlan, updateStaticSceneMatrices } from './static-scenery-cache.mjs';
+import { isNativeImmutableGeometry } from './immutable-geometry.mjs';
+import { ReferencedVertexPrefixCache, FULL_GEOMETRY_PREFIX } from './geometry-prefix.mjs';
 export const SCENE_PROTOCOL = 1;
 
 const TYPES = new Map([
@@ -22,6 +25,9 @@ const standaloneIdentity = (attribute) => {
 };
 export function encodeBytes(array) {
   const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+  // Native WebView supports the typed-array encoder. Avoid spreading every byte
+  // into JS arguments and creating intermediate binary strings each frame.
+  if (typeof bytes.toBase64 === 'function') return bytes.toBase64();
   if (globalThis.Buffer) return globalThis.Buffer.from(bytes).toString('base64');
   let binary = '';
   for (let i = 0; i < bytes.length; i += 8192)
@@ -50,7 +56,9 @@ export function encodeAttribute(
     count,
     data: encodeBytes(values),
     normalized: !!attribute.normalized,
-    instanced: !!attribute.isInstancedBufferAttribute,
+    instanced: !!(
+      attribute.isInstancedBufferAttribute || attribute.data?.isInstancedInterleavedBuffer
+    ),
     version: attribute.version ?? attribute.data?.version ?? 0,
   };
 }
@@ -69,6 +77,7 @@ const MAPS = [
   'aoMap',
 ];
 export function shaderFamily(material) {
+  if (material.userData?.nativeFamily === 'infantry') return 'infantry';
   if (material.isShaderMaterial || material.isRawShaderMaterial) {
     const vertex = material.vertexShader || '',
       fragment = material.fragmentShader || '';
@@ -148,10 +157,36 @@ const materialEqual = (raw, previous) => {
   );
 };
 
+const nativeLods = (geometry) => {
+  const lods = geometry.userData?.nativeLods || [];
+  if (!Array.isArray(lods)) throw Error('nativeLods must be an array');
+  for (const lod of lods)
+    if (
+      !Number.isFinite(lod.distance) ||
+      lod.distance <= 0 ||
+      !lod.index?.isBufferAttribute ||
+      lod.index.itemSize !== 1 ||
+      lod.index.count % 3 !== 0
+    )
+      throw Error('Invalid native geometry LOD distance/index');
+  return lods;
+};
+export function encodeNativeGeometryLods(record, geometry, encode = encodeAttribute) {
+  record.nativeLods = nativeLods(geometry).map(({ distance, index }) => ({
+    distance,
+    index: encode(index),
+  }));
+}
+
 export class SceneExporter {
-  constructor({ encodeTexture = pngTexture, clock = () => globalThis.performance.now() } = {}) {
+  constructor({
+    encodeTexture = pngTexture,
+    clock = () => globalThis.performance.now(),
+    useStaticScenery = true,
+  } = {}) {
     this.encodeTexture = encodeTexture;
     this.geometryCache = new Map();
+    this.geometryPrefixes = new ReferencedVertexPrefixCache();
     this.materialCache = new Map();
     this.textureCache = new Map();
     this.objectCache = new Map();
@@ -163,6 +198,11 @@ export class SceneExporter {
     this.frameTextures = new Map();
     this.clock = clock;
     this.profile = {};
+    this.useStaticScenery = useStaticScenery;
+    this.dynamicIds = new Set();
+    this.staticVisibleIds = new Set();
+    this.staticOwner = null;
+    this.staticRevision = 0;
   }
   attributeSignature(attribute, count = attribute?.count) {
     if (!attribute) return '-';
@@ -275,27 +315,54 @@ export class SceneExporter {
   }
   geometry(geometry, packet) {
     if (this.frameGeometries.has(geometry.uuid)) return geometry.uuid;
-    const started = this.clock();
     this.frameGeometries.add(geometry.uuid);
+    // Exact native-bank ownership is stronger than Three's mutable version
+    // convention. Still emit the full first definition for every exporter/cache.
+    if (isNativeImmutableGeometry(geometry) && this.geometryCache.has(geometry.uuid))
+      return geometry.uuid;
+    const started = this.clock();
     const id = geometry.uuid,
       previous = this.geometryCache.get(id),
       signatures = {};
+    // Authored immutable banks are sent once and keep their complete vertex bank,
+    // also if an owner later changes its draw range. Mutable FX use cached exact
+    // referenced prefixes; instanced attributes are a separate per-instance bank.
+    const prefix = isNativeImmutableGeometry(geometry)
+      ? FULL_GEOMETRY_PREFIX
+      : this.geometryPrefixes.get(geometry);
     const record = { id, attributes: {}, groups: geometry.groups.map((g) => ({ ...g })) };
     for (const [name, attribute] of Object.entries(geometry.attributes)) {
-      signatures[name] = this.attributeSignature(attribute);
+      const count =
+        attribute.isInstancedBufferAttribute ||
+        attribute.data?.isInstancedInterleavedBuffer ||
+        prefix.vertexPrefix === null
+          ? attribute.count
+          : Math.min(attribute.count, prefix.vertexPrefix);
+      signatures[name] = this.attributeSignature(attribute, count);
       if (!previous || previous[name] !== signatures[name]) {
-        record.attributes[name] = this.encodeAttribute(attribute);
+        record.attributes[name] = this.encodeAttribute(attribute, count);
         attribute.clearUpdateRanges?.();
       }
     }
     signatures.groups = JSON.stringify(record.groups);
-    signatures.index = this.attributeSignature(geometry.index);
+    const indexCount = prefix.indexPrefix ?? geometry.index?.count;
+    signatures.index = this.attributeSignature(geometry.index, indexCount);
     if (!previous || previous.index !== signatures.index)
-      record.index = this.encodeAttribute(geometry.index);
+      record.index = this.encodeAttribute(geometry.index, indexCount);
+    const lods = nativeLods(geometry);
+    signatures.nativeLods = JSON.stringify(
+      lods.map((lod) => [lod.distance, this.attributeSignature(lod.index)]),
+    );
+    if (
+      previous?.nativeLods !== signatures.nativeLods &&
+      (lods.length || (previous && previous.nativeLods !== '[]'))
+    )
+      encodeNativeGeometryLods(record, geometry, (attribute) => this.encodeAttribute(attribute));
     if (
       !previous ||
       Object.keys(record.attributes).length ||
       Object.hasOwn(record, 'index') ||
+      Object.hasOwn(record, 'nativeLods') ||
       previous.groups !== signatures.groups
     )
       (previous ? packet.frame.geometryUpdates : packet.definitions.geometries).push(record);
@@ -317,11 +384,15 @@ export class SceneExporter {
       leaves: 0,
       unchangedLeaves: 0,
       changedLeaves: 0,
+      staticResidents: 0,
+      staticSkipped: 0,
     };
     this.frameGeometries.clear();
     this.frameMaterials.clear();
     this.frameTextures.clear();
-    scene.updateMatrixWorld();
+    const staticPlan = this.useStaticScenery ? getStaticCapturePlan(scene) : null;
+    if (staticPlan) updateStaticSceneMatrices(staticPlan);
+    else scene.updateMatrixWorld();
     camera.updateMatrixWorld();
     this.profile.matrixMs = this.clock() - captureStarted;
     const packet = {
@@ -368,7 +439,19 @@ export class SceneExporter {
     if (visualBindings) packet.frame.visualBindings = visualBindings;
     const present = new Set();
     const traversalStarted = this.clock();
-    scene.traverseVisible((object) => {
+    if (this.staticOwner !== staticPlan) {
+      for (const id of this.staticVisibleIds) this.dynamicIds.add(id);
+      this.staticVisibleIds.clear();
+      this.staticRevision = 0;
+      this.staticOwner = staticPlan;
+    }
+    const remove = (id) => {
+      if (!this.objectCache.has(id)) return;
+      packet.frame.removed.push(id);
+      this.objectCache.delete(id);
+      this.instanceCache.delete(id);
+    };
+    const captureObject = (object, resident = false) => {
       if (object.isLight) {
         packet.frame.lights.push({
           id: object.uuid,
@@ -398,7 +481,8 @@ export class SceneExporter {
       // The source marks its empty tracer arrays dirty even while paused. No
       // vertices means no draw: defer both descriptors and buffers until used.
       if (count <= 0) return;
-      present.add(object.uuid);
+      if (resident) this.staticVisibleIds.add(object.uuid);
+      else present.add(object.uuid);
       this.profile.leaves++;
       const geometryId = this.geometry(object.geometry, packet);
       if (Array.isArray(object.material)) {
@@ -416,9 +500,18 @@ export class SceneExporter {
         previous = this.objectCache.get(object.uuid);
       const instanceMatrix = object.isInstancedMesh ? object.instanceMatrix : null;
       const instanceColor = object.isInstancedMesh ? object.instanceColor : null;
+      const instancePose = object.isInstancedMesh ? object.userData?.nativePose || null : null;
+      if (
+        instancePose &&
+        (!instancePose.isBufferAttribute ||
+          instancePose.itemSize !== 4 ||
+          instancePose.count < object.count)
+      )
+        throw Error('nativePose must be a vec4 BufferAttribute covering active instances');
       const matrixVersion = instanceMatrix?.version ?? -1,
         colorVersion = instanceColor?.version ?? -1;
       const instanceCount = object.isInstancedMesh ? object.count : 0;
+      const poseVersion = instancePose?.version ?? -1;
       const centerX = object.isSprite ? object.center?.x : undefined,
         centerY = object.isSprite ? object.center?.y : undefined;
       const matrixChanged =
@@ -430,6 +523,11 @@ export class SceneExporter {
         !previous ||
         previous.instanceColor !== instanceColor ||
         previous.colorVersion !== colorVersion ||
+        previous.instanceCount !== instanceCount;
+      const poseChanged =
+        !previous ||
+        previous.instancePose !== instancePose ||
+        previous.poseVersion !== poseVersion ||
         previous.instanceCount !== instanceCount;
       if (
         previous &&
@@ -446,6 +544,7 @@ export class SceneExporter {
         previous.centerY === centerY &&
         !matrixChanged &&
         !colorChanged &&
+        !poseChanged &&
         materialEqual(object.material, previous) &&
         matrixEqual(matrix, previous.matrix)
       ) {
@@ -478,12 +577,18 @@ export class SceneExporter {
         }
         if (colorChanged)
           record.instances.color = this.encodeAttribute(object.instanceColor, object.count);
+        if (poseChanged && (instancePose || previous?.instancePose))
+          record.instances.pose = instancePose
+            ? this.encodeAttribute(instancePose, object.count)
+            : null;
         this.instanceCache.set(object.uuid, {
           matrix: instanceMatrix,
           color: instanceColor,
           matrixVersion,
           colorVersion,
           count: instanceCount,
+          pose: instancePose,
+          poseVersion,
         });
       }
       packet.frame.objects.push(record);
@@ -508,18 +613,75 @@ export class SceneExporter {
         matrixVersion,
         colorVersion,
         instanceCount,
+        instancePose,
+        poseVersion,
+        worldMatrix: object.matrixWorld,
       });
-    });
+    };
+    if (staticPlan) {
+      // Resident resources remain live: colors, uniforms and texture transforms may change without version bumps.
+      for (const geometry of staticPlan.geometries) this.geometry(geometry, packet);
+      for (const material of staticPlan.materials) this.material(material, packet);
+      const notified = staticPlan.revision !== this.staticRevision;
+      for (const object of staticPlan.meshes) {
+        const visible = object.visible && object.material.visible !== false && object.count > 0;
+        const count = Number.isFinite(object.geometry.drawRange.count)
+          ? object.geometry.drawRange.count
+          : (object.geometry.index?.count ?? object.geometry.attributes.position?.count ?? 0);
+        if (!visible || count <= 0) {
+          this.staticVisibleIds.delete(object.uuid);
+          remove(object.uuid);
+          continue;
+        }
+        this.profile.staticResidents++;
+        this.staticVisibleIds.add(object.uuid);
+        const previous = this.objectCache.get(object.uuid);
+        const flags =
+          (object.castShadow ? 1 : 0) |
+          (object.receiveShadow ? 2 : 0) |
+          (object.frustumCulled !== false ? 4 : 0);
+        const pose = object.userData?.nativePose || null;
+        if (
+          previous &&
+          previous.object === object &&
+          previous.geometry === object.geometry &&
+          previous.geometryId === object.geometry.uuid &&
+          previous.worldMatrix === object.matrixWorld &&
+          previous.materials.length === 1 &&
+          previous.materials[0] === object.material &&
+          previous.materialIds[0] === object.material.uuid &&
+          previous.name === object.name &&
+          previous.start === object.geometry.drawRange.start &&
+          previous.count === count &&
+          previous.flags === flags &&
+          previous.renderOrder === (object.renderOrder || 0) &&
+          previous.instanceMatrix === object.instanceMatrix &&
+          previous.matrixVersion === object.instanceMatrix.version &&
+          previous.instanceColor === object.instanceColor &&
+          previous.colorVersion === (object.instanceColor?.version ?? -1) &&
+          previous.instancePose === pose &&
+          previous.poseVersion === (pose?.version ?? -1) &&
+          previous.instanceCount === object.count &&
+          (!notified || (staticPlan.notifications.get(object) || 0) <= this.staticRevision)
+        ) {
+          this.profile.leaves++;
+          this.profile.unchangedLeaves++;
+          this.profile.staticSkipped++;
+          continue;
+        }
+        captureObject(object, true);
+      }
+      for (const root of staticPlan.dynamicRoots)
+        root.traverseVisible((object) => captureObject(object));
+      this.staticRevision = staticPlan.revision;
+    } else scene.traverseVisible((object) => captureObject(object));
     this.profile.traversalMs = this.clock() - traversalStarted;
     this.profile.resourcesMs = this.profile.materialMs + this.profile.geometryMs;
     this.profile.objectRecordsMs = Math.max(0, this.profile.traversalMs - this.profile.resourcesMs);
     const removalStarted = this.clock();
-    for (const id of this.objectCache.keys())
-      if (!present.has(id)) {
-        packet.frame.removed.push(id);
-        this.objectCache.delete(id);
-        this.instanceCache.delete(id);
-      }
+    for (const id of this.dynamicIds)
+      if (!present.has(id) && !this.staticVisibleIds.has(id)) remove(id);
+    this.dynamicIds = present;
     this.profile.removalMs = this.clock() - removalStarted;
     this.profile.totalMs = this.clock() - captureStarted;
     return packet;

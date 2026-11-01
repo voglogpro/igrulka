@@ -15,7 +15,7 @@ public partial class BrowserSceneView : Node3D
         public Node3D Root = null!;
         public string Signature = "", Geometry = "", Type = "";
         public readonly List<GeometryInstance3D> Parts = new();
-        public BrowserAttribute? Matrices, Colors;
+        public BrowserAttribute? Matrices, Colors, Pose;
         public BrowserAttribute? UploadedAlpha, UploadedTint;
         public int UploadedCount = -1;
         public float[] InstanceBuffer = Array.Empty<float>();
@@ -26,6 +26,8 @@ public partial class BrowserSceneView : Node3D
     private readonly Dictionary<string, BrowserMaterial> _materials = new();
     private readonly Dictionary<string, BrowserTexture> _textures = new();
     private readonly Dictionary<string, SceneObject> _objects = new();
+    private readonly SceneResourceOwners _resourceOwners = new();
+    private readonly HashSet<string> _resourceDependents = new();
     private readonly Dictionary<string, Light3D> _lights = new();
     private readonly HashSet<string> _visible = new();
     private readonly HashSet<string> _dirtyGeometries = new(), _dirtyMaterials = new();
@@ -33,6 +35,7 @@ public partial class BrowserSceneView : Node3D
     private Node3D _scene = null!;
     private int _frames;
     private long _lastSequence;
+    private int _resourceOwnerVisits, _resourceReapplies;
     private readonly TerrainPresentation _terrain = new();
     private TrenchPresentation _trenches = null!;
     private string _terrainId = "";
@@ -70,6 +73,9 @@ public partial class BrowserSceneView : Node3D
             light.QueueFree();
         }
         _objects.Clear();
+        _resourceOwners.Clear();
+        _resourceDependents.Clear();
+        _resourceOwnerVisits = _resourceReapplies = 0;
         _geometries.Clear();
         _materials.Clear();
         _textures.Clear();
@@ -77,7 +83,7 @@ public partial class BrowserSceneView : Node3D
         _visible.Clear();
         _frames = 0;
     }
-    public object Diagnostics() => new { frames = _frames, sequence = _lastSequence, objects = _objects.Count, visible = _visible.Count, geometries = _geometries.Count, materials = _materials.Count, textures = _textures.Count, lights = _lights.Count, instanceSectors = _objects.Values.Sum(o => o.Sectors?.SectorCount ?? 0), sectorInstances = _objects.Values.Sum(o => o.Sectors?.InstanceCount ?? 0), terrainObjectId = _terrainId, terrainGeometryId = _objects.TryGetValue(_terrainId, out var terrainObject) ? terrainObject.Geometry : "", sourceTrenchIds = _sourceTrenchIds, enhancedTerrain = _terrain.Enabled && _terrainId.Length > 0, trenches = _trenches?.Diagnostics() };
+    public object Diagnostics() => new { frames = _frames, sequence = _lastSequence, objects = _objects.Count, visible = _visible.Count, geometries = _geometries.Count, lodGeometries = _geometries.Values.Count(g => g.LodCount > 0), infantryMaterials = _materials.Values.Count(m => m.Type == "infantry"), posedObjects = _objects.Values.Count(o => o.Pose != null), materials = _materials.Count, textures = _textures.Count, lights = _lights.Count, instanceSectors = _objects.Values.Sum(o => o.Sectors?.SectorCount ?? 0), sectorInstances = _objects.Values.Sum(o => o.Sectors?.InstanceCount ?? 0), resourceIndexOwners = _resourceOwners.Count, resourceOwnerVisits = _resourceOwnerVisits, resourceReapplies = _resourceReapplies, terrainObjectId = _terrainId, terrainGeometryId = _objects.TryGetValue(_terrainId, out var terrainObject) ? terrainObject.Geometry : "", sourceTrenchIds = _sourceTrenchIds, enhancedTerrain = _terrain.Enabled && _terrainId.Length > 0, trenches = _trenches?.Diagnostics() };
 
     public void Apply(JsonElement message)
     {
@@ -115,14 +121,19 @@ public partial class BrowserSceneView : Node3D
         }
         // Scene packets contain object deltas. A static object remains present until
         // explicitly removed; resource changes can arrive without an object delta.
-        if (_dirtyGeometries.Count > 0 || _dirtyMaterials.Count > 0)
-            foreach (var (id, item) in _objects)
-                if (!applied.Contains(id) && (_dirtyGeometries.Contains(item.Geometry) || item.Descriptor.P("materials").Items().Any(m => _dirtyMaterials.Contains(BrowserValues.Id(m)))))
-                    ApplyObject(id, item.Descriptor);
+        _resourceOwnerVisits = _resourceOwners.Collect(_dirtyGeometries, _dirtyMaterials, applied, _resourceDependents);
+        _resourceReapplies = 0;
+        foreach (var id in _resourceDependents)
+            if (_objects.TryGetValue(id, out var item))
+            {
+                ApplyObject(id, item.Descriptor);
+                _resourceReapplies++;
+            }
         foreach (var raw in frame.P("removed").Items())
         {
             var id = BrowserValues.Id(raw);
             _visible.Remove(id);
+            _resourceOwners.Remove(id);
             if (_objects.Remove(id, out var removed))
             {
                 _scene.RemoveChild(removed.Root);
@@ -252,7 +263,11 @@ public partial class BrowserSceneView : Node3D
                     node = new MeshInstance3D { Mesh = mesh, MaterialOverride = material.Material };
                 node.CastShadow = data.B("castShadow") ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.Off;
                 node.SetMeta("browser_material", materialId);
-                if (!data.B("frustumCulled") || material.Type == "weather")
+                // Plain instance vertices are completely described by the mesh
+                // and instance buffer. Godot can use their actual bounds even
+                // when the source CPU renderer disables its own frustum test.
+                var automaticBounds = type == "instanced" && material.Type is "standard" or "basic";
+                if ((!data.B("frustumCulled") && !automaticBounds) || material.Type == "weather")
                     node.CustomAabb = new Aabb(new Vector3(-20000, -20000, -20000), new Vector3(40000, 40000, 40000));
                 item.Root.AddChild(node);
                 item.Parts.Add(node);
@@ -272,17 +287,23 @@ public partial class BrowserSceneView : Node3D
             else
                 ((MultiMeshInstance3D)part).MaterialOverride = material;
             var materialType = _materials[part.GetMeta("browser_material").AsString()].Type;
-            var uncullableSource = !data.B("frustumCulled") || materialType == "weather";
+            var automaticBounds = type == "instanced" && materialType is "standard" or "basic";
+            var uncullableSource = (!data.B("frustumCulled") && !automaticBounds) || materialType == "weather";
             part.CustomAabb = item.Sectors == null && uncullableSource
                 ? new Aabb(new Vector3(-20000, -20000, -20000), new Vector3(40000, 40000, 40000))
                 : new Aabb();
         }
         item.Sectors?.SynchronizeAppearance();
+        _resourceOwners.Bind(id, geometryId, materialIds);
     }
     private static void ApplyInstances(SceneObject item, BrowserGeometry geometry, JsonElement data, bool plainMaterial)
     {
         var rawMatrix = data.P("matrix");
         var rawColor = data.P("color");
+        var rawPose = data.P("pose");
+        var poseChanged = rawPose.ValueKind == JsonValueKind.Object && (item.Pose == null || !item.Pose.Matches(rawPose));
+        if (poseChanged) item.Pose = BrowserAttribute.Read(rawPose);
+        if (rawPose.ValueKind == JsonValueKind.Null && item.Pose != null) { item.Pose = null; poseChanged = true; }
         var count = data.I("count");
         var matrixChanged = rawMatrix.ValueKind == JsonValueKind.Object && (item.Matrices == null || !item.Matrices.Matches(rawMatrix));
         var colorChanged = rawColor.ValueKind == JsonValueKind.Object && (item.Colors == null || !item.Colors.Matches(rawColor));
@@ -301,7 +322,7 @@ public partial class BrowserSceneView : Node3D
         }
         var alpha = geometry.Attribute("aOpacity");
         var tint = geometry.Attribute("aTint");
-        var dirty = matrixChanged || colorChanged || item.UploadedCount < 0 || !ReferenceEquals(item.UploadedAlpha, alpha) || !ReferenceEquals(item.UploadedTint, tint);
+        var dirty = matrixChanged || colorChanged || poseChanged || item.UploadedCount < 0 || !ReferenceEquals(item.UploadedAlpha, alpha) || !ReferenceEquals(item.UploadedTint, tint);
         var matrices = item.Matrices;
         if (matrices == null)
             throw new InvalidDataException("Instanced object has no matrices");
@@ -331,9 +352,8 @@ public partial class BrowserSceneView : Node3D
                 for (var c = 0; c < 3; c++)
                     item.InstanceBuffer[p + 12 + c] = item.Colors?.At(i, c, 1) ?? 1;
                 item.InstanceBuffer[p + 15] = item.Colors is { ItemSize: > 3 } ? item.Colors.At(i, 3, 1) : 1;
-                for (var c = 0; c < 3; c++)
-                    item.InstanceBuffer[p + 16 + c] = tint?.At(i, c, 1) ?? 1;
-                item.InstanceBuffer[p + 19] = alpha?.At(i, 0, 1) ?? 1;
+                for (var c = 0; c < 4; c++)
+                    item.InstanceBuffer[p + 16 + c] = item.Pose?.At(i, c) ?? (c == 3 ? alpha?.At(i, 0, 1) ?? 1 : tint?.At(i, c, 1) ?? 1);
             }
             item.UploadedAlpha = alpha;
             item.UploadedTint = tint;
