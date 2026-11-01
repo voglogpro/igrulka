@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
+using Skyfront.Transport;
 
 namespace Skyfront.BrowserHost;
 
@@ -87,6 +88,7 @@ internal sealed class MessageQueue
     private readonly object _gate = new();
     public bool Add(string json)
     {
+        NativeTransportPolicy.RequireMessageLength(json.Length, "Queued");
         using var document = JsonDocument.Parse(json);
         if (document.RootElement.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException("Messages must be JSON objects");
@@ -100,7 +102,7 @@ internal sealed class MessageQueue
                         _messages.Remove(node);
                         break;
                     }
-            if (_messages.Count >= 64)
+            if (_messages.Count >= NativeTransportPolicy.MaxQueuedMessages)
                 return false;
             _messages.AddLast((key, json));
             return true;
@@ -126,11 +128,28 @@ internal static class QueueSelfTest
 {
     public static int Run()
     {
+        Check(NativeTransportPolicy.AcceptsMessageLength(32 * 1024 * 1024 + 1), "scene above former 32 MiB cap accepted");
+        Check(NativeTransportPolicy.AcceptsMessageLength(NativeTransportPolicy.MaxMessageCharacters - 1), "message just below shared limit accepted");
+        Check(NativeTransportPolicy.AcceptsMessageLength(NativeTransportPolicy.MaxMessageCharacters), "message exactly at shared limit accepted");
+        Check(!NativeTransportPolicy.AcceptsMessageLength(NativeTransportPolicy.MaxMessageCharacters + 1), "message above shared limit rejected");
+        Check(!NativeTransportPolicy.AcceptsMessageLength(-1), "negative message length rejected");
+        bool oversizedRejected = false;
+        try
+        {
+            NativeTransportPolicy.RequireMessageLength(NativeTransportPolicy.MaxMessageCharacters + 1, "Browser output");
+        }
+        catch (InvalidDataException error)
+        {
+            oversizedRejected = error.Message.Contains("actualChars=128000001", StringComparison.Ordinal) &&
+                error.Message.Contains("limitChars=128000000", StringComparison.Ordinal) &&
+                !error.Message.Contains("queue", StringComparison.OrdinalIgnoreCase);
+        }
+        Check(oversizedRejected, "oversized diagnostic reports actual size and limit separately from queue capacity");
         var queue = new MessageQueue();
-        for (int i = 0; i < 64; i++)
+        for (int i = 0; i < NativeTransportPolicy.MaxQueuedMessages; i++)
             Check(queue.Add(JsonSerializer.Serialize(new { kind = "resource", index = i })), "resource accepted");
         Check(!queue.Add("{\"kind\":\"overflow\"}"), "bounded ordered backlog");
-        for (int i = 0; i < 64; i++)
+        for (int i = 0; i < NativeTransportPolicy.MaxQueuedMessages; i++)
         {
             Check(queue.Take(out var json), "ordered resource exists");
             using var document = JsonDocument.Parse(json);
@@ -146,7 +165,14 @@ internal static class QueueSelfTest
         bool rejected = false;
         try { queue.Add("[1,2]"); } catch (InvalidDataException) { rejected = true; }
         Check(rejected, "non-object protocol input rejected");
-        Console.WriteLine("{\"kind\":\"host-self-test\",\"ok\":true,\"scope\":\"bounded order and opt-in coalescing; no GUI\"}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            kind = "host-self-test", ok = true,
+            scope = "shared protocol length boundaries without large allocations, bounded order and opt-in coalescing; no GUI",
+            maxMessageCharacters = NativeTransportPolicy.MaxMessageCharacters,
+            maxQueuedMessages = NativeTransportPolicy.MaxQueuedMessages,
+            protocolLengthChecks = 6
+        }));
         return 0;
     }
     private static void Check(bool value, string message)
@@ -209,7 +235,6 @@ internal sealed class PipeOutput : IDisposable
 
 internal sealed class BrowserContext : ApplicationContext
 {
-    private const int MaxLine = 32 * 1024 * 1024;
     private readonly Options _options;
     private readonly PipeOutput _output = new();
     private readonly MessageQueue _input = new();
@@ -289,8 +314,12 @@ internal sealed class BrowserContext : ApplicationContext
                 try
                 {
                     var json = e.WebMessageAsJson;
-                    if (json.Length > MaxLine || !_output.Send(json))
-                        Fail(new InvalidDataException("Browser output exceeded the bounded queue"));
+                    NativeTransportPolicy.RequireMessageLength(json.Length, "Browser output");
+                    if (Environment.GetEnvironmentVariable("SKYFRONT_NATIVE_QA") == "1" && json.Length > 32 * 1024 * 1024)
+                        Send(new { kind = "host-transport", direction = "browser-output", actualChars = json.Length,
+                            limitChars = NativeTransportPolicy.MaxMessageCharacters, queueLimit = NativeTransportPolicy.MaxQueuedMessages });
+                    if (!_output.Send(json))
+                        Fail(new InvalidDataException($"Browser output exceeded the bounded message queue: actualChars={json.Length}, queueLimit={NativeTransportPolicy.MaxQueuedMessages}."));
                 }
                 catch (Exception error) { Fail(error); }
             };
@@ -311,7 +340,9 @@ internal sealed class BrowserContext : ApplicationContext
                     url = _web.Source,
                     transparent = _controller.DefaultBackgroundColor.A == 0,
                     parent = (long)_parent,
-                    parentComposition = _parentComposition.Diagnostics()
+                    parentComposition = _parentComposition.Diagnostics(),
+                    protocolLimits = new { maxMessageCharacters = NativeTransportPolicy.MaxMessageCharacters,
+                        maxQueuedMessages = NativeTransportPolicy.MaxQueuedMessages }
                 });
             };
             UpdateBounds();
@@ -332,8 +363,9 @@ internal sealed class BrowserContext : ApplicationContext
                     _closeRequested = true;
                     return;
                 }
-                if (line.Length > MaxLine || !_input.Add(line))
-                    throw new InvalidDataException("Native input exceeded the bounded queue");
+                NativeTransportPolicy.RequireMessageLength(line.Length, "Native input");
+                if (!_input.Add(line))
+                    throw new InvalidDataException($"Native input exceeded the bounded message queue: actualChars={line.Length}, queueLimit={NativeTransportPolicy.MaxQueuedMessages}.");
             }
         }
         catch (OperationCanceledException) { }

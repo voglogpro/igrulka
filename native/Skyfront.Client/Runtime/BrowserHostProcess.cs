@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
+using Skyfront.Transport;
 
 namespace Skyfront.Client.Runtime;
 
@@ -12,7 +13,7 @@ public sealed class BrowserHostProcess : IDisposable
 {
     private Process? _process;
     private readonly ConcurrentQueue<string> _messages = new();
-    private readonly Channel<string> _outbound = Channel.CreateBounded<string>(64);
+    private readonly Channel<string> _outbound = Channel.CreateBounded<string>(NativeTransportPolicy.MaxQueuedMessages);
     private string _error = "";
     public string Error => _error;
     public bool Alive => _process is { HasExited: false };
@@ -72,10 +73,9 @@ public sealed class BrowserHostProcess : IDisposable
             {
                 while (await child.StandardOutput.ReadLineAsync() is { } message)
                 {
-                    if (message.Length > 128_000_000)
-                        throw new InvalidDataException("Слишком большое сообщение графического адаптера.");
-                    if (_messages.Count >= 64)
-                        throw new InvalidDataException("Переполнена очередь интерфейса. Кадры должны ждать подтверждения.");
+                    NativeTransportPolicy.RequireMessageLength(message.Length, "Browser host output");
+                    if (_messages.Count >= NativeTransportPolicy.MaxQueuedMessages)
+                        throw new InvalidDataException($"Переполнена очередь интерфейса: actualChars={message.Length}, queueLimit={NativeTransportPolicy.MaxQueuedMessages}. Кадры должны ждать подтверждения.");
                     _messages.Enqueue(message);
                 }
             }
@@ -94,7 +94,9 @@ public sealed class BrowserHostProcess : IDisposable
 
     public void Send(object message)
     {
-        if (!_outbound.Writer.TryWrite(JsonSerializer.Serialize(message)))
+        var json = JsonSerializer.Serialize(message);
+        NativeTransportPolicy.RequireMessageLength(json.Length, "Native host input");
+        if (!_outbound.Writer.TryWrite(json))
             _error = "Переполнена очередь графического адаптера.";
     }
     public bool Poll(out string message) => _messages.TryDequeue(out message!);

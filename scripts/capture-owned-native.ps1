@@ -3,8 +3,10 @@ $ErrorActionPreference = 'Stop'
 $captureRepo = Split-Path -Parent $PSScriptRoot
 $captureProcess = Get-Process -Id $GameProcessId
 $captureExe = [IO.Path]::GetFullPath($captureProcess.Path)
-$captureRelease = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $captureRepo) 'Skyfront-Native-0.2-Windows/Skyfront.exe'))
-if (-not $captureExe.StartsWith([IO.Path]::GetFullPath($captureRepo) + '\', [StringComparison]::OrdinalIgnoreCase) -and $captureExe -ne $captureRelease) {
+$captureReleases = @('Skyfront-Native-0.2-Windows', 'Skyfront-Native-0.2.1-Windows') | ForEach-Object {
+    [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $captureRepo) ($_ + '/Skyfront.exe')))
+}
+if (-not $captureExe.StartsWith([IO.Path]::GetFullPath($captureRepo) + '\', [StringComparison]::OrdinalIgnoreCase) -and $captureExe -notin $captureReleases) {
     throw 'Only this workspace-owned game process may be captured'
 }
 $captureProcess.Refresh()

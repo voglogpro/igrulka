@@ -23,6 +23,7 @@ public partial class ParityApp : Node3D
     private double _lastApplyMs, _lastParseMs;
     private bool _qaFinished;
     private bool _rendererSeen;
+    private bool _qaFailed;
 
     public override async void _Ready()
     {
@@ -179,6 +180,10 @@ public partial class ParityApp : Node3D
                     case "web-error":
                         ShowError(message.S("message", line));
                         break;
+                    case "host-transport":
+                        if (_qa)
+                            GD.Print("SKYFRONT_PARITY_TRANSPORT " + line);
+                        break;
                     case "startup-stage":
                     case "web-status":
                         if (_qa)
@@ -186,6 +191,8 @@ public partial class ParityApp : Node3D
                         break;
                     case "qa-result":
                         GD.Print("SKYFRONT_PARITY_WEB_QA " + line);
+                        if (_qa && _capture != "" && message.S("stage").StartsWith("capture-", StringComparison.Ordinal))
+                            _ = CapturePhase(message.S("stage"));
                         if (message.S("stage") == "complete")
                             _qaFinished = true;
                         break;
@@ -236,6 +243,47 @@ public partial class ParityApp : Node3D
                 message = error
             });
         GD.PushError(error);
+        // A fatal host/scene error cannot leave an automated run waiting for a
+        // script in a closed WebView. Preserve the failure and exit nonzero.
+        if (_qa && !_qaFailed)
+        {
+            _qaFailed = true;
+            GD.Print("SKYFRONT_PARITY_NATIVE_FAILURE " + JsonSerializer.Serialize(new
+            {
+                passed = false,
+                error,
+                receivedFrame = _receivedFrame,
+                scene = _scene.Diagnostics()
+            }));
+            GetTree().Quit(1);
+        }
+    }
+    private async Task CapturePhase(string stage)
+    {
+        try
+        {
+            await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+            if (_qaFailed || !IsInsideTree())
+                return;
+            var suffix = string.Concat(stage.Where(character => char.IsAsciiLetterOrDigit(character) || character == '-'));
+            suffix = suffix[..Math.Min(suffix.Length, 80)];
+            var destination = System.IO.Path.GetFullPath(_capture);
+            var path = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(destination)!,
+                System.IO.Path.GetFileNameWithoutExtension(destination) + "-" + suffix + ".png");
+            var result = GetViewport().GetTexture().GetImage().SavePng(path);
+            if (result != Error.Ok)
+                throw new IOException("Native QA capture failed: " + result);
+            var position = _scene.Camera.GlobalPosition;
+            GD.Print("SKYFRONT_PARITY_CAPTURE " + JsonSerializer.Serialize(new
+            {
+                stage,
+                path,
+                scope = "Owned Godot viewport only; HTML interface is a separate window layer",
+                camera = new { x = position.X, y = position.Y, z = position.Z, fov = _scene.Camera.Fov },
+                scene = _scene.Diagnostics()
+            }));
+        }
+        catch (Exception error) { ShowError(error.ToString()); }
     }
     private async Task CaptureAndQuit()
     {

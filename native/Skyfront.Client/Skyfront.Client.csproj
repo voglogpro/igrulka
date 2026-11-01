@@ -5,4 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../shared/NativeTransportPolicy.cs" Link="Runtime/NativeTransportPolicy.cs" />
+  </ItemGroup>
 </Project>
