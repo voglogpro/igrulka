@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir, cp } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { nativeInviteTransform } from '../native/parity/invite-host-transform.mjs';
+import { nativePresentationTransform } from '../native/parity/presentation-transform.mjs';
 import { createHash } from 'node:crypto';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -13,6 +14,23 @@ export function parityAliases() {
   return {
     name: 'original-game-godot-backend',
     setup(plugin) {
+      plugin.onResolve({ filter: /^skyfront-native-presentation$/ }, () => ({
+        path: path.join(native, 'trench-presentation.mjs'),
+      }));
+      plugin.onLoad(
+        {
+          filter:
+            /src[\\/]rendering[\\/](models[\\/]infantry[\\/]soldiers|models[\\/]ground|input[\\/]build-tools|sync|effects[\\/]tracer-path|performance[\\/]contact-shadows)\.js$/,
+        },
+        async ({ path: sourcePath }) => ({
+          contents: nativePresentationTransform(
+            sourcePath.replaceAll('\\', '/'),
+            await readFile(sourcePath, 'utf8'),
+          ),
+          loader: 'js',
+          resolveDir: path.dirname(sourcePath),
+        }),
+      );
       plugin.onResolve({ filter: /three\.module\.js$/ }, ({ importer }) => ({
         path: importer === shim ? originalThree : shim,
       }));
@@ -136,10 +154,19 @@ export async function buildNativeParityWeb(output = path.join(root, 'native/buil
       'post GPU backend -> Godot',
       'GPU warmup -> CPU models/navigation + native first-frame acknowledgement',
       'native asset origin default server address',
+      'read-only terrain/fortification bindings and shared trench presentation floor',
     ],
     sceneProtocol: 1,
     sourceInputs,
-    sourceAdaptations: ['src/network/invite.js: native virtual hostname default endpoint only'],
+    sourceAdaptations: [
+      'src/network/invite.js: native virtual hostname default endpoint only',
+      'src/rendering/models/infantry/soldiers.js: presentation floor, crew and corpse poses',
+      'src/rendering/models/ground.js: MOG presentation floor',
+      'src/rendering/input/build-tools.js: matching presentation picking/box projection',
+      'src/rendering/sync.js: matching visual muzzle flash',
+      'src/rendering/effects/tracer-path.js: matching visual projectile endpoints',
+      'src/rendering/performance/contact-shadows.js: matching presentation floor',
+    ],
     output,
     bundleBytes: Buffer.byteLength(bundle.outputFiles[0].text),
   };

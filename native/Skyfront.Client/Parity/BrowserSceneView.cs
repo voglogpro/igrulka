@@ -33,6 +33,11 @@ public partial class BrowserSceneView : Node3D
     private Node3D _scene = null!;
     private int _frames;
     private long _lastSequence;
+    private readonly TerrainPresentation _terrain = new();
+    private TrenchPresentation _trenches = null!;
+    private string _terrainId = "";
+    private int _trenchMaskRevision = -1;
+    private string[] _sourceTrenchIds = Array.Empty<string>();
     public Camera3D Camera { get; private set; } = null!;
 
     public override void _Ready()
@@ -43,9 +48,17 @@ public partial class BrowserSceneView : Node3D
         AddChild(Camera);
         _worldEnvironment = new WorldEnvironment { Environment = new Godot.Environment { BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color("253749"), AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color("9eaed3"), AmbientLightEnergy = .6f, ReflectedLightSource = Godot.Environment.ReflectionSource.Disabled, TonemapMode = Godot.Environment.ToneMapper.Aces } };
         AddChild(_worldEnvironment);
+        _trenches = new TrenchPresentation { Name = "NativeExcavatedTrenches" };
+        AddChild(_trenches);
+        if (_terrain.Enabled) _trenches.SetEarthMaterial(_terrain.CreateExcavationMaterial());
     }
     public void Reset()
     {
+        _terrain.Reset();
+        _trenches?.Reset();
+        _terrainId = "";
+        _sourceTrenchIds = Array.Empty<string>();
+        _trenchMaskRevision = -1;
         foreach (var item in _objects.Values)
         {
             _scene.RemoveChild(item.Root);
@@ -64,7 +77,7 @@ public partial class BrowserSceneView : Node3D
         _visible.Clear();
         _frames = 0;
     }
-    public object Diagnostics() => new { frames = _frames, sequence = _lastSequence, objects = _objects.Count, visible = _visible.Count, geometries = _geometries.Count, materials = _materials.Count, textures = _textures.Count, lights = _lights.Count, instanceSectors = _objects.Values.Sum(o => o.Sectors?.SectorCount ?? 0), sectorInstances = _objects.Values.Sum(o => o.Sectors?.InstanceCount ?? 0) };
+    public object Diagnostics() => new { frames = _frames, sequence = _lastSequence, objects = _objects.Count, visible = _visible.Count, geometries = _geometries.Count, materials = _materials.Count, textures = _textures.Count, lights = _lights.Count, instanceSectors = _objects.Values.Sum(o => o.Sectors?.SectorCount ?? 0), sectorInstances = _objects.Values.Sum(o => o.Sectors?.InstanceCount ?? 0), terrainObjectId = _terrainId, terrainGeometryId = _objects.TryGetValue(_terrainId, out var terrainObject) ? terrainObject.Geometry : "", sourceTrenchIds = _sourceTrenchIds, enhancedTerrain = _terrain.Enabled && _terrainId.Length > 0, trenches = _trenches?.Diagnostics() };
 
     public void Apply(JsonElement message)
     {
@@ -116,8 +129,32 @@ public partial class BrowserSceneView : Node3D
                 removed.Root.QueueFree();
             }
         }
+        ApplyPresentation(frame);
         _frames++;
         _lastSequence = message.P("seq").TryGetInt64(out var sequence) ? sequence : _lastSequence + 1;
+    }
+    private void ApplyPresentation(JsonElement frame)
+    {
+        var bindings = frame.P("visualBindings");
+        if (bindings.P("terrain").ValueKind == JsonValueKind.Object)
+            _terrainId = bindings.P("terrain").S("objectId");
+        if (bindings.P("trenches").ValueKind == JsonValueKind.Array)
+            _sourceTrenchIds = bindings.P("trenches").Items().Select(value => BrowserValues.Id(value.P("id"))).ToArray();
+        if (!_terrain.Enabled) return;
+        _trenches.Apply(bindings);
+        if (_trenchMaskRevision != _trenches.MaskRevision)
+        {
+            _trenchMaskRevision = _trenches.MaskRevision;
+            if (_trenches.HasCutouts && _trenches.IndexTexture != null && _trenches.MaskTexture != null)
+                _terrain.SetTrenchMask(_trenches.IndexTexture, _trenches.MaskTexture, _trenches.AtlasSize);
+            else _terrain.ClearTrenchMask();
+        }
+        foreach (var id in _trenches.HiddenPoolIds)
+            if (_objects.TryGetValue(id, out var original)) original.Root.Visible = false;
+        var parts = _objects.TryGetValue(_terrainId, out var ground)
+            ? (IEnumerable<GeometryInstance3D>)ground.Parts : Array.Empty<GeometryInstance3D>();
+        _terrain.Apply(frame, parts);
+        WarAtmosphere.ApplyLighting(_worldEnvironment.Environment, _lights, frame, _terrain.Enabled);
     }
     private void ReadGeometries(JsonElement list)
     {

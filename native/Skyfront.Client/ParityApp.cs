@@ -142,7 +142,8 @@ public partial class ParityApp : Node3D
                         {
                             kind = "native-ready",
                             protocol = 1,
-                            serverAddress = _server.Address
+                            serverAddress = _server.Address,
+                            enhancedGraphics = _atmosphere.Enabled
                         });
                         break;
                     case "host-ready":
@@ -150,7 +151,8 @@ public partial class ParityApp : Node3D
                         {
                             kind = "native-ready",
                             protocol = 1,
-                            serverAddress = _server.Address
+                            serverAddress = _server.Address,
+                            enhancedGraphics = _atmosphere.Enabled
                         });
                         break;
                     case "scene":

@@ -26,4 +26,7 @@ Get-ChildItem -LiteralPath $hostOutput -Force | Copy-Item -Destination (Join-Pat
 Get-ChildItem -LiteralPath $webOutput -Force | Copy-Item -Destination (Join-Path $parityOutput 'web') -Recurse -Force
 Get-ChildItem -LiteralPath (Join-Path $parityRepo 'native/build/network') -Force | Copy-Item -Destination (Join-Path $parityOutput 'network') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $parityRepo 'native/README-PARITY.txt') -Destination (Join-Path $parityOutput 'README.txt')
+foreach ($terrainLicense in @('README.md','provenance.json','CC0-1.0.txt')) {
+    Copy-Item -LiteralPath (Join-Path $parityRepo ('native/Skyfront.Client/Assets/terrain/'+$terrainLicense)) -Destination (Join-Path $parityOutput ('licenses/TERRAIN-'+$terrainLicense))
+}
 Write-Output "Full original game + Godot: $parityOutput"

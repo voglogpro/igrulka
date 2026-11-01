@@ -4,6 +4,7 @@ import {
   warmupModelJobs,
 } from '../../src/rendering/performance/warmup-families.js';
 import { showNativeFailure, reportNativeStatus } from './native-failure.mjs';
+import { registerVisualWorld } from './visual-bindings.mjs';
 
 const paint = () => new Promise((resolve) => globalThis.requestAnimationFrame(resolve));
 const identity = (state) => [
@@ -19,6 +20,7 @@ const equal = (a, b) => a.every((part, i) => part === b[i]);
 // Preserve the original CPU model caches and navigation preparation; GPU ownership
 // changes only to a native readiness/first complete scene acknowledgement.
 export async function warmStartupScene(world, options) {
+  registerVisualWorld(world);
   try {
     return await prepareNativeScene(world, options);
   } catch (error) {

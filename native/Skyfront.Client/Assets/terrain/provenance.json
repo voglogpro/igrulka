@@ -1,0 +1,77 @@
+{
+  "source": "Poly Haven",
+  "credit": "Textures and metadata powered by Poly Haven",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "reviewedDate": "2026-11-01",
+  "runtimeNetworkAccess": false,
+  "notes": "Two shared 1K PBR sets; original provider JPEG bytes. No displacement textures or runtime geometry changes.",
+  "downloads": [
+    {
+      "asset": "brown_mud",
+      "author": "Rob Tuytel",
+      "widthMetres": 1.3,
+      "map": "Diffuse",
+      "file": "brown_mud_diff_1k.jpg",
+      "bytes": 501955,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud/brown_mud_diff_1k.jpg",
+      "providerMd5": "b141af27b413db140818d0a4998c394c",
+      "sha256": "df3f135c899f10a3b018738343b222cbc67d13e7c76c5d8da834a3d34c984417"
+    },
+    {
+      "asset": "brown_mud",
+      "author": "Rob Tuytel",
+      "widthMetres": 1.3,
+      "map": "nor_gl",
+      "file": "brown_mud_nor_gl_1k.jpg",
+      "bytes": 1011780,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud/brown_mud_nor_gl_1k.jpg",
+      "providerMd5": "62df05266fa5a0adc7733a7184a15dea",
+      "sha256": "ac517ca39eb507ae0f27e2b3db431c60888f9b5c3c52bec49d2c0775da0920cb"
+    },
+    {
+      "asset": "brown_mud",
+      "author": "Rob Tuytel",
+      "widthMetres": 1.3,
+      "map": "arm",
+      "file": "brown_mud_arm_1k.jpg",
+      "bytes": 224431,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud/brown_mud_arm_1k.jpg",
+      "providerMd5": "4f528864a1edbe9fff8c9b52a0922b9f",
+      "sha256": "40a5ac438f23ea454ff45f3f62f0fe4ac5b89c42fd070d10e7d41c51252caf88"
+    },
+    {
+      "asset": "dirt",
+      "author": "Charlotte Baglioni",
+      "widthMetres": 2,
+      "map": "Diffuse",
+      "file": "dirt_diff_1k.jpg",
+      "bytes": 730425,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt/dirt_diff_1k.jpg",
+      "providerMd5": "cb37e24797597b1dd1ae3819fa80f076",
+      "sha256": "6ce6ca7e28ed046f7f93fa60dcb29f8cf42cd5a539adc5676675acccfa34efd3"
+    },
+    {
+      "asset": "dirt",
+      "author": "Charlotte Baglioni",
+      "widthMetres": 2,
+      "map": "nor_gl",
+      "file": "dirt_nor_gl_1k.jpg",
+      "bytes": 1202783,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt/dirt_nor_gl_1k.jpg",
+      "providerMd5": "362610edf09fd31735958eecec823a84",
+      "sha256": "5a5f97d920fdcdf352b350b95558bf48bb306be1fe61a47418aadc60b7deb0ce"
+    },
+    {
+      "asset": "dirt",
+      "author": "Charlotte Baglioni",
+      "widthMetres": 2,
+      "map": "arm",
+      "file": "dirt_arm_1k.jpg",
+      "bytes": 653784,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt/dirt_arm_1k.jpg",
+      "providerMd5": "b734c3c74da00491da65aff33cd06d2e",
+      "sha256": "54bd300ba53a3bcc4772e4b5bdab7670bf52e23cc698b628c2b38315c5a9bae8"
+    }
+  ]
+}

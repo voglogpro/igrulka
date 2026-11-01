@@ -26,6 +26,8 @@ export class NativeTransport {
       }
     }
     if (message?.kind === 'native-ready' && message.protocol === SCENE_PROTOCOL) {
+      globalThis.__SKYFRONT_NATIVE__ ||= {};
+      globalThis.__SKYFRONT_NATIVE__.enhancedGraphics = message.enhancedGraphics === true;
       if (typeof message.serverAddress === 'string' && message.serverAddress) {
         globalThis.__SKYFRONT_NATIVE__ ||= {};
         globalThis.__SKYFRONT_NATIVE__.serverAddress = message.serverAddress;

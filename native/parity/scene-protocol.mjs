@@ -1,4 +1,5 @@
 // Godot owns drawing. These descriptors retain the original Three scene and CPU rules.
+import { captureVisualBindings } from './visual-bindings.mjs';
 export const SCENE_PROTOCOL = 1;
 
 const TYPES = new Map([
@@ -363,6 +364,8 @@ export class SceneExporter {
         textureUpdates: [],
       },
     };
+    const visualBindings = captureVisualBindings(scene, seq === 1);
+    if (visualBindings) packet.frame.visualBindings = visualBindings;
     const present = new Set();
     const traversalStarted = this.clock();
     scene.traverseVisible((object) => {
