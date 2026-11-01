@@ -27,6 +27,8 @@ public partial class ParityApp : Node3D
 
     public override async void _Ready()
     {
+        // Keep the project/user-data name stable so existing campaigns survive.
+        DisplayServer.WindowSetTitle("Небесный рубеж — Godot 0.3 · правила 8.16");
         var args = OS.GetCmdlineUserArgs();
         _qa = args.Contains("--qa-parity");
         _capture = args.FirstOrDefault(x => x.StartsWith("--capture="))?[10..] ?? "";

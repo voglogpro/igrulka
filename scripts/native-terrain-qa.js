@@ -17,6 +17,7 @@
     const bindings = value?.kind === 'scene' && value.frame?.visualBindings;
     if (bindings?.terrain) observedBindings.terrain = structuredClone(bindings.terrain);
     if (bindings?.trenches) observedBindings.trenches = structuredClone(bindings.trenches);
+    if (bindings?.trenchLinks) observedBindings.trenchLinks = structuredClone(bindings.trenchLinks);
     return originalPost.call(this, value);
   };
   let record, api, world, baseline, originalTime, originalWeather, enhancedMode;
@@ -39,24 +40,35 @@
   };
   function expectedY(unit, x, z) {
     if (!enhancedMode) return unit.y || 1;
-    const t = world.fortifications.models.get(unit.trenchId);
-    if (!t) return Math.max(0, world.height(x, z)) + 0.05;
-    const c = Math.cos(t.yaw),
-      s = Math.sin(t.yaw),
-      dx = x - t.x,
-      dz = z - t.z;
-    const horizontal = dx * c - dz * s;
-    const along = horizontal / (t.stretch * Math.cos(t.roll));
-    const across = dx * s + dz * c;
-    const distance = Math.hypot(Math.max(0, Math.abs(along) - 6.8), across);
-    const depth =
-      1.55 *
-      smooth(0, 0.75, t.progress) *
-      smooth(0, 2.8, 9 - Math.abs(along)) *
-      smooth(0, 0.65, 2.2 - distance);
-    return depth
-      ? t.y + horizontal * Math.tan(t.roll) + 0.05 - depth * Math.cos(t.roll)
-      : Math.max(0, world.height(x, z)) + 0.05;
+    let floor = -Infinity;
+    for (const t of [
+      ...fixture.expected.floorOracle.sections,
+      ...fixture.expected.floorOracle.connectors,
+    ]) {
+      const c = Math.cos(t.yaw),
+        s = Math.sin(t.yaw),
+        dx = x - t.x,
+        dz = z - t.z;
+      const horizontal = dx * c - dz * s;
+      const along = horizontal / (t.stretch * Math.cos(t.roll));
+      const across = (dx * s + dz * c) / (t.widthScale || 1);
+      const distance = Math.hypot(Math.max(0, Math.abs(along) - 6.8), across);
+      const depth = t.connector
+        ? Math.abs(along) > 9
+          ? 0
+          : 1.55 *
+            smooth(0, 0.75, t.progress) *
+            smooth(0, 0.65, 2.2 - Math.abs(across)) *
+            (t.rampStart ? smooth(0, 8.4, along + 9) : 1) *
+            (t.rampEnd ? smooth(0, 8.4, 9 - along) : 1)
+        : 1.55 *
+          smooth(0, 0.75, t.progress) *
+          smooth(0, 2.8, 9 - Math.abs(along)) *
+          smooth(0, 0.65, 2.2 - distance);
+      if (depth > 0)
+        floor = Math.max(floor, t.y + horizontal * Math.tan(t.roll) - depth * Math.cos(t.roll));
+    }
+    return (Number.isFinite(floor) ? floor : Math.max(0, world.height(x, z))) + 0.05;
   }
   async function scene(stage) {
     const renderer = world.renderer,
@@ -71,6 +83,7 @@
       const bindings = packet.frame.visualBindings;
       if (bindings?.terrain) record.bindings.terrain = bindings.terrain;
       if (bindings?.trenches) record.bindings.trenches = bindings.trenches;
+      if (bindings?.trenchLinks) record.bindings.trenchLinks = bindings.trenchLinks;
       expected.set(packet.seq, { objects: this.objectCache.size, bindings: !!bindings });
       if (expected.size > 8) expected.delete(expected.keys().next().value);
       return packet;
@@ -109,7 +122,7 @@
             : ': baseline terrain and original flat trenches retained'),
         enhancedMode
           ? accepted.ack.scene?.enhancedTerrain === true &&
-              accepted.ack.scene.trenches?.sections === 4 &&
+              accepted.ack.scene.trenches?.sections === fixture.expected.trenches.length &&
               accepted.ack.scene.trenches?.occupiedTiles > 0 &&
               accepted.ack.scene.trenches?.maskBytes > 0
           : accepted.ack.scene?.enhancedTerrain === false &&
@@ -123,6 +136,16 @@
         sequence: accepted.ack.seq,
         native: accepted.ack.scene,
       });
+      const sourceLinks = world.fortifications.links.records.size;
+      if (sourceLinks > 0)
+        check(
+          stage + ': source connectors use the matching graphics mode',
+          enhancedMode
+            ? accepted.ack.scene.trenches?.linkPieces ===
+                fixture.expected.floorOracle.connectors.length
+            : accepted.ack.scene.trenches?.linkPieces === 0,
+          { sourceLinks, native: accepted.ack.scene.trenches },
+        );
       store();
     } finally {
       exporter.capture = capture;
@@ -302,8 +325,8 @@
       },
     );
     check(
-      'actual received bindings retain all four original trenches',
-      receivedBindings.sourceTrenchIds?.length === 4 &&
+      'actual received bindings retain all original trenches',
+      receivedBindings.sourceTrenchIds?.length === fixture.expected.trenches.length &&
         fixture.expected.trenches.every((t) =>
           receivedBindings.sourceTrenchIds.includes(String(t.id)),
         ),
@@ -323,7 +346,7 @@
       sourceInstances(
         camera.name === 'slope-night'
           ? ['slope-longitudinal', 'slope-oblique']
-          : ['flat-full', 'flat-digging'],
+          : ['flat-full', 'flat-digging', 'flat-connected'],
       );
       if (camera.name === 'close-day') pickLoweredInfantry();
       post({
@@ -348,8 +371,8 @@
     world.sync();
     await scene('restored');
     check(
-      'all four source poses available including genuine slopes',
-      world.fortifications.models.size === 4 &&
+      'all source poses available including genuine slopes',
+      world.fortifications.models.size === fixture.expected.trenches.length &&
         [...world.fortifications.models.values()].filter((t) => Math.abs(t.roll) > 0.025).length >=
           2,
     );

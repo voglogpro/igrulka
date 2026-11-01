@@ -33,7 +33,10 @@ backend переключает на Godot; WebView2 выводит исходн�
 read-only native/parity/visual-bindings и общий trench-presentation floor для body/pick,
 MOG/barrelTip, box selection, corpse, shadow и visual projectile. Browser src не менять:
 native-only esbuild transform содержит точные guards и перечисляется в manifest.
-Глубокими становятся отдельные секции; исходные соединители пока остаются прежними.
+Глубокими становятся секции и исходные соединительные ходы. `trench-link-layout.mjs`
+держит отдельные revisions секций/связей и пространственный индекс; network identity churn
+не должен повторно пересылать статические links. Маска адаптирует tilePixels128/64/32;
+glue обязан передавать `_trenches.TilePixels`. Крытые блиндажи/форты сохраняют прежний art.
 Пути, защита и урон не меняются скрытно. Затем — линейка техники и видимый из города дальний бой.
 Механики и хорошие исходные звуки сохраняются.
 Новые ресурсы принимать вместе с LOD/instancing/culling и сравнимыми замерами

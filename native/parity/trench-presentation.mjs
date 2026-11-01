@@ -1,4 +1,10 @@
 import { isInfantry } from '../../src/game/config.js';
+import {
+  presentationTrenchLayout,
+  drawingIdsAt,
+  drawingRecord,
+  drawingRecordsAlongRay,
+} from './trench-link-layout.mjs';
 
 let activeWorld;
 const rounds = new WeakMap();
@@ -31,6 +37,7 @@ const smooth = (a, b, v) => {
 };
 export function bindPresentationWorld(world) {
   activeWorld = world;
+  presentationTrenchLayout(world, true);
 }
 export function presentationEnabled() {
   return globalThis.__SKYFRONT_NATIVE__?.enhancedGraphics === true;
@@ -44,7 +51,17 @@ export function trenchDepth(record, x, z) {
   const dx = x - record.x,
     dz = z - record.z;
   const along = (dx * c - dz * s) / ((record.stretch || 1) * Math.cos(record.roll || 0));
-  const across = dx * s + dz * c;
+  const across = (dx * s + dz * c) / (record.widthScale || 1);
+  if (record.connector) {
+    if (Math.abs(along) > 9) return 0;
+    return (
+      1.55 *
+      smooth(0, 0.75, record.progress || 0) *
+      smooth(0, 0.65, 2.2 - Math.abs(across)) *
+      (record.rampStart ? smooth(0, 8.4, along + 9) : 1) *
+      (record.rampEnd ? smooth(0, 8.4, 9 - along) : 1)
+    );
+  }
   const distance = Math.hypot(Math.max(0, Math.abs(along) - 6.8), across);
   return (
     1.55 *
@@ -59,15 +76,32 @@ export function trenchSurfaceY(record, x, z) {
     s = Math.sin(record.yaw || 0);
   return (record.y || 0) + ((x - record.x) * c - (z - record.z) * s) * Math.tan(record.roll || 0);
 }
+export function presentationFloor(world, x, z, selected = null) {
+  const layout = presentationTrenchLayout(world);
+  let floor = -Infinity,
+    found = null;
+  for (const id of drawingIdsAt(layout, x, z)) {
+    const record = world.fortifications?.models.get(id) || drawingRecord(layout, id);
+    const depth = trenchDepth(record, x, z);
+    if (!(depth > 0)) continue;
+    const y = trenchSurfaceY(record, x, z) - depth * Math.cos(record.roll || 0);
+    // Where visible source channels touch, choose the topmost actual floor,
+    // matching the depth-tested overlapping earth surfaces.
+    if (y > floor) {
+      floor = y;
+      found = id;
+    }
+  }
+  if (selected) selected.id = found;
+  return found !== null ? floor : Math.max(0, world.height(x, z));
+}
 export function presentationOffset(world, unit, x = unit.x, z = unit.z) {
   if (!presentationEnabled() || !isInfantry(unit.key) || unit.carrierId) return 0;
-  const trench = world.fortifications?.models.get(unit.trenchId);
-  const depth = trenchDepth(trench, x, z);
-  const base = unit.y || 1,
-    top = depth ? trenchSurfaceY(trench, x, z) : Math.max(0, world.height(x, z));
+  const floor = presentationFloor(world, x, z);
+  const base = unit.y || 1;
   // Source art roots float about one metre above terrain. The enhanced drawing
   // contract puts feet on the actual floor both outside and inside the ramp.
-  return top + 0.05 - base - depth * Math.cos(trench?.roll || 0);
+  return floor + 0.05 - base;
 }
 export const presentationUnitY = (world, unit, x = unit.x, z = unit.z) =>
   (unit.y || 1) + presentationOffset(world, unit, x, z);
@@ -75,39 +109,24 @@ export const presentationModelY = (unit) =>
   activeWorld ? presentationUnitY(activeWorld, unit) : unit.y || 1;
 export function presentationCorpseY(world, unit, y, x = unit.x, z = unit.z) {
   if (!presentationEnabled()) return y;
-  const trench = world.fortifications?.models.get(unit.trenchId ?? unit.nativeTrenchId);
-  const depth = trenchDepth(trench, x, z);
-  return (
-    y +
-    (depth
-      ? trenchSurfaceY(trench, x, z) - depth * Math.cos(trench.roll || 0)
-      : Math.max(0, world.height(x, z)))
-  );
+  return y + presentationFloor(world, x, z);
 }
 export function presentationCorpseTrench(world, event) {
   if (!presentationEnabled()) return null;
-  for (const [id, record] of world.fortifications?.models || [])
-    if (trenchDepth(record, event.x, event.z)) return id;
-  return null;
+  const selected = { id: null };
+  presentationFloor(world, event.x, event.z, selected);
+  return selected.id;
 }
 export function presentationShadowY(unit, original) {
   if (!presentationEnabled() || !activeWorld || !isInfantry(unit.key)) return original;
-  const trench = activeWorld.fortifications?.models.get(unit.trenchId);
-  const depth = trenchDepth(trench, unit.x, unit.z);
-  return (
-    0.035 +
-    (depth
-      ? trenchSurfaceY(trench, unit.x, unit.z) - depth * Math.cos(trench.roll || 0)
-      : Math.max(0, activeWorld.height(unit.x, unit.z)))
-  );
+  return 0.035 + presentationFloor(activeWorld, unit.x, unit.z);
 }
 export function presentationGroundPoint(world, ray, original) {
   if (!original || !presentationEnabled() || Math.abs(ray.direction.y) < 1e-5) return original;
-  const models = world.fortifications?.models;
-  if (!models?.size) return original;
-  // Only pointer queries enter this loop. Soldiers use their assigned trench ID
-  // directly; there is no soldiers-by-trenches search in the animation loop.
-  for (const record of models.values()) {
+  const layout = presentationTrenchLayout(world);
+  let closest = Infinity,
+    hit = original;
+  for (const record of drawingRecordsAlongRay(layout, ray)) {
     const point = original.clone();
     const directionAlong =
       ray.direction.x * Math.cos(record.yaw || 0) - ray.direction.z * Math.sin(record.yaw || 0);
@@ -125,9 +144,15 @@ export function presentationGroundPoint(world, ray, original) {
       if (distance < 0) break;
       ray.at(distance, point);
     }
-    if (trenchDepth(record, point.x, point.z) > 0.02) return point;
+    if (trenchDepth(record, point.x, point.z) > 0.02) {
+      const distance = point.distanceTo(ray.origin);
+      if (distance < closest) {
+        closest = distance;
+        hit = point;
+      }
+    }
   }
-  return original;
+  return hit;
 }
 export function presentationMuzzleEvent(world, event) {
   // The source barrel-tip resolver has already sampled the moved CPU model.

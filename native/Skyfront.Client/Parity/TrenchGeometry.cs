@@ -6,7 +6,19 @@ namespace Skyfront.Client.Parity;
 internal static class TrenchGeometry
 {
     public const float HalfCore = 6.8f, HalfWidth = 2.2f, HalfLength = 9f, FullDepth = 1.55f;
-    public readonly record struct Pose(string Id, float X, float Z, float Y, float Yaw, float Roll, float Stretch, int Level, float Progress);
+    public readonly record struct Pose(string Id, float X, float Z, float Y, float Yaw, float Roll, float Stretch, int Level, float Progress, bool Connector = false, float WidthScale = 1, bool RampStart = false, bool RampEnd = false);
+    public readonly record struct GroupKey(int Level, bool Connector, bool RampStart, bool RampEnd, float WidthScale, int X, int Z);
+    public static GroupKey BatchKey(Pose pose) => new(pose.Level, pose.Connector, pose.RampStart, pose.RampEnd, pose.WidthScale, (int)MathF.Floor(pose.X / 512), (int)MathF.Floor(pose.Z / 512));
+    public static bool SamePoses(IEnumerable<Pose> current, IReadOnlyList<Pose> previous)
+    {
+        var index = 0;
+        foreach (var pose in current)
+        {
+            if (index >= previous.Count || previous[index] != pose) return false;
+            index++;
+        }
+        return index == previous.Count;
+    }
     public sealed class Surface
     {
         public readonly List<Vector3> Vertices = new(), Normals = new();
@@ -38,23 +50,26 @@ internal static class TrenchGeometry
         return t * t * (3 - 2 * t);
     }
     public static float Distance(float along, float across) => MathF.Sqrt(MathF.Pow(Math.Max(0, Math.Abs(along) - HalfCore), 2) + across * across);
-    public static float Depth(float along, float across, float progress = 1) =>
-        FullDepth * Smooth(0, .75f, progress) * Smooth(0, 2.8f, HalfLength - Math.Abs(along)) * Smooth(0, .65f, HalfWidth - Distance(along, across));
+    public static float Depth(float along, float across, float progress = 1, bool connector = false, bool rampStart = false, bool rampEnd = false) =>
+        connector
+            ? (Math.Abs(along) <= HalfLength + .25f ? FullDepth * Smooth(0, .75f, progress) * Smooth(0, .65f, HalfWidth - Math.Abs(across)) * (rampStart ? Smooth(0, 8.4f, along + HalfLength) : 1) * (rampEnd ? Smooth(0, 8.4f, HalfLength - along) : 1) : 0)
+            : FullDepth * Smooth(0, .75f, progress) * Smooth(0, 2.8f, HalfLength - Math.Abs(along)) * Smooth(0, .65f, HalfWidth - Distance(along, across));
     public static Vector2 Local(Pose pose, float x, float z)
     {
         var c = MathF.Cos(pose.Yaw); var s = MathF.Sin(pose.Yaw);
         var horizontalStretch = pose.Stretch * MathF.Cos(pose.Roll);
-        return new Vector2(((x - pose.X) * c - (z - pose.Z) * s) / Math.Max(.001f, horizontalStretch), (x - pose.X) * s + (z - pose.Z) * c);
+        return new Vector2(((x - pose.X) * c - (z - pose.Z) * s) / Math.Max(.001f, horizontalStretch), ((x - pose.X) * s + (z - pose.Z) * c) / Math.Max(.001f, pose.WidthScale));
     }
     public static bool Contains(Pose pose, float x, float z)
     {
         var local = Local(pose, x, z);
-        return pose.Progress > 0 && Distance(local.X, local.Y) < HalfWidth;
+        return pose.Progress > 0 && (pose.Connector ? Math.Abs(local.X) <= HalfLength && Math.Abs(local.Y) < HalfWidth : Distance(local.X, local.Y) < HalfWidth);
     }
     private static float Width(float x)
     {
-        // A quarter-metre collar covers raster/triangle edge differences at the cut without enlarging its actual footprint.
-        const float collar = .25f;
+        // This is overlap geometry only. The authoritative shape and cutout
+        // footprint remain unchanged, including at adaptive atlas densities.
+        const float collar = .75f;
         var width = HalfWidth + collar;
         return Math.Abs(x) <= HalfCore ? width : MathF.Sqrt(Math.Max(0, width * width - MathF.Pow(Math.Abs(x) - HalfCore, 2)));
     }
@@ -72,12 +87,13 @@ internal static class TrenchGeometry
         surface.Quad(a, e, h, d, -Vector3.UnitX);
         surface.Quad(b, c, g, f, Vector3.UnitX);
     }
-    public static Section Build(int level)
+    public static Section Build(int level, bool connector = false, bool rampStart = false, bool rampEnd = false, float widthScale = 1)
     {
+        if (connector) return BuildConnector(level, rampStart, rampEnd, widthScale);
         var section = new Section();
         // Dense only on the actual eighteen-metre excavation. The surrounding map stays coarse.
         const int samples = 48;
-        const float outerHalfLength = HalfLength + .25f;
+        const float outerHalfLength = HalfLength + .75f;
         float[] bands = { -1, -.88f, -.71f, -.45f, 0, .45f, .71f, .88f, 1 };
         for (var i = 0; i < samples; i++)
         {
@@ -121,6 +137,67 @@ internal static class TrenchGeometry
         {
             var x = -5.75f + i * .5f;
             Box(section.Wood, new Vector3(x, -FullDepth + .025f, 0), new Vector3(.17f, .05f, 2.4f));
+        }
+        return section;
+    }
+    private static Section BuildConnector(int level, bool rampStart, bool rampEnd, float widthScale)
+    {
+        var section = new Section();
+        // Open-ended repeated pieces have no end ramp or end wall: the floor
+        // stays at the same depth across each source piece boundary.
+        const float outerHalfLength = HalfLength + .75f;
+        // Source links use two widths. Compensate the mesh collar before the
+        // instance Z scale so both keep 0.75m of world-space seam overlap.
+        var outerHalfWidth = HalfWidth + .75f / Math.Max(.001f, widthScale);
+        // Exact side-depth knots keep the flat floor at the same height as the
+        // analytical soldier floor, independent of the widened overlap collar.
+        float[] across = { -outerHalfWidth, -2.2f, -2.0375f, -1.875f, -1.7125f, -1.55f, 0, 1.55f, 1.7125f, 1.875f, 2.0375f, 2.2f, outerHalfWidth };
+        float[] along = { -outerHalfLength, -9, -7.5f, -6, -4.5f, -3, -1.5f, 0, 1.5f, 3, 4.5f, 6, 7.5f, 9, outerHalfLength };
+        if (rampStart && rampEnd) { along[6] = -.6f; along[8] = .6f; }
+        else if (rampStart) along[7] = -.6f;
+        else if (rampEnd) along[7] = .6f;
+        for (var i = 0; i < along.Length - 1; i++)
+        {
+            var ax = along[i]; var bx = along[i + 1];
+            for (var j = 0; j < across.Length - 1; j++)
+            {
+                Vector3 Point(float x, float z) => new(x, -Depth(x, z, 1, true, rampStart, rampEnd), z);
+                section.Earth.Quad(Point(ax, across[j]), Point(bx, across[j]), Point(bx, across[j + 1]), Point(ax, across[j + 1]), Vector3.UnitY);
+            }
+        }
+        for (var side = -1; side <= 1; side += 2)
+        {
+            for (var i = 0; i < 6; i++)
+            {
+                var x = -7.5f + i * 3;
+                var inner = side * (HalfWidth - .05f); var outer = side * (HalfWidth + 1.05f);
+                var crest = side * (HalfWidth + .36f + MathF.Sin(i * 1.91f) * .08f);
+                var h = .26f + (i % 4) * .055f;
+                var a = new Vector3(x - 1.5f, -.035f, inner); var b = new Vector3(x + 1.5f, -.035f, inner);
+                var c = new Vector3(x + 1.35f, h, crest); var d = new Vector3(x - 1.35f, h * .9f, crest);
+                section.Earth.Quad(a, b, c, d, Vector3.UnitY);
+                section.Earth.Quad(d, c, new Vector3(x + 1.5f, -.04f, outer), new Vector3(x - 1.5f, -.04f, outer), Vector3.UnitY);
+                if (level >= 2 && i < 5)
+                    Box(section.Sandbags, new Vector3(x, .4f, side * (HalfWidth + .15f)), new Vector3(.78f, .23f, .42f));
+            }
+            for (var i = 0; i < 3; i++)
+            {
+                var x = -6 + i * 6;
+                var floor = -Depth(x, 0, 1, true, rampStart, rampEnd);
+                var postHeight = Math.Max(.12f, -floor - .07f);
+                Box(section.Wood, new Vector3(x, floor + postHeight * .5f, side * 1.48f), new Vector3(.16f, postHeight, .2f));
+                for (var row = 0; row < 3; row++)
+                {
+                    var rowHeight = floor + .25f + row * .31f;
+                    if (rowHeight > -.03f) continue;
+                    Box(section.Wood, new Vector3(x, rowHeight, side * 1.58f), new Vector3(6.2f, .19f, .1f));
+                }
+            }
+        }
+        for (var i = 0; i < 8; i++)
+        {
+            var x = -7.875f + i * 2.25f;
+            Box(section.Wood, new Vector3(x, -Depth(x, 0, 1, true, rampStart, rampEnd) + .025f, 0), new Vector3(.17f, .05f, 2.4f));
         }
         return section;
     }

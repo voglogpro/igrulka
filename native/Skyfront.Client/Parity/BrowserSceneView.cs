@@ -146,7 +146,7 @@ public partial class BrowserSceneView : Node3D
         {
             _trenchMaskRevision = _trenches.MaskRevision;
             if (_trenches.HasCutouts && _trenches.IndexTexture != null && _trenches.MaskTexture != null)
-                _terrain.SetTrenchMask(_trenches.IndexTexture, _trenches.MaskTexture, _trenches.AtlasSize);
+                _terrain.SetTrenchMask(_trenches.IndexTexture, _trenches.MaskTexture, _trenches.AtlasSize, tilePixels: _trenches.TilePixels);
             else _terrain.ClearTrenchMask();
         }
         foreach (var id in _trenches.HiddenPoolIds)

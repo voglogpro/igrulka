@@ -3,11 +3,12 @@
 // applied separately, equally to the drawn mesh and its original picking proxy.
 const readers = new WeakMap();
 import { bindPresentationWorld } from './trench-presentation.mjs';
+import { presentationTrenchLayout } from './trench-link-layout.mjs';
 
 export function registerVisualWorld(world) {
   bindPresentationWorld(world);
   if (readers.has(world.scene)) return;
-  readers.set(world.scene, { world, terrain: null, trenches: new Map() });
+  readers.set(world.scene, { world, terrain: null, sectionRevision: -1, linkRevision: -1 });
 }
 
 export function captureVisualBindings(scene, reset = false) {
@@ -32,20 +33,18 @@ export function captureVisualBindings(scene, reset = false) {
       ),
     };
   }
-  const models = world.fortifications?.models;
-  if (models) {
-    let changed = reset || reader.trenches.size !== models.size;
-    if (!changed)
-      for (const [id, record] of models)
-        if (reader.trenches.get(id) !== record) {
-          changed = true;
-          break;
-        }
-    if (changed) {
-      reader.trenches = new Map(models);
-      result.trenches = Array.from(models, ([id, record]) => ({ id, ...record }));
-      result.trenchPools = world.fortifications.pools.map((pool) => pool.uuid);
-    }
+  const layout = presentationTrenchLayout(world, true);
+  const newLayout = reader.layout !== layout;
+  reader.layout = layout;
+  if (reset || newLayout || reader.sectionRevision !== layout.sectionsRevision) {
+    reader.sectionRevision = layout.sectionsRevision;
+    result.trenches = layout.sections;
+    result.trenchPools = world.fortifications?.pools?.map((pool) => pool.uuid) || [];
+  }
+  if (reset || newLayout || reader.linkRevision !== layout.linksRevision) {
+    reader.linkRevision = layout.linksRevision;
+    result.trenchLinks = layout.connectors;
+    result.trenchLinkPools = world.fortifications?.links?.pools?.map((pool) => pool.uuid) || [];
   }
   return Object.keys(result).length ? result : undefined;
 }
