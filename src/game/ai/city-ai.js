@@ -147,9 +147,11 @@ export function ai(s, side = 1) {
         if (index < plans.length) {
           const [ax, az, bx, bz] = plans[index],
             r = buildRoad(s, side, hq.x + ax, hq.z + az, hq.x + bx, hq.z + bz);
+          // A street blocked by a well or another building is skipped, not retried forever.
           if (
             typeof r !== 'string' ||
-            overlappingRoad(s, hq.x + ax, hq.z + az, hq.x + bx, hq.z + bz)
+            overlappingRoad(s, hq.x + ax, hq.z + az, hq.x + bx, hq.z + bz) ||
+            /здание|занято/i.test(r)
           )
             memory.roadPlan = index + 1;
         }

@@ -28,8 +28,8 @@ test('vehicle ladder grows from cheap scout cars to heavy tanks', () => {
 test('every new vehicle fights a real target', () => {
   for (const key of ['armoredcar', 'lighttank', 'ifv', 'heavytank']) {
     const s = fresh(),
-      u = E.makeGround(s, 0, key, -1092, 250),
-      enemy = E.makeGround(s, 1, 'apc', -992, 250);
+      u = E.makeGround(s, 0, key, -1860, 250),
+      enemy = E.makeGround(s, 1, 'apc', -1760, 250);
     enemy.hp = enemy.maxHp = 1e5;
     s.groundUnits.push(u, enemy);
     E.advance(s, 12);
@@ -58,9 +58,9 @@ test('an MLRS fires a twelve-rocket salvo and then reloads', () => {
 
 test('units use their configured base armour and health without research multipliers', () => {
   const s = fresh();
-  const tank = E.makeGround(s, 0, 'lighttank', -1092, 250);
+  const tank = E.makeGround(s, 0, 'lighttank', -1860, 250);
   assert.equal(tank.maxHp, E.GROUND_UNITS.lighttank.hp);
-  const soldier = E.makeGround(s, 0, 'infantry', -1092, 300);
+  const soldier = E.makeGround(s, 0, 'infantry', -1860, 300);
   s.groundUnits.push(soldier);
   damageGround(s, soldier, 10, () => {}, 'bullet');
   assert.ok(Math.abs(soldier.maxHp - soldier.hp - 10) < 1e-9);
@@ -72,14 +72,14 @@ test('new vehicles require their paid facility and the bot difficulty is saved',
     id: s.nextId++,
     key: 'barracks',
     side: 0,
-    x: -1092,
+    x: -1860,
     z: 120,
     hp: 600,
     maxHp: 600,
     progress: 1,
   });
   assert.equal(typeof E.recruit(s, 0, 'heavytank'), 'string');
-  const base = E.build(s, 0, 'vehiclebase', -1152, -80);
+  const base = E.build(s, 0, 'vehiclebase', -1920, -80);
   assert.equal(typeof base, 'object', String(base));
   base.progress = 1;
   base.hp = base.maxHp;

@@ -74,7 +74,13 @@ export function expandLegacyX(x) {
   return Math.sign(x) * (value + 400);
 }
 const LEGACY_HQ_X = 1015;
-export const HQ_X = expandV23X(LEGACY_HQ_X);
+// Campaigns before 8.16 keep their cities here; the ground stays level for them.
+export const V23_HQ_X = expandV23X(LEGACY_HQ_X);
+// New cities stand at the outer edge of each bank, so the land between the sea and the
+// headquarters becomes depth for layered air defence and ground defence. The 768 m move is a
+// whole number of 24 m route cells and 64 m obstacle cells, so paths inside a city keep
+// their lattice.
+export const HQ_X = 1975;
 // Co-op and two-bot cities stand north and south of the bank; their latitude is unchanged.
 export const HQ_Z = 1015;
 export const DISTRICT_X = expandV23X(460);
@@ -144,10 +150,15 @@ function lcg(seed) {
 }
 // City cores stay flat so streets and buildings never sit on a slope.
 const coreDistance = (x, z) =>
-  Math.min(Math.hypot(Math.abs(x) - HQ_X, z), Math.hypot(Math.abs(x) - HQ_X, Math.abs(z) - HQ_Z));
+  Math.min(
+    ...[HQ_X, V23_HQ_X].flatMap((cx) => [
+      Math.hypot(Math.abs(x) - cx, z),
+      Math.hypot(Math.abs(x) - cx, Math.abs(z) - HQ_Z),
+    ]),
+  );
 // Keep the seeded legacy hills/woods stable; extra city plains are flattened below.
 const legacyFlatCore = (x, z, r) => Math.hypot(Math.abs(x) - LEGACY_HQ_X, z) < r;
-const flatCore = (x, z, r) => Math.hypot(Math.abs(x) - HQ_X, z) < r;
+const flatCore = (x, z, r) => coreDistance(x, z) < r;
 // Ground added by state 23: the outer fields beyond the legacy map edge.
 const newGround = (x, z, margin = 0) =>
   Math.abs(z) > LEGACY_MAP.depth / 2 + margin ||
@@ -180,6 +191,18 @@ let LEGACY_HILLS;
     HILLS.push({ x, z, r, h }, { x: -x, z: -z, r, h });
     added += 2;
   }
+}
+
+// Legacy woods were seeded around the legacy hills; keep that list before any removal.
+const LEGACY_HILL_LIST = HILLS.slice(0, LEGACY_HILLS);
+// New city sites at the bank edges stay as level as the old ones: no hill within reach.
+for (let i = HILLS.length - 1; i >= 0; i--) {
+  const h = HILLS[i],
+    d = Math.min(
+      Math.hypot(Math.abs(h.x) - HQ_X, h.z),
+      Math.hypot(Math.abs(h.x) - HQ_X, Math.abs(h.z) - HQ_Z),
+    );
+  if (d < 380 + h.r) HILLS.splice(i, 1);
 }
 
 const H_CELL = 8,
@@ -260,7 +283,7 @@ export const COVER_PATCHES = [];
   const legacyOil = V22_OIL_FIELDS.slice(0, LEGACY_OIL_FIELDS.length);
   for (let i = 0, legacy = 0; i < 900 && legacy < 190; i++) {
     const onHill = i % 3 === 0 && LEGACY_HILLS,
-      hill = onHill ? HILLS[Math.floor(rnd() * LEGACY_HILLS)] : null,
+      hill = onHill ? LEGACY_HILL_LIST[Math.floor(rnd() * LEGACY_HILLS)] : null,
       // Legacy patches were placed around the legacy hill positions.
       hx = hill ? compressV23X(hill.x) : 0,
       x = hill ? hx + (rnd() - 0.5) * hill.r * 1.6 : (rnd() - 0.5) * (LEGACY_MAP.width - 140),
@@ -317,5 +340,13 @@ export const COVER_PATCHES = [];
   };
   for (const x of [-560, -330, 330, 560]) belt(x, -1220, x, -1940, [[0.42, 0.5]]);
   belt(-760, -1800, 760, -1800, [[0.46, 0.54]]);
+  // Keep the new city sites at the bank edges clear of woods.
+  const newCore = (p) =>
+    Math.min(
+      Math.hypot(Math.abs(p.x) - HQ_X, p.z),
+      Math.hypot(Math.abs(p.x) - HQ_X, Math.abs(p.z) - HQ_Z),
+    );
+  for (let i = COVER_PATCHES.length - 1; i >= 0; i--)
+    if (newCore(COVER_PATCHES[i]) < 380 + COVER_PATCHES[i].r) COVER_PATCHES.splice(i, 1);
   belt(-160, -1600, 160, -1600, []);
 }

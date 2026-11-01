@@ -206,7 +206,7 @@ test('experienced mobile AA applies its rank when firing at a real airborne targ
 
 test('desired army replacement pays ordinary costs, preserves reserves and never erases paid recruits', () => {
   const s = fresh();
-  const b = game.build(s, 0, 'barracks', -1272, -10);
+  const b = game.build(s, 0, 'barracks', -2040, -10);
   assert.notEqual(typeof b, 'string', b);
   b.hp = b.maxHp;
   b.progress = 1;
@@ -237,7 +237,7 @@ test('desired army replacement pays ordinary costs, preserves reserves and never
 test('barracks can send recruits to guard, wait, or move with combat to rally', () => {
   for (const mode of ['guard', 'wait', 'attackmove']) {
     const s = fresh();
-    const b = game.build(s, 0, 'barracks', -1272, -10);
+    const b = game.build(s, 0, 'barracks', -2040, -10);
     assert.notEqual(typeof b, 'string', b);
     b.hp = b.maxHp;
     b.progress = 1;
@@ -269,7 +269,7 @@ test('barracks can send recruits to guard, wait, or move with combat to rally', 
 
 test('default rally guards human troops and lets the solo bot enter the shared depot commander', () => {
   const s = fresh();
-  const b = game.build(s, 1, 'barracks', 1272, -10);
+  const b = game.build(s, 1, 'barracks', 2040, -10);
   assert.notEqual(typeof b, 'string', b);
   b.hp = b.maxHp;
   b.progress = 1;

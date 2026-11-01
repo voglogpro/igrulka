@@ -21,8 +21,22 @@ function ready(s, side, key, x, z) {
   return b;
 }
 // A street from the camp road to a point, so road-bound buildings can stand there.
-function street(s, x, z) {
-  assert.equal(typeof E.buildRoad(s, 0, -1297, -45, x, z), 'object');
+function street(s, x, z, from = { x: -2065, z: -45 }) {
+  // Streets are built in legs of at most 650 m.
+  const legs = Math.ceil(Math.hypot(x - from.x, z - from.z) / 600);
+  for (let i = 0; i < legs; i++) {
+    const a = i / legs,
+      b = (i + 1) / legs;
+    const r = E.buildRoad(
+      s,
+      0,
+      from.x + (x - from.x) * a,
+      from.z + (z - from.z) * a,
+      from.x + (x - from.x) * b,
+      from.z + (z - from.z) * b,
+    );
+    assert.equal(typeof r, 'object', String(r));
+  }
 }
 
 test('oil fields are mirrored, flat and dry; wells stand only on a field', () => {
@@ -47,7 +61,7 @@ test('wells fill the storage, tanks raise it, and surplus beyond capacity is los
   assert.ok(f.oil > E.OIL.start + 10, f.oil);
   E.advance(s, 400);
   assert.ok(Math.abs(f.oil - E.OIL.baseStorage) < 1e-6, 'capped by the headquarters reserve');
-  ready(s, 0, 'oiltank', -1382, -60);
+  ready(s, 0, 'oiltank', -2150, -60);
   assert.equal(E.oilStorage(s, 0), E.OIL.baseStorage + E.BUILDINGS.oiltank.storage);
   E.advance(s, 30);
   assert.ok(f.oil > E.OIL.baseStorage);
@@ -55,9 +69,9 @@ test('wells fill the storage, tanks raise it, and surplus beyond capacity is los
 
 test('machines need oil to be built and crawl on empty tanks; infantry needs none', () => {
   const s = fresh();
-  ready(s, 0, 'barracks', -1272, -10);
-  ready(s, 0, 'factory', -1142, -10);
-  ready(s, 0, 'vehiclebase', -1207, -80);
+  ready(s, 0, 'barracks', -2040, -10);
+  ready(s, 0, 'factory', -1910, -10);
+  ready(s, 0, 'vehiclebase', -1975, -80);
   const f = s.sides[0];
   f.oil = 10;
   assert.match(E.recruit(s, 0, 'leopard'), /нефти/);
@@ -67,9 +81,9 @@ test('machines need oil to be built and crawl on empty tanks; infantry needs non
   assert.equal(E.recruit(s, 0, 'leopard'), true);
   assert.equal(f.oil, 100 - E.GROUND_UNITS.leopard.oil);
   // Engines burn fuel on the move; dry tanks slow the machine to a crawl.
-  const tank = E.makeGround(s, 0, 'leopard', -1042, 250);
+  const tank = E.makeGround(s, 0, 'leopard', -1810, 250);
   s.groundUnits.push(tank);
-  E.orderGround(s, 0, [tank.id], { x: -892, z: 250 });
+  E.orderGround(s, 0, [tank.id], { x: -1685, z: 250 });
   const before = f.oil;
   E.advance(s, 1);
   assert.ok(f.oil < before);
@@ -82,8 +96,8 @@ test('machines need oil to be built and crawl on empty tanks; infantry needs non
 
 test('a destroyed tank burns for minutes and sets the neighbouring tank on fire', () => {
   const s = fresh();
-  const a = ready(s, 0, 'oiltank', -1382, -60),
-    b = ready(s, 0, 'oiltank', -1382, -25);
+  const a = ready(s, 0, 'oiltank', -2150, -60),
+    b = ready(s, 0, 'oiltank', -2150, -25);
   s.sides[0].oil = 600;
   a.hp = 0;
   E.step(s, 0.05);
@@ -99,12 +113,12 @@ test('a destroyed tank burns for minutes and sets the neighbouring tank on fire'
 
 test('a port ship sails to the island exchange, sells surplus oil and comes home with cargo', () => {
   const s = fresh();
-  let x = -922;
+  let x = -1715;
   while (E.seaDistance(x, -20) > 20) x += 3;
-  assert.equal(typeof E.buildRoad(s, 0, -1117, -45, x - 30, -20), 'object');
+  street(s, x - 30, -20, { x: -1885, z: -45 });
   const port = ready(s, 0, 'port', x, -20);
-  assert.match(E.canPlace(s, 'port', -1192, 300, 0), /берегу/);
-  ready(s, 0, 'oiltank', -1382, -60);
+  assert.match(E.canPlace(s, 'port', -1960, 300, 0), /берегу/);
+  ready(s, 0, 'oiltank', -2150, -60);
   const f = s.sides[0];
   f.oil = 650;
   E.step(s, 0.05);
@@ -147,8 +161,8 @@ test('old campaigns gain the starting oil stock and an empty fleet; corrupt valu
 
 test('a connected training range sends trained recruits and drills resting soldiers to rank two', () => {
   const s = fresh();
-  ready(s, 0, 'barracks', -1272, -10);
-  const range = ready(s, 0, 'training', -1142, -10);
+  ready(s, 0, 'barracks', -2040, -10);
+  const range = ready(s, 0, 'training', -1910, -10);
   assert.equal(E.recruit(s, 0, 'infantry'), true);
   E.advance(s, 40);
   const recruit = s.groundUnits.find((u) => u.side === 0 && u.key === 'infantry');

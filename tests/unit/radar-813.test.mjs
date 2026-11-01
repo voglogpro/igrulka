@@ -7,7 +7,7 @@ function fixture() {
   const s = E.createGame(813, { mode: 'multiplayer' });
   s.rules.rear = false;
   Object.assign(s.sides[0], { credits: 10000, materials: 1000 });
-  const radar = E.build(s, 0, 'radar', -1080, -10);
+  const radar = E.build(s, 0, 'radar', -1848, -10);
   assert.equal(typeof radar, 'object', String(radar));
   Object.assign(radar, { progress: 1, hp: radar.maxHp });
   return { s, radar };
@@ -56,7 +56,7 @@ test('radar provides local fire control and loses support when destroyed or unpo
       id: s.nextId++,
       side: 0,
       key: 'electronics',
-      x: -1000,
+      x: -1768,
       z: i * 40,
       hp: d.hp,
       maxHp: d.hp,
@@ -104,7 +104,7 @@ test('radar warning observes only hostile launched aircraft and estimates public
 });
 test('a real battery acquires an ordinary drone outside its old range only while radar works', () => {
   const { s, radar } = fixture();
-  const gun = E.build(s, 0, 'gun', -1080, 100);
+  const gun = E.build(s, 0, 'gun', -1848, 100);
   assert.equal(typeof gun, 'object', String(gun));
   Object.assign(gun, { progress: 1, hp: gun.maxHp });
   const u = aircraft(s, 1, gun.x + E.BUILDINGS.gun.range * 1.15, gun.z);

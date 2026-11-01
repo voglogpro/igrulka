@@ -30,6 +30,7 @@ function patchWithClearing(s) {
       p.forest &&
       E.walkable(s, spot.x, spot.z, 1) &&
       E.walkable(s, p.x, p.z, 1) &&
+      E.walkable(s, spot.x + 120, spot.z, 1) &&
       coverInfo(s, { key: 'infantry', ...spot }).cover === 0
     )
       return { patch: p, spot };

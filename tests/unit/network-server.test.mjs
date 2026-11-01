@@ -125,8 +125,8 @@ test('internet WebSocket compression negotiates and keeps authoritative snapshot
   assert.ok(pair.b.socket.extensions.includes('permessage-deflate'));
   const { viewA, viewB } = await startPair(pair);
   assert.equal(viewA.state.mode, 'multiplayer');
-  assert.equal(viewB.state.buildings.find((b) => b.key === 'hq' && b.side === 0).x, 1207);
-  const result = await command(pair.a, 'build', { key: 'power', x: -1262, z: -80 });
+  assert.equal(viewB.state.buildings.find((b) => b.key === 'hq' && b.side === 0).x, 1975);
+  const result = await command(pair.a, 'build', { key: 'power', x: -2030, z: -80 });
   assert.ok(result.result?.id);
   const [updatedA, updatedB] = await tickSnapshots(pair, 20);
   assert.equal(updatedA.state.time, updatedB.state.time);
@@ -665,7 +665,7 @@ test('cooperative room has four independent cities, private allied economies, tw
   const hqs = [0, 1, 2, 3].map((side) => E.hqOf(room.state, side));
   assert.equal(E.hqOf(viewA.state, 0).id, hqs[0].id);
   assert.equal(E.hqOf(viewB.state, 0).id, hqs[2].id);
-  assert.deepEqual([E.hqOf(viewB.state, 0).x, E.hqOf(viewB.state, 0).z], [-1207, 1015]);
+  assert.deepEqual([E.hqOf(viewB.state, 0).x, E.hqOf(viewB.state, 0).z], [-1975, 1015]);
   for (const side of [0, 2])
     Object.assign(room.state.sides[side], { credits: 20000, materials: 2000 });
   const firstBudget = structuredClone(room.state.sides[0]);

@@ -58,7 +58,7 @@ test('without an enemy market the bot trades with its own connected villages and
   s.buildings[0].hp = s.buildings[0].maxHp = 1e8;
   s.ai.nextStrike = s.ai.nextAttack = 1e9;
   const villageTrips = new Set();
-  for (let t = 0; t < 1500 && !(s.sides[1].trades > 0); t++) {
+  for (let t = 0; t < 2700 && !(s.sides[1].trades > 0); t++) {
     E.advance(s, 1);
     for (const u of s.groundUnits) if (u.side === 1 && u.trade?.village) villageTrips.add(u.id);
   }

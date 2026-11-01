@@ -31,7 +31,7 @@ test('two real co-op clients receive ordinary acquired town buildings through de
     host.send({ type: 'start' });
     await until(() => guest.room.phase === 'playing');
     for (const args of [
-      { a: { x: -1297, z: -1060 }, b: { x: -1707, z: -1060 } },
+      { a: { x: -1885, z: -1060 }, b: { x: -1707, z: -1060 } },
       { a: { x: -1707, z: -1060 }, b: { x: -1707, z: -1337 } },
     ])
       assert.equal(typeof (await host.command('road', args)), 'object');

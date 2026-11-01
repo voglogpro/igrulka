@@ -213,14 +213,14 @@ test('new crews consume two APC seats and new roles actually recruit and round t
     E.advance(s, 0.1);
     assert.equal(crews.filter((u) => u.carrierId === apc.id).length, 4);
     assert.equal(E.unloadGround(s, side, apc.id), 4);
-    const x = side === 0 ? -1272 : 1272;
+    const x = side === 0 ? -2040 : 2040;
     const site = E.build(s, side, 'barracks', x, -10);
     assert.notEqual(typeof site, 'string', site);
     site.hp = site.maxHp;
     site.progress = 1;
     assert.equal(E.setRallyMode(s, side, site.id, 'wait'), true);
     assert.equal(E.recruit(s, side, 'atgm', site.id), true);
-    const base = E.build(s, side, 'vehiclebase', side === 0 ? -1152 : 1152, -80);
+    const base = E.build(s, side, 'vehiclebase', side === 0 ? -1920 : 1920, -80);
     assert.equal(typeof base, 'object', String(base));
     base.progress = 1;
     base.hp = base.maxHp;

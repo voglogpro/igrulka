@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../../src/game/index.js';
-import { SEA, expandLegacyZ, expandLegacyX, expandV23X } from '../../src/game/map.js';
+import { SEA, expandLegacyZ, expandLegacyX, expandV23X, V23_HQ_X } from '../../src/game/map.js';
 const migrateX = (x) => expandV23X(expandLegacyX(x));
 import { GRID, fogVisible } from '../../src/game/vision-grid.js';
 import { walkable, groundPath } from '../../src/game/units/ground/navigation.js';
@@ -268,7 +268,7 @@ test('v14 width migration preserves local headquarters, driveway and building of
   const nextHq = loaded.buildings.find((v) => v.id === hq.id),
     next = loaded.buildings.find((v) => v.id === b.id);
   const nextRoad = loaded.roads.find((v) => v.id === road.id);
-  assert.equal(nextHq.x, -E.HQ_X);
+  assert.equal(nextHq.x, -V23_HQ_X);
   assert.equal(next.x - nextHq.x, initial.offset);
   assert.equal(nextRoad.ax - next.x, initial.roadOffset);
   assert.equal(Math.hypot(nextRoad.bx - nextRoad.ax, nextRoad.bz - nextRoad.az), initial.length);

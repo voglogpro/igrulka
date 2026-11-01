@@ -25,7 +25,7 @@ function funds(s) {
   s.rules.oil = false;
 }
 function town(s, side = 0) {
-  const x = side === 0 ? -1207 : 1207;
+  const x = side === 0 ? -1975 : 1975;
   return {
     power: ready(s, side, 'power', x - 55, -80),
     housing: ready(s, side, 'housing', x, -80),
@@ -54,21 +54,21 @@ test('empty equal starts, equal camp access, exact 25% bonus on every economic o
 });
 test('economic placement requires a connected street; construction creates a functional driveway', () => {
   const s = fresh();
-  assert.match(E.canPlace(s, 'housing', -892, 200), /улицей/);
-  assert.equal(E.canPlace(s, 'housing', -1207, -80), null);
-  const b = E.build(s, 0, 'housing', -1207, -80);
+  assert.match(E.canPlace(s, 'housing', -1660, 200), /улицей/);
+  assert.equal(E.canPlace(s, 'housing', -1975, -80), null);
+  const b = E.build(s, 0, 'housing', -1975, -80);
   assert.ok(b.roadLink);
   assert.ok(s.roads.some((r) => r.connectorTo === b.id));
   assert.equal(E.supplyFactor(s, b), 1);
-  assert.equal(E.canPlace(s, 'gun', -892, 200), null);
+  assert.equal(E.canPlace(s, 'gun', -1660, 200), null);
   assert.match(E.canPlace(s, 'housing', 0, 0), /земля/);
 });
 test('cutting the only trunk reduces downstream economy to 20%; bypass and repair restore supply', () => {
   const s = fresh();
   funds(s);
-  const b = ready(s, 0, 'industry', -1152, -80),
+  const b = ready(s, 0, 'industry', -1920, -80),
     before = E.economy(s, 0).materials,
-    central = s.roads.find((r) => r.side === 0 && r.camp && r.ax < -1207 && r.bx > -1207);
+    central = s.roads.find((r) => r.side === 0 && r.camp && r.ax < -1975 && r.bx > -1975);
   E.damageRoad(s, central, 100);
   assert.equal(E.supplyFactor(s, b), 0.2);
   assert.ok(Math.abs(E.economy(s, 0).materials - before * 0.2) < 1e-9);
@@ -76,10 +76,10 @@ test('cutting the only trunk reduces downstream economy to 20%; bypass and repai
   E.advance(s, 7);
   assert.equal(E.supplyFactor(s, b), 1);
   E.damageRoad(s, central, 120);
-  const first = E.buildRoad(s, 0, -1282, -45, -1282, 45);
+  const first = E.buildRoad(s, 0, -2050, -45, -2050, 45);
   assert.equal(typeof first, 'object');
-  assert.equal(typeof E.buildRoad(s, 0, -1282, 45, -1122, 45), 'object');
-  assert.equal(typeof E.buildRoad(s, 0, -1122, 45, -1122, -45), 'object');
+  assert.equal(typeof E.buildRoad(s, 0, -2050, 45, -1890, 45), 'object');
+  assert.equal(typeof E.buildRoad(s, 0, -1890, 45, -1890, -45), 'object');
   assert.equal(E.supplyFactor(s, b), 1);
 });
 test('an attack aimed at a road actually severs it and the next tick updates supply', () => {
@@ -87,12 +87,12 @@ test('an attack aimed at a road actually severs it and the next tick updates sup
   funds(s);
   const own = town(s);
   const enemy = town(s, 1),
-    central = s.roads.find((r) => r.side === 1 && r.camp && r.ax < 1207 && r.bx > 1207);
+    central = s.roads.find((r) => r.side === 1 && r.camp && r.ax < 1975 && r.bx > 1975);
   s.sides[0].inventory.drone = 1;
   E.requestWeaponDelivery(s, 0, own.launcher.id, 'drone', 1);
   while (!E.availableLaunchStock(own.launcher, 'drone') && s.time < 40) E.step(s, 0.05);
   assert.equal(E.launch(s, 0, 'drone', central.id), 1);
-  E.advance(s, 70);
+  E.advance(s, 140);
   assert.ok(central.hp < central.maxHp * 0.3);
   assert.equal(E.supplyFactor(s, enemy.industry), 0.2);
   assert.ok(s.stats.roadsCut >= 1);
@@ -100,27 +100,27 @@ test('an attack aimed at a road actually severs it and the next tick updates sup
 test('road construction splits long streets, validates collisions, and supports snapping', () => {
   const s = fresh();
   funds(s);
-  const r = E.buildRoad(s, 0, -1297, -45, -1422, -45);
+  const r = E.buildRoad(s, 0, -2065, -45, -2190, -45);
   assert.equal(typeof r, 'object');
   assert.equal(r.segments.length, 2);
   assert.ok(r.segments.every((seg) => E.network(s, 0).ids.has(seg.id)));
-  assert.match(E.buildRoad(s, 0, -1252, 0, -1162, 0), /здание/);
+  assert.match(E.buildRoad(s, 0, -2020, 0, -1930, 0), /здание/);
   assert.match(E.buildRoad(s, 0, -100, 0, 100, 0), /суше/);
-  const snapped = E.snapRoadPoint(s, 0, -1419, -43);
-  assert.equal(snapped.x, -1422);
+  const snapped = E.snapRoadPoint(s, 0, -2187, -43);
+  assert.equal(snapped.x, -2190);
   assert.equal(snapped.z, -45);
 });
 test('factory manufactures local stock and a real pad receives and launches it once', () => {
   const s = fresh();
   funds(s);
   assert.match(E.produce(s, 0, 'drone'), /базу дронов/);
-  ready(s, 0, 'power', -1262, -80);
-  ready(s, 0, 'factory', -1272, -10);
+  ready(s, 0, 'power', -2030, -80);
+  ready(s, 0, 'factory', -2040, -10);
   assert.equal(E.produce(s, 0, 'drone', 3), true);
   E.advance(s, 37);
   assert.equal(E.weaponStock(s, 0, 'drone'), 3);
   assert.equal(typeof E.launch(s, 0, 'drone', 2), 'string');
-  const launcher = ready(s, 0, 'launcher', -942, -150);
+  const launcher = ready(s, 0, 'launcher', -1710, -150);
   assert.equal(launcher.roadLink, undefined);
   E.advance(s, 35);
   assert.ok(
@@ -128,8 +128,8 @@ test('factory manufactures local stock and a real pad receives and launches it o
     'paid stock physically arrives at the remote pad',
   );
   assert.equal(E.launch(s, 0, 'drone', 2, 1, launcher.id), 1);
-  assert.equal(E.launch(s, 0, 'drone', { x: 1172, z: 30 }, 1, launcher.id), 1);
-  assert.equal(E.launch(s, 0, 'drone', { x: 1092, z: 30 }, 1, launcher.id), 1);
+  assert.equal(E.launch(s, 0, 'drone', { x: 1940, z: 30 }, 1, launcher.id), 1);
+  assert.equal(E.launch(s, 0, 'drone', { x: 1860, z: 30 }, 1, launcher.id), 1);
   assert.equal(s.units.length, 3);
   assert.equal(s.sides[0].inventory.drone, 0);
   assert.match(E.launch(s, 0, 'drone', 2), /готового аппарата/);
@@ -161,18 +161,18 @@ function movingDrone(s) {
     id: s.nextId++,
     side: 1,
     key: 'heavy',
-    x: -902,
+    x: -1670,
     z: 20,
     y: 57,
-    startX: 1207,
+    startX: 1975,
     startZ: 20,
-    tx: -1207,
+    tx: -1975,
     tz: 20,
     targetId: 1,
     hp: 1000,
     maxHp: 1000,
-    travelled: 1725,
-    total: 2030,
+    travelled: 3695,
+    total: 4000,
     speed: 0.001,
     delay: 0,
     phase: 1,
@@ -183,8 +183,8 @@ function movingDrone(s) {
 test('gun rounds follow gravity without homing and record real hits and misses', () => {
   const s = fresh();
   funds(s);
-  ready(s, 0, 'gun', -1052, 0);
-  ready(s, 0, 'radar', -1192, 100);
+  ready(s, 0, 'gun', -1820, 0);
+  ready(s, 0, 'radar', -1960, 100);
   const u = movingDrone(s);
   E.advance(s, 0.2);
   const p = s.projectiles.find((p) => p.kind === 'bullet');
@@ -219,7 +219,7 @@ test('leading solution advances the aim instead of aiming at the current point',
 test('zero ammunition stops defense and impact destruction completes the campaign', () => {
   const s = fresh();
   funds(s);
-  const gun = ready(s, 0, 'gun', -1052, 0);
+  const gun = ready(s, 0, 'gun', -1820, 0);
   gun.groundAmmo = 0;
   gun.ammoReserve = 0;
   movingDrone(s);
@@ -234,7 +234,7 @@ test('zero ammunition stops defense and impact destruction completes the campaig
   E.requestWeaponDelivery(win, 0, own.launcher.id, 'drone', 1);
   while (!E.availableLaunchStock(own.launcher, 'drone') && win.time < 40) E.step(win, 0.05);
   assert.equal(E.launch(win, 0, 'drone', 2), 1);
-  E.advance(win, 70);
+  E.advance(win, 140);
   assert.equal(win.result, 'victory');
   const t = win.time;
   E.advance(win, 10);
@@ -304,7 +304,7 @@ test('AI builds a connected, compact city and manufactures real attacks from ide
   assert.ok(
     own
       .filter((b) => !['oilwell', 'port'].includes(b.key))
-      .every((b) => Math.abs(b.x - 1207) <= 200 && Math.abs(b.z) <= 300),
+      .every((b) => Math.abs(b.x - 1975) <= 200 && Math.abs(b.z) <= 300),
   );
   assert.ok(s.stats.impacts > 0 || s.units.some((u) => u.side === 1));
 });
@@ -325,13 +325,13 @@ test('all four base weapons participate in a live defended battle without resear
     hq.hp = hq.maxHp = 8000;
   }
   for (const owner of [0, 1]) {
-    const x = owner === 0 ? -1207 : 1207;
+    const x = owner === 0 ? -1975 : 1975;
     town(s, owner);
     assert.equal(typeof E.buildRoad(s, owner, x - 90, -45, x - 170, -45), 'object');
     assert.equal(typeof E.research(s, owner, 'cruise'), 'string');
   }
   for (const owner of [0, 1]) {
-    const x = owner === 0 ? -1207 : 1207;
+    const x = owner === 0 ? -1975 : 1975;
     ready(s, owner, 'gun', x + (owner === 0 ? 170 : -170), 0);
     ready(s, owner, 'sam', x + (owner === 0 ? 180 : -180), 85);
     ready(s, owner, 'silo', x + (owner === 0 ? 170 : -170), 180);
@@ -378,22 +378,22 @@ test('a driveway is never hit on its own and disappears together with its ruined
 test('road drawing snaps like a city builder: compass and street angles, length steps, parallel guides', () => {
   const s = fresh();
   funds(s);
-  assert.equal(typeof E.buildRoad(s, 0, -1292, 200, -1092, 200), 'object');
+  assert.equal(typeof E.buildRoad(s, 0, -2060, 200, -1860, 200), 'object');
   const block = E.ROAD_GRID.block;
   // A start near the line one block away lands exactly on it, lined up with the street end.
-  const start = E.snapRoadPoint(s, 0, -1289, 200 + block + 4);
+  const start = E.snapRoadPoint(s, 0, -2057, 200 + block + 4);
   assert.equal(start.kind, 'guide');
-  assert.deepEqual([start.x, start.z], [-1292, 200 + block]);
+  assert.deepEqual([start.x, start.z], [-2060, 200 + block]);
   // Drawn almost straight: the end keeps the street direction and an 8 m length step.
-  const end = E.snapRoadPoint(s, 0, -1175, 200 + block + 3, start);
+  const end = E.snapRoadPoint(s, 0, -1943, 200 + block + 3, start);
   assert.ok(Math.abs(end.z - start.z) < 1e-9);
   assert.equal(Math.abs(end.x - start.x) % E.ROAD_GRID.lengthStep, 0);
   // Across from the street end the drawing snaps perpendicular.
-  const across = E.snapRoadPoint(s, 0, -1090, 330, { x: -1092, z: 200 });
-  assert.ok(Math.abs(across.x + 1092) < 1e-9);
+  const across = E.snapRoadPoint(s, 0, -1858, 330, { x: -1860, z: 200 });
+  assert.ok(Math.abs(across.x + 1860) < 1e-9);
   // Shift forces the nearest grid direction even far from it.
-  const forced = E.snapRoadPoint(s, 0, -1192, 330, { x: -1292, z: 330 }, true);
+  const forced = E.snapRoadPoint(s, 0, -1960, 330, { x: -2060, z: 330 }, true);
   assert.ok(
-    Math.abs(forced.z - 330) < 1e-9 || Math.abs(forced.x + 1292) < 1e-9 || forced.kind === 'angle',
+    Math.abs(forced.z - 330) < 1e-9 || Math.abs(forced.x + 2060) < 1e-9 || forced.kind === 'angle',
   );
 });

@@ -768,7 +768,7 @@ test('first paid base building and upgrades reuse actual warmed geometry after r
     assert.equal(gun.level, level);
     check(f.world.model(gun).root);
   }
-  const factory = E.build(s, 0, 'factory', -1272, -10);
+  const factory = E.build(s, 0, 'factory', -2040, -10);
   assert.equal(typeof factory, 'object', String(factory));
   check(f.world.model(factory).root);
   for (const level of [0, 1, 2])

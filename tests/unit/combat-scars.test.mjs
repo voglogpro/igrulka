@@ -18,7 +18,7 @@ test('a paid tank consumes local ammunition without a second charge and its shal
   s.rules.rear = false;
   s.sides[0].credits = 100000;
   s.sides[0].materials = 10000;
-  const base = E.build(s, 0, 'vehiclebase', -1272, -10);
+  const base = E.build(s, 0, 'vehiclebase', -2040, -10);
   assert.equal(typeof base, 'object', String(base));
   base.progress = 1;
   base.hp = base.maxHp;
@@ -28,10 +28,10 @@ test('a paid tank consumes local ammunition without a second charge and its shal
   base.armyQueue[0].progress = 1;
   E.step(s, 0.05);
   const tank = s.groundUnits.find((u) => u.key === 'leopard' && u.side === 0),
-    target = E.makeGround(s, 1, 'leopard', -1092, 250);
+    target = E.makeGround(s, 1, 'leopard', -1860, 250);
   assert.ok(tank, 'the ordinarily paid production queue must produce the tank');
   Object.assign(tank, {
-    x: -1192,
+    x: -1960,
     z: 250,
     path: [],
     order: null,

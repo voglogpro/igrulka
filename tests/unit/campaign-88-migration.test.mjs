@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as E from '../../src/game/index.js';
-import { expandLegacyX, expandV23X } from '../../src/game/map.js';
+import { expandLegacyX, expandV23X, V23_HQ_X } from '../../src/game/map.js';
 import { pointOnRoute } from '../../src/game/units/aviation/routes.js';
 import { moveUnits } from '../../src/game/units/aviation/flight.js';
 const fixture = () =>
@@ -13,8 +13,8 @@ test('actual exported 8.8 city migrates facilities, paid work, health and explic
   const s = E.load(JSON.stringify(before));
   assert.equal(before.version, 14);
   assert.equal(s.version, E.VERSION);
-  assert.equal(s.buildings[0].x, -E.HQ_X);
-  assert.equal(s.buildings[1].x, E.HQ_X);
+  assert.equal(s.buildings[0].x, -V23_HQ_X);
+  assert.equal(s.buildings[1].x, V23_HQ_X);
   const lab = before.buildings.find((b) => b.key === 'lab');
   assert.equal(s.buildings.find((b) => b.id === lab.id).demolished, true);
   assert.equal(

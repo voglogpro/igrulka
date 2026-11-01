@@ -19,7 +19,7 @@ function fresh() {
   }
   return s;
 }
-function building(s, key, x = -1272, z = -10) {
+function building(s, key, x = -2040, z = -10) {
   const b = E.build(s, 0, key, x, z);
   assert.equal(typeof b, 'object', String(b));
   b.progress = 1;

@@ -82,7 +82,7 @@ test('forty ordinary machinegunners physically occupy balanced outer, inner and 
       0,
       'machinegunner',
       {
-        x: -1092 - (i % 5) * 8,
+        x: -1860 - (i % 5) * 8,
         z: (Math.floor(i / 5) - 4) * 8,
       },
       true,
@@ -203,17 +203,17 @@ test('a visible moving rear intruder is followed at bounded cadence and survivin
     for (const line of corridorGeometry(s, 0))
       for (const slot of line.slots)
         units.push(post(s, 0, 'infantry', line.id, row, slot.slot, true));
-  const enemy = troop(s, 1, 'leopard', { x: -1242, z: -100 }, true);
+  const enemy = troop(s, 1, 'leopard', { x: -2010, z: -100 }, true);
   E.step(s, 0.05);
   const sent = units.find((u) => u.defenseTask);
   assert.ok(sent);
   const home = { ...sent.defenseTask.home },
     initial = { ...sent.guard };
   assert.ok(distance(initial, enemy) < 140);
-  assert.equal(E.orderGround(s, 1, [enemy.id], { x: -1572, z: -350, mode: 'move' }), 1);
+  assert.equal(E.orderGround(s, 1, [enemy.id], { x: -2340, z: -350, mode: 'move' }), 1);
   const start = { x: sent.x, z: sent.z };
   E.advance(s, 14);
-  assert.ok(distance(enemy, { x: -1242, z: -100 }) > 200, 'the intruder really moved');
+  assert.ok(distance(enemy, { x: -2010, z: -100 }) > 200, 'the intruder really moved');
   assert.ok(sent.defenseTask && !sent.defenseTask.returning);
   assert.ok(distance(sent.guard, initial) > 100);
   assert.ok(
@@ -502,7 +502,7 @@ test('central depot hubs receive finite paid ammunition by real vans without dup
   const s = fresh();
   own(s, 0);
   const before = s.sides[0].credits;
-  const factory = E.build(s, 0, 'ammofactory', -1272, -80);
+  const factory = E.build(s, 0, 'ammofactory', -2040, -80);
   assert.equal(factory.key, 'ammofactory');
   assert.ok(s.sides[0].credits < before);
   for (const line of corridorGeometry(s, 0))

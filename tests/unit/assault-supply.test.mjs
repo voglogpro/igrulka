@@ -63,15 +63,15 @@ test('a stationary building gun cannot start a walking supply trip', () => {
 
 test('a blocked return after real pickup and save/load resumes the attack without teleporting', () => {
   let s = E.createGame(8131, { mode: 'multiplayer' });
-  let u = E.makeGround(s, 0, 'infantry', -1172, -80);
+  let u = E.makeGround(s, 0, 'infantry', -1940, -80);
   s.groundUnits.push(u);
-  E.orderGround(s, 0, [u.id], { x: -972, z: -80, mode: 'attackmove' });
+  E.orderGround(s, 0, [u.id], { x: -1740, z: -80, mode: 'attackmove' });
   u.groundAmmo = u.ammoReserve = 0;
   s.ammoCrates.push({
     id: s.nextId++,
     side: 0,
     key: 'ammo-crate',
-    x: -1352,
+    x: -2120,
     z: -80,
     hp: 100,
     maxHp: 100,
@@ -82,7 +82,7 @@ test('a blocked return after real pickup and save/load resumes the attack withou
     E.advance(s, 1);
   assert.equal(u.supplyTrip?.phase, 'returning');
   assert.ok(E.ammunitionStatus(s, u).total > 0);
-  const building = E.build(s, 0, 'housing', -1172, -80);
+  const building = E.build(s, 0, 'housing', -1940, -80);
   assert.equal(typeof building, 'object');
   // Discard the old now-invalid path after the actual paid solid placement.
   u.path = [];
@@ -93,7 +93,7 @@ test('a blocked return after real pickup and save/load resumes the attack withou
   updateFieldSupply(s);
   assert.equal(u.supplyTrip, undefined);
   assert.equal(u.order.mode, 'attackmove');
-  assert.equal(u.order.x, -972);
+  assert.equal(u.order.x, -1740);
   assert.deepEqual({ x: u.x, z: u.z, ammo: E.ammunitionStatus(s, u).total }, before);
   assert.doesNotThrow(() => E.load(E.save(s)));
 });
@@ -154,8 +154,8 @@ test('blocked supply returns consume at most four path attempts per cadence', ()
   for (let i = 0; i < 5; i++) {
     const u = E.makeGround(s, 0, 'infantry', -1352, -80 - i * 4);
     s.groundUnits.push(u);
-    u.supplyTrip = { crateId: crate.id, phase: 'returning', home: { x: -1207, z: 0 } };
-    u.order = { x: -1207, z: 0, mode: 'resupplyReturn', supplyId: crate.id };
+    u.supplyTrip = { crateId: crate.id, phase: 'returning', home: { x: -1975, z: 0 } };
+    u.order = { x: -1975, z: 0, mode: 'resupplyReturn', supplyId: crate.id };
     u.routeQueue = [{ x: -972, z: -80 - i * 4, mode: 'attackmove' }];
   }
   assert.doesNotThrow(() => E.load(E.save(s)));
