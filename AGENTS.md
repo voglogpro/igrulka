@@ -3,6 +3,9 @@
 ## Native 0.4 — наземные модели и запуск Windows
 
 Пользователь выбрал Windows-версию для себя и друзей, без Steam на этом этапе.
+Runtime0.4 — `0a3024f`, исходные285 inputs8.16 совпадают. Полный check1180,
+release paid43/reload29/paused50015 и dual-native49 прошли. Детали, включая
+неудачные ранние прогоны и оставшиеся long tasks, находятся в отчёте0.4.
 План — `docs/engine/GRAPHICS-04.md`, факты — `GRAPHICS-04-STATUS.md`.
 Архитектура source 8.16 сохраняется; art overlays применяются только native.
 `native/art-assets/` — runtime banks в Git; Blender не нужен для обычной сборки.
@@ -13,7 +16,9 @@ Prefix transport сохраняет vertex IDs; LOD, immutable и instance banks
 geometry clones и заканчивается после FramePostDraw, не меняя исходные FX pools.
 Tagged artWarmup ждёт до 120 секунд холодной компиляции; live scene watchdog остаётся
 30 секунд. Нельзя заменять подтверждение FramePostDraw ранним ACK ради теста.
-Старые готовые 0.1/0.2/0.2.1/0.3 папки и архивы не перезаписывать. Различать
+Готовый `Skyfront-Native-0.4-Windows` также принят: запуск копии 5/5, архив
+538 payload + manifest, SHA `0CC882EC…C8DA162C`. Ярлык Native указывает на 0.4.
+Старые готовые 0.1/0.2/0.2.1/0.3/0.4 папки и архивы не перезаписывать. Различать
 функциональный бой 500 групп и плавность: long tasks ещё остаются.
 
 ## Активная задача — графика Godot после принятого переноса
