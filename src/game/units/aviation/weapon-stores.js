@@ -10,9 +10,11 @@ export function weaponStoreAllows(site, key) {
     typeof key === 'string' &&
     Object.hasOwn(WEAPONS, key) &&
     (site?.key === 'factory' ||
-      (site?.key === 'launcher' && ['drone', 'heavy'].includes(key)) ||
+      (site?.key === 'launcher' && ['drone', 'heavy', 'bomber'].includes(key)) ||
       (site?.key === 'silo' && isMissile(key)) ||
-      (site?.key === 'navalbase' && WEAPONS[key].family === 'cruise'))
+      (site?.key === 'navalbase' &&
+        (WEAPONS[key].family === 'cruise' ||
+          (site.shipClass === 'destroyer' && WEAPONS[key].family === 'drone'))))
   );
 }
 export function launchSiteAllows(site, key) {
@@ -21,9 +23,12 @@ export function launchSiteAllows(site, key) {
 // Retain the existing persisted launchStore field for real warehouses and racks.
 export function launchStoreCapacity(site, key = null) {
   if (key != null && !weaponStoreAllows(site, key)) return 0;
-  const capacity = Object.hasOwn(WEAPON_STORE_CAPACITY, site?.key)
-    ? WEAPON_STORE_CAPACITY[site.key]
-    : 0;
+  const capacity =
+    site?.key === 'navalbase' && site.shipClass === 'destroyer'
+      ? 8
+      : Object.hasOwn(WEAPON_STORE_CAPACITY, site?.key)
+        ? WEAPON_STORE_CAPACITY[site.key]
+        : 0;
   return site?.key === 'factory'
     ? Math.max(
         Math.floor(capacity * equipmentModifiers(site).production),

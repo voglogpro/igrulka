@@ -3,6 +3,8 @@ import { build, canPlace } from '../city/construction.js';
 import { nearestRoad } from '../city/road-network.js';
 import { buildRoad } from '../city/roads.js';
 import { oilStorage } from '../city/oil.js';
+import { buyShip, warshipOf } from '../city/naval.js';
+import { SHIPS } from '../city/ships.config.js';
 
 // The bot's oil industry: wells on the fields nearest its city, a road to each of them, tank
 // farms for the stock and a port on its shore. Returns true when it spent this planning turn.
@@ -91,6 +93,18 @@ export function oilPlan(s, side, hq, active) {
       if (tanks.some((b) => Math.hypot(b.x - x, b.z - z) < 70)) continue;
       if (tryBuild(s, side, 'oiltank', x, z)) return true;
     }
+  }
+  // Shipyards build paid hulls: the destroyer only from a rich treasury.
+  for (const base of [...active('navalbase'), ...active('patrolbase')]) {
+    if (warshipOf(s, base)) continue;
+    const hull =
+      base.key === 'patrolbase'
+        ? 'patrol'
+        : f.credits > SHIPS.destroyer.cost + 2500 && f.materials > SHIPS.destroyer.metal + 150
+          ? 'destroyer'
+          : 'missile';
+    if (f.credits > SHIPS[hull].cost + 900 && typeof buyShip(s, side, base.id, hull) === 'number')
+      return true;
   }
   if (s.time > 360 && !active('port').length && f.credits > BUILDINGS.port.cost + 600)
     for (const p of portSites(hq)) if (tryBuild(s, side, 'port', p.x, p.z)) return true;

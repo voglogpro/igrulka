@@ -3,11 +3,21 @@ import { guardGround } from '../units/ground/guard.js';
 import { event } from '../shared/events.js';
 import { DISTRICT_BY_ID, DISTRICT_RULES as R } from './districts.config.js';
 import { districtState } from './state.js';
-import { allied, hostile, sideIds, teamOf, validSide } from '../factions.js';
+import {
+  allied,
+  hostile,
+  sideIds,
+  teamOf,
+  validSide,
+  frontDirection,
+  teamCount,
+  opposedPresence,
+  contestedPresence,
+} from '../factions.js';
 
 export { DISTRICTS, DISTRICT_TYPES, DISTRICT_BY_ID, DISTRICT_RULES } from './districts.config.js';
 export { createDistricts } from './state.js';
-const direction = (s, side) => (teamOf(s, side) === 0 ? 1 : -1);
+const direction = (s, side) => frontDirection(s, side);
 const definition = (id) =>
   typeof id === 'string' && Object.hasOwn(DISTRICT_BY_ID, id) ? DISTRICT_BY_ID[id] : null;
 
@@ -89,7 +99,7 @@ export function updateDistricts(s, dt) {
   for (const value of s.districts || []) {
     const d = definition(value.id);
     if (!d) continue;
-    const present = [0, 0],
+    const present = Array(teamCount(s)).fill(0),
       foot = s.sides.map(() => 0);
     for (const u of s.groundUnits) {
       if (
@@ -111,8 +121,8 @@ export function updateDistricts(s, dt) {
       )
         foot[u.side]++;
     }
-    value.contested = present[0] > 0 && present[1] > 0;
-    value.blocked = value.owner != null && present[1 - teamOf(s, value.owner)] > 0;
+    value.contested = contestedPresence(present);
+    value.blocked = value.owner != null && opposedPresence(present, teamOf(s, value.owner)) > 0;
     const candidates = sideIds(s).filter((side) => foot[side] > 0);
     const side = value.contested
       ? null
@@ -123,7 +133,11 @@ export function updateDistricts(s, dt) {
           : (candidates[0] ?? null);
     value.capturing = side != null && !allied(s, side, value.owner) ? side : null;
     if (side != null) {
-      const sign = direction(s, side);
+      // Against a hostile owner control always runs back toward neutral, whichever bank.
+      const sign =
+        value.owner != null && hostile(s, value.owner, side)
+          ? -direction(s, value.owner)
+          : direction(s, side);
       const teamFoot = candidates.reduce(
         (sum, id) => sum + (allied(s, id, side) ? foot[id] : 0),
         0,
@@ -155,7 +169,7 @@ export function updateDistricts(s, dt) {
           event(s, 'districtCaptured', { side, districtId: d.id, x: d.x, z: d.z });
         }
       }
-    } else if (!present[0] && !present[1]) {
+    } else if (!present.some((n) => n > 0)) {
       const target = value.owner == null ? 0 : direction(s, value.owner);
       value.control +=
         Math.sign(target - value.control) *

@@ -45,15 +45,22 @@ function restorePlan(s, plan) {
 }
 export function restoreAI(s) {
   s.ai = restorePlan(s, s.ai);
-  const extra = s.sides.length === 4 ? '3' : s.sides.length === 3 ? '2' : null;
+  const extra =
+    s.mode === 'war' || s.mode === 'ffa'
+      ? ['2', '3']
+      : s.sides.length === 4
+        ? ['3']
+        : s.sides.length === 3
+          ? ['2']
+          : null;
   if (extra) {
     if (
       !object(s.aiBySide) ||
-      Object.keys(s.aiBySide).length !== 1 ||
-      !Object.hasOwn(s.aiBySide, extra)
+      Object.keys(s.aiBySide).length !== extra.length ||
+      extra.some((key) => !Object.hasOwn(s.aiBySide, key))
     )
       throw Error('Повреждены города ботов');
-    s.aiBySide = { [extra]: restorePlan(s, s.aiBySide[extra]) };
+    s.aiBySide = Object.fromEntries(extra.map((key) => [key, restorePlan(s, s.aiBySide[key])]));
   } else if (s.aiBySide != null) {
     if (!object(s.aiBySide) || Object.keys(s.aiBySide).length) throw Error('Лишний город бота');
     delete s.aiBySide;

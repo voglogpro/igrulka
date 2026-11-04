@@ -103,6 +103,25 @@ export const WEAPONS = {
     blast: 135,
     altitude: 220,
   },
+  // Front-line bomber: a crewed, reusable aircraft. It flies to the target, drops a stick of FAB
+  // bombs that physically fall, turns for home and lands back on its pad to be sent out again.
+  bomber: {
+    family: 'drone',
+    name: 'Фронтовой бомбардировщик',
+    cost: 1500,
+    oil: 40,
+    components: 16,
+    metal: 90,
+    time: 70,
+    hp: 260,
+    speed: 62,
+    damage: 300,
+    blast: 50,
+    altitude: 120,
+    bombs: 3,
+    // Seconds before the same aircraft can fly again after landing.
+    turnaround: 25,
+  },
 };
 export const weaponFamily = (key) => WEAPONS[key]?.family || null;
 export const isMissile = (key) => ['cruise', 'ballistic'].includes(weaponFamily(key));

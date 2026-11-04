@@ -51,6 +51,51 @@ function buildTemplate(w, key, side) {
       g.add(rotor);
     }
     box(details, 0, -0.2, 1.1, 0.5, 0.5, 0.4, '#203b3a');
+  } else if (key === 'bomber') {
+    // Swept-wing twin-engine bomber with FAB bombs under the wings.
+    const skin = ['#7d8c84', '#8c8576', '#74889a', '#958c70'][side];
+    const body = new T.Mesh(
+      new T.CylinderGeometry(1.25, 1.05, 17, 14),
+      w.mat(skin, { metalness: 0.35, roughness: 0.45 }),
+    );
+    body.rotation.x = Math.PI / 2;
+    g.add(body);
+    const nose = new T.Mesh(
+      new T.ConeGeometry(1.25, 4.2, 14),
+      w.mat('#3b4446', { metalness: 0.3, roughness: 0.3 }),
+    );
+    nose.rotation.x = Math.PI / 2;
+    nose.position.z = 10.6;
+    g.add(nose);
+    box(details, 0, 1, 6.5, 1.3, 0.7, 2.6, '#22323a');
+    for (const sign of [-1, 1]) {
+      const wing = new T.Group();
+      wing.name = sign < 0 ? 'wing-left' : 'wing-right';
+      wing.userData.dynamic = true;
+      const panel = box(wing, sign * 5.2, -0.2, -0.6, 9.5, 0.28, 3.4, skin);
+      panel.rotation.y = sign * 0.38;
+      g.add(wing);
+      const engine = new T.Mesh(
+        new T.CylinderGeometry(0.62, 0.7, 4.4, 10),
+        w.mat('#4a5254', { metalness: 0.5, roughness: 0.4 }),
+      );
+      engine.rotation.x = Math.PI / 2;
+      engine.position.set(sign * 3.4, -0.8, -0.4);
+      g.add(engine);
+      // FAB bombs on pylons.
+      for (const x of [2, 4.6]) {
+        const bomb = new T.Mesh(
+          new T.CylinderGeometry(0.42, 0.36, 2.6, 8),
+          w.mat('#4e5a3f', { metalness: 0.2, roughness: 0.6 }),
+        );
+        bomb.rotation.x = Math.PI / 2;
+        bomb.position.set(sign * x, -1.2, x === 2 ? 0.6 : -0.6);
+        details.add(bomb);
+      }
+    }
+    // Tailplane and fin.
+    box(g, 0, 0.2, -7.6, 6.4, 0.2, 1.8, skin);
+    box(g, 0, 1.9, -7.4, 0.24, 3.2, 2.2, skin);
   } else if (key === 'drone' || heavy) {
     const profile = [
       new T.Vector2(0, -5.8),

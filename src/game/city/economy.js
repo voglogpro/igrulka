@@ -4,9 +4,11 @@ import { buildingConnected } from './road-network.js';
 import { BUILDINGS, GROUND_UNITS } from '../config.js';
 import { districtIncome } from '../territory/districts.js';
 import { difficultyOf } from '../ai/difficulty.config.js';
-import { aiSides } from '../factions.js';
+import { aiSides, teamOf } from '../factions.js';
 import { settlementIncome, settlementOperational } from '../territory/settlements.js';
 import { HEADQUARTERS_INCOME, roadRecoveryFundingRate } from './road-recovery.js';
+// Free-for-all bots differ: a modest rival, an ordinary one and a strong one, on top of difficulty.
+export const FFA_STRENGTH = Object.freeze({ 1: 0, 2: -0.1, 3: 0.3 });
 export function supplyFactor(s, b) {
   if (b.settlementId)
     return settlementOperational(s, b.settlementId, b.side) &&
@@ -99,7 +101,14 @@ export function economy(s, owner, dt = 0) {
   income += districts.income;
   materials += districts.materials;
   science += districts.science;
-  const bonus = aiSides(s).includes(owner) ? difficultyOf(s).bonus : 1;
+  // The difficulty bonus belongs to the bots opposing the player, not to an allied bot.
+  const bonus = !aiSides(s).includes(owner)
+    ? 1
+    : s.mode === 'ffa'
+      ? Math.max(1, difficultyOf(s).bonus + (FFA_STRENGTH[owner] || 0))
+      : teamOf(s, owner) === 1
+        ? difficultyOf(s).bonus
+        : 1;
   const roadRecovery = roadRecoveryFundingRate(s, owner, dt);
   return {
     gross: income * bonus - roadRecovery,

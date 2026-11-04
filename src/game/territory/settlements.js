@@ -1,7 +1,17 @@
 import { buildingConnected, segmentDistance } from '../city/road-network.js';
 import { BUILDINGS } from '../city/buildings.config.js';
 import { expandLegacyX, expandLegacyZ, expandV23X } from '../map.js';
-import { allied, hostile, hqOf, sideIds, teamOf, validSide } from '../factions.js';
+import {
+  allied,
+  hostile,
+  hqOf,
+  sideIds,
+  teamOf,
+  validSide,
+  teamCount,
+  opposedPresence,
+  contestedPresence,
+} from '../factions.js';
 import { GROUND_UNITS, isInfantry } from '../units/ground/types.js';
 import { event } from '../shared/events.js';
 import {
@@ -320,7 +330,7 @@ export function settlementIncome(s, side, context = null) {
   return result;
 }
 function presence(s, d) {
-  const teams = [0, 0],
+  const teams = Array(teamCount(s)).fill(0),
     foot = s.sides.map(() => 0);
   for (const u of s.groundUnits || []) {
     if (
@@ -354,8 +364,8 @@ function claim(s, value, side, d) {
 }
 function updateOne(s, value, d, dt) {
   const { teams, foot } = presence(s, d);
-  value.contested = teams[0] > 0 && teams[1] > 0;
-  value.blocked = value.owner !== null && teams[1 - teamOf(s, value.owner)] > 0;
+  value.contested = contestedPresence(teams);
+  value.blocked = value.owner !== null && opposedPresence(teams, teamOf(s, value.owner)) > 0;
   if (value.contested) return;
   const hostileFoot = sideIds(s).filter(
     (side) =>
@@ -399,7 +409,9 @@ function updateOne(s, value, d, dt) {
     if (liveHQ(s, value.owner) || value.contested) return;
     const replacement = sideIds(s).find(
       (side) =>
-        allied(s, side, value.owner) && connected(s, side, d) && !teams[1 - teamOf(s, side)],
+        allied(s, side, value.owner) &&
+        connected(s, side, d) &&
+        !opposedPresence(teams, teamOf(s, side)),
     );
     if (replacement !== undefined) claim(s, value, replacement, d);
     return;
@@ -409,7 +421,7 @@ function updateOne(s, value, d, dt) {
   const claimant = sideIds(s).find(
     (side) =>
       (side === home || (!liveHQ(s, home) && allied(s, side, home))) &&
-      !teams[1 - teamOf(s, side)] &&
+      !opposedPresence(teams, teamOf(s, side)) &&
       connected(s, side, d),
   );
   if (claimant !== undefined) {

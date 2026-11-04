@@ -1,6 +1,14 @@
 import * as T from '../../../vendor/three/three.module.js';
 import * as E from '../../game/index.js';
 import { streetDecorationSpans } from './road-surfaces.js';
+const heightAt = (r, t) =>
+  Math.max(0, E.groundHeight(r.ax + (r.bx - r.ax) * t, r.az + (r.bz - r.az) * t));
+// True when any part of the segment rises above the plain.
+function hillRoad(r, length) {
+  const samples = Math.max(2, Math.ceil(length / 8));
+  for (let i = 0; i <= samples; i++) if (heightAt(r, i / samples) > 0.6) return true;
+  return false;
+}
 export function road(r, network) {
   const root = new T.Group(),
     length = Math.hypot(r.bx - r.ax, r.bz - r.az),
@@ -27,6 +35,41 @@ export function road(r, network) {
       );
       m.rotation.y = i;
     }
+  } else if (hillRoad(r, length)) {
+    // Over a hill the road is laid in short sections that follow the ground.
+    const pieces = Math.max(2, Math.ceil(length / 8));
+    for (let i = 0; i < pieces; i++) {
+      const t0 = i / pieces,
+        t1 = (i + 1) / pieces,
+        h0 = heightAt(r, t0),
+        h1 = heightAt(r, t1),
+        run = length / pieces,
+        slope = Math.atan2(h1 - h0, run),
+        piece = this.box(
+          root,
+          0,
+          (h0 + h1) / 2 - 0.05,
+          ((t0 + t1) / 2) * length - length / 2,
+          width,
+          0.6,
+          Math.hypot(run, h1 - h0) + 0.4,
+          asphaltColor,
+        );
+      piece.rotation.x = -slope;
+      for (const x of [-width / 2 - 0.4, width / 2 + 0.4]) {
+        const curb = this.box(
+          root,
+          x,
+          (h0 + h1) / 2 + 0.12,
+          ((t0 + t1) / 2) * length - length / 2,
+          0.7,
+          0.61,
+          Math.hypot(run, h1 - h0) + 0.4,
+          '#8b9085',
+        );
+        curb.rotation.x = -slope;
+      }
+    }
   } else {
     this.box(root, 0, -0.05, 0, width, 0.6, length, asphaltColor);
     for (const x of [-width / 2 - 0.4, width / 2 + 0.4])
@@ -43,7 +86,7 @@ export function road(r, network) {
           paint.renderOrder = 12;
         }
   }
-  if (!r.connectorTo && !damaged && length > 35) {
+  if (!r.connectorTo && !damaged && length > 35 && !hillRoad(r, length)) {
     this.cyl(root, width / 2 + 2, 0.7, 0, 0.18, 11, '#57655b');
     this.box(root, width / 2 + 1, 11.6, 0, 2.4, 0.25, 1.2, '#ffdca1', {
       emissive: '#ffbf6b',

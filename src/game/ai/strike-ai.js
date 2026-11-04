@@ -74,6 +74,8 @@ function weaponWeights(s, side) {
     stealth: sam ? 1 + sam * 0.5 : 0.5,
     ballistic: weaponStock(s, side, 'ballistic') >= 2 ? 0 : sam ? 1 + sam : 0.5,
     tactical: weaponStock(s, side, 'tactical') >= 2 ? 0 : sam ? 1 : 0.7,
+    // A rich bot keeps a bomber or two: reusable, but expensive and exposed to air defence.
+    bomber: weaponStock(s, side, 'bomber') >= 2 || s.sides[side].credits < 4000 ? 0 : sam ? 0.4 : 1,
     // Cluster warheads answer dug-in troops.
     cluster:
       weaponStock(s, side, 'cluster') >= 2
@@ -213,7 +215,7 @@ export function updateStrikes(s, side, reserve) {
     salvo = Math.min(STRIKE.salvoMax, Math.max(STRIKE.salvoMin, 2 + defences.sam)),
     stock = totalStock(s, side);
   if (stock < salvo && stock < strikeStockTarget(s, side, reserve)) return launched;
-  for (const key of ['ballistic', 'tactical', 'stealth', 'cruise', 'heavy', 'drone']) {
+  for (const key of ['ballistic', 'tactical', 'stealth', 'cruise', 'bomber', 'heavy', 'drone']) {
     const target = strategicTarget(s, side, key, defences);
     if (!target) break;
     const aim = aimAt(s, side, key, target);

@@ -1,9 +1,9 @@
 import { DISTRICTS, DISTRICT_BY_ID } from './districts.config.js';
 import { createDistricts, districtState } from './state.js';
-import { allied, teamOf, validSide } from '../factions.js';
+import { allied, validSide, frontDirection } from '../factions.js';
 
 const legacyHp = { 'north-depot': 360, 'north-relay': 300, 'south-relay': 300, 'south-depot': 360 };
-const sign = (s, side) => (teamOf(s, side) === 0 ? 1 : -1);
+const sign = (s, side) => frontDirection(s, side);
 
 // Only old campaigns receive neutral sites; malformed current data is never silently replaced.
 export function restoreDistricts(s, sourceVersion = s.version) {

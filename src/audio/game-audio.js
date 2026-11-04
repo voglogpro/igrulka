@@ -364,7 +364,10 @@ export class GameAudio {
       (e.type === 'intercept' && e.mode !== 'fall')
     ) {
       const large =
-          weaponFamily(e.key) === 'ballistic' || e.key === 'heavy' || e.type === 'destroy',
+          weaponFamily(e.key) === 'ballistic' ||
+          e.key === 'heavy' ||
+          e.key === 'fab' ||
+          e.type === 'destroy',
         small = e.key === 'tank' || e.key === 'fpv' || e.type === 'intercept',
         name = large ? 'blastLarge' : small ? 'blastSmall' : 'blast';
       if (this.throttle('blast:' + name, 0.06))
@@ -584,7 +587,9 @@ export class GameAudio {
     if (!paused) {
       for (const u of state.units)
         if (u.hp > 0 && u.delay <= 0 && u.status !== 'falling')
-          wanted[isMissile(u.key) ? 'jet' : u.subtype === 'fpv' ? 'rotor' : 'moped'].push(u);
+          wanted[
+            isMissile(u.key) || u.key === 'bomber' ? 'jet' : u.subtype === 'fpv' ? 'rotor' : 'moped'
+          ].push(u);
       for (const p of state.projectiles || [])
         if (!p.dead && (p.shooterKey === 'mlrs' || p.kind === 'interceptor')) wanted.jet.push(p);
       // Nearby foot soldiers use the bounded one-shot scheduler above.

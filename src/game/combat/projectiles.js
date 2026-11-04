@@ -5,6 +5,7 @@ import { event } from '../shared/events.js';
 import { unitVisible } from '../visibility.js';
 import { interceptPoint } from './air-defense.js';
 import { damageAircraft } from '../units/aviation/flight.js';
+import { weaponFamily } from '../units/aviation/weapons.config.js';
 export function closestRelativeDistance(p, u) {
   const ax = p.px - u.prevX,
     ay = p.py - u.prevY,
@@ -79,7 +80,7 @@ export function moveProjectiles(s, dt) {
         hostile(s, u.side, p.side) &&
         u.hp > 0 &&
         u.delay <= 0 &&
-        (p.kind === 'interceptor' || u.key === 'drone' || u.key === 'heavy') &&
+        (p.kind === 'interceptor' || weaponFamily(u.key) === 'drone') &&
         closestRelativeDistance(p, u) < radius
       ) {
         p.dead = true;

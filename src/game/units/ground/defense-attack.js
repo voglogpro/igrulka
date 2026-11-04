@@ -159,6 +159,21 @@ function approach(s, u, nominal, hq, direction) {
   return null;
 }
 
+// The attack always goes in from every direction: a city that guards one corridor still sends
+// half of its wave through the other one. Groups keep their selection fairness from attackPlan.
+export function attackRoutes(groups) {
+  const all = groups.flatMap((g) => g.units).sort((a, b) => a.id - b.id);
+  if (!all.length) return [];
+  const half = Math.ceil(all.length / 2),
+    home = groups.length === 1 ? groups[0].id : null;
+  if (!home) return groups;
+  const other = home === 'north' ? 'south' : 'north';
+  return [
+    { id: home, units: all.slice(0, half) },
+    { id: other, units: all.slice(half) },
+  ].filter((g) => g.units.length);
+}
+
 export function launchDefenseAttack(s, side) {
   const status = defenseAttackStatus(s, side);
   if (!status.ok) return status.reason;
@@ -172,15 +187,32 @@ export function launchDefenseAttack(s, side) {
       g.units.map((u) => [u.id, { x: u.guard?.x ?? u.x, z: u.guard?.z ?? u.z }]),
     ),
   );
-  for (const group of plan.groups) {
+  // A rival on the same bank (free-for-all) is attacked overland, without a sea crossing.
+  const own = hqOf(s, side),
+    sameBank = !!own && Math.sign(own.x) === Math.sign(hq.x);
+  const routes = sameBank
+    ? [{ id: 'bank', units: plan.groups.flatMap((g) => g.units) }]
+    : attackRoutes(plan.groups);
+  for (const group of routes) {
     const wanted = new Set(group.units.map((u) => u.id));
     const units = s.groundUnits.filter((u) => wanted.has(u.id));
     if (!units.length) continue;
-    const goals = groundFormationDestinations(s, side, units, {
-      x: hq.x - direction * ((BUILDINGS.hq?.size || 30) * 0.56 + 22),
-      z: hq.z,
-    }).map((point, i) => approach(s, units[i], point, hq, direction));
+    // Each wave closes on the enemy city from its own corridor's side, not one shared point.
+    const flank = sameBank ? 0 : group.id === 'north' ? -1 : 1,
+      offset = (BUILDINGS.hq?.size || 30) * 0.56 + 22;
+    const facing = sameBank ? Math.sign(own.z - hq.z) || 1 : 0;
+    const goals = groundFormationDestinations(
+      s,
+      side,
+      units,
+      sameBank
+        ? { x: hq.x, z: hq.z + facing * offset }
+        : { x: hq.x - direction * offset * 0.8, z: hq.z + flank * offset * 0.6 },
+    ).map((point, i) => approach(s, units[i], point, hq, direction));
     const goalsById = new Map(units.map((u, i) => [u.id, goals[i]]).filter(([, goal]) => goal));
+    // A corridor the city does not guard is reached along its own bank first.
+    const corridorZ = CORRIDORS[group.id === 'north' ? 0 : 1],
+      detour = !sameBank && !frontIds(s, side).includes(group.id);
     const previous = new Map(units.map((u) => [u.id, u.order]));
     // A real corridor leg forces both waves to use their own land crossing.
     // Batch admission is linear; the planner builds at most two paths per step.
@@ -188,11 +220,11 @@ export function launchDefenseAttack(s, side) {
       s,
       side,
       [...goalsById.keys()],
-      {
-        x: direction * expandV23X(650),
-        z: CORRIDORS[group.id === 'north' ? 0 : 1],
-        mode: 'attackmove',
-      },
+      sameBank
+        ? { x: own.x * 0.55, z: (own.z + hq.z) / 2, mode: 'attackmove' }
+        : detour
+          ? { x: -direction * expandV23X(650), z: corridorZ, mode: 'attackmove' }
+          : { x: direction * expandV23X(650), z: corridorZ, mode: 'attackmove' },
       { defer: true },
     );
     if (typeof result !== 'number') continue;
@@ -206,7 +238,10 @@ export function launchDefenseAttack(s, side) {
         nextAt: s.time + 3,
       };
       u.stance = { mode: 'attack' };
-      u.routeQueue = [{ ...goalsById.get(u.id), mode: 'attackmove' }];
+      u.routeQueue = [
+        ...(detour ? [{ x: direction * expandV23X(650), z: corridorZ, mode: 'attackmove' }] : []),
+        { ...goalsById.get(u.id), mode: 'attackmove' },
+      ];
       holdAssaultForSupply(s, u);
       accepted++;
     }

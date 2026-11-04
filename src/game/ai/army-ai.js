@@ -17,7 +17,13 @@ export const needsCaptureInfantry = needsDepotInfantry;
 export function launchAIAssault(s, side) {
   if (s.result || !aiSides(s).includes(side) || s.time <= difficultyOf(s).armyFrom + 180) return 0;
   const status = defenseAttackStatus(s, side);
-  if (!status.ok || status.eligible < 8 || status.active || status.returning) return 0;
+  // A few stragglers of the previous wave no longer hold back the next one.
+  if (
+    !status.ok ||
+    status.eligible < 8 ||
+    status.active + status.returning > Math.max(3, Math.floor(status.eligible * 0.25))
+  )
+    return 0;
   let established = 0;
   for (const u of s.groundUnits)
     if (

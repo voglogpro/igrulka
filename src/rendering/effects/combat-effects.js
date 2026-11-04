@@ -592,6 +592,14 @@ export class CombatEffects {
   handle(e, shooter = null) {
     if (['impact', 'crash'].includes(e.type) && ['drone', 'fpv', 'heavy'].includes(e.key))
       this.wreck(e.x, e.z, e.key === 'heavy' ? 0.6 : 0.42, 45, true);
+    if (e.type === 'crash' && e.key === 'bomber') this.wreck(e.x, e.z, 1.2, 60, true);
+    // A cluster warhead scatters bomblets: a ring of small bursts around the main one.
+    if (e.type === 'impact' && e.key === 'cluster')
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2 + Math.random() * 0.5,
+          r = (e.radius || 100) * (0.25 + Math.random() * 0.55);
+        this.explode(e.x + Math.cos(a) * r, 2, e.z + Math.sin(a) * r, 0.55);
+      }
     if (e.type === 'intercept') {
       if (e.mode === 'fall') {
         this.flash(e.x, e.y, e.z, 5, 0.1);
@@ -604,7 +612,22 @@ export class CombatEffects {
         this.fragment(e.x, e.y, e.z, 3, e.vx, e.vy, e.vz);
       } else this.explode(e.x, e.y, e.z, weaponFamily(e.key) === 'ballistic' ? 1.6 : 1, true);
     }
-    if (e.type === 'navalShot') this.flash(e.x, 4, e.z, 4, 0.08);
+    if (e.type === 'navalShot') {
+      this.flash(e.x, 4, e.z, 4, 0.08);
+      // The shell itself: a glowing round flying from the muzzle to the aim point.
+      const dx = e.tx - e.x,
+        dz = e.tz - e.z,
+        distance = Math.hypot(dx, dz) || 1,
+        life = Math.min(2.2, distance / 280);
+      this.spark(e.x, 6, e.z, 0.9, life, {
+        vx: dx / life,
+        vy: -2 / life,
+        vz: dz / life,
+        gravity: 0,
+        drag: 0,
+        color: [1, 0.78, 0.4],
+      });
+    }
     if (e.type === 'impact' || e.type === 'crash')
       this.explode(
         e.x,
@@ -618,11 +641,13 @@ export class CombatEffects {
               ? 1.05
               : e.key === 'tank'
                 ? 0.8
-                : weaponFamily(e.key) === 'ballistic'
-                  ? 2.6
-                  : e.key === 'heavy'
-                    ? 1.7
-                    : 1.2,
+                : e.key === 'fab'
+                  ? 2.3
+                  : weaponFamily(e.key) === 'ballistic'
+                    ? 2.6
+                    : e.key === 'heavy'
+                      ? 1.7
+                      : 1.2,
       );
     if (e.type === 'destroy') this.collapse(e.x, e.z, e.key);
     if (e.type === 'oilfire') {

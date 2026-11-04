@@ -181,3 +181,5 @@ export { PROBLEMS, problemMarkers, problemSummary } from './city/problems.js';
 export { refineryActive, weaponPerformance, REFINED } from './city/oil.js';
 export { COMPLEX, complexStatus, complexBonus, complexLabel } from './city/complexes.js';
 export { oilEnabled } from './city/oil.js';
+export { buyShip, shipOrderStatus, warshipOf, shipClassOf } from './city/naval.js';
+export { SHIPS, SHIP_CLASSES, shipClassesFor } from './city/ships.config.js';

@@ -91,7 +91,7 @@ export function launchStatus(s, owner, key, aim, siteId = null) {
   const origin = selectedLaunchSite(s, owner, siteId, key);
   if (!origin) return 'Выбранная пусковая недоступна';
   if (origin.key === 'navalbase' && !warshipOf(s, origin))
-    return 'Корабль базы потоплен: ждём спуска нового';
+    return 'У базы нет корабля: закажите его на верфи';
   if (!availableLaunchStock(origin, key))
     return 'На пусковой нет готового аппарата: ждём физическую доставку со склада';
   if (queuedLaunches(s, origin) >= COMBAT.queueLimit)

@@ -38,7 +38,9 @@ export function createGame(
 ) {
   // 'coop': two allied player cities against two bots; 'siege': one player in the middle of the
   // western bank against two allied bots holding the north and south of the eastern bank.
-  const count = mode === 'coop' ? 4 : mode === 'siege' ? 3 : 2;
+  // 'war': the player and an allied bot against two bots on the four-city map.
+  // 'ffa': four cities, every one for itself; the player against three bots of different strength.
+  const count = ['coop', 'war', 'ffa'].includes(mode) ? 4 : mode === 'siege' ? 3 : 2;
   const plan = () => ({
     nextBuild: 7,
     nextAttack: 170,
@@ -86,6 +88,7 @@ export function createGame(
     ammoLogisticsAt: 0,
     ships: [],
     warships: [],
+    bombs: [],
     frontlineMemory: createFrontlineMemory(count),
     units: [],
     groundUnits: [],
@@ -109,7 +112,13 @@ export function createGame(
       aiDefenseAt: 0,
       aiGroundReserve: { amount: 0, nextAt: 0 },
     },
-    ...(count === 4 ? { aiBySide: { 3: plan() } } : count === 3 ? { aiBySide: { 2: plan() } } : {}),
+    ...(mode === 'war' || mode === 'ffa'
+      ? { aiBySide: { 2: plan(), 3: plan() } }
+      : count === 4
+        ? { aiBySide: { 3: plan() } }
+        : count === 3
+          ? { aiBySide: { 2: plan() } }
+          : {}),
     result: null,
     stats: {
       shots: 0,

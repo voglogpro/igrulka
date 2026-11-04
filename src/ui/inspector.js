@@ -162,6 +162,42 @@ export function renderInspector(context) {
     toggle.textContent = report.enabled ? 'Отключить службу' : 'Включить службу';
     toggle.disabled = b.progress < 1;
   }
+  if (['navalbase', 'patrolbase'].includes(b.key) && b.side === 0 && !ruin) {
+    const classes = E.shipClassesFor(b.key);
+    if (!$('#shipyard-detail'))
+      $('#building-detail').insertAdjacentHTML(
+        'afterend',
+        `<section id="shipyard-detail" aria-label="Верфь"><span class="eyebrow">ВЕРФЬ</span><p id="shipyard-status" class="status-note" role="status"></p>${classes
+          .map(
+            (key) =>
+              `<div class="shipyard-hull"><b>${E.SHIPS[key].name}</b><small>${E.SHIPS[key].description}</small><button data-buy-ship="${key}" data-base-id="${b.id}">Заказать · ${E.SHIPS[key].cost} ₡ · ${E.SHIPS[key].metal} спл.</button></div>`,
+          )
+          .join('')}</section>`,
+      );
+    const ship = E.warshipOf(state, b);
+    const modes = {
+      hunt: 'охотится на корабли',
+      raid: 'обстреливает берег',
+      repair: 'идёт на ремонт',
+      reload: 'идёт на перезарядку',
+      patrol: 'в дозоре',
+    };
+    $('#shipyard-status').textContent = ship
+      ? `${E.SHIPS[ship.class]?.name || 'Корабль'}: ${Math.ceil(ship.hp)} / ${ship.maxHp}` +
+        (ship.mode
+          ? ' · ' + modes[ship.mode]
+          : ship.state === 'docked'
+            ? ' · у причала'
+            : ' · в море')
+      : b.progress < 1
+        ? 'Верфь строится'
+        : 'Корабля нет: выберите корпус и оплатите заказ';
+    for (const button of host.querySelectorAll('[data-buy-ship]')) {
+      const reason = E.shipOrderStatus(state, 0, b.id, button.dataset.buyShip);
+      button.disabled = !!reason;
+      button.title = reason || 'Корабль спустят на воду сразу после оплаты';
+    }
+  }
   let equipment = host.querySelector('#equipment-detail');
   if (!equipment) {
     equipment = document.createElement('div');

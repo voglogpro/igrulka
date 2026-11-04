@@ -58,7 +58,7 @@ export class DistrictHUD {
             : E.allied(state, 0, d.owner)
               ? 'Союзник'
               : 'Противник';
-      const sign = E.teamOf(state, d.capturing) === 0 ? 1 : -1;
+      const sign = E.frontDirection(state, d.capturing);
       const neutralizing = d.owner != null || d.control * sign < 0;
       const percent = Math.round(
         (neutralizing ? 1 - Math.abs(d.control) : Math.abs(d.control)) * 100,

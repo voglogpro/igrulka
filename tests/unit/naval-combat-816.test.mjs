@@ -18,6 +18,8 @@ function sea() {
         const b = E.build(s, side, key, x, z);
         b.progress = 1;
         b.hp = b.maxHp;
+        const hull = { patrolbase: 'patrol', navalbase: 'missile' }[key];
+        if (hull) assert.equal(typeof E.buyShip(s, side, b.id, hull), 'number');
         return b;
       }
     throw Error('no shore for ' + key);
@@ -63,4 +65,53 @@ test('a field anti-tank gun costs 200, needs no road and destroys an advancing t
   E.advance(s, 40);
   assert.equal(tank.hp, 0);
   assert.ok(gun.groundAmmo + gun.ammoReserve < 12, 'paid shells were spent');
+});
+
+test('a destroyer is bought at a naval base, guns down drones and launches drones from its shaft', () => {
+  const { s, shore } = sea();
+  const base = shore(0, 0, 'navalbase');
+  // The fixture's missile ship is sunk; the yard then builds the big hull for its full price.
+  E.applyBlast(s, s.warships[0].x, s.warships[0].z, 5000, 4);
+  E.advance(s, 1);
+  assert.equal(E.buyShip(s, 0, base.id, 'patrol'), 'Эта верфь не строит такой корабль');
+  const credits = s.sides[0].credits;
+  const id = E.buyShip(s, 0, base.id, 'destroyer');
+  assert.equal(typeof id, 'number');
+  assert.equal(credits - s.sides[0].credits, E.SHIPS.destroyer.cost);
+  assert.equal(E.buyShip(s, 0, base.id, 'destroyer'), 'У причала уже есть корабль');
+  const ship = s.warships.find((v) => v.id === id);
+  assert.equal(ship.maxHp, E.SHIPS.destroyer.hp);
+  assert.equal(E.launchSiteAllows(base, 'drone'), true, 'the launch shaft takes drones');
+  assert.equal(E.launchStoreCapacity(base, 'drone'), 8);
+  // Enemy drones over the ship are met by machine-gun fire.
+  for (let i = 0; i < 6; i++)
+    s.units.push({
+      id: s.nextId++,
+      side: 1,
+      key: 'drone',
+      x: ship.x + 150 + i * 10,
+      y: 60,
+      z: ship.z,
+      vx: -20,
+      vy: 0,
+      vz: 0,
+      hp: E.WEAPONS.drone.hp,
+      maxHp: E.WEAPONS.drone.hp,
+      launched: true,
+      status: 'flying',
+      targetX: ship.x,
+      targetZ: ship.z,
+    });
+  const before = s.stats.shots;
+  E.advance(s, 2);
+  assert.ok(s.stats.shots > before, 'the mounts open fire');
+  assert.ok(s.projectiles.some((p) => p.sourceId === ship.id) || s.stats.shots - before >= 3);
+  assert.ok(E.acceptLaunchDelivery(base, 'drone', 3) > 0 || base.launchStore.drone === 3);
+  const launched = E.launch(s, 0, 'drone', { x: E.HQ_X - 300, z: 0 }, 3, base.id);
+  assert.equal(launched, 3);
+  // The hand-made enemy drones are test props, not a saved flight plan.
+  s.units = s.units.filter((u) => u.side === 0);
+  s.projectiles = [];
+  const loaded = E.load(E.save(s));
+  assert.deepEqual(loaded.warships, s.warships);
 });

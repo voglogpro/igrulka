@@ -1,5 +1,9 @@
 import { BUILDINGS, ISLAND, seaDistance } from '../config.js';
-import { hostile } from '../factions.js';
+import { COMBAT } from '../combat/config.js';
+import { hostile, validSide } from '../factions.js';
+import { weaponFamily } from '../units/aviation/weapons.config.js';
+import { interceptPoint } from '../combat/air-defense.js';
+import { SHIPS, shipClassesFor } from './ships.config.js';
 import { random } from '../shared/random.js';
 import { applyBlast } from '../combat/damage.js';
 import { event } from '../shared/events.js';
@@ -11,7 +15,10 @@ import { berthOf, quayOf } from './ports.js';
 const cfg = (key = 'navalbase') => BUILDINGS[key].naval;
 const NAVAL_BASES = new Set(['navalbase', 'patrolbase']);
 const live = (b) => NAVAL_BASES.has(b.key) && b.hp > 0 && b.progress >= 1 && !b.demolished;
-export const shipClassOf = (base) => (base?.key === 'patrolbase' ? 'patrol' : 'missile');
+// The hull a base builds or last built. A naval base remembers the class the player chose.
+export const shipClassOf = (base) =>
+  base?.key === 'patrolbase' ? 'patrol' : base?.shipClass === 'destroyer' ? 'destroyer' : 'missile';
+const shipCfg = (ship) => SHIPS[ship.class] || SHIPS.missile;
 export const SHIP_RADIUS = 10;
 
 export const warshipOf = (s, base) =>
@@ -30,14 +37,15 @@ export function warshipDocked(s, base) {
   return !!ship && ship.state === 'docked';
 }
 
-function move(ship, goal, step) {
+function move(ship, goal, step, berth) {
   const dx = goal.x - ship.x,
     dz = goal.z - ship.z,
     l = Math.hypot(dx, dz);
   if (l <= step) {
     ship.x = goal.x;
     ship.z = goal.z;
-    ship.state = 'docked';
+    ship.state =
+      !berth || Math.hypot(goal.x - berth.x, goal.z - berth.z) < 1 ? 'docked' : 'station';
     return true;
   }
   ship.yaw = Math.atan2(dx, dz);
@@ -53,7 +61,6 @@ function sink(s, ship, base) {
   ship.hp = 0;
   if (base) {
     for (const key of Object.keys(base.launchStore || {})) base.launchStore[key] = 0;
-    base.shipReplaceAt = s.time + cfg(base.key).replaceDelay;
     base.shipLost = true;
   }
   event(s, 'shipSunk', { side: ship.side, x: ship.x, z: ship.z, shipId: ship.id });
@@ -114,7 +121,7 @@ function shell(s, ship, target, gun) {
 // Patrol boats hunt enemy ships first, then shell buildings near the enemy shore, and go home
 // for repairs when badly damaged. Every decision reads public positions only.
 function patrolGoal(s, ship, base, dt) {
-  const c = cfg(base.key),
+  const c = shipCfg(ship),
     gun = c.gun;
   ship.cooldown = Math.max(0, (ship.cooldown || 0) - dt);
   if (ship.hp < c.hp * 0.4 || (ship.mode === 'repair' && ship.hp < c.hp)) {
@@ -123,6 +130,18 @@ function patrolGoal(s, ship, base, dt) {
     if (Math.hypot(ship.x - berth.x, ship.z - berth.z) < 2)
       ship.hp = Math.min(c.hp, ship.hp + 6 * dt);
     return berth;
+  }
+  // A destroyer with an empty launch shaft calls at its berth to take missiles and drones aboard.
+  if (c.magazine && ship.class === 'destroyer') {
+    const loaded = magazine(base);
+    if (ship.mode === 'reload') {
+      if (loaded >= c.magazine || s.time >= (ship.reloadUntil || 0)) ship.mode = 'patrol';
+      else return berthOf(base);
+    } else if (!loaded && s.time >= (ship.reloadUntil || 0) + 90) {
+      ship.mode = 'reload';
+      ship.reloadUntil = s.time + 150;
+      return berthOf(base);
+    }
   }
   // Enemy batteries are public; a boat never steams into a battery's reach to fight.
   const batteries = s.buildings.filter(
@@ -200,6 +219,135 @@ function updateCoastGuns(s, dt) {
   }
 }
 
+// Shipyard order: the chosen hull is paid for in full and launched at the berth at once.
+export function shipOrderStatus(s, side, baseId, shipClass) {
+  if (!validSide(s, side)) return 'Неизвестная сторона';
+  const base = s.buildings.find((b) => b.id === baseId);
+  if (!base || base.side !== side) return 'Верфь вам не принадлежит';
+  if (!live(base)) return 'Верфь ещё не готова';
+  const c = SHIPS[shipClass];
+  if (!c || !shipClassesFor(base.key).includes(shipClass))
+    return 'Эта верфь не строит такой корабль';
+  if (warshipOf(s, base)) return 'У причала уже есть корабль';
+  const f = s.sides[side];
+  if (f.credits < c.cost) return `Нужно ${c.cost} ₡`;
+  if (f.materials < c.metal) return `Нужно ${c.metal} сплавов`;
+  return '';
+}
+export function buyShip(s, side, baseId, shipClass) {
+  const reason = shipOrderStatus(s, side, baseId, shipClass);
+  if (reason) return reason;
+  const base = s.buildings.find((b) => b.id === baseId),
+    c = SHIPS[shipClass],
+    f = s.sides[side],
+    berth = berthOf(base);
+  f.credits -= c.cost;
+  f.materials -= c.metal;
+  // A different hull empties the old magazine rack, whose weapons stay in the shipyard store.
+  if (base.key === 'navalbase') base.shipClass = shipClass;
+  base.shipLost = false;
+  const ship = {
+    id: s.nextId++,
+    side,
+    baseId: base.id,
+    x: berth.x,
+    z: berth.z,
+    yaw: 0,
+    hp: c.hp,
+    maxHp: c.hp,
+    class: shipClass,
+    state: 'docked',
+    loaded: 0,
+    loadedAt: s.time,
+  };
+  s.warships.push(ship);
+  event(s, 'shipLaunched', { side, x: berth.x, z: berth.z, shipId: ship.id, class: shipClass });
+  return ship.id;
+}
+
+// Machine-gun mounts fire real bullets at drones near the ship; missiles need a SAM.
+function updateShipAirDefense(s, dt) {
+  for (const ship of s.warships) {
+    const aa = shipCfg(ship).aa;
+    if (!aa || ship.hp <= 0) continue;
+    ship.aaCooldown = Math.max(0, (ship.aaCooldown || 0) - dt);
+    if (ship.aaCooldown) continue;
+    const threats = [];
+    for (const u of s.units)
+      if (
+        u.hp > 0 &&
+        u.launched &&
+        weaponFamily(u.key) === 'drone' &&
+        hostile(s, ship.side, u.side) &&
+        Math.hypot(u.x - ship.x, u.z - ship.z) < aa.range
+      )
+        threats.push(u);
+    if (!threats.length) continue;
+    threats.sort(
+      (a, b) =>
+        Math.hypot(a.x - ship.x, a.z - ship.z) - Math.hypot(b.x - ship.x, b.z - ship.z) ||
+        a.id - b.id,
+    );
+    ship.aaCooldown = aa.cooldown;
+    for (let mount = 0; mount < aa.mounts; mount++) {
+      const u = threats[mount % threats.length],
+        speed = 390,
+        origin = { x: ship.x, y: 6, z: ship.z },
+        aim = interceptPoint(origin, u, speed),
+        spread = 4 + Math.hypot(u.x - ship.x, u.z - ship.z) * 0.03;
+      aim.x += (random(s) - 0.5) * spread * 2;
+      aim.y += (random(s) - 0.5) * spread * 1.2 + 0.5 * COMBAT.gravity * aim.time * aim.time;
+      aim.z += (random(s) - 0.5) * spread * 2;
+      const dx = aim.x - origin.x,
+        dy = aim.y - origin.y,
+        dz = aim.z - origin.z,
+        length = Math.hypot(dx, dy, dz) || 1,
+        mx = origin.x + (dx / length) * 4 + (mount - 1) * 3,
+        my = origin.y,
+        mz = origin.z + (dz / length) * 4;
+      s.projectiles.push({
+        sourceId: ship.id,
+        abm: false,
+        gravity: COMBAT.gravity,
+        tracer: true,
+        id: s.nextId++,
+        side: ship.side,
+        source: ship.id,
+        targetId: u.id,
+        x: mx,
+        y: my,
+        z: mz,
+        px: mx,
+        py: my,
+        pz: mz,
+        vx: (dx / length) * speed,
+        vy: (dy / length) * speed,
+        vz: (dz / length) * speed,
+        speed,
+        damage: aa.damage,
+        kind: 'bullet',
+        life: 0,
+        maxLife: Math.min(2, aa.range / speed + 0.6),
+      });
+      s.stats.shots++;
+      event(s, 'shot', {
+        x: ship.x,
+        y: 6,
+        z: ship.z,
+        side: ship.side,
+        key: 'gun',
+        shooter: 'ship',
+        mx,
+        my,
+        mz,
+        tx: aim.x,
+        ty: aim.y,
+        tz: aim.z,
+      });
+    }
+  }
+}
+
 export function updateWarships(s, dt) {
   s.warships ||= [];
   updateCoastGuns(s, dt);
@@ -207,42 +355,16 @@ export function updateWarships(s, dt) {
     bases = new Map(s.buildings.filter(live).map((b) => [b.id, b]));
   // A ship whose base is lost goes with it.
   s.warships = s.warships.filter((ship) => ship.hp > 0 && bases.has(ship.baseId));
-  for (const base of bases.values()) {
-    if (warshipOf(s, base) || (base.shipReplaceAt || 0) > s.time) continue;
-    const f = s.sides[base.side],
-      c = cfg(base.key);
-    // The first ship comes with the base; a replacement for a sunk one is paid for.
-    if (base.shipLost) {
-      if (f.credits < c.replaceCost + 250 || f.materials < c.replaceMetal) continue;
-      f.credits -= c.replaceCost;
-      f.materials -= c.replaceMetal;
-      base.shipLost = false;
-    }
-    const berth = berthOf(base);
-    s.warships.push({
-      id: s.nextId++,
-      side: base.side,
-      baseId: base.id,
-      x: berth.x,
-      z: berth.z,
-      yaw: 0,
-      hp: c.hp,
-      maxHp: c.hp,
-      class: shipClassOf(base),
-      state: 'docked',
-      loaded: 0,
-      loadedAt: s.time,
-    });
-    event(s, 'shipLaunched', { side: base.side, x: berth.x, z: berth.z });
-  }
+  updateShipAirDefense(s, dt);
   for (const ship of s.warships) {
     const base = bases.get(ship.baseId);
     if (ship.hp <= 0) continue;
-    if (ship.class === 'patrol') {
+    if (shipCfg(ship).gun) {
       move(
         ship,
         steer(ship, patrolGoal(s, ship, base, dt)),
-        cfg(base.key).speed * (s.weather?.speed ?? 1) * dt,
+        shipCfg(ship).speed * (s.weather?.speed ?? 1) * dt,
+        berthOf(base),
       );
       continue;
     }
@@ -262,13 +384,13 @@ export function updateWarships(s, dt) {
     const sail =
       loaded > 0 &&
       (ship.state !== 'docked' ||
-        loaded >= 4 ||
+        loaded >= shipCfg(ship).magazine ||
         (!incoming && s.time - (ship.loadedAt || 0) >= c.loadWait));
     const goal = sail ? navalStation(base) : berthOf(base),
       dx = goal.x - ship.x,
       dz = goal.z - ship.z,
       l = Math.hypot(dx, dz),
-      step = c.speed * (s.weather?.speed ?? 1) * dt;
+      step = shipCfg(ship).speed * (s.weather?.speed ?? 1) * dt;
     if (l <= step) {
       ship.x = goal.x;
       ship.z = goal.z;
@@ -296,16 +418,18 @@ export function restoreWarships(s) {
       !base ||
       !NAVAL_BASES.has(base.key) ||
       base.side !== ship.side ||
-      (ship.class ?? 'missile') !== shipClassOf(base) ||
+      !shipClassesFor(base.key).includes(ship.class ?? 'missile') ||
+      (ship.aaCooldown != null && !finite(ship.aaCooldown, 0, 10)) ||
+      (ship.reloadUntil != null && !finite(ship.reloadUntil, 0)) ||
       (ship.cooldown != null && !finite(ship.cooldown, 0, 60)) ||
-      (ship.mode != null && !['repair', 'hunt', 'raid', 'patrol'].includes(ship.mode)) ||
+      (ship.mode != null && !['repair', 'hunt', 'raid', 'patrol', 'reload'].includes(ship.mode)) ||
       !finite(ship.x) ||
       !finite(ship.z) ||
       !finite(ship.yaw) ||
-      !finite(ship.hp, 0, cfg(base.key).hp) ||
-      ship.maxHp !== cfg(base.key).hp ||
+      !finite(ship.hp, 0, (SHIPS[ship.class] || SHIPS.missile).hp) ||
+      ship.maxHp !== (SHIPS[ship.class] || SHIPS.missile).hp ||
       !['docked', 'sailing', 'station'].includes(ship.state) ||
-      (ship.loaded != null && !finite(ship.loaded, 0, 4)) ||
+      (ship.loaded != null && !finite(ship.loaded, 0, 8)) ||
       (ship.loadedAt != null && !finite(ship.loadedAt, 0))
     )
       throw Error('Повреждён военный флот');
@@ -317,5 +441,7 @@ export function restoreWarships(s) {
     if (b.shipReplaceAt != null && !finite(b.shipReplaceAt, 0))
       throw Error('Повреждена база флота');
     if (b.shipLost != null && typeof b.shipLost !== 'boolean') throw Error('Повреждена база флота');
+    if (b.shipClass != null && !['missile', 'destroyer'].includes(b.shipClass))
+      throw Error('Повреждена база флота');
   }
 }

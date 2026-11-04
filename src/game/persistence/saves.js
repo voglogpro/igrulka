@@ -46,7 +46,10 @@ export function load(raw) {
     !Array.isArray(s.roads) ||
     !Array.isArray(s.sides) ||
     ![2, 3, 4].includes(s.sides.length) ||
-    (s.sides.length === 4 && (s.version < 17 || s.mode !== 'coop')) ||
+    (s.sides.length === 4 &&
+      (s.version < 17 ||
+        !['coop', 'war', 'ffa'].includes(s.mode) ||
+        (s.mode !== 'coop' && s.version < 23))) ||
     (s.sides.length === 3 && (s.version < 23 || s.mode !== 'siege')) ||
     (s.mode === 'siege' && s.sides.length !== 3) ||
     !Number.isFinite(s.time) ||
@@ -467,6 +470,23 @@ export function load(raw) {
   restoreGroundScars(s, sourceVersion);
   restoreLaunchSupply(s, sourceVersion);
   restoreWarships(s);
+  // Falling FAB bombs (8.17); older saves have none in the air.
+  s.bombs ??= [];
+  if (
+    !Array.isArray(s.bombs) ||
+    s.bombs.length > 600 ||
+    s.bombs.some(
+      (b) =>
+        !b ||
+        !validSide(s, b.side) ||
+        !Number.isSafeInteger(b.id) ||
+        !['x', 'y', 'z', 'vx', 'vy', 'vz', 'damage', 'blast'].every((k) => Number.isFinite(b[k])),
+    )
+  )
+    throw Error('Повреждены авиабомбы');
+  for (const u of s.units)
+    if (u.returning != null && typeof u.returning !== 'boolean')
+      throw Error('Повреждён возврат самолёта');
   restoreFactoryOrders(s);
   restoreAmmunition(s, sourceVersion);
   restoreFieldSupply(s, sourceVersion);

@@ -76,6 +76,15 @@ export function routePoint(origin, target, key, t, phase = 0, landing = false) {
 }
 
 export function basePosition(u, travelled) {
+  const pos = baseRoutePosition(u, travelled);
+  // A bomber holds its altitude over the target and descends only to land at home.
+  if (WEAPONS[u.key]?.bombs) {
+    const climb = u.returning ? Math.max(0, u.total - travelled) : travelled;
+    pos.y = Math.min(u.altitude || WEAPONS[u.key].altitude, 5 + climb * 0.48);
+  }
+  return pos;
+}
+function baseRoutePosition(u, travelled) {
   const pos = routePoint(
     { x: u.startX, z: u.startZ },
     { x: u.tx, z: u.tz },
@@ -217,8 +226,85 @@ function evade(s, u, pos, behind, dt) {
   pos.y = Math.max(6, pos.y + Math.sin(s.time * 2.6 + phase * 1.7) * profile.lift * weight);
 }
 
+// FAB bombs fall under gravity from the bomber's height and explode on the ground.
+export const FAB = Object.freeze({ spacing: 26, gravity: 9.8, forward: 18 });
+function dropBombs(s, u) {
+  const d = WEAPONS[u.key],
+    heading = Math.atan2(u.vx || u.tx - u.startX, u.vz || u.tz - u.startZ);
+  s.bombs ||= [];
+  for (let i = 0; i < d.bombs; i++) {
+    const along = (i - (d.bombs - 1) / 2) * FAB.spacing;
+    s.bombs.push({
+      id: s.nextId++,
+      side: u.side,
+      x: u.x + Math.sin(heading) * along,
+      y: u.y,
+      z: u.z + Math.cos(heading) * along,
+      vx: Math.sin(heading) * FAB.forward,
+      vy: 0,
+      vz: Math.cos(heading) * FAB.forward,
+      damage: u.damage || d.damage,
+      blast: u.blast || d.blast,
+    });
+  }
+  event(s, 'bombDrop', { side: u.side, x: u.x, y: u.y, z: u.z, count: d.bombs });
+}
+export function updateBombs(s, dt) {
+  if (!s.bombs?.length) return;
+  for (const b of s.bombs) {
+    b.vy -= FAB.gravity * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.z += b.vz * dt;
+    const ground = groundHeight(b.x, b.z);
+    if (b.y > ground) continue;
+    b.dead = true;
+    s.stats.impacts++;
+    applyBlast(s, b.x, b.z, b.damage, b.blast);
+    event(s, 'impact', { x: b.x, z: b.z, y: 2, key: 'fab', side: b.side, radius: b.blast });
+  }
+  s.bombs = s.bombs.filter((b) => !b.dead);
+}
+// The bomber turns for home after its run and lands back on its pad, ready for another sortie.
+function turnHome(s, u) {
+  const home = s.buildings.find((b) => b.id === u.sourceId && b.hp > 0 && !b.demolished);
+  const hx = home ? home.x : u.startX,
+    hz = home ? home.z : u.startZ;
+  u.returning = true;
+  u.startX = u.x;
+  u.startZ = u.z;
+  u.tx = hx;
+  u.tz = hz;
+  u.route = null;
+  u.travelled = 0;
+  u.total = Math.max(1, Math.hypot(hx - u.x, hz - u.z));
+}
+function land(s, u) {
+  u.hp = 0;
+  u.status = 'landed';
+  const home = s.buildings.find((b) => b.id === u.sourceId && b.hp > 0 && !b.demolished);
+  if (!home?.launchStore) return;
+  home.launchStore[u.key] = (home.launchStore[u.key] || 0) + 1;
+  home.nextLaunchAt = Math.max(home.nextLaunchAt || 0, s.time + WEAPONS[u.key].turnaround);
+  event(s, 'landed', { side: u.side, x: u.x, z: u.z, key: u.key, sourceId: home.id });
+}
+
 export function impacts(s) {
-  for (const u of s.units)
+  for (const u of s.units) {
+    if (WEAPONS[u.key]?.bombs) {
+      if (u.hp <= 0 || u.status === 'falling' || u.delay > 0) continue;
+      // Bombs keep the aircraft's forward speed: release them a fall's distance short of the aim.
+      const lead = u.returning
+        ? 0
+        : FAB.forward * Math.sqrt((2 * Math.max(1, u.y - 2)) / FAB.gravity);
+      if (u.travelled < u.total - lead) continue;
+      if (u.returning) land(s, u);
+      else {
+        dropBombs(s, u);
+        turnHome(s, u);
+      }
+      continue;
+    }
     if (u.hp > 0 && u.status !== 'falling' && u.delay <= 0 && u.travelled >= u.total) {
       u.hp = 0;
       s.stats.impacts++;
@@ -234,4 +320,5 @@ export function impacts(s) {
         radius: blast,
       });
     }
+  }
 }

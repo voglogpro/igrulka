@@ -538,7 +538,7 @@ test('model preparation primes actual template caches with bounded shared assets
     state = E.save(f.world.state),
     jobs = warmupModelJobs(f.world);
   assert.ok(
-    jobs.length < 110,
+    jobs.length < 116,
     'bounded own tiers and active-side air, not all foreign ground permutations',
   );
   families.collectExisting();
@@ -732,7 +732,7 @@ test('exact paid construction tiers and participating enemy aircraft have canoni
   );
   for (const job of jobs) families.prepare(job);
   const result = families.diagnostics();
-  assert.ok(jobs.length <= 152, `${jobs.length} bounded jobs`);
+  assert.ok(jobs.length <= 160, `${jobs.length} bounded jobs`);
   assert.ok(
     result.geometryBytes < 16 * 1024 * 1024,
     `${result.geometryBytes} unique geometry bytes`,

@@ -2621,3 +2621,22 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+#game #shipyard-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+}
+#game .shipyard-hull {
+  display: grid;
+  gap: 4px;
+}
+#game .shipyard-hull small {
+  color: var(--muted, #9aa49a);
+  line-height: 1.35;
+}
+#game .shipyard-hull button {
+  min-height: 32px;
+  padding: 6px 8px;
+}

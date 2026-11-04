@@ -8,7 +8,7 @@ import { event } from './shared/events.js';
 import { updateConstruction } from './city/update.js';
 import { updateGround } from './units/ground/index.js';
 import { random } from './shared/random.js';
-import { moveUnits, impacts } from './units/aviation/flight.js';
+import { moveUnits, impacts, updateBombs } from './units/aviation/flight.js';
 import { fireDefenses } from './combat/air-defense.js';
 import { moveProjectiles } from './combat/projectiles.js';
 import { ai } from './ai/city-ai.js';
@@ -61,11 +61,24 @@ export function step(s, dt) {
   fireDefenses(s, rates, dt);
   moveProjectiles(s, dt);
   impacts(s);
+  updateBombs(s, dt);
   s.units = s.units.filter((u) => u.hp > 0 || u.status === 'falling');
   s.projectiles = s.projectiles.filter((p) => !p.dead);
   updateDistricts(s, dt);
   updateSettlements(s, dt);
   for (const owner of aiSides(s)) ai(s, owner);
+  if (s.mode === 'ffa') {
+    // Free-for-all: the player loses with its headquarters and wins as the last city standing.
+    const alive = sideIds(s).filter((side) =>
+      s.buildings.some((b) => b.side === side && b.key === 'hq' && b.hp > 0),
+    );
+    if (!alive.includes(0) || alive.length === 1) {
+      s.result = alive.includes(0) ? 'victory' : 'defeat';
+      s.winnerTeam = s.result === 'victory' ? 0 : 1;
+      event(s, 'result', { result: s.result });
+    }
+    return;
+  }
   for (const team of [0, 1])
     if (!s.buildings.some((b) => teamOf(s, b.side) === team && b.key === 'hq' && b.hp > 0)) {
       s.winnerTeam = 1 - team;

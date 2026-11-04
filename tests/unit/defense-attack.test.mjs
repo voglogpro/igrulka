@@ -134,11 +134,14 @@ test('cooperative attack commands own only their city and keep one defender per 
   const before = structuredClone(friend);
   assert.equal(executeCommand(s, 2, 'defense-attack', {}), 12);
   assert.deepEqual(friend, before);
-  assert.ok(
-    s.groundUnits
-      .filter((u) => u.side === 2 && u.stance?.mode === 'attack')
-      .every((u) => u.order.z > 0),
-  );
+  // Half of the wave goes straight through the home corridor, the other half walks along its
+  // own bank to the far corridor: the attack comes from every direction.
+  const wave = s.groundUnits.filter((u) => u.side === 2 && u.stance?.mode === 'attack');
+  const direct = wave.filter((u) => u.order.z > 0 && u.order.x > 0),
+    detour = wave.filter((u) => u.order.z < 0 && u.order.x < 0);
+  assert.equal(direct.length, 6);
+  assert.equal(detour.length, 6);
+  assert.ok(detour.every((u) => u.routeQueue.length === 2 && u.routeQueue[0].x > 0));
   const small = fixture();
   small.groundUnits = small.groundUnits.slice(0, 2);
   assert.equal(E.defenseAttackStatus(small, 0).ok, false);

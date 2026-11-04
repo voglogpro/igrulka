@@ -2,7 +2,7 @@ import { FIELD } from '../game/map.js';
 import * as E from '../game/index.js';
 
 // Production orders and earmarked road payments must match the client's rules.
-export const PROTOCOL_VERSION = 18;
+export const PROTOCOL_VERSION = 19;
 const own = (s, side, id) => E.targetById(s, id)?.side === side;
 const validId = (id) => Number.isSafeInteger(id) && id > 0;
 const point = (p) =>
@@ -134,6 +134,9 @@ export function executeCommand(s, side, type, a = {}) {
       if (!s.buildings.some((b) => b.id === a.id && b.side === side && b.key === 'service'))
         return 'Ремонтная служба вам не принадлежит';
       return E.setServiceEnabled(s, side, a.id, a.enabled);
+    case 'buy-ship':
+      if (!validId(a.id) || typeof a.shipClass !== 'string') return invalid;
+      return E.buyShip(s, side, a.id, a.shipClass);
     case 'rear-auto':
       if (typeof a.enabled !== 'boolean') return invalid;
       return E.setRearAutomatic(s, side, a.enabled);

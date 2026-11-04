@@ -122,7 +122,7 @@ test('a factory physically supplies drone pads and missile silos without researc
     silo = building(s, 'silo', 0, 200),
     launcher = building(s, 'launcher', 0, 320);
   for (const key of Object.keys(E.WEAPONS)) {
-    const source = ['drone', 'heavy'].includes(key) ? launcher : silo;
+    const source = ['drone', 'heavy', 'bomber'].includes(key) ? launcher : silo;
     assert.equal(E.acceptLaunchDelivery(factory, key, 1), 1);
     E.requestWeaponDelivery(s, 0, source.id, key, 1);
     const end = s.time + 60;

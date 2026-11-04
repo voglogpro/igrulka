@@ -32,17 +32,24 @@ export function roadPreview(
   if (!validSide(s, owner)) return { error: 'Неизвестный город' };
   if (![ax, az, bx, bz].every(Number.isFinite)) return { error: 'Некорректная дорога' };
   const length = Math.hypot(bx - ax, bz - az),
-    cost = Math.ceil(length * 0.8);
+    samples = Math.ceil(length / 5);
+  // Roads climb over hills along the slope; the hillside share costs half as much again.
+  let hill = 0;
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples,
+      x = ax + (bx - ax) * t,
+      z = az + (bz - az) * t;
+    if (groundHeight(x, z) > 1.2) hill++;
+  }
+  const cost = Math.ceil(length * 0.8 * (1 + (0.5 * hill) / (samples + 1)));
   if (length < 8 || length > 650) return { error: 'Длина участка: 8–650', length, cost };
-  for (let i = 0; i <= Math.ceil(length / 5); i++) {
-    const t = i / Math.ceil(length / 5),
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples,
       x = ax + (bx - ax) * t,
       z = az + (bz - az) * t;
     if (Math.abs(x) > FIELD.x || Math.abs(z) > FIELD.z)
       return { error: 'За границей карты', length, cost };
     if (riverDistance(x, z) < 75) return { error: 'Улица должна проходить по суше', length, cost };
-    if (groundHeight(x, z) > 1.2)
-      return { error: 'Улица не поднимается на холм: ведите её по равнине', length, cost };
   }
   if (overlappingRoad(s, ax, az, bx, bz, ignoreRoadId))
     return {
