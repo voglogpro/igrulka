@@ -4,8 +4,8 @@ export const SHIPS = Object.freeze({
   patrol: Object.freeze({
     name: 'Сторожевой катер',
     base: 'patrolbase',
-    cost: 900,
-    metal: 30,
+    cost: 1600,
+    metal: 60,
     hp: 320,
     speed: 22,
     gun: Object.freeze({ range: 420, damage: 22, cooldown: 1.2 }),
@@ -16,8 +16,8 @@ export const SHIPS = Object.freeze({
   missile: Object.freeze({
     name: 'Ракетный корабль',
     base: 'navalbase',
-    cost: 2600,
-    metal: 80,
+    cost: 4800,
+    metal: 180,
     hp: 600,
     speed: 13,
     gun: null,
@@ -30,8 +30,8 @@ export const SHIPS = Object.freeze({
   destroyer: Object.freeze({
     name: 'Эсминец',
     base: 'navalbase',
-    cost: 5200,
-    metal: 180,
+    cost: 8500,
+    metal: 320,
     hp: 1300,
     speed: 11,
     gun: Object.freeze({ range: 560, damage: 46, cooldown: 2.2 }),

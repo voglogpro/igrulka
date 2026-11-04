@@ -250,7 +250,7 @@ test('city building output matches the total economy and exposes road, health an
     b = ready(s, 0, 'housing', -1975, -80),
     o = E.buildingOutput(s, b),
     e = E.economy(s, 0);
-  assert.equal(o.income, e.gross - 1.8);
+  assert.ok(Math.abs(o.income - (e.gross - 1.8)) < 1e-9);
   assert.equal(o.road, 1);
   b.hp = b.maxHp * 0.5;
   assert.ok(E.buildingOutput(s, b).income < o.income);

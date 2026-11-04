@@ -116,7 +116,7 @@ export function ai(s, side = 1) {
       let placed = false,
         hasSite = false;
       const xs = [-110, -55, 55, 110, -165, 0, 165],
-        zs = [-80, -10, 90, 20, 190, 120, -180, -110, 290, 220];
+        zs = [-80, -10, 90, 20, 190, 120, -180, -110, 290, 220, -210, -280, 320, 390];
       for (const dz of zs) {
         for (const dx of xs) {
           const x = hq.x + dx,
@@ -142,9 +142,18 @@ export function ai(s, side = 1) {
             [-200, -45, -200, -245],
             [-200, -145, 200, -145],
             [-200, 255, 200, 255],
+            // Cheap buildings fill a city faster: outer blocks for a larger town.
+            [200, -245, 200, 255],
+            [-200, -245, 200, -245],
+            [-200, 255, -200, 355],
+            [-200, 355, 200, 355],
+            [-200, -245, -200, -345],
+            [-200, -345, 200, -345],
           ],
           index = memory.roadPlan || 0;
-        if (index < plans.length) {
+        // A full city still joins its villages instead of waiting for a lot forever.
+        if (index >= plans.length) settlementRoadPlan(s, side);
+        else {
           const [ax, az, bx, bz] = plans[index],
             r = buildRoad(s, side, hq.x + ax, hq.z + az, hq.x + bx, hq.z + bz);
           // A street blocked by a well or another building is skipped, not retried forever.

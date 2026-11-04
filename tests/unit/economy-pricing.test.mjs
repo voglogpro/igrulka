@@ -22,8 +22,8 @@ test('building groups sum sequential per-item rounded prices and cap after the f
   const s = fresh(),
     before = JSON.stringify(s);
   const group = purchaseQuote(s, 0, 'building', 'housing', 5);
-  assert.equal(group.cost, 2100);
-  assert.equal(group.metal, 91);
+  assert.equal(group.cost, 1251);
+  assert.equal(group.metal, 56);
   assert.deepEqual([group.factor, group.lastFactor, group.nextFactor], [0.5, 1.5, 1.5]);
   assert.equal(JSON.stringify(s), before, 'previews must not mutate purchase history');
   const totals = { cost: 0, metal: 0 };
