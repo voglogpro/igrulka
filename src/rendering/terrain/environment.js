@@ -182,6 +182,78 @@ export function terrain() {
   this.foam.renderOrder = 2;
   this.scene.add(this.foam);
   this.island();
+  this.rivers();
+}
+
+// The two rivers: a water ribbon along each channel whose ripples drift toward the sea, and the
+// bridges where roads and troops cross.
+export function rivers() {
+  this.riverNormals = rippleTexture();
+  this.riverNormals.repeat.set(2, 1);
+  const material = new T.MeshStandardMaterial({
+    color: '#2f5a62',
+    metalness: 0.3,
+    roughness: 0.15,
+    normalMap: this.riverNormals,
+    normalScale: new T.Vector2(0.5, 0.5),
+    transparent: true,
+    opacity: 0.93,
+  });
+  const end = E.riverEnd(),
+    step = 16;
+  for (const sign of [-1, 1]) {
+    const verts = [],
+      uvs = [],
+      index = [];
+    let n = 0;
+    for (let a = E.RIVER.mouth - 140; a <= end; a += step, n++) {
+      const z = sign * a,
+        c = E.riverCenter(z),
+        half = E.RIVER.halfWidth + 26;
+      verts.push(c - half, WATER_LEVEL, z, c + half, WATER_LEVEL, z);
+      uvs.push(0, a / 70, 1, a / 70);
+      if (n) index.push((n - 1) * 2, n * 2, (n - 1) * 2 + 1, (n - 1) * 2 + 1, n * 2, n * 2 + 1);
+    }
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(index);
+    geo.computeVertexNormals();
+    const water = new T.Mesh(geo, material);
+    water.material.side = T.DoubleSide;
+    water.receiveShadow = true;
+    water.renderOrder = 1;
+    this.scene.add(water);
+  }
+  // Bridges: the corridor crossing is one wide deck on a grid of piers; the others are spans.
+  const group = new T.Group();
+  for (const sign of [-1, 1])
+    for (const b of E.RIVER_BRIDGES) {
+      const wide = b.half > 60,
+        length = wide ? b.half * 2 : 16;
+      for (let along = -length / 2; along < length / 2 - 1; along += wide ? 30 : length) {
+        const piece = wide ? Math.min(30, length / 2 - along) : length,
+          z = sign * (b.z + along + piece / 2),
+          c = E.riverCenter(z),
+          span = (E.RIVER.halfWidth + (wide ? 70 : 30)) * 2,
+          deck = 0.9;
+        this.box(group, c, deck - 0.6, z, span, 0.8, piece + 0.2, '#77736a');
+        for (const x of [-span / 3, 0, span / 3])
+          this.box(group, c + x, WATER_LEVEL - 3, z, 3, deck + 3, Math.min(10, piece), '#6c685e');
+        if (!wide)
+          for (const side of [-1, 1])
+            this.box(group, c, deck, z + side * 7.6, span, 1.2, 0.5, '#9a958a');
+      }
+      if (wide)
+        for (const end of [-1, 1]) {
+          const z = sign * (b.z + (end * length) / 2),
+            c = E.riverCenter(z),
+            span = (E.RIVER.halfWidth + 70) * 2;
+          this.box(group, c, 0.9, z, span, 1.4, 0.6, '#9a958a');
+        }
+    }
+  batchStatic(group);
+  this.scene.add(group);
 }
 
 // Lighthouse, quay and warehouses of the neutral trading harbour.
@@ -319,11 +391,14 @@ export function environment() {
     this.trees.push(...k.records);
   }
   // Layered distant hills give the valley a horizon without hiding the battlefield.
-  for (let i = 0; i < 40; i++) {
-    const a = (i / 40) * Math.PI * 2,
-      r = 3900 + (i % 3) * 120;
+  // They stand on an ellipse beyond the map edge, so a larger map never puts them on the field.
+  for (let i = 0; i < 48; i++) {
+    const a = (i / 48) * Math.PI * 2,
+      grow = 1 + (i % 3) * 0.04,
+      rx = (E.MAP.width / 2 + 1100) * grow,
+      rz = (E.MAP.depth / 2 + 1100) * grow;
     const m = new T.Mesh(this.sphereGeo, this.mat(i % 2 ? '#3b4c4b' : '#455351'));
-    m.position.set(Math.cos(a) * r, 20, Math.sin(a) * r);
+    m.position.set(Math.cos(a) * rx, 20, Math.sin(a) * rz);
     m.scale.set(260 + (i % 4) * 60, 110 + (i % 5) * 30, 280);
     this.scene.add(m);
   }

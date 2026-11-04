@@ -11,6 +11,10 @@
   присутствия команд используйте `teamCount`, `opposedPresence`, `contestedPresence`.
 - Корабли не появляются сами: `buyShip` (`city/naval.js`, классы — `city/ships.config.js`).
   Пулемёты эсминца стреляют настоящими пулями только по семейству `drone`.
+- Реки (`RIVER`, `riverCenter`, `riverChannelDistance` в `game/map.js`) входят в `seaDistance`,
+  но не в `walkWaterDistance`: войска их переходят вброд, дороги — мостом. Генерация рельефа
+  использует `baseSeaDistance`, чтобы не сдвинуть прежние холмы. Корабли — через `waterPath`.
+- Города режимов `war`/`ffa` — в углах `FAR_HQ`; прежние режимы сохраняют свои позиции.
 - Бомбардировщик (`bomber`, семейство `drone`) сбрасывает падающие `s.bombs` и садится на свою
   площадку; это не ракета и не ПВО.
 

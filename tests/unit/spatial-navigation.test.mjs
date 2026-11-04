@@ -6,7 +6,7 @@ import { dirtyNetwork } from '../../src/game/city/road-network.js';
 
 function linear(s, x, z, radius, ignore = null) {
   if (Math.abs(x) > E.FIELD.x || Math.abs(z) > E.FIELD.z) return false;
-  if (E.riverDistance(x, z) < 77 + radius) return false;
+  if (E.walkWaterDistance(x, z) < 77 + radius) return false;
   if (
     activeSettlementFootprints(s).some(
       (b) => Math.abs(x - b.x) < b.r + radius && Math.abs(z - b.z) < b.r + radius,

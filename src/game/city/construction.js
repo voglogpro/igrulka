@@ -51,7 +51,7 @@ export function physicalPlacement(s, key, x, z, owner = 0) {
   const shore = seaDistance(x, z);
   if (SHORE.has(key)) {
     // A port stands on the waterline: its quay reaches into the sea, its yard stays on land.
-    if (shore < 8 || shore > 34) return 'Строится у самой воды, на берегу моря';
+    if (shore < 8 || shore > 34) return 'Строится у самой воды: на берегу моря или реки';
   } else if (riverDistance(x, z) < MAP.riverWidth + d.size * 0.65 + 26)
     return 'Нужна сухая ровная земля';
   if (key === 'oilwell' && !oilFieldAt(x, z))

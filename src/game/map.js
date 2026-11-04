@@ -89,6 +89,10 @@ export const V23_HQ_X = expandV23X(LEGACY_HQ_X);
 export const HQ_X = 1975;
 // Co-op and two-bot cities stand north and south of the bank; their latitude is unchanged.
 export const HQ_Z = 1015;
+// 8.17 'war' and free-for-all: the four cities stand in the far corners of the map, as far
+// apart as the field allows.
+export const FAR_HQ = Object.freeze({ x: 2740, z: 2340 });
+const farCore = (x, z) => Math.hypot(Math.abs(x) - FAR_HQ.x, Math.abs(z) - FAR_HQ.z);
 export const DISTRICT_X = expandV23X(460);
 // The neutral trading island in the middle of the sea. In the rules it is open water: armies
 // cannot walk or build there, but merchant ships of both cities tie up at its quays.
@@ -126,6 +130,7 @@ export const OIL_FIELDS = V22_OIL_FIELDS.map((f) => ({ ...f, x: expandV23X(f.x) 
 // 8.17 frontier fields behind every city and on the far northern and southern plains, one set per
 // quadrant so every city position has the same reach. Existing field IDs are unchanged.
 const FRONTIER_OIL = [
+  [2300, 2020],
   [2700, 520],
   [2700, 1520],
   [1450, 2450],
@@ -156,12 +161,70 @@ function legacySeaDistance(x, z) {
 }
 // The coast moved intact with the banks, and the stretched band lies in open water or across the
 // flat northern/southern shores, so the legacy measure stays a metric distance near the shore.
-export const seaDistance = (x, z) => legacySeaDistance(compressV23X(x), z);
+// The sea alone, as every map before 8.17 knew it; seeded hills and woods are placed against it.
+const baseSeaDistance = (x, z) => legacySeaDistance(compressV23X(x), z);
+
+// 8.17 rivers: one flows from the northern map edge and one from the southern edge into the
+// inland sea along its long axis. Ships sail up them; ground troops cross only on bridges.
+export const RIVER = Object.freeze({ mouth: 1000, halfWidth: 34, bridgeReach: 60 });
+// Crossings by distance from the centre line; the widest one carries the land corridor.
+export const RIVER_BRIDGES = Object.freeze([
+  Object.freeze({ z: 1365, half: 95 }),
+  Object.freeze({ z: 1900, half: 45 }),
+  Object.freeze({ z: 2300, half: 45 }),
+  Object.freeze({ z: 2650, half: 45 }),
+]);
+export const riverEnd = () => MAP.depth / 2 + 300;
+// Centre line of the river on the half of the map with sign(z).
+export const riverCenter = (z) =>
+  riverX(z) + Math.sin(Math.abs(z) / 230) * 55 * Math.min(1, (Math.abs(z) - RIVER.mouth) / 300);
+// The channel widens a little toward the mouth.
+const riverHalf = (z) => RIVER.halfWidth + 10 * Math.max(0, 1 - (Math.abs(z) - RIVER.mouth) / 600);
+export function riverChannelDistance(x, z) {
+  // The mouth lies inside the sea, so the channel simply starts there; negative over water.
+  if (Math.abs(z) < RIVER.mouth) return Infinity;
+  return Math.abs(x - riverCenter(z)) - riverHalf(z);
+}
+export const seaDistance = (x, z) => Math.min(baseSeaDistance(x, z), riverChannelDistance(x, z));
+// A bridge deck: ground troops and roads cross the river here, ships pass underneath.
+export function onBridge(x, z) {
+  const a = Math.abs(z);
+  for (const b of RIVER_BRIDGES)
+    if (
+      Math.abs(a - b.z) < b.half &&
+      Math.abs(x - riverCenter(z)) < RIVER.halfWidth + RIVER.bridgeReach + 40
+    )
+      return true;
+  return false;
+}
 
 // Compatibility measure used by placement and movement rules since the river map: values below
 // MAP.riverWidth mean water, and every metre further from the shore adds one.
 export const riverDistance = (x, z) => Math.max(0, seaDistance(x, z) + MAP.riverWidth);
 export const isWater = (x, z) => seaDistance(x, z) < 0;
+// Water as ground movement and roads see it: troops ford the rivers and roads bridge them, so
+// only the sea blocks the land; buildings still keep out of the river channels.
+export const walkWaterDistance = (x, z) => Math.max(0, baseSeaDistance(x, z) + MAP.riverWidth);
+export { baseSeaDistance };
+
+// A water route between two points: along the river channel to its mouth, across the open sea,
+// and up the other river if the goal lies on one. Points are in navigable water.
+const inRiver = (p) => Math.abs(p.z) >= RIVER.mouth && riverChannelDistance(p.x, p.z) < 20;
+function riverLeg(p, toMouth) {
+  const sign = Math.sign(p.z) || 1,
+    points = [];
+  for (let a = Math.abs(p.z); a > RIVER.mouth - 60; a -= 60)
+    points.push({ x: riverCenter(sign * a), z: sign * a });
+  points.push({ x: riverCenter(sign * (RIVER.mouth - 80)), z: sign * (RIVER.mouth - 80) });
+  return toMouth ? points : points.reverse();
+}
+export function waterPath(from, to) {
+  const path = [];
+  if (inRiver(from)) path.push(...riverLeg(from, true));
+  if (inRiver(to)) path.push(...riverLeg(to, false));
+  path.push({ x: to.x, z: to.z });
+  return path;
+}
 
 function lcg(seed) {
   let s = seed;
@@ -212,7 +275,7 @@ let LEGACY_HILLS;
       z = (extra() - 0.5) * (V23_MAP.depth - 120),
       r = 45 + extra() * 70,
       h = 4 + extra() * 9;
-    if (!newGround(x, z, r * 0.5) || seaDistance(x, z) < r + 30 || flatCore(x, z, 420 + r))
+    if (!newGround(x, z, r * 0.5) || baseSeaDistance(x, z) < r + 30 || flatCore(x, z, 420 + r))
       continue;
     HILLS.push({ x, z, r, h }, { x: -x, z: -z, r, h });
     added += 2;
@@ -229,6 +292,7 @@ let LEGACY_HILLS;
       !frontierGround(x, z, r * 0.5) ||
       seaDistance(x, z) < r + 40 ||
       flatCore(x, z, 480 + r) ||
+      farCore(x, z) < 520 + r ||
       FRONTIER_OIL.some((f) => Math.hypot(Math.abs(x) - f[0], Math.abs(z) - f[1]) < r * 2 + 60)
     )
       continue;
@@ -281,7 +345,11 @@ for (let row = 0; row < H_ROWS; row++)
       z = H_OZ + row * H_CELL,
       i = row * H_COLS + col,
       shore = Math.min(1, Math.max(0, seaDistance(x, z) / 60)),
-      core = Math.min(1, Math.max(0, (coreDistance(x, z) - 330) / 80)),
+      core = Math.min(
+        1,
+        Math.max(0, (coreDistance(x, z) - 330) / 80),
+        Math.max(0, (farCore(x, z) - 380) / 80),
+      ),
       // District sites and oil fields sit on level ground.
       site = Math.min(
         1,
@@ -327,6 +395,7 @@ export function terrainClear(ax, az, ay, bx, bz, by) {
 
 // Forests and thickets: concealment and soft cover for infantry, mirrored like the hills.
 // `belt` marks a narrow tree line (lesopolosa): a chain of small patches along a field edge.
+
 export const COVER_PATCHES = [];
 {
   const rnd = lcg(81273);
@@ -354,7 +423,7 @@ export const COVER_PATCHES = [];
     COVER_PATCHES.push({ x: expandV23X(x), z, r, forest }, { x: -expandV23X(x), z: -z, r, forest });
   }
   const clear = (x, z, r) =>
-    seaDistance(x, z) >= r + 40 &&
+    baseSeaDistance(x, z) >= r + 40 &&
     !flatCore(x, z, 420 + r) &&
     inField(x, z, r + 10) &&
     !OIL_FIELDS.some((f) => Math.hypot(x - f.x, z - f.z) < r + 45) &&
@@ -385,7 +454,12 @@ export const COVER_PATCHES = [];
         [-1, -1],
         [1, -1],
         [-1, 1],
-      ].some(([sx, sz]) => !clear(sx * x, sz * z, r))
+      ].some(
+        ([sx, sz]) =>
+          !clear(sx * x, sz * z, r) ||
+          riverChannelDistance(sx * x, sz * z) < r + 60 ||
+          farCore(sx * x, sz * z) < 460 + r,
+      )
     )
       continue;
     for (const [sx, sz] of [
@@ -425,4 +499,10 @@ export const COVER_PATCHES = [];
   for (let i = COVER_PATCHES.length - 1; i >= 0; i--)
     if (newCore(COVER_PATCHES[i]) < 380 + COVER_PATCHES[i].r) COVER_PATCHES.splice(i, 1);
   belt(-160, -1600, 160, -1600, []);
+}
+
+// 8.17 rivers run through the corridor fields: no wood stands in a river channel.
+for (let i = COVER_PATCHES.length - 1; i >= 0; i--) {
+  const p = COVER_PATCHES[i];
+  if (riverChannelDistance(p.x, p.z) < p.r + 12) COVER_PATCHES.splice(i, 1);
 }

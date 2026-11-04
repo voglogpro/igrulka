@@ -1,4 +1,4 @@
-import { VERSION, HQ_X, WEAPONS } from './config.js';
+import { VERSION, HQ_X, FAR_HQ, WEAPONS } from './config.js';
 import { HQ_Z } from './map.js';
 import { campRoads } from './city/roads.js';
 import { log } from './shared/events.js';
@@ -49,13 +49,15 @@ export function createGame(
     aiGroundReserve: { amount: 0, nextAt: 0 },
   });
   const site = (side) =>
-    count === 4
-      ? { x: side % 2 ? HQ_X : -HQ_X, z: side < 2 ? -HQ_Z : HQ_Z }
-      : count === 3
-        ? side
-          ? { x: HQ_X, z: side === 1 ? -HQ_Z : HQ_Z }
-          : { x: -HQ_X, z: 0 }
-        : { x: side ? HQ_X : -HQ_X, z: 0 };
+    mode === 'war' || mode === 'ffa'
+      ? { x: side % 2 ? FAR_HQ.x : -FAR_HQ.x, z: side < 2 ? -FAR_HQ.z : FAR_HQ.z }
+      : count === 4
+        ? { x: side % 2 ? HQ_X : -HQ_X, z: side < 2 ? -HQ_Z : HQ_Z }
+        : count === 3
+          ? side
+            ? { x: HQ_X, z: side === 1 ? -HQ_Z : HQ_Z }
+            : { x: -HQ_X, z: 0 }
+          : { x: side ? HQ_X : -HQ_X, z: 0 };
   const s = {
     version: VERSION,
     ...(mode ? { mode } : {}),

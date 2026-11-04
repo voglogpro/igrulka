@@ -1,4 +1,12 @@
-import { BUILDINGS, ISLAND, seaDistance } from '../config.js';
+import {
+  BUILDINGS,
+  ISLAND,
+  seaDistance,
+  baseSeaDistance,
+  waterPath,
+  riverCenter,
+  riverChannelDistance,
+} from '../config.js';
 import { event } from '../shared/events.js';
 import { supplyFactor } from './economy.js';
 import { oilStorage } from './oil.js';
@@ -13,8 +21,10 @@ const live = (b) => b.hp > 0 && b.progress >= 1 && !b.demolished;
 export function berthOf(b) {
   let x = b.x,
     z = b.z;
-  const dx = ISLAND.x - b.x,
-    dz = ISLAND.z - b.z,
+  // On a river bank the berth lies straight out toward the middle of the channel.
+  const river = riverChannelDistance(b.x, b.z) < baseSeaDistance(b.x, b.z);
+  const dx = river ? riverCenter(b.z) - b.x : ISLAND.x - b.x,
+    dz = river ? 0 : ISLAND.z - b.z,
     l = Math.hypot(dx, dz) || 1;
   for (let i = 0; i < 60 && seaDistance(x, z) > -26; i++) {
     x += (dx / l) * 4;
@@ -35,6 +45,9 @@ function route(b, outbound) {
     quay = quayOf(b),
     // Open water halfway, so ships swing wide of the shore.
     mid = { x: (berth.x + quay.x) / 2, z: (berth.z + quay.z) / 2 };
+  // A river port's ship follows the channel down to the sea and back up.
+  const river = waterPath(berth, quay);
+  if (river.length > 1) return outbound ? river : waterPath(quay, berth);
   return outbound ? [mid, quay] : [mid, berth];
 }
 

@@ -1,5 +1,5 @@
 import { ROAD_HP, dirtyNetwork, overlappingRoad, segmentDistance } from './road-network.js';
-import { riverDistance, BUILDINGS, FIELD, groundHeight } from '../config.js';
+import { walkWaterDistance as riverDistance, BUILDINGS, FIELD, groundHeight } from '../config.js';
 import { event } from '../shared/events.js';
 import { sideIds, validSide } from '../factions.js';
 import { activeSettlementFootprints } from '../territory/settlements.config.js';

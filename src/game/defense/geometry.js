@@ -1,5 +1,11 @@
 import { allied, frontDirection, frontIds } from '../factions.js';
-import { FRONT_FIELD_Z, SEA, COVER_PATCHES, riverDistance, seaDistance } from '../map.js';
+import {
+  FRONT_FIELD_Z,
+  SEA,
+  COVER_PATCHES,
+  walkWaterDistance as riverDistance,
+  baseSeaDistance as seaDistance,
+} from '../map.js';
 import { DISTRICTS } from '../territory/districts.config.js';
 import { FRONTLINE as C } from './config.js';
 

@@ -3,7 +3,7 @@ import {
   OIL_FIELDS,
   LEGACY_OIL_FIELDS,
   V22_OIL_FIELDS,
-  seaDistance,
+  baseSeaDistance as seaDistance,
   expandLegacyZ,
   expandLegacyX,
   expandV23X,

@@ -14,6 +14,7 @@ export {
   SEA,
   CORRIDORS,
   HQ_X,
+  FAR_HQ,
   ISLAND,
   OIL_FIELDS,
   HILLS,
@@ -23,6 +24,17 @@ export {
   isWater,
   groundHeight,
   terrainClear,
+  RIVER,
+  RIVER_BRIDGES,
+  riverCenter,
+  riverChannelDistance,
+  riverEnd,
+  onBridge,
+  walkWaterDistance,
+  baseSeaDistance,
+  waterPath,
+  V23_MAP,
+  FRONT_FIELD_Z,
 } from './map.js';
 export { dayPhase } from './clock.js';
 export function weaponStats(f, key) {

@@ -11,17 +11,17 @@ const hook = registerHooks({
     const result = next(url, context);
     if (!url.endsWith('/src/game/map.js')) return result;
     const source = String(result.source).replace(
-      'export const riverDistance =',
-      'const originalRiverDistance =',
+      'export const walkWaterDistance =',
+      'const originalWalkWaterDistance =',
     );
     assert.notEqual(source, String(result.source));
     return {
       ...result,
       source:
         source +
-        `\nexport const riverDistance = (...args) => {
+        `\nexport const walkWaterDistance = (...args) => {
           globalThis[Symbol.for('skyfront.navigation-terrain-test')].calls++;
-          return originalRiverDistance(...args);
+          return originalWalkWaterDistance(...args);
         };\n`,
     };
   },

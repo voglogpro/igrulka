@@ -220,7 +220,8 @@ test('ground navigation goes around the sea through a land corridor and avoids b
   const path = E.groundPath(s, { x: -1860, z: 0 }, { x: 1860, z: 0 }, 4);
   assert.ok(path.length > 20);
   assert.ok(path.every((p) => E.walkable(s, p.x, p.z, 4)));
-  assert.ok(path.every((p) => E.seaDistance(p.x, p.z) > 0));
+  // Rivers are fordable; only the sea itself blocks the march.
+  assert.ok(path.every((p) => E.baseSeaDistance(p.x, p.z) > 0));
   // The only dry crossing lies beyond the end of the sea.
   assert.ok(Math.max(...path.map((p) => Math.abs(p.z))) > E.SEA.halfZ);
   for (let i = 1; i < path.length; i++) {

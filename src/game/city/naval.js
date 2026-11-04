@@ -1,4 +1,12 @@
-import { BUILDINGS, ISLAND, seaDistance } from '../config.js';
+import {
+  BUILDINGS,
+  ISLAND,
+  seaDistance,
+  waterPath,
+  RIVER,
+  riverCenter,
+  riverChannelDistance,
+} from '../config.js';
 import { COMBAT } from '../combat/config.js';
 import { hostile, validSide } from '../factions.js';
 import { weaponFamily } from '../units/aviation/weapons.config.js';
@@ -28,6 +36,11 @@ export function navalStation(base) {
   const berth = berthOf(base),
     quay = quayOf(base),
     k = cfg().station;
+  // A river base sends its ship down to open water just off the river mouth.
+  if (Math.abs(berth.z) >= RIVER.mouth && riverChannelDistance(berth.x, berth.z) < 20) {
+    const z = Math.sign(berth.z) * (RIVER.mouth - 160);
+    return { x: riverCenter(z), z };
+  }
   return { x: berth.x + (quay.x - berth.x) * k, z: berth.z + (quay.z - berth.z) * k };
 }
 
@@ -83,8 +96,17 @@ export function damageWarships(s, x, z, at) {
   }
 }
 
-// Ships keep to open water: a leg that would cross the island is bent around it.
+// Ships keep to open water: rivers are followed along their channel, and a leg that would cross
+// the island is bent around it.
 function steer(ship, goal) {
+  const path = waterPath(ship, goal);
+  if (path.length > 1) {
+    const next = path.find((p) => Math.hypot(p.x - ship.x, p.z - ship.z) > 6) || path.at(-1);
+    if (next !== path.at(-1)) return next;
+  }
+  return steerIsland(ship, goal);
+}
+function steerIsland(ship, goal) {
   const dx = goal.x - ship.x,
     dz = goal.z - ship.z,
     l2 = dx * dx + dz * dz || 1,
@@ -386,7 +408,8 @@ export function updateWarships(s, dt) {
       (ship.state !== 'docked' ||
         loaded >= shipCfg(ship).magazine ||
         (!incoming && s.time - (ship.loadedAt || 0) >= c.loadWait));
-    const goal = sail ? navalStation(base) : berthOf(base),
+    const target = sail ? navalStation(base) : berthOf(base),
+      goal = steer(ship, target),
       dx = goal.x - ship.x,
       dz = goal.z - ship.z,
       l = Math.hypot(dx, dz),
@@ -394,7 +417,7 @@ export function updateWarships(s, dt) {
     if (l <= step) {
       ship.x = goal.x;
       ship.z = goal.z;
-      ship.state = sail ? 'station' : 'docked';
+      if (goal === target) ship.state = sail ? 'station' : 'docked';
       continue;
     }
     ship.yaw = Math.atan2(dx, dz);

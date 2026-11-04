@@ -7,6 +7,7 @@ import {
   makeCover as makeCoverForWorld,
   landmarks as landmarksForWorld,
   island as islandForWorld,
+  rivers as riversForWorld,
   clearTrees as clearTreesForWorld,
 } from './terrain/environment.js';
 import { syncTrenches as syncTrenchesForWorld } from './terrain/trenches.js';
@@ -440,6 +441,9 @@ export class RTSWorld {
   island(...args) {
     return islandForWorld.call(this, ...args);
   }
+  rivers(...args) {
+    return riversForWorld.call(this, ...args);
+  }
   updateDaylight(...args) {
     return updateDaylightForWorld.call(this, ...args);
   }
@@ -661,6 +665,8 @@ export class RTSWorld {
     this.combatFX.lead = this.simLead || 0;
     // Ripples drift with battle time, so they rest when the game is paused.
     this.waterNormals?.offset.set(this.battleTime * 0.004, this.battleTime * 0.009);
+    // River ripples drift downstream toward the sea.
+    this.riverNormals?.offset.set(Math.sin(this.battleTime * 0.3) * 0.01, -this.battleTime * 0.12);
     if (this.foam) this.foam.material.opacity = 0.05 + Math.sin(this.battleTime * 0.9) * 0.03;
     if (this.beacon)
       this.beacon.intensity =

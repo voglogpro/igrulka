@@ -1,4 +1,10 @@
-import { FIELD, BUILDINGS, GROUND_UNITS, riverDistance, CORRIDORS } from '../../config.js';
+import {
+  FIELD,
+  BUILDINGS,
+  GROUND_UNITS,
+  walkWaterDistance as riverDistance,
+  CORRIDORS,
+} from '../../config.js';
 import { activeSettlementFootprints } from '../../territory/settlements.config.js';
 import { frontDirection, frontIds } from '../../factions.js';
 import { GROUND_COMMAND_LIMIT } from './limits.js';

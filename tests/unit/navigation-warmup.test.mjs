@@ -12,12 +12,12 @@ const hook = registerHooks({
       ...result,
       source:
         String(result.source).replace(
-          'export const riverDistance =',
-          'const originalRiverDistance =',
+          'export const walkWaterDistance =',
+          'const originalWalkWaterDistance =',
         ) +
-        `\nexport const riverDistance = (...args) => {
+        `\nexport const walkWaterDistance = (...args) => {
           globalThis[Symbol.for('skyfront.navigation-warmup-test')].calls++;
-          return originalRiverDistance(...args);
+          return originalWalkWaterDistance(...args);
         };\n`,
     };
   },

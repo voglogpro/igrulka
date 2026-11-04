@@ -207,7 +207,7 @@ test('a queued march crosses the northern land corridor and continues on the far
   until(
     s,
     () => {
-      assert.ok(E.seaDistance(u.x, u.z) > 0, 'the march never wades into the sea');
+      assert.ok(E.baseSeaDistance(u.x, u.z) > 0, 'the march never wades into the sea');
       if (Math.abs(u.x) < 40) corridorSamples++;
       return !u.routeState;
     },
