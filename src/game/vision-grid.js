@@ -4,12 +4,17 @@ import { buildingConnected } from './city/road-network.js';
 // Compatibility API for the retired map fog. Radar remains an AA targeting aid;
 // concealment of individual infantry is handled separately in infantry/cover.js.
 export const VISION = { radar: 850 };
+// Cells keep the state-23 alignment (origin -2400/-2000) and extend over the 8.17 ground.
+const PAD = {
+  x: Math.ceil((MAP.width - 4800) / 80) * 40,
+  z: Math.ceil((MAP.depth - 4000) / 80) * 40,
+};
 export const GRID = {
   cell: 40,
-  cols: Math.ceil(MAP.width / 40),
-  rows: Math.ceil(MAP.depth / 40),
-  ox: -MAP.width / 2,
-  oz: -MAP.depth / 2,
+  cols: Math.ceil((4800 + PAD.x * 2) / 40),
+  rows: Math.ceil((4000 + PAD.z * 2) / 40),
+  ox: -2400 - PAD.x,
+  oz: -2000 - PAD.z,
 };
 
 // Radars that actually work: they need power from the connected grid.

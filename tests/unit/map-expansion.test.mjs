@@ -49,8 +49,8 @@ function oldCampaign() {
   return { s, well, moving, central };
 }
 
-test('expanded 4800x4000 map contains the 2240m sea and both wide land corridors span the field', () => {
-  assert.deepEqual([E.MAP.width, E.MAP.depth, SEA.halfZ * 2, SEA.halfX], [4800, 4000, 2240, 792]);
+test('expanded 6336x5536 map contains the 2240m sea and both wide land corridors span the field', () => {
+  assert.deepEqual([E.MAP.width, E.MAP.depth, SEA.halfZ * 2, SEA.halfX], [6336, 5536, 2240, 792]);
   assert.deepEqual(E.CORRIDORS, [-1360, 1360]);
   const s = E.createGame(117);
   for (const z of E.CORRIDORS) {
@@ -64,8 +64,9 @@ test('expanded 4800x4000 map contains the 2240m sea and both wide land corridors
 
 test('vision dimensions cover both corridors but points are open for both sides', () => {
   const s = E.createGame(117);
-  assert.equal(GRID.rows * GRID.cell, 4000);
-  assert.equal(GRID.cols * GRID.cell, 4800);
+  // The grid keeps its state-23 alignment and covers the whole 8.17 map.
+  assert.equal(GRID.ox % GRID.cell, -2400 % GRID.cell);
+  assert.ok(GRID.cols * GRID.cell >= E.MAP.width && GRID.rows * GRID.cell >= E.MAP.depth);
   for (const z of E.CORRIDORS) s.groundUnits.push(E.makeGround(s, 0, 'infantry', -20, z));
   for (const z of E.CORRIDORS) {
     assert.equal(fogVisible(s, 0, -20, z), true);

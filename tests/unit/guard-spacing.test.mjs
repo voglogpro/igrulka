@@ -52,8 +52,8 @@ function produce(key, count, setup = () => ({ x: -1860, z: -40 })) {
   }
   assert.equal(s.groundUnits.length, count);
   assert.equal(game.setArmyTarget(s, 0, key, 0), true);
-  // Even the last recruit must physically cross the expanded map to its corner post.
-  game.advance(s, 150);
+  // Even the last recruit must physically cross the expanded 8.17 map to its corner post.
+  game.advance(s, 420);
   assert.equal(b.armyQueue.length, 0);
   assert.equal(s.groundUnits.length, count);
   return { s, b, rally, units: s.groundUnits };

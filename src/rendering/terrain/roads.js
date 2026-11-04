@@ -86,9 +86,11 @@ export function road(r, network) {
           paint.renderOrder = 12;
         }
   }
-  if (!r.connectorTo && !damaged && length > 35 && !hillRoad(r, length)) {
-    this.cyl(root, width / 2 + 2, 0.7, 0, 0.18, 11, '#57655b');
-    this.box(root, width / 2 + 1, 11.6, 0, 2.4, 0.25, 1.2, '#ffdca1', {
+  if (!r.connectorTo && !damaged && length > 35) {
+    // On a hill the lamp stands on the ground at the middle of the segment.
+    const lift = hillRoad(r, length) ? heightAt(r, 0.5) : 0;
+    this.cyl(root, width / 2 + 2, 0.7 + lift, 0, 0.18, 11, '#57655b');
+    this.box(root, width / 2 + 1, 11.6 + lift, 0, 2.4, 0.25, 1.2, '#ffdca1', {
       emissive: '#ffbf6b',
       emissiveIntensity: 5,
     });
@@ -106,7 +108,7 @@ export function road(r, network) {
     }
     const pool = new T.Mesh(this.roadGlowGeometry, this.roadGlowMaterial);
     pool.rotation.x = -Math.PI / 2;
-    pool.position.set(width / 2, 0.74, 0);
+    pool.position.set(width / 2, 0.74 + lift, 0);
     root.add(pool);
   }
   this.scene.add(root);

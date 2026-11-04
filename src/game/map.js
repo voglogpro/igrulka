@@ -2,12 +2,18 @@ export const VERSION = 23;
 // A wide valley split by an inland sea. Two land corridors at the northern and southern ends are
 // the only ground routes between the opposing banks; aircraft cross the water.
 // State 23 widens the corridors (a deeper map) and moves the two banks further apart.
-export const MAP = { width: 4800, depth: 4000, riverWidth: 44 };
+// 8.17 adds 768 m of new ground on every side (a whole number of 24 m route cells, 64 m obstacle
+// cells and 8 m height cells), so every existing hill, wood, town and saved position stays put.
+export const MAP = { width: 6336, depth: 5536, riverWidth: 44 };
+// The map of states 23 before 8.17: its seeded outer fields are generated from these bounds.
+export const V23_MAP = { width: 4800, depth: 4000 };
 // The map before state 23. Its seeded hills, woods and coast are kept and carried over by
 // expandV23X, so old campaigns keep the same ground under their trenches and towns.
 export const LEGACY_MAP = { width: 4000, depth: 3200 };
 // The playable field inside the map edge: orders, routes and saved points must stay inside it.
 export const FIELD = { x: MAP.width / 2 - 16, z: MAP.depth / 2 - 16 };
+// Fortified corridor lines keep their state-23 span; the 8.17 far fields beyond are open flanks.
+export const FRONT_FIELD_Z = V23_MAP.depth / 2 - 16;
 const LEGACY_FIELD = { x: LEGACY_MAP.width / 2 - 16, z: LEGACY_MAP.depth / 2 - 16 };
 export const inField = (x, z, margin = 0) =>
   Math.abs(x) <= FIELD.x - margin && Math.abs(z) <= FIELD.z - margin;
@@ -117,6 +123,22 @@ const SETTLEMENT_SITES = [-1415, 1415].flatMap((z) =>
 const BELT_RADIUS = 12,
   BELT_SPACING = 20;
 export const OIL_FIELDS = V22_OIL_FIELDS.map((f) => ({ ...f, x: expandV23X(f.x) }));
+// 8.17 frontier fields behind every city and on the far northern and southern plains, one set per
+// quadrant so every city position has the same reach. Existing field IDs are unchanged.
+const FRONTIER_OIL = [
+  [2700, 520],
+  [2700, 1520],
+  [1450, 2450],
+  [500, 2550],
+];
+for (const [x, z] of FRONTIER_OIL)
+  for (const [sx, sz] of [
+    [-1, -1],
+    [1, 1],
+    [-1, 1],
+    [1, -1],
+  ])
+    OIL_FIELDS.push({ id: OIL_FIELDS.length + 1, x: sx * x, z: sz * z, r: 22 });
 
 // Gentle meander of the sea's long axis.
 export const riverX = (z) => (Math.sin(z / 190) * 42 + Math.sin(z / 470) * 25) * 0.5;
@@ -164,6 +186,10 @@ const newGround = (x, z, margin = 0) =>
   Math.abs(z) > LEGACY_MAP.depth / 2 + margin ||
   Math.abs(x) > expandV23X(LEGACY_MAP.width / 2) + margin;
 
+// Ground added by 8.17 beyond the state-23 map edge.
+const frontierGround = (x, z, margin = 0) =>
+  Math.abs(z) > V23_MAP.depth / 2 + margin || Math.abs(x) > V23_MAP.width / 2 + margin;
+
 // Hills are part of the rules: they block lines of sight, so the same heights drive the picture.
 export const HILLS = [];
 let LEGACY_HILLS;
@@ -182,14 +208,38 @@ let LEGACY_HILLS;
   // Low rolling ground on the new outer fields.
   const extra = lcg(23023);
   for (let i = 0, added = 0; i < 600 && added < 24; i++) {
-    const x = (extra() - 0.5) * (MAP.width - 120),
-      z = (extra() - 0.5) * (MAP.depth - 120),
+    const x = (extra() - 0.5) * (V23_MAP.width - 120),
+      z = (extra() - 0.5) * (V23_MAP.depth - 120),
       r = 45 + extra() * 70,
       h = 4 + extra() * 9;
     if (!newGround(x, z, r * 0.5) || seaDistance(x, z) < r + 30 || flatCore(x, z, 420 + r))
       continue;
     HILLS.push({ x, z, r, h }, { x: -x, z: -z, r, h });
     added += 2;
+  }
+  // 8.17 frontier: high ridges and hills on the new rear and far fields, symmetric for all cities.
+  const frontier = lcg(81700);
+  for (let i = 0, added = 0; i < 900 && added < 64; i++) {
+    const x = (frontier() - 0.5) * (MAP.width - 140),
+      z = (frontier() - 0.5) * (MAP.depth - 140),
+      ridge = frontier() < 0.3,
+      r = ridge ? 110 + frontier() * 90 : 50 + frontier() * 80,
+      h = ridge ? 16 + frontier() * 14 : 6 + frontier() * 12;
+    if (
+      !frontierGround(x, z, r * 0.5) ||
+      seaDistance(x, z) < r + 40 ||
+      flatCore(x, z, 480 + r) ||
+      FRONTIER_OIL.some((f) => Math.hypot(Math.abs(x) - f[0], Math.abs(z) - f[1]) < r * 2 + 60)
+    )
+      continue;
+    for (const [sx, sz] of [
+      [1, 1],
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+    ])
+      HILLS.push({ x: sx * x, z: sz * z, r, h });
+    added += 4;
   }
 }
 
@@ -313,13 +363,39 @@ export const COVER_PATCHES = [];
   // Woods on the new outer fields.
   const extra = lcg(42023);
   for (let i = 0, added = 0; i < 900 && added < 70; i++) {
-    const x = (extra() - 0.5) * (MAP.width - 140),
-      z = (extra() - 0.5) * (MAP.depth - 140),
+    const x = (extra() - 0.5) * (V23_MAP.width - 140),
+      z = (extra() - 0.5) * (V23_MAP.depth - 140),
       forest = extra() < 0.75,
       r = forest ? 24 + extra() * 30 : 12 + extra() * 12;
     if (!newGround(x, z, r) || !clear(x, z, r) || !clear(-x, -z, r)) continue;
     COVER_PATCHES.push({ x, z, r, forest }, { x: -x, z: -z, r, forest });
     added += 2;
+  }
+  // 8.17 frontier forests: large woods on the new rear and far fields, symmetric per quadrant.
+  const wilds = lcg(81701);
+  for (let i = 0, added = 0; i < 1400 && added < 120; i++) {
+    const x = (wilds() - 0.5) * (MAP.width - 140),
+      z = (wilds() - 0.5) * (MAP.depth - 140),
+      forest = wilds() < 0.8,
+      r = forest ? 28 + wilds() * 40 : 14 + wilds() * 12;
+    if (
+      !frontierGround(x, z, r) ||
+      [
+        [1, 1],
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+      ].some(([sx, sz]) => !clear(sx * x, sz * z, r))
+    )
+      continue;
+    for (const [sx, sz] of [
+      [1, 1],
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+    ])
+      COVER_PATCHES.push({ x: sx * x, z: sz * z, r, forest });
+    added += 4;
   }
   // Tree lines across the corridor fields. Lines along z face the enemy and make natural
   // defensive belts; lines along x are covered approaches for assault groups.

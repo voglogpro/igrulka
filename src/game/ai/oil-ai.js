@@ -8,7 +8,7 @@ import { SHIPS } from '../city/ships.config.js';
 
 // The bot's oil industry: wells on the fields nearest its city, a road to each of them, tank
 // farms for the stock and a port on its shore. Returns true when it spent this planning turn.
-const REACH = 760;
+const REACH = 900;
 
 function connect(s, side, x, z) {
   const near = nearestRoad(s, side, x, z, { connected: true });

@@ -1,5 +1,5 @@
 import { allied, frontDirection, frontIds } from '../factions.js';
-import { FIELD, SEA, COVER_PATCHES, riverDistance, seaDistance } from '../map.js';
+import { FRONT_FIELD_Z, SEA, COVER_PATCHES, riverDistance, seaDistance } from '../map.js';
 import { DISTRICTS } from '../territory/districts.config.js';
 import { FRONTLINE as C } from './config.js';
 
@@ -16,8 +16,8 @@ export function corridorGeometry(s, side, direction = frontDirection(s, side)) {
       ? district.x + direction * (district.radius + C.territoryAdvance)
       : -direction * C.homeLineX;
     let shore = SEA.halfZ - SEA.round;
-    while (shore < FIELD.z && seaDistance(x, sign * shore) < 0) shore += 2;
-    const edge = FIELD.z - C.edgeMargin;
+    while (shore < FRONT_FIELD_Z && seaDistance(x, sign * shore) < 0) shore += 2;
+    const edge = FRONT_FIELD_Z - C.edgeMargin;
     let inset = C.edgeCoverage;
     while (riverDistance(x, sign * (shore + inset)) < C.shoreClearance && inset < 80) inset += 2;
     const span = Math.max(0, edge - shore - inset - C.edgeCoverage);

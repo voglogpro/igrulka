@@ -114,7 +114,7 @@ export function terrain() {
   tex.repeat.set(16, 14);
   tex.colorSpace = T.SRGBColorSpace;
   tex.anisotropy = 8;
-  const geo = new T.PlaneGeometry(E.MAP.width + 3400, E.MAP.depth + 3200, 360, 310);
+  const geo = new T.PlaneGeometry(E.MAP.width + 3400, E.MAP.depth + 3200, 420, 370);
   geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position,
     colors = new Float32Array(p.count * 3),
@@ -303,7 +303,7 @@ export function environment() {
     }
   }
   // Scattered trees and groves on the open ground, thinned around the city cores.
-  for (let i = 0; i < 14000; i++) {
+  for (let i = 0; i < 18000; i++) {
     const x = (rnd() - 0.5) * (E.MAP.width + 2400),
       z = (rnd() - 0.5) * (E.MAP.depth + 2200),
       city = Math.min(Math.hypot(x + E.HQ_X, z), Math.hypot(x - E.HQ_X, z)),
